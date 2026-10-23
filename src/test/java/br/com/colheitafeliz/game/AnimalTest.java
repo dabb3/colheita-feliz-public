@@ -27,6 +27,50 @@ class AnimalTest {
         assertEquals(Animal.Status.HUNGRY, animal.collect(clock.instant().plus(hen.productionTime())).statusAt(clock.instant()));
     }
 
+    @Test void everyAnimalUnlocksAtItsLevelAndFitsItsPen() {
+        ManualClock clock = new ManualClock();
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
+        assertEquals(java.util.List.of("galinha", "pato", "ovelha", "vaca"),
+                game.animalTypes().stream().map(AnimalType::id).toList());
+        game.wallet().credit(100_000);
+        for (AnimalType type : game.animalTypes()) {
+            while (game.progress().level() < type.requiredLevel() - 1) game.progress().award(game.progress().xpToNext());
+            assertFalse(game.buyAnimal(type).success(), type.id() + " antes do nível");
+            game.progress().award(game.progress().xpToNext());
+            for (int i = 0; i < type.max(); i++) assertTrue(game.buyAnimal(type).success(), type.id());
+            assertFalse(game.buyAnimal(type).success(), type.id() + " além do limite");
+        }
+        int total = game.animalTypes().stream().mapToInt(AnimalType::max).sum();
+        assertEquals(total, game.barn().size());
+    }
+
+    @Test void collectMissionAppearsOnlyWithAnimalsAndPaysAfterTwoCollections() {
+        ManualClock clock = new ManualClock();
+        GameState game = levelThree(clock);
+        assertEquals(3, game.dailyMissions().missions().size());
+        AnimalType hen = game.animalType("galinha");
+        game.wallet().credit(2 * hen.price() + 2 * hen.feedPrice());
+        game.buyAnimal(hen);
+        game.buyAnimal(hen);
+        assertTrue(game.dailyMissions().missions().contains(DailyMissionBoard.COLLECT));
+        game.buyFeed(hen);
+        game.buyFeed(hen);
+        game.tendAnimal(0);
+        game.tendAnimal(1);
+        clock.advanceSeconds(hen.productionSeconds());
+        game.tendAnimal(0);
+        assertFalse(game.dailyMissions().completed(DailyMissionBoard.COLLECT));
+        int coins = game.wallet().coins();
+        assertTrue(game.tendAnimal(1).success());
+        assertTrue(game.dailyMissions().completed(DailyMissionBoard.COLLECT));
+        assertEquals(coins + DailyMissionBoard.COLLECT.coins(), game.wallet().coins());
+    }
+
+    @Test void everyAnimalPaysMoreThanItsFeed() {
+        for (AnimalType type : AnimalCatalogLoader.load())
+            assertTrue(type.productYield() * type.productPrice() > 3 * type.feedPrice(), type.id());
+    }
+
     @Test void buyingRespectsLevelCoinsAndPenSize() {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);

@@ -18,7 +18,7 @@ import java.time.ZonedDateTime;
 
 /** Janela das missões diárias: uma linha por missão, com barra de progresso e recompensas. */
 public final class MissionsWindow {
-    public static final float LEFT = 430, BOTTOM = 240, WIDTH = 740, HEIGHT = 420;
+    public static final float LEFT = 430, BOTTOM = 190, WIDTH = 740, HEIGHT = 520;
     private static final float BAR = 46, ROW_H = 104;
     private boolean open;
 
@@ -114,6 +114,7 @@ public final class MissionsWindow {
             case "sell" -> assets.coin;
             case "plow" -> assets.hoe;
             case "buy" -> assets.shop;
+            case "collect" -> assets.nestEggs;
             default -> assets.gift;
         };
     }

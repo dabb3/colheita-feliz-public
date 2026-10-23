@@ -278,6 +278,7 @@ public final class GameState {
         if (wallet.coins() < known.price()) return report(ActionResult.fail("Moedas insuficientes."));
         wallet.debit(known.price());
         barn.add(known);
+        dailyMissions.animalsAvailable(true);
         return report(ActionResult.ok("Comprou: " + known.name() + "! Dê ração no cercado para produzir."));
     }
 
@@ -526,6 +527,7 @@ public final class GameState {
                 snapshot.level(), snapshot.currentXp());
         game.land.restore(snapshot.unlockedPlotIds());
         game.tutorial.restore(snapshot.tutorialStep());
+        game.dailyMissions.animalsAvailable(snapshot.animals() != null && !snapshot.animals().isEmpty());
         game.dailyMissions.restore(snapshot.dailyMissionDay(), snapshot.dailyMissionProgress(),
                 snapshot.completedDailyMissions(), LocalDate.now(realClock));
         if (snapshot.unlockedCropIds() != null)
