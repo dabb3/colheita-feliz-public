@@ -13,7 +13,7 @@ public final class Tutorial {
             new Step("harvest", "Colha um nabo pronto", "Escolha a luvinha (7) e clique num nabo", 10, 5),
             new Step("sell", "Venda a colheita", "Abra o Depósito (V) e clique em Vender tudo", 10, 5),
             new Step("buy", "Compre uma semente", "Abra a Loja (B) e compre qualquer semente", 10, 5),
-            new Step("plow", "Are a terra", "Use a pá (2) na grama ou na planta morta", 10, 5),
+            new Step("plow", "Are a terra", "Use a pá (2) numa grama livre", 10, 5),
             new Step("plant", "Plante a semente", "Escolha o saco de sementes (3) e clique na terra arada", 10, 5),
             new Step("water", "Regue a plantação", "Use o regador (4) na terra seca", 20, 10)
     );

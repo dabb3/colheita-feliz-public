@@ -399,6 +399,8 @@ public final class Hud {
             if (tile.state() == TileState.GRASS) simpleTip(batch, skin, tileX, tileY, "Grama", "Use a pá (2) para arar");
             else if (tile.state() == TileState.DEAD)
                 simpleTip(batch, skin, tileX, tileY, tile.withered().name() + " morto", "Use a pá (2) para retirar");
+            else if (tile.state() == TileState.FALLOW)
+                simpleTip(batch, skin, tileX, tileY, "Terra seca", "Use a pá (2) para arar");
             else simpleTip(batch, skin, tileX, tileY, "Terra arada", "Escolha uma semente (3) e plante");
             return;
         }
@@ -441,7 +443,8 @@ public final class Hud {
         if (tile.insects() > 0) chips.add(new String[]{tile.insects() == 1 ? "VERME" : tile.insects() + " VERMES", "c62a20"});
         if (!crop.matureAt(now) && crop.dryAt(now)) chips.add(new String[]{crop.watered() ? "SECA" : "SEM ÁGUA", "b07a3a"});
         if (chips.isEmpty()) chips.add(new String[]{"SAUDÁVEL", "3a8a14"});
-        return chips.size() > 2 ? chips.subList(0, 2) : chips;
+        if (tile.fertilized()) chips.add(new String[]{"ADUBADA", "6a9a2a"});
+        return chips.size() > 3 ? chips.subList(0, 3) : chips;
     }
 
     /** Balão sobre o ninho: o que a galinha está fazendo e o que o clique faz. */

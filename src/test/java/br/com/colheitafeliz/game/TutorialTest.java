@@ -39,16 +39,16 @@ class TutorialTest {
         assertTrue(game.buySeed(turnip).success());
         assertEquals(3, game.tutorial().stepIndex());
         game.selectTool(Tool.HOE);
-        assertTrue(game.act(0, 0).success(), "a pá na planta morta conta como arar");
+        assertTrue(game.act(0, 2).success(), "arar a grama conclui o passo");
         assertEquals(4, game.tutorial().stepIndex());
         game.selectSeed(turnip);
-        assertTrue(game.act(0, 0).success());
+        assertTrue(game.act(0, 2).success());
         assertEquals(5, game.tutorial().stepIndex());
         for (DailyMissionBoard.Mission mission : game.dailyMissions().missions())
             assertEquals(0, game.dailyMissions().progress(mission), "missões não contam durante o tutorial");
 
         game.selectTool(Tool.WATER);
-        assertTrue(game.act(0, 0).success());
+        assertTrue(game.act(0, 2).success());
         assertFalse(game.tutorial().active());
         assertTrue(game.message().contains("Primeiros passos concluídos"));
         int rewards = 0;

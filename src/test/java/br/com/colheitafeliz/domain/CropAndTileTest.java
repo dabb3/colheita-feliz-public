@@ -47,8 +47,11 @@ class CropAndTileTest {
         assertNull(tile.crop());
         assertThrows(IllegalStateException.class, () -> tile.plant(corn, start.plusSeconds(3300)));
         tile.clearDead();
-        assertEquals(TileState.PLOWED, tile.state());
+        assertEquals(TileState.FALLOW, tile.state());
         assertNull(tile.withered());
+        assertThrows(IllegalStateException.class, () -> tile.plant(corn, start.plusSeconds(3400)));
+        tile.plow();
+        assertEquals(TileState.PLOWED, tile.state());
     }
 
     @Test void soilDriesAfterAThirdOfTheCycleAndDrySoilGrowsAtHalfSpeed() {

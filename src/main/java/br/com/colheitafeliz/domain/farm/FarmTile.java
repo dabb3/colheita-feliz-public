@@ -28,16 +28,18 @@ public final class FarmTile {
     public CropType withered() { return withered; }
     public boolean fertilized() { return fertilized; }
 
+    /** A pá ara a grama ou a terra seca que fica depois de retirar a planta morta. */
     public void plow() {
-        require(TileState.GRASS);
+        if (state != TileState.GRASS && state != TileState.FALLOW)
+            throw new IllegalStateException("Tile is " + state + ", expected GRASS or FALLOW");
         state = TileState.PLOWED;
     }
 
-    /** A pá retira a planta morta e deixa a terra arada para o próximo plantio. */
+    /** A pá retira a planta morta e deixa a terra seca, que precisa ser arada de novo antes de plantar. */
     public void clearDead() {
         require(TileState.DEAD);
         withered = null;
-        state = TileState.PLOWED;
+        state = TileState.FALLOW;
     }
 
     public void plant(CropType type, Instant now) {
