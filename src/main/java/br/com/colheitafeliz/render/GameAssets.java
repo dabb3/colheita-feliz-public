@@ -62,6 +62,10 @@ public final class GameAssets implements AutoCloseable {
     /** Pesticida (frasco vermelho): remove insetos. */
     public final Texture pesticide = load("classic/hud/pesticida-ui.png");
     public final Texture coin = load("classic/avatar-ui/moeda-comum.png");
+    public final Texture greenCoin = load("classic/avatar-ui/moeda-verde.png");
+    public final Texture bell = generated(HudIcons.bell());
+    public final Texture gear = generated(HudIcons.gear());
+    public final Texture clipboard = generated(HudIcons.clipboard());
     public final Texture star = load("classic/ui/icon_xp.png");
     public final Texture gift = load("classic/ui/icon_gift.png");
     public final Texture shop = load("classic/others-ui/icon-shop.png");
@@ -161,6 +165,14 @@ public final class GameAssets implements AutoCloseable {
         } else {
             texture = new Texture(Gdx.files.internal(path), true);
         }
+        texture.setFilter(Texture.TextureFilter.MipMapLinearLinear, Texture.TextureFilter.Linear);
+        textures.add(texture);
+        return texture;
+    }
+
+    private Texture generated(Pixmap pixels) {
+        Texture texture = new Texture(pixels, true);
+        pixels.dispose();
         texture.setFilter(Texture.TextureFilter.MipMapLinearLinear, Texture.TextureFilter.Linear);
         textures.add(texture);
         return texture;

@@ -58,11 +58,18 @@ public final class InputController extends InputAdapter {
             return true;
         }
         Hud.Shortcut shortcut = renderer.hud().shortcutHit(p.x, p.y);
+        if (renderer.hud().panelOpen() && shortcut != Hud.Shortcut.ALERTS && shortcut != Hud.Shortcut.SETTINGS) {
+            Hud.Setting setting = renderer.hud().panelClick(p.x, p.y);
+            if (setting != null) apply(setting);
+            return true;
+        }
         if (shortcut != null) {
             switch (shortcut) {
+                case ALERTS -> renderer.hud().toggleAlerts();
                 case MISSIONS -> renderer.missions().toggle();
                 case SHOP -> renderer.marketPanel().showShop();
                 case DEPOSIT -> renderer.marketPanel().showSell();
+                case SETTINGS -> renderer.hud().toggleSettings();
             }
             audio.play(Cue.PLOW);
             return true;
@@ -153,21 +160,35 @@ public final class InputController extends InputAdapter {
                 renderer.marketPanel().close();
                 renderer.missions().close();
                 renderer.hud().dismissBanner();
+                renderer.hud().closePanel();
             }
-            case Input.Keys.F3 -> renderer.toggleDebug();
-            case Input.Keys.M -> {
-                state.setMusicEnabled(!state.musicEnabled());
-                audio.applySettings();
-                save.run();
-            }
-            case Input.Keys.N -> {
-                state.setEffectsEnabled(!state.effectsEnabled());
-                save.run();
-            }
-            case Input.Keys.T -> session.clock().setSpeed(session.clock().speed() == 1 ? 60 : 1);
-            case Input.Keys.S -> save.run();
+            case Input.Keys.F3 -> apply(Hud.Setting.DEBUG);
+            case Input.Keys.M -> apply(Hud.Setting.MUSIC);
+            case Input.Keys.N -> apply(Hud.Setting.EFFECTS);
+            case Input.Keys.T -> apply(Hud.Setting.SPEED);
+            case Input.Keys.S -> apply(Hud.Setting.SAVE);
             default -> { return false; }
         }
         return true;
+    }
+
+    private void apply(Hud.Setting setting) {
+        switch (setting) {
+            case MUSIC -> {
+                session.state().setMusicEnabled(!session.state().musicEnabled());
+                audio.applySettings();
+                save.run();
+            }
+            case EFFECTS -> {
+                session.state().setEffectsEnabled(!session.state().effectsEnabled());
+                save.run();
+            }
+            case SPEED -> session.clock().setSpeed(session.clock().speed() == 1 ? 60 : 1);
+            case DEBUG -> renderer.toggleDebug();
+            case SAVE -> {
+                save.run();
+                renderer.hud().toast(null, "", "Jogo salvo.", Hud.ToastKind.NORMAL);
+            }
+        }
     }
 }

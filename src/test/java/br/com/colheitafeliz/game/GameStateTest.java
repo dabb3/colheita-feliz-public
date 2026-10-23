@@ -144,6 +144,28 @@ class GameStateTest {
         assertEquals(TileState.GRASS, game.farm().tile(0, 0).state());
     }
 
+    @Test void alertsListFarmProblemsAndDisappearWhenSolved() {
+        ManualClock clock = new ManualClock();
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
+        assertTrue(game.alerts().isEmpty());
+        CropType turnip = game.catalog().get("nabo");
+        game.buySeed(turnip);
+        game.selectTool(Tool.HOE);
+        game.act(0, 0);
+        game.selectSeed(turnip);
+        game.act(0, 0);
+        assertEquals(java.util.List.of(new GameState.Alert("Terra seca", "Nabo")), game.alerts());
+        game.selectTool(Tool.WATER);
+        game.act(0, 0);
+        assertTrue(game.alerts().isEmpty());
+        game.farm().tile(0, 0).checkInsects(game.now(), true);
+        assertEquals("Insetos", game.alerts().getFirst().title());
+        game.selectTool(Tool.PESTICIDE);
+        game.act(0, 0);
+        assertTrue(game.alerts().isEmpty());
+        assertEquals(0, game.greenCoins());
+    }
+
     @Test void plantingWithoutSeedIsRejectedAndLeavesSoilReady() {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);
