@@ -10,7 +10,10 @@ public record GameSnapshot(int coins, Map<String, Integer> seeds, Map<String, In
                            boolean musicEnabled, boolean effectsEnabled,
                            String dailyMissionDay, Map<String, Integer> dailyMissionProgress,
                            List<String> completedDailyMissions, List<Integer> unlockedPlotIds,
-                           Integer tutorialStep) {
+                           Integer tutorialStep, List<AnimalSnapshot> animals,
+                           Map<String, Integer> animalProducts, Map<String, Integer> feed) {
+    /** Um animal do cercado: o tipo e quando comeu pela última vez (nulo = com fome). */
+    public record AnimalSnapshot(String typeId, String fedAt) {}
     public record TileSnapshot(TileState state, String cropId, String plantedAt, String wateredAt,
                                String pest, String pestAt, String nextPestCheckAt,
                                String growthAnchorAt, long grownAtAnchorMillis,

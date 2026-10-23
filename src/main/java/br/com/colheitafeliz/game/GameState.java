@@ -1,5 +1,8 @@
 package br.com.colheitafeliz.game;
 
+import br.com.colheitafeliz.domain.animal.Animal;
+import br.com.colheitafeliz.domain.animal.AnimalType;
+import br.com.colheitafeliz.domain.animal.Barn;
 import br.com.colheitafeliz.domain.crop.Crop;
 import br.com.colheitafeliz.domain.crop.CropCatalog;
 import br.com.colheitafeliz.domain.crop.CropType;
@@ -43,6 +46,8 @@ public final class GameState {
     private final DailyMissionBoard dailyMissions;
     private final LandExpansion land = new LandExpansion();
     private final Tutorial tutorial = new Tutorial(true);
+    private final List<AnimalType> animalTypes = AnimalCatalogLoader.load();
+    private final Barn barn = new Barn();
     private final Set<String> unlockedIds = new HashSet<>();
     private Tool tool = Tool.HAND;
     private CropType seed;
@@ -52,6 +57,7 @@ public final class GameState {
     private boolean effectsEnabled = true;
     private int lastHarvestAmount;
     private int lastTreasureCoins;
+    private int lastCollected;
 
     public GameState(GameClock clock, CropCatalog catalog) {
         this(clock, catalog, ThreadLocalRandom.current()::nextInt);
@@ -88,6 +94,13 @@ public final class GameState {
     public DailyMissionBoard dailyMissions() { return dailyMissions; }
     public LandExpansion land() { return land; }
     public Tutorial tutorial() { return tutorial; }
+    public List<AnimalType> animalTypes() { return animalTypes; }
+    public Barn barn() { return barn; }
+
+    public AnimalType animalType(String id) {
+        for (AnimalType type : animalTypes) if (type.id().equals(id)) return type;
+        throw new IllegalArgumentException("Unknown animal: " + id);
+    }
     public Tool tool() { return tool; }
     public CropType seed() { return seed; }
     public String message() { return message; }
@@ -245,11 +258,95 @@ public final class GameState {
         return sellProduce(known, inventory.produce(known));
     }
 
-    /** Valor de todo o depósito pelos preços atuais. */
+    /** Valor de todo o depósito pelos preços atuais: colheitas e produtos de animais. */
     public int depositValue() {
         int total = 0;
         for (CropType crop : catalog.all()) total = Math.addExact(total, Math.multiplyExact(crop.salePrice(), inventory.produce(crop)));
+        for (AnimalType type : animalTypes)
+            total = Math.addExact(total, Math.multiplyExact(type.productPrice(), inventory.product(type.productId())));
         return total;
+    }
+
+    // ---------- animais ----------
+
+    public ActionResult buyAnimal(AnimalType type) {
+        AnimalType known = animalType(type.id());
+        if (progress.level() < known.requiredLevel())
+            return report(ActionResult.fail(known.name() + " libera no nível " + known.requiredLevel() + "."));
+        if (barn.full(known))
+            return report(ActionResult.fail("O cercado já tem " + known.max() + " " + known.name().toLowerCase() + "s."));
+        if (wallet.coins() < known.price()) return report(ActionResult.fail("Moedas insuficientes."));
+        wallet.debit(known.price());
+        barn.add(known);
+        return report(ActionResult.ok(known.name() + " comprada! Dê ração para ela produzir."));
+    }
+
+    public ActionResult buyFeed(AnimalType type) {
+        AnimalType known = animalType(type.id());
+        if (progress.level() < known.requiredLevel())
+            return report(ActionResult.fail("Ração de " + known.name().toLowerCase() + " libera no nível " + known.requiredLevel() + "."));
+        if (wallet.coins() < known.feedPrice()) return report(ActionResult.fail("Moedas insuficientes."));
+        wallet.debit(known.feedPrice());
+        inventory.addFeed(known.id(), 1);
+        return report(ActionResult.ok("+1 ração de " + known.name().toLowerCase() + " | -" + known.feedPrice() + " moedas"));
+    }
+
+    /** Clique num animal: coleta o produto pronto ou, com fome, dá uma ração. */
+    public ActionResult tendAnimal(int index) {
+        if (index < 0 || index >= barn.size()) return report(ActionResult.fail("Animal inválido."));
+        Instant now = clock.now();
+        Animal animal = barn.get(index);
+        AnimalType type = animal.type();
+        lastCollected = 0;
+        switch (animal.statusAt(now)) {
+            case READY -> {
+                barn.collect(index, now);
+                inventory.addProduct(type.productId(), type.productYield());
+                lastCollected = type.productYield();
+                ActionResult result = ActionResult.ok("+" + type.productYield() + " " + type.productName().toLowerCase()
+                        + "s no depósito. Dê ração de novo para produzir mais.");
+                String levelReward = awardXp(type.collectXp());
+                if (!levelReward.isEmpty()) result = ActionResult.ok(result.message() + " " + levelReward);
+                String missionReward = recordDailyMission("collect", 1);
+                if (!missionReward.isEmpty()) result = ActionResult.ok(result.message() + " " + missionReward);
+                return report(result);
+            }
+            case HUNGRY -> {
+                if (inventory.feed(type.id()) == 0)
+                    return report(ActionResult.fail("Sem ração de " + type.name().toLowerCase() + ". Compre na Loja, aba Animais."));
+                inventory.useFeed(type.id());
+                barn.feed(index, now);
+                return report(ActionResult.ok(type.name() + " alimentada. " + type.productName() + "s em "
+                        + formatDuration(type.productionTime()) + "."));
+            }
+            default -> {
+                return report(ActionResult.fail(type.name() + " ainda está produzindo: "
+                        + formatDuration(animal.remainingAt(now)) + "."));
+            }
+        }
+    }
+
+    public ActionResult sellProduct(AnimalType type, boolean all) {
+        AnimalType known = animalType(type.id());
+        int amount = all ? inventory.product(known.productId()) : Math.min(1, inventory.product(known.productId()));
+        if (amount == 0) return report(ActionResult.fail("Você não possui " + known.productName().toLowerCase() + "s."));
+        inventory.takeProduct(known.productId(), amount);
+        int total = Math.multiplyExact(known.productPrice(), amount);
+        wallet.credit(total);
+        ActionResult result = ActionResult.ok("Vendeu " + amount + "x " + known.productName() + " | +" + total + " moedas");
+        String missionReward = recordDailyMission("sell", total);
+        if (!missionReward.isEmpty()) result = ActionResult.ok(result.message() + " " + missionReward);
+        return report(result);
+    }
+
+    /** Unidades coletadas no último {@link #tendAnimal(int)} (0 se não houve coleta). */
+    public int lastCollected() { return lastCollected; }
+
+    static String formatDuration(java.time.Duration duration) {
+        long minutes = Math.max(1, (duration.toSeconds() + 59) / 60);
+        if (minutes < 60) return minutes + " min";
+        long hours = minutes / 60, rest = minutes % 60;
+        return rest == 0 ? hours + "h" : hours + "h" + String.format("%02d", rest);
     }
 
     /** Vende todos os produtos de todas as culturas de uma vez. */
@@ -260,6 +357,13 @@ public final class GameState {
             int amount = inventory.produce(crop);
             if (amount == 0) continue;
             market.sellProduce(crop, amount);
+            units += amount;
+        }
+        for (AnimalType type : animalTypes) {
+            int amount = inventory.product(type.productId());
+            if (amount == 0) continue;
+            inventory.takeProduct(type.productId(), amount);
+            wallet.credit(Math.multiplyExact(type.productPrice(), amount));
             units += amount;
         }
         if (units == 0) return report(ActionResult.fail("O depósito está vazio."));
@@ -398,7 +502,9 @@ public final class GameState {
                 tiles, seed.id(), tool, progress.level(), progress.currentXp(), unlocked,
                 musicEnabled, effectsEnabled, dailyMissions.day().toString(),
                 dailyMissions.progressSnapshot(), dailyMissions.completedSnapshot(), land.snapshot(),
-                tutorial.stepIndex());
+                tutorial.stepIndex(), barn.animals().stream().map(animal -> new GameSnapshot.AnimalSnapshot(
+                        animal.type().id(), animal.fedAt() == null ? null : animal.fedAt().toString())).toList(),
+                inventory.productSnapshot(), inventory.feedSnapshot());
     }
 
     public static GameState restore(GameClock clock, CropCatalog catalog, GameSnapshot snapshot) {
@@ -427,6 +533,14 @@ public final class GameState {
         for (String id : snapshot.seeds().keySet()) catalog.get(id);
         for (String id : snapshot.produce().keySet()) catalog.get(id);
         game.inventory.restore(snapshot.seeds(), snapshot.produce());
+        game.inventory.restoreAnimalItems(snapshot.animalProducts(), snapshot.feed());
+        if (snapshot.animals() != null) {
+            List<Animal> animals = new ArrayList<>();
+            for (GameSnapshot.AnimalSnapshot saved : snapshot.animals())
+                animals.add(new Animal(game.animalType(saved.typeId()),
+                        saved.fedAt() == null ? null : Instant.parse(saved.fedAt())));
+            game.barn.restore(animals);
+        }
         for (int i = 0; i < snapshot.tiles().size(); i++) {
             GameSnapshot.TileSnapshot tile = snapshot.tiles().get(i);
             boolean dead = tile.state() == TileState.DEAD;
