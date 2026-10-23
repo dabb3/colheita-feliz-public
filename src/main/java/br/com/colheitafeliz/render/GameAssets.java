@@ -47,11 +47,12 @@ public final class GameAssets implements AutoCloseable {
     public final Texture[] weeds = new Texture[4];
     /** Minhocas por quantidade: insects[0] = 1 minhoca ... insects[2] = 3. */
     public final Texture[] insects = new Texture[3];
-    public final Texture tileGrass = load("classic/terrain/grama-default.png");
-    public final Texture tilePlowed = load("classic/terrain/terra-arada.png");
-    public final Texture tileWet = load("classic/terrain/terra-molhada.png");
-    public final Texture tileDry = load("classic/terrain/terrain_dry.png");
-    public final Texture tileHighlight = load("classic/terrain/terrain_highlight.png");
+    private final Map<Texture, float[]> diamonds = new HashMap<>();
+    public final Texture tileGrass = ground("classic/terrain/grama-default.png");
+    public final Texture tilePlowed = ground("classic/terrain/terra-arada.png");
+    public final Texture tileWet = ground("classic/terrain/terra-molhada.png");
+    public final Texture tileDry = ground("classic/terrain/terrain_dry.png");
+    public final Texture tileHighlight = ground("classic/terrain/terrain_highlight.png");
     public final Texture cursor = load("classic/hud/cursor-ui.png");
     public final Texture hoe = load("classic/hud/pa-ui.png");
     public final Texture bag = load("classic/hud/saco-ui.png");
@@ -167,6 +168,17 @@ public final class GameAssets implements AutoCloseable {
         }
         texture.setFilter(Texture.TextureFilter.MipMapLinearLinear, Texture.TextureFilter.Linear);
         textures.add(texture);
+        return texture;
+    }
+
+    /** Vértices do losango da imagem de chão (ver {@link TileDiamond#corners}). */
+    public float[] diamond(Texture ground) { return diamonds.get(ground); }
+
+    private Texture ground(String path) {
+        Pixmap pixels = new Pixmap(Gdx.files.internal(path));
+        float[] corners = TileDiamond.corners(pixels.getWidth(), pixels.getHeight(), (x, y) -> pixels.getPixel(x, y) & 0xff);
+        Texture texture = generated(pixels);
+        diamonds.put(texture, corners);
         return texture;
     }
 

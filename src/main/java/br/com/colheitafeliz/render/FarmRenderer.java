@@ -34,7 +34,9 @@ import java.util.Set;
 /** Desenha a fazenda (cena, canteiros e seus estados) e orquestra o HUD, a toolbar e as janelas. */
 public final class FarmRenderer implements AutoCloseable {
     /** Tamanho de desenho dos tiles clássicos: o losango cobre a grade com uma leve sobreposição. */
-    private static final float TILE_W = 188, TILE_H = 86, TILE_TOP = 42;
+    /** Losango de cada canteiro na tela: a célula da grade com 8% de folga, para os canteiros se encostarem. */
+    private static final float TILE_W = IsoRenderer.TILE_WIDTH * 1.08f, TILE_H = IsoRenderer.TILE_HEIGHT * 1.08f;
+    private final float[] quad = new float[20];
 
     private final GameAssets assets;
     private final UiSkin skin = new UiSkin();
@@ -185,20 +187,35 @@ public final class FarmRenderer implements AutoCloseable {
                 Vector2 p = iso.gridToScreen(col, row);
                 boolean unlocked = state.land().isUnlocked(col, row);
                 Texture ground = !unlocked || tile.state() == TileState.GRASS ? assets.tileGrass
-                        : tile.state() == TileState.DEAD ? assets.tileDry
+                        : tile.state() == TileState.DEAD || tile.state() == TileState.FALLOW ? assets.tileDry
                         : tile.crop() == null ? assets.tilePlowed
                         : tile.crop().dryAt(now) && !tile.crop().matureAt(now) ? assets.tileDry : assets.tileWet;
                 if (!unlocked) batch.setColor(.70f, .78f, .62f, .72f);
-                batch.draw(ground, p.x - TILE_W / 2f, p.y + TILE_TOP - TILE_H, TILE_W, TILE_H);
+                drawDiamond(ground, p.x, p.y, TILE_W, TILE_H);
                 batch.setColor(Color.WHITE);
                 if (hovered != null && hovered.column() == col && hovered.row() == row) {
                     float pulse = .65f + .35f * MathUtils.sin(System.nanoTime() / 220_000_000f);
                     batch.setColor(1, 1, 1, pulse);
-                    batch.draw(assets.tileHighlight, p.x - TILE_W / 2f - 2, p.y + TILE_TOP - TILE_H - 1, TILE_W + 4, TILE_H + 2);
+                    drawDiamond(assets.tileHighlight, p.x, p.y, TILE_W + 4, TILE_H + 2);
                     batch.setColor(Color.WHITE);
                 }
             }
         }
+    }
+
+    /** Desenha a imagem de chão levando cada vértice do losango dela ao vértice da célula centrada em (cx, cy). */
+    private void drawDiamond(Texture ground, float cx, float cy, float width, float height) {
+        float[] uv = assets.diamond(ground);
+        float color = batch.getPackedColor();
+        float[][] xy = {{cx - width / 2f, cy}, {cx, cy - height / 2f}, {cx + width / 2f, cy}, {cx, cy + height / 2f}};
+        for (int i = 0; i < 4; i++) {
+            quad[i * 5] = xy[i][0];
+            quad[i * 5 + 1] = xy[i][1];
+            quad[i * 5 + 2] = color;
+            quad[i * 5 + 3] = uv[i * 2];
+            quad[i * 5 + 4] = uv[i * 2 + 1];
+        }
+        batch.draw(ground, quad, 0, quad.length);
     }
 
     private void drawPlants(GameState state, Instant now) {
@@ -231,7 +248,7 @@ public final class FarmRenderer implements AutoCloseable {
                 batch.setColor(Color.WHITE);
                 if (tile.insects() > 0) {
                     Texture worms = assets.insects[tile.insects() - 1];
-                    float ww = 70, wh = ww * worms.getHeight() / worms.getWidth();
+                    float ww = 46, wh = ww * worms.getHeight() / worms.getWidth();
                     float wiggle = MathUtils.sin(System.nanoTime() / 200_000_000f + col * 3) * 1.5f;
                     batch.draw(worms, p.x - ww / 2f - 4 + wiggle, p.y - 24, ww, wh);
                 }
