@@ -1,5 +1,8 @@
 package br.com.colheitafeliz.game;
 
+import br.com.colheitafeliz.domain.animal.Animal;
+import br.com.colheitafeliz.domain.animal.AnimalType;
+import br.com.colheitafeliz.domain.animal.Barn;
 import br.com.colheitafeliz.domain.crop.Crop;
 import br.com.colheitafeliz.domain.crop.CropCatalog;
 import br.com.colheitafeliz.domain.crop.CropType;
@@ -29,6 +32,9 @@ public final class GameState {
     public static final int STARTING_COINS = 100;
     /** Chance, em %, de achar um baú do tesouro ao arar grama. */
     public static final int TREASURE_CHANCE = 5;
+    /** Adubo: preço, nível para comprar e fração do ciclo que ele adianta. */
+    public static final int FERTILIZER_PRICE = 15, FERTILIZER_LEVEL = 2;
+    public static final double FERTILIZER_BOOST = .25;
 
     private final Farm farm = new Farm(COLUMNS, ROWS);
     private final Inventory inventory = new Inventory();
@@ -43,6 +49,8 @@ public final class GameState {
     private final DailyMissionBoard dailyMissions;
     private final LandExpansion land = new LandExpansion();
     private final Tutorial tutorial = new Tutorial(true);
+    private final List<AnimalType> animalTypes = AnimalCatalogLoader.load();
+    private final Barn barn = new Barn();
     private final Set<String> unlockedIds = new HashSet<>();
     private Tool tool = Tool.HAND;
     private CropType seed;
@@ -52,6 +60,7 @@ public final class GameState {
     private boolean effectsEnabled = true;
     private int lastHarvestAmount;
     private int lastTreasureCoins;
+    private int lastCollected;
 
     public GameState(GameClock clock, CropCatalog catalog) {
         this(clock, catalog, ThreadLocalRandom.current()::nextInt);
@@ -88,6 +97,13 @@ public final class GameState {
     public DailyMissionBoard dailyMissions() { return dailyMissions; }
     public LandExpansion land() { return land; }
     public Tutorial tutorial() { return tutorial; }
+    public List<AnimalType> animalTypes() { return animalTypes; }
+    public Barn barn() { return barn; }
+
+    public AnimalType animalType(String id) {
+        for (AnimalType type : animalTypes) if (type.id().equals(id)) return type;
+        throw new IllegalArgumentException("Unknown animal: " + id);
+    }
     public Tool tool() { return tool; }
     public CropType seed() { return seed; }
     public String message() { return message; }
@@ -163,6 +179,18 @@ public final class GameState {
                     result = ActionResult.fail("Não há ervas daninhas aqui. O herbicida é para ervas.");
                 else { tile.removePest(now); result = ActionResult.ok("Ervas removidas. Planta voltou a crescer."); }
             }
+            case FERTILIZER -> {
+                if (tile.state() != TileState.GROWING) result = ActionResult.fail("O adubo é para plantas em crescimento.");
+                else if (inventory.fertilizer() == 0) result = ActionResult.fail("Sem adubo. Compre na Loja.");
+                else if (!tile.crop().watered()) result = ActionResult.fail("Regue antes de adubar.");
+                else if (tile.fertilized()) result = ActionResult.fail("Esta planta já recebeu adubo.");
+                else {
+                    inventory.useFertilizer();
+                    tile.fertilize(now, FERTILIZER_BOOST);
+                    tile.refresh(now);
+                    result = ActionResult.ok("Adubo aplicado: a planta adiantou um quarto do ciclo.");
+                }
+            }
             case PESTICIDE -> {
                 if (tile.insects() == 0)
                     result = ActionResult.fail("Não há insetos aqui. O pesticida é para minhocas.");
@@ -190,6 +218,7 @@ public final class GameState {
                 case HAND -> harvested.harvestXp();
                 case WEEDER, PESTICIDE -> progress.rules().removePestXp();
                 case HOE -> cleared ? progress.rules().clearDeadXp() : 0;
+                case FERTILIZER -> 0;
             };
             String levelReward = awardXp(xp);
             if (!levelReward.isEmpty()) result = ActionResult.ok(result.message() + " " + levelReward);
@@ -200,6 +229,7 @@ public final class GameState {
                 case SEED -> "plant";
                 case WEEDER -> "weed";
                 case PESTICIDE -> "pesticide";
+                case FERTILIZER -> "fertilize";
             }, 1);
             if (!missionReward.isEmpty()) result = ActionResult.ok(result.message() + " " + missionReward);
         }
@@ -245,11 +275,105 @@ public final class GameState {
         return sellProduce(known, inventory.produce(known));
     }
 
-    /** Valor de todo o depósito pelos preços atuais. */
+    /** Valor de todo o depósito pelos preços atuais: colheitas e produtos de animais. */
     public int depositValue() {
         int total = 0;
         for (CropType crop : catalog.all()) total = Math.addExact(total, Math.multiplyExact(crop.salePrice(), inventory.produce(crop)));
+        for (AnimalType type : animalTypes)
+            total = Math.addExact(total, Math.multiplyExact(type.productPrice(), inventory.product(type.productId())));
         return total;
+    }
+
+    // ---------- animais ----------
+
+    public ActionResult buyAnimal(AnimalType type) {
+        AnimalType known = animalType(type.id());
+        if (progress.level() < known.requiredLevel())
+            return report(ActionResult.fail(known.name() + " libera no nível " + known.requiredLevel() + "."));
+        if (barn.full(known))
+            return report(ActionResult.fail("O cercado está cheio: cabem " + known.max() + " de " + known.name().toLowerCase() + "."));
+        if (wallet.coins() < known.price()) return report(ActionResult.fail("Moedas insuficientes."));
+        wallet.debit(known.price());
+        barn.add(known);
+        dailyMissions.animalsAvailable(true);
+        return report(ActionResult.ok("Comprou: " + known.name() + "! Dê ração no cercado para produzir."));
+    }
+
+    public ActionResult buyFertilizer() {
+        if (progress.level() < FERTILIZER_LEVEL)
+            return report(ActionResult.fail("O adubo libera no nível " + FERTILIZER_LEVEL + "."));
+        if (wallet.coins() < FERTILIZER_PRICE) return report(ActionResult.fail("Moedas insuficientes."));
+        wallet.debit(FERTILIZER_PRICE);
+        inventory.addFertilizer(1);
+        return report(ActionResult.ok("+1 adubo | -" + FERTILIZER_PRICE + " moedas"));
+    }
+
+    public ActionResult buyFeed(AnimalType type) {
+        AnimalType known = animalType(type.id());
+        if (progress.level() < known.requiredLevel())
+            return report(ActionResult.fail("Ração de " + known.name().toLowerCase() + " libera no nível " + known.requiredLevel() + "."));
+        if (wallet.coins() < known.feedPrice()) return report(ActionResult.fail("Moedas insuficientes."));
+        wallet.debit(known.feedPrice());
+        inventory.addFeed(known.id(), 1);
+        return report(ActionResult.ok("+1 ração de " + known.name().toLowerCase() + " | -" + known.feedPrice() + " moedas"));
+    }
+
+    /** Clique num animal: coleta o produto pronto ou, com fome, dá uma ração. */
+    public ActionResult tendAnimal(int index) {
+        if (index < 0 || index >= barn.size()) return report(ActionResult.fail("Animal inválido."));
+        Instant now = clock.now();
+        Animal animal = barn.get(index);
+        AnimalType type = animal.type();
+        lastCollected = 0;
+        switch (animal.statusAt(now)) {
+            case READY -> {
+                barn.collect(index, now);
+                inventory.addProduct(type.productId(), type.productYield());
+                lastCollected = type.productYield();
+                ActionResult result = ActionResult.ok("Coletou " + type.productYield() + "× " + type.productName()
+                        + ". Dê ração de novo para produzir mais.");
+                String levelReward = awardXp(type.collectXp());
+                if (!levelReward.isEmpty()) result = ActionResult.ok(result.message() + " " + levelReward);
+                String missionReward = recordDailyMission("collect", 1);
+                if (!missionReward.isEmpty()) result = ActionResult.ok(result.message() + " " + missionReward);
+                return report(result);
+            }
+            case HUNGRY -> {
+                if (inventory.feed(type.id()) == 0)
+                    return report(ActionResult.fail("Sem ração de " + type.name().toLowerCase() + ". Compre na Loja, aba Animais."));
+                inventory.useFeed(type.id());
+                barn.feed(index, now);
+                return report(ActionResult.ok(type.name() + " comeu a ração. " + type.productName() + " pronto em "
+                        + formatDuration(type.productionTime()) + "."));
+            }
+            default -> {
+                return report(ActionResult.fail(type.name() + " ainda está produzindo: "
+                        + formatDuration(animal.remainingAt(now)) + "."));
+            }
+        }
+    }
+
+    public ActionResult sellProduct(AnimalType type, boolean all) {
+        AnimalType known = animalType(type.id());
+        int amount = all ? inventory.product(known.productId()) : Math.min(1, inventory.product(known.productId()));
+        if (amount == 0) return report(ActionResult.fail("Você não possui " + known.productName().toLowerCase() + "."));
+        inventory.takeProduct(known.productId(), amount);
+        int total = Math.multiplyExact(known.productPrice(), amount);
+        wallet.credit(total);
+        ActionResult result = ActionResult.ok("Vendeu " + amount + "x " + known.productName() + " | +" + total + " moedas");
+        String missionReward = recordDailyMission("sell", total);
+        if (!missionReward.isEmpty()) result = ActionResult.ok(result.message() + " " + missionReward);
+        return report(result);
+    }
+
+    /** Unidades coletadas no último {@link #tendAnimal(int)} (0 se não houve coleta). */
+    public int lastCollected() { return lastCollected; }
+
+    static String formatDuration(java.time.Duration duration) {
+        long minutes = Math.max(1, (duration.toSeconds() + 59) / 60);
+        if (minutes < 60) return minutes + " min";
+        long hours = minutes / 60, rest = minutes % 60;
+        return rest == 0 ? hours + "h" : hours + "h" + String.format("%02d", rest);
     }
 
     /** Vende todos os produtos de todas as culturas de uma vez. */
@@ -260,6 +384,13 @@ public final class GameState {
             int amount = inventory.produce(crop);
             if (amount == 0) continue;
             market.sellProduce(crop, amount);
+            units += amount;
+        }
+        for (AnimalType type : animalTypes) {
+            int amount = inventory.product(type.productId());
+            if (amount == 0) continue;
+            inventory.takeProduct(type.productId(), amount);
+            wallet.credit(Math.multiplyExact(type.productPrice(), amount));
             units += amount;
         }
         if (units == 0) return report(ActionResult.fail("O depósito está vazio."));
@@ -391,14 +522,16 @@ public final class GameState {
                     tile.nextPestCheckAt() == null ? null : tile.nextPestCheckAt().toString(),
                     crop == null || crop.growthAnchorAt() == null ? null : crop.growthAnchorAt().toString(),
                     crop == null ? 0 : crop.grownAtAnchorMillis(), tile.insects(),
-                    tile.nextInsectCheckAt() == null ? null : tile.nextInsectCheckAt().toString()));
+                    tile.nextInsectCheckAt() == null ? null : tile.nextInsectCheckAt().toString(), tile.fertilized()));
         }
         List<String> unlocked = catalog.all().stream().filter(this::unlocked).map(CropType::id).toList();
         return new GameSnapshot(wallet.coins(), inventory.seedSnapshot(), inventory.produceSnapshot(),
                 tiles, seed.id(), tool, progress.level(), progress.currentXp(), unlocked,
                 musicEnabled, effectsEnabled, dailyMissions.day().toString(),
                 dailyMissions.progressSnapshot(), dailyMissions.completedSnapshot(), land.snapshot(),
-                tutorial.stepIndex());
+                tutorial.stepIndex(), barn.animals().stream().map(animal -> new GameSnapshot.AnimalSnapshot(
+                        animal.type().id(), animal.fedAt() == null ? null : animal.fedAt().toString())).toList(),
+                inventory.productSnapshot(), inventory.feedSnapshot(), inventory.fertilizer());
     }
 
     public static GameState restore(GameClock clock, CropCatalog catalog, GameSnapshot snapshot) {
@@ -420,6 +553,7 @@ public final class GameState {
                 snapshot.level(), snapshot.currentXp());
         game.land.restore(snapshot.unlockedPlotIds());
         game.tutorial.restore(snapshot.tutorialStep());
+        game.dailyMissions.animalsAvailable(snapshot.animals() != null && !snapshot.animals().isEmpty());
         game.dailyMissions.restore(snapshot.dailyMissionDay(), snapshot.dailyMissionProgress(),
                 snapshot.completedDailyMissions(), LocalDate.now(realClock));
         if (snapshot.unlockedCropIds() != null)
@@ -427,6 +561,15 @@ public final class GameState {
         for (String id : snapshot.seeds().keySet()) catalog.get(id);
         for (String id : snapshot.produce().keySet()) catalog.get(id);
         game.inventory.restore(snapshot.seeds(), snapshot.produce());
+        game.inventory.restoreAnimalItems(snapshot.animalProducts(), snapshot.feed());
+        game.inventory.restoreFertilizer(snapshot.fertilizer());
+        if (snapshot.animals() != null) {
+            List<Animal> animals = new ArrayList<>();
+            for (GameSnapshot.AnimalSnapshot saved : snapshot.animals())
+                animals.add(new Animal(game.animalType(saved.typeId()),
+                        saved.fedAt() == null ? null : Instant.parse(saved.fedAt())));
+            game.barn.restore(animals);
+        }
         for (int i = 0; i < snapshot.tiles().size(); i++) {
             GameSnapshot.TileSnapshot tile = snapshot.tiles().get(i);
             boolean dead = tile.state() == TileState.DEAD;
@@ -444,7 +587,7 @@ public final class GameState {
                     : Instant.parse(tile.nextInsectCheckAt());
             game.farm.tile(i % COLUMNS, i / COLUMNS).restore(tile.state(), crop,
                     tile.pest() == null ? PestState.NONE : PestState.valueOf(tile.pest()), next,
-                    tile.insects(), nextInsects, dead ? catalog.get(tile.cropId()) : null);
+                    tile.insects(), nextInsects, dead ? catalog.get(tile.cropId()) : null, tile.fertilized());
         }
         game.seed = catalog.get(snapshot.selectedSeedId());
         game.tool = Objects.requireNonNull(snapshot.tool());

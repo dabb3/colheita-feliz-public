@@ -19,10 +19,13 @@ public final class DailyMissionBoard {
             new Mission("plow", "plow", "Are 4 terrenos", 4, 25, 10),
             new Mission("buy", "buy", "Compre 3 sementes", 3, 25, 10)
     );
+    /** Missão extra do dia, só para quem tem animais: as três da rotação continuam as mesmas. */
+    public static final Mission COLLECT = new Mission("collect", "collect", "Colete 2 produtos de animais", 2, 40, 15);
 
     private LocalDate day;
     private final Map<String, Integer> progress = new HashMap<>();
     private final Set<String> completed = new HashSet<>();
+    private boolean animals;
 
     public DailyMissionBoard(LocalDate today) { day = today; }
 
@@ -33,10 +36,17 @@ public final class DailyMissionBoard {
         completed.clear();
     }
 
+    /** Liga a missão de coleta quando o jogador tem pelo menos um animal. */
+    public void animalsAvailable(boolean available) { animals = available; }
+
     public List<Mission> missions() {
         int start = Math.floorMod(day.toEpochDay(), ROTATION.size());
-        return List.of(ROTATION.get(start), ROTATION.get((start + 1) % ROTATION.size()),
+        List<Mission> today = List.of(ROTATION.get(start), ROTATION.get((start + 1) % ROTATION.size()),
                 ROTATION.get((start + 2) % ROTATION.size()));
+        if (!animals) return today;
+        List<Mission> withCollect = new ArrayList<>(today);
+        withCollect.add(COLLECT);
+        return List.copyOf(withCollect);
     }
 
     public List<Mission> record(String action, int amount, LocalDate today) {

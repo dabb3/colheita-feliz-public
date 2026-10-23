@@ -1,0 +1,10 @@
+[
+  {"id":"galinha", "name":"Galinha", "price":300, "requiredLevel":3, "feedPrice":20, "productionSeconds":14400,
+   "productId":"ovo", "productName":"Ovo", "productYield":3, "productPrice":45, "collectXp":20, "max":3},
+  {"id":"pato", "name":"Pato", "price":500, "requiredLevel":4, "feedPrice":25, "productionSeconds":21600,
+   "productId":"ovo_de_pata", "productName":"Ovo de pata", "productYield":2, "productPrice":90, "collectXp":30, "max":2},
+  {"id":"ovelha", "name":"Ovelha", "price":900, "requiredLevel":5, "feedPrice":40, "productionSeconds":28800,
+   "productId":"la", "productName":"Lã", "productYield":1, "productPrice":320, "collectXp":50, "max":2},
+  {"id":"vaca", "name":"Vaca", "price":1500, "requiredLevel":6, "feedPrice":60, "productionSeconds":43200,
+   "productId":"leite", "productName":"Leite", "productYield":2, "productPrice":360, "collectXp":80, "max":1}
+]

@@ -57,6 +57,12 @@ public record Crop(CropType type, Instant plantedAt, Instant wateredAt, Instant 
         return new Crop(type, plantedAt, wateredAt, null, now, grownMillisAt(now));
     }
 
+    /** Adianta o crescimento (adubo) sem mexer na água: o tempo seguinte segue as mesmas regras. */
+    public Crop advance(Instant now, long millis) {
+        if (!watered() || millis < 0) throw new IllegalStateException("Crop cannot be advanced");
+        return new Crop(type, plantedAt, wateredAt, pestAt, now, grownMillisAt(now) + millis);
+    }
+
     public long grownMillisAt(Instant now) {
         if (!watered()) return 0;
         long total = type.growthTime().toMillis();

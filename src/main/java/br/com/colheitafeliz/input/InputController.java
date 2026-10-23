@@ -73,6 +73,13 @@ public final class InputController extends InputAdapter {
             save.run();
             return true;
         }
+        int animal = renderer.animalAt(p.x, p.y);
+        if (animal >= 0) {
+            Snapshot before = new Snapshot(state);
+            ActionResult result = state.tendAnimal(animal);
+            show(result, state.lastCollected() > 0 ? Cue.HARVEST : Cue.PLANT, before, p.x, p.y + 40, null, 0);
+            return true;
+        }
         CropType seed = state.tool() == Tool.SEED ? renderer.toolbar().seedHit(p.x, p.y, state.catalog().all()) : null;
         if (seed != null) {
             ActionResult result = state.selectSeed(seed);
@@ -94,6 +101,7 @@ public final class InputController extends InputAdapter {
             case WATER -> Cue.WATER;
             case SEED -> Cue.PLANT;
             case WEEDER, PESTICIDE -> Cue.WEED;
+            case FERTILIZER -> Cue.PLANT;
         };
         Vector2 center = renderer.tileCenter(tile.column(), tile.row());
         boolean harvested = !lockedPlot && actionTool == Tool.HAND && result.success();
