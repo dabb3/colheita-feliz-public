@@ -1,0 +1,392 @@
+package br.com.colheitafeliz.ui;
+
+import br.com.colheitafeliz.domain.crop.Crop;
+import br.com.colheitafeliz.domain.crop.CropType;
+import br.com.colheitafeliz.domain.farm.FarmTile;
+import br.com.colheitafeliz.domain.farm.PestState;
+import br.com.colheitafeliz.domain.farm.TileState;
+import br.com.colheitafeliz.game.DailyMissionBoard;
+import br.com.colheitafeliz.game.GameState;
+import br.com.colheitafeliz.game.Tutorial;
+import br.com.colheitafeliz.game.LandExpansion;
+import br.com.colheitafeliz.render.GameAssets;
+import br.com.colheitafeliz.render.Palette;
+import br.com.colheitafeliz.render.UiSkin;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.NinePatch;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.math.Interpolation;
+import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.utils.Align;
+import java.time.Instant;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.Iterator;
+import java.util.List;
+
+/**
+ * Camada do HUD sobre a fazenda: cartão do perfil, ícones de atalho, avisos (toasts), números que sobem
+ * (floaters), banner de subir de nível e o balão de status do canteiro.
+ */
+public final class Hud {
+    public enum Shortcut { MISSIONS, SHOP, DEPOSIT }
+    public enum ToastKind { NORMAL, REWARD, ALERT }
+    public enum FloaterStyle { COIN, XP, ITEM }
+
+    private record Toast(Texture icon, String bold, String rest, ToastKind kind) {}
+    private record Floater(float x, float y, Texture icon, String text, FloaterStyle style, long start) {}
+
+    private static final float CARD_X = 16, CARD_W = 330, CARD_H = 92, CARD_Y = 900 - 14 - CARD_H;
+    private static final float ICON_W = 78, ICON_TOP = 890;
+    private static final long TOAST_NANOS = 3_200_000_000L, TOAST_FADE = 250_000_000L;
+    private static final long FLOATER_NANOS = 1_100_000_000L, BANNER_NANOS = 2_600_000_000L, BUMP_NANOS = 360_000_000L;
+
+    private final Deque<Toast> toasts = new ArrayDeque<>();
+    private long toastStarted;
+    private final List<Floater> floaters = new ArrayList<>();
+    private String bannerTitle, bannerSub;
+    private long bannerStarted;
+    private float shownCoins = -1;
+    private long bumpStarted;
+
+    // ---------- eventos ----------
+
+    public void toast(Texture icon, String bold, String rest, ToastKind kind) {
+        for (Toast t : toasts) if (t.bold().equals(bold) && t.rest().equals(rest)) return;
+        if (toasts.isEmpty()) toastStarted = System.nanoTime();
+        while (toasts.size() >= 3) toasts.removeLast();
+        toasts.addLast(new Toast(icon, bold, rest, kind));
+    }
+
+    public void floater(float x, float y, Texture icon, String text, FloaterStyle style, long delayNanos) {
+        floaters.add(new Floater(x, y, icon, text, style, System.nanoTime() + delayNanos));
+    }
+
+    public void levelUp(int level, List<CropType> unlocked) {
+        bannerTitle = "Nível " + level + "!";
+        bannerSub = unlocked.isEmpty() ? "Continue colhendo para liberar mais culturas"
+                : joinNames(unlocked) + (unlocked.size() == 1 ? " liberado na Loja" : " liberados na Loja");
+        bannerStarted = System.nanoTime();
+    }
+
+    public boolean bannerVisible() { return bannerTitle != null; }
+
+    /** Limpa avisos, floaters e banner (usado pela revisão visual entre cenas). */
+    public void reset() { toasts.clear(); floaters.clear(); bannerTitle = null; shownCoins = -1; }
+    public void dismissBanner() { bannerTitle = null; }
+
+    // ---------- atalhos ----------
+
+    public static Rectangle shortcutBounds(Shortcut shortcut) {
+        int fromRight = Shortcut.values().length - 1 - shortcut.ordinal();
+        float cx = 1600 - 18 - ICON_W / 2f - fromRight * (ICON_W + 6);
+        return new Rectangle(cx - ICON_W / 2f, ICON_TOP - 88, ICON_W, 88);
+    }
+
+    public Shortcut shortcutHit(float x, float y) {
+        for (Shortcut s : Shortcut.values()) if (shortcutBounds(s).contains(x, y)) return s;
+        return null;
+    }
+
+    // ---------- desenho ----------
+
+    public void drawTop(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state, float px, float py) {
+        drawProfile(batch, skin, assets, state);
+        if (state.tutorial().active()) drawTutorial(batch, skin, assets, state.tutorial());
+        drawShortcuts(batch, skin, assets, state, px, py);
+    }
+
+    /** Card dos primeiros passos, logo abaixo do perfil: tarefa atual, dica e recompensa. */
+    private void drawTutorial(SpriteBatch batch, UiSkin skin, GameAssets assets, Tutorial tutorial) {
+        Tutorial.Step step = tutorial.current();
+        float w = 420, h = 96, x = CARD_X, y = CARD_Y - 12 - h;
+        skin.dropShadow(batch, x, y, w, h, 2);
+        skin.draw(batch, skin.hudCard, x, y, w, h);
+        skin.text(batch, skin.caption, "Primeiros passos · " + (tutorial.stepIndex() + 1) + "/" + Tutorial.STEPS.size(),
+                x + 16, y + h - 14, Palette.INK_MUTED, Align.left);
+        skin.text(batch, skin.label, step.title(), x + 16, y + h - 40, Palette.INK, Align.left);
+        skin.text(batch, skin.caption, step.hint(), x + 16, y + 22, Palette.INK_MUTED, Align.left);
+        float rx = x + w - 16;
+        String xp = "+" + step.xp(), coins = "+" + step.coins();
+        float xpW = skin.width(skin.label, xp);
+        skin.text(batch, skin.label, xp, rx, y + h - 40, Palette.SKY_INK, Align.right);
+        Toolbar.drawFitted(batch, assets.star, rx - xpW - 14, y + h - 46, 22);
+        float coinsRight = rx - xpW - 34;
+        skin.text(batch, skin.label, coins, coinsRight, y + h - 40, Palette.COIN_INK, Align.right);
+        Toolbar.drawFitted(batch, assets.coin, coinsRight - skin.width(skin.label, coins) - 14, y + h - 46, 22);
+    }
+
+    private void drawProfile(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state) {
+        int coins = state.wallet().coins();
+        long now = System.nanoTime();
+        if (shownCoins < 0 || coins < shownCoins) shownCoins = coins;
+        else if (coins > shownCoins) {
+            shownCoins = Math.min(coins, shownCoins + Math.max(1, (coins - shownCoins) / 8f));
+            if (now - bumpStarted > BUMP_NANOS) bumpStarted = now;
+        }
+        skin.dropShadow(batch, CARD_X, CARD_Y, CARD_W, CARD_H, 2);
+        skin.draw(batch, skin.hudCard, CARD_X, CARD_Y, CARD_W, CARD_H);
+        skin.draw(batch, skin.sheet, CARD_X + 8, CARD_Y + 10, 72, 72);
+        batch.draw(assets.avatar, CARD_X + 11, CARD_Y + 13, 66, 66);
+        float tx = CARD_X + 92;
+        String name = "Minha fazenda";
+        skin.text(batch, skin.label, name, tx, CARD_Y + CARD_H - 14, Palette.INK, Align.left);
+        float starX = tx + skin.width(skin.label, name) + 26;
+        Toolbar.drawFitted(batch, assets.star, starX, CARD_Y + CARD_H - 21, 36);
+        skin.outlined(batch, skin.label, Integer.toString(state.progress().level()), starX, CARD_Y + CARD_H - 15,
+                Palette.ON_COLOR, Palette.SKY_INK, 1f, Align.center);
+        skin.bar(batch, skin.barSky, tx, CARD_Y + 40, 220, 18,
+                state.progress().currentXp() / (float) state.progress().xpToNext(),
+                state.progress().currentXp() + " / " + state.progress().xpToNext() + " XP");
+        float bump = 1;
+        float t = (now - bumpStarted) / (float) BUMP_NANOS;
+        if (t < 1) bump = 1 + .35f * (float) Math.sin(t * Math.PI);
+        Toolbar.drawFitted(batch, assets.coin, tx + 11, CARD_Y + 22, 24 * bump);
+        skin.text(batch, skin.number, formatInt(Math.round(shownCoins)), tx + 28, CARD_Y + 30, Palette.INK, Align.left);
+    }
+
+    private void drawShortcuts(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state, float px, float py) {
+        int pending = 0;
+        if (state.tutorial().active()) pending = 1;
+        else for (DailyMissionBoard.Mission mission : state.dailyMissions().missions())
+            if (!state.dailyMissions().completed(mission)) pending++;
+        boolean produce = false;
+        for (CropType crop : state.catalog().all()) if (state.inventory().produce(crop) > 0) produce = true;
+        for (Shortcut s : Shortcut.values()) {
+            Rectangle r = shortcutBounds(s);
+            boolean hover = r.contains(px, py);
+            float cx = r.x + r.width / 2f, cy = r.y + 56;
+            if (hover) skin.glow(batch, cx, cy, 100, 1f);
+            Texture icon = switch (s) { case MISSIONS -> assets.gift; case SHOP -> assets.shop; case DEPOSIT -> assets.deposit; };
+            batch.setColor(0, 0, 0, .25f);
+            Toolbar.drawFitted(batch, icon, cx + 1, cy - 3 + (hover ? 2 : 0), 56);
+            batch.setColor(Color.WHITE);
+            Toolbar.drawFitted(batch, icon, cx, cy + (hover ? 2 : 0), hover ? 60 : 56);
+            String label = switch (s) { case MISSIONS -> "Missões"; case SHOP -> "Loja"; case DEPOSIT -> "Depósito"; };
+            skin.onScene(batch, skin.label, label, cx, r.y + 14, Align.center);
+            if (s == Shortcut.MISSIONS && pending > 0) badge(batch, skin, Integer.toString(pending), cx + 24, cy + 22);
+            if (s == Shortcut.DEPOSIT && produce) badge(batch, skin, "", cx + 22, cy + 22);
+        }
+    }
+
+    private static void badge(SpriteBatch batch, UiSkin skin, String text, float cx, float cy) {
+        float h = text.isEmpty() ? 16 : 22;
+        float w = text.isEmpty() ? 16 : Math.max(22, skin.width(skin.micro, text) + 12);
+        skin.draw(batch, skin.badge, cx - w / 2f, cy - h / 2f, w, h);
+        if (!text.isEmpty()) skin.text(batch, skin.micro, text, cx, cy + 4.5f, Palette.ON_COLOR, Align.center);
+    }
+
+    /** Avisos, floaters e banner: desenhados por último, sobre janelas e toolbar. */
+    public void drawOverlay(SpriteBatch batch, UiSkin skin) {
+        drawFloaters(batch, skin);
+        drawToast(batch, skin);
+        drawBanner(batch, skin);
+    }
+
+    private void drawToast(SpriteBatch batch, UiSkin skin) {
+        if (toasts.isEmpty()) return;
+        long now = System.nanoTime();
+        long age = now - toastStarted;
+        if (age >= TOAST_NANOS) {
+            toasts.removeFirst();
+            toastStarted = now;
+            if (toasts.isEmpty()) return;
+            age = 0;
+        }
+        Toast toast = toasts.peekFirst();
+        float in = Math.min(1, age / (float) TOAST_FADE);
+        float out = Math.min(1, (TOAST_NANOS - age) / (float) TOAST_FADE);
+        float alpha = Math.min(in, out);
+        float boldW = toast.bold().isEmpty() ? 0 : skin.width(skin.label, toast.bold()) + 5;
+        float textW = boldW + skin.width(skin.body, toast.rest());
+        float w = textW + (toast.icon() != null ? 64 : 34), h = 50;
+        float x = 800 - w / 2f, y = 900 - 112 - h + (1 - Interpolation.pow2Out.apply(in)) * 16;
+        Color previous = batch.getColor().cpy();
+        batch.setColor(1, 1, 1, alpha);
+        skin.dropShadow(batch, x, y, w, h, 4);
+        NinePatch patch = switch (toast.kind()) { case REWARD -> skin.toastReward; case ALERT -> skin.toastAlert; default -> skin.toast; };
+        patch.setColor(new Color(1, 1, 1, alpha));
+        skin.draw(batch, patch, x, y, w, h);
+        patch.setColor(Color.WHITE);
+        if (toast.kind() == ToastKind.ALERT) skin.rect(batch, withAlpha(Palette.BERRY, alpha), x + 1, y + 8, 3, h - 16);
+        float tx = x + 18;
+        if (toast.icon() != null) {
+            batch.setColor(1, 1, 1, alpha);
+            Toolbar.drawFitted(batch, toast.icon(), x + 30, y + h / 2f, 36);
+            tx = x + 54;
+        }
+        batch.setColor(previous);
+        if (!toast.bold().isEmpty())
+            skin.text(batch, skin.label, toast.bold(), tx, y + 31, withAlpha(Palette.INK, alpha), Align.left);
+        skin.text(batch, skin.body, toast.rest(), tx + boldW, y + 31, withAlpha(Palette.INK, alpha), Align.left);
+    }
+
+    private void drawFloaters(SpriteBatch batch, UiSkin skin) {
+        long now = System.nanoTime();
+        for (Iterator<Floater> it = floaters.iterator(); it.hasNext(); ) {
+            Floater f = it.next();
+            long age = now - f.start();
+            if (age < 0) continue;
+            if (age >= FLOATER_NANOS) { it.remove(); continue; }
+            float t = age / (float) FLOATER_NANOS;
+            float scale = t < .18f ? Interpolation.swingOut.apply(t / .18f) : 1;
+            float alpha = t < .75f ? 1 : 1 - (t - .75f) / .25f;
+            float y = f.y() + Interpolation.pow2Out.apply(t) * 46;
+            Color fill = switch (f.style()) { case COIN -> Palette.COIN; case XP -> Palette.SKY_HI; case ITEM -> Palette.ON_COLOR; };
+            Color line = switch (f.style()) { case COIN -> Palette.COIN_INK; case XP -> Palette.SKY_INK; case ITEM -> Palette.LEAF_INK; };
+            BitmapFont font = skin.floater;
+            font.getData().setScale(Math.max(.01f, scale));
+            float textW = skin.width(font, f.text());
+            float iconSize = 28 * scale;
+            float total = (f.icon() != null ? iconSize + 4 : 0) + textW;
+            float x = f.x() - total / 2f;
+            if (f.icon() != null) {
+                batch.setColor(1, 1, 1, alpha);
+                Toolbar.drawFitted(batch, f.icon(), x + iconSize / 2f, y + 10 * scale, iconSize);
+                batch.setColor(Color.WHITE);
+                x += iconSize + 4;
+            }
+            skin.outlined(batch, font, f.text(), x, y + 21 * scale, withAlpha(fill, alpha), withAlpha(line, alpha), 1.6f, Align.left);
+            font.getData().setScale(1);
+        }
+    }
+
+    private void drawBanner(SpriteBatch batch, UiSkin skin) {
+        if (bannerTitle == null) return;
+        long age = System.nanoTime() - bannerStarted;
+        if (age >= BANNER_NANOS) { bannerTitle = null; return; }
+        float t = Math.min(1, age / 450_000_000f);
+        float scale = Interpolation.swingOut.apply(t) * .6f + .4f * Math.min(1, t * 2);
+        float alpha = Math.min(1, (BANNER_NANOS - age) / 300_000_000f);
+        float w = Math.max(420, skin.width(skin.body, bannerSub) + 80) * scale, h = 128 * scale;
+        float x = 800 - w / 2f, y = 470 - h / 2f;
+        batch.setColor(1, 1, 1, alpha);
+        skin.glow(batch, 800, 470, 560 * scale, .7f * alpha);
+        skin.dropShadow(batch, x, y, w, h, 6);
+        skin.banner.setColor(new Color(1, 1, 1, alpha));
+        skin.draw(batch, skin.banner, x, y, w, h);
+        skin.banner.setColor(Color.WHITE);
+        batch.setColor(Color.WHITE);
+        skin.banner48.getData().setScale(Math.max(.01f, scale));
+        skin.outlined(batch, skin.banner48, bannerTitle, 800, y + h - 26 * scale,
+                withAlpha(Palette.SUN, alpha), withAlpha(Palette.SUN_INK, alpha), 2.2f * scale, Align.center);
+        skin.banner48.getData().setScale(1);
+        skin.text(batch, skin.body, bannerSub, 800, y + 30 * scale, withAlpha(Palette.INK, alpha), Align.center);
+    }
+
+    // ---------- balão de status ----------
+
+    public void drawTooltip(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state,
+                            int col, int row, float tileX, float tileY) {
+        Instant now = state.now();
+        FarmTile tile = state.farm().tile(col, row);
+        if (!state.land().isUnlocked(col, row)) {
+            LandExpansion.Plot plot = state.land().at(col, row);
+            LandExpansion.Plot next = state.land().next();
+            if (next != null && next.id() == plot.id()) {
+                boolean levelOk = state.progress().level() >= plot.requiredLevel();
+                simpleTip(batch, skin, tileX, tileY, "Lote à venda",
+                        !levelOk ? "Libera no nível " + plot.requiredLevel() + " · " + plot.price() + " moedas"
+                                : state.wallet().coins() >= plot.price() ? "Clique para comprar por " + plot.price() + " moedas"
+                                : "Custa " + plot.price() + " moedas");
+            } else simpleTip(batch, skin, tileX, tileY, "Lote bloqueado", "Os lotes são comprados em ordem");
+            return;
+        }
+        if (tile.crop() == null) {
+            if (tile.state() == TileState.GRASS) simpleTip(batch, skin, tileX, tileY, "Grama", "Use a enxada (2) para arar");
+            else if (tile.state() == TileState.DEAD)
+                simpleTip(batch, skin, tileX, tileY, tile.withered().name() + " morto", "Use a enxada (2) para retirar");
+            else simpleTip(batch, skin, tileX, tileY, "Terra arada", "Escolha uma semente (4) e plante");
+            return;
+        }
+        Crop crop = tile.crop();
+        CropType type = crop.type();
+        float w = 330, h = 134;
+        float x = clamp(tileX - w / 2f, 12, 1600 - w - 12), y = Math.min(900 - 140 - h, tileY + 92);
+        tipBox(batch, skin, x, y, w, h, tileX);
+        List<String[]> chips = chips(tile, now);
+        skin.text(batch, skin.label, type.name(), x + 14, y + h - 14, Palette.INK, Align.left);
+        float cx = x + w - 12;
+        for (int i = chips.size() - 1; i >= 0; i--) {
+            String text = chips.get(i)[0];
+            float cw = skin.width(skin.micro, text) + 12;
+            skin.tinted(batch, skin.chip, Color.valueOf(chips.get(i)[1]), cx - cw, y + h - 30, cw, 18);
+            skin.text(batch, skin.micro, text, cx - cw / 2f, y + h - 17, Palette.ON_COLOR, Align.center);
+            cx -= cw + 4;
+        }
+        Toolbar.drawFitted(batch, assets.coin, x + 26, y + 78, 26);
+        skin.text(batch, skin.caption, "Produção", x + 48, y + 95, Palette.INK_MUTED, Align.left);
+        int yield = tile.harvestYield();
+        skin.bar(batch, skin.barSun, x + 48, y + 66, w - 62, 17, yield / (float) type.harvestYield(),
+                yield + " / " + type.harvestYield() + (yield == 1 ? " unidade" : " unidades"));
+        Toolbar.drawFitted(batch, assets.crop(type, Math.max(1, crop.stageAt(now))), x + 26, y + 34, 32);
+        skin.text(batch, skin.caption, "Crescimento", x + 48, y + 51, Palette.INK_MUTED, Align.left);
+        float fraction = crop.grownMillisAt(now) / (float) type.growthTime().toMillis();
+        boolean paused = tile.pest() == PestState.WEEDS;
+        String growth = !crop.watered() ? "Regue para começar"
+                : crop.matureAt(now) ? "Pronta! Use a mão"
+                : paused ? "Pausado pela erva daninha"
+                : formatRemaining(crop.remainingAt(now)) + (crop.dryAt(now) ? " · regue p/ acelerar" : "");
+        skin.bar(batch, paused || !crop.watered() ? skin.barGray : skin.barLeaf, x + 48, y + 22, w - 62, 17, fraction, growth);
+    }
+
+    private static List<String[]> chips(FarmTile tile, Instant now) {
+        List<String[]> chips = new ArrayList<>();
+        Crop crop = tile.crop();
+        if (crop.matureAt(now)) chips.add(new String[]{"PRONTA!", "3a8a14"});
+        if (tile.pest() == PestState.WEEDS) chips.add(new String[]{"PRAGA", "4f7d1f"});
+        if (tile.insects() > 0) chips.add(new String[]{tile.insects() == 1 ? "VERME" : tile.insects() + " VERMES", "c62a20"});
+        if (!crop.matureAt(now) && crop.dryAt(now)) chips.add(new String[]{crop.watered() ? "SECA" : "SEM ÁGUA", "b07a3a"});
+        if (chips.isEmpty()) chips.add(new String[]{"SAUDÁVEL", "3a8a14"});
+        return chips.size() > 2 ? chips.subList(0, 2) : chips;
+    }
+
+    private void simpleTip(SpriteBatch batch, UiSkin skin, float tileX, float tileY, String title, String line) {
+        float w = Math.max(skin.width(skin.label, title), skin.width(skin.body, line)) + 30, h = 60;
+        float x = clamp(tileX - w / 2f, 12, 1600 - w - 12), y = tileY + 58;
+        tipBox(batch, skin, x, y, w, h, tileX);
+        skin.text(batch, skin.label, title, x + 15, y + h - 14, Palette.INK, Align.left);
+        skin.text(batch, skin.body, line, x + 15, y + 22, Palette.INK_MUTED, Align.left);
+    }
+
+    private static void tipBox(SpriteBatch batch, UiSkin skin, float x, float y, float w, float h, float tailX) {
+        skin.dropShadow(batch, x, y, w, h, 4);
+        float tx = clamp(tailX, x + 18, x + w - 18);
+        batch.setColor(Palette.TOOLTIP_LINE);
+        batch.draw(skin.white, tx - 8, y - 8, 8, 8, 16, 16, 1, 1, 45, 0, 0, 2, 2, false, false);
+        batch.setColor(Color.WHITE);
+        skin.draw(batch, skin.tooltip, x, y, w, h);
+        batch.setColor(Palette.TOOLTIP);
+        batch.draw(skin.white, tx - 7, y - 6, 7, 7, 14, 14, 1, 1, 45, 0, 0, 2, 2, false, false);
+        batch.setColor(Color.WHITE);
+    }
+
+    // ---------- utilidades ----------
+
+    private static String joinNames(List<CropType> crops) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < crops.size(); i++) {
+            if (i > 0) out.append(i == crops.size() - 1 ? " e " : ", ");
+            out.append(crops.get(i).name());
+        }
+        return out.toString();
+    }
+
+    static String formatRemaining(java.time.Duration remaining) {
+        long minutes = Math.max(1, (remaining.toSeconds() + 59) / 60);
+        long hours = minutes / 60;
+        if (hours >= 24) return hours / 24 + "d " + hours % 24 + "h";
+        if (hours > 0) return hours + "h" + String.format("%02d", minutes % 60);
+        return minutes + " min";
+    }
+
+    public static String formatInt(int value) {
+        return String.format(java.util.Locale.forLanguageTag("pt-BR"), "%,d", value);
+    }
+
+    private static Color withAlpha(Color c, float a) { return new Color(c.r, c.g, c.b, c.a * a); }
+    private static float clamp(float v, float lo, float hi) { return Math.max(lo, Math.min(hi, v)); }
+}

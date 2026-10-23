@@ -1,0 +1,71 @@
+plugins {
+    id 'application'
+}
+
+group = 'br.com.colheitafeliz'
+version = providers.gradleProperty('releaseVersion').getOrElse('0.1.0')
+
+repositories { mavenCentral() }
+
+def gdxVersion = '1.13.5'
+
+dependencies {
+    implementation "com.badlogicgames.gdx:gdx:$gdxVersion"
+    implementation "com.badlogicgames.gdx:gdx-freetype:$gdxVersion"
+    implementation "com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion"
+    runtimeOnly "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
+    runtimeOnly "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-desktop"
+    implementation 'com.google.code.gson:gson:2.14.0'
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+
+application {
+    mainClass = 'br.com.colheitafeliz.desktop.DesktopLauncher'
+    applicationDefaultJvmArgs = System.getProperty('os.name').toLowerCase().contains('mac')
+            ? ['-XstartOnFirstThread'] : []
+}
+
+sourceSets.main.resources.srcDir 'assets'
+tasks.named('test') { useJUnitPlatform() }
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs.addAll(['-Xlint:all', '-Werror'])
+}
+
+tasks.register('dependencyInventory') {
+    group = 'help'
+    description = 'Writes resolved production/test Maven coordinates for an explicit advisory audit.'
+    def report = layout.buildDirectory.file('reports/dependencies.json')
+    outputs.file(report)
+    outputs.upToDateWhen { false }
+    doLast {
+        def inventory = ['runtimeClasspath', 'testRuntimeClasspath'].collectEntries { name ->
+            def modules = configurations.getByName(name).incoming.resolutionResult.allComponents
+                    .findAll { it.id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier }
+                    .collect { it.moduleVersion }
+                    .collect { [name: "${it.group}:${it.name}".toString(), version: it.version] }
+                    .unique().sort { a, b -> a.name <=> b.name }
+            [(name): modules]
+        }
+        def destination = report.get().asFile
+        destination.parentFile.mkdirs()
+        destination.setText(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(inventory)), 'UTF-8')
+    }
+}
+
+tasks.register('visualReview', JavaExec) {
+    group = 'verification'
+    description = 'Captures the HUD visual review scenes into docs/visual-review/hud-retro without touching the player save.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'br.com.colheitafeliz.visual.VisualReviewLauncher'
+    workingDir = projectDir
+    systemProperty 'colheita.visualOutput', providers.gradleProperty('visualOutput')
+            .getOrElse('build/visual-review')
+    jvmArgs application.applicationDefaultJvmArgs
+}
