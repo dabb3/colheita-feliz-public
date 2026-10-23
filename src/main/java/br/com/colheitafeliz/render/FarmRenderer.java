@@ -85,8 +85,8 @@ public final class FarmRenderer implements AutoCloseable {
     public void failure(String message) { hud.toast(null, "", message, Hud.ToastKind.ALERT); }
 
     public void pestAlert(PestSystem.Outbreak outbreak) {
-        if (outbreak.insects()) hud.toast(assets.insects[1], "Insetos", "na plantação. Use o pesticida (5).", Hud.ToastKind.ALERT);
-        if (outbreak.weeds()) hud.toast(assets.weeds[3], "Ervas daninhas", "pausaram uma planta. Use o herbicida (6).", Hud.ToastKind.ALERT);
+        if (outbreak.insects()) hud.toast(assets.insects[1], "Insetos", "na plantação. Use o pesticida (6).", Hud.ToastKind.ALERT);
+        if (outbreak.weeds()) hud.toast(assets.weeds[3], "Ervas daninhas", "pausaram uma planta. Use o herbicida (5).", Hud.ToastKind.ALERT);
     }
 
     /** Números que sobem do ponto da ação: itens colhidos, XP e moedas. */

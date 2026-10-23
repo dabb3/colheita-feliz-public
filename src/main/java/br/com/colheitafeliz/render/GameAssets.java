@@ -52,6 +52,7 @@ public final class GameAssets implements AutoCloseable {
     public final Texture tileWet = load("classic/terrain/terra-molhada.png");
     public final Texture tileDry = load("classic/terrain/terrain_dry.png");
     public final Texture tileHighlight = load("classic/terrain/terrain_highlight.png");
+    public final Texture cursor = load("classic/hud/cursor-ui.png");
     public final Texture hoe = load("classic/hud/pa-ui.png");
     public final Texture bag = load("classic/hud/saco-ui.png");
     public final Texture hand = load("classic/hud/mao-restaurada.png");
@@ -111,6 +112,7 @@ public final class GameAssets implements AutoCloseable {
 
     public Texture tool(br.com.colheitafeliz.game.Tool tool) {
         return switch (tool) {
+            case CURSOR -> cursor;
             case HAND -> hand;
             case HOE -> hoe;
             case WATER -> water;

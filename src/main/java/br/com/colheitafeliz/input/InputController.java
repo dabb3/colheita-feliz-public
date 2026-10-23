@@ -69,6 +69,7 @@ public final class InputController extends InputAdapter {
         }
         Tool tool = renderer.toolbar().hit(p.x, p.y);
         if (tool != null) {
+            renderer.toolbar().picked(tool, state.tool());
             state.selectTool(tool);
             save.run();
             return true;
@@ -80,10 +81,12 @@ public final class InputController extends InputAdapter {
             show(result, state.lastCollected() > 0 ? Cue.HARVEST : Cue.PLANT, before, p.x, p.y + 40, null, 0);
             return true;
         }
-        CropType seed = state.tool() == Tool.SEED ? renderer.toolbar().seedHit(p.x, p.y, state.catalog().all()) : null;
+        CropType seed = state.tool() == Tool.SEED && renderer.toolbar().seedsOpen()
+                ? renderer.toolbar().seedHit(p.x, p.y, state.catalog().all()) : null;
         if (seed != null) {
             ActionResult result = state.selectSeed(seed);
             if (!result.success()) renderer.failure(result.message());
+            else renderer.toolbar().closeSeeds();
             return true;
         }
         IsoRenderer.GridPosition tile = renderer.iso().screenToGrid(p.x, p.y);
@@ -91,12 +94,14 @@ public final class InputController extends InputAdapter {
         Tool actionTool = state.tool();
         Snapshot before = new Snapshot(state);
         boolean lockedPlot = !state.land().isUnlocked(tile.column(), tile.row());
+        if (!lockedPlot && actionTool == Tool.CURSOR) return true;
         FarmTile farmTile = state.farm().tile(tile.column(), tile.row());
         CropType crop = farmTile.crop() == null ? null : farmTile.crop().type();
         ActionResult result = lockedPlot ? state.buyPlot(tile.column(), tile.row())
                 : state.act(tile.column(), tile.row());
         Cue cue = lockedPlot ? Cue.BUY : switch (actionTool) {
             case HAND -> Cue.HARVEST;
+            case CURSOR -> Cue.PLOW;
             case HOE -> Cue.PLOW;
             case WATER -> Cue.WATER;
             case SEED -> Cue.PLANT;
@@ -135,7 +140,9 @@ public final class InputController extends InputAdapter {
     @Override public boolean keyDown(int keycode) {
         GameState state = session.state();
         if (keycode >= Input.Keys.NUM_1 && keycode < Input.Keys.NUM_1 + Tool.BAR.size()) {
-            state.selectTool(Tool.BAR.get(keycode - Input.Keys.NUM_1));
+            Tool tool = Tool.BAR.get(keycode - Input.Keys.NUM_1);
+            renderer.toolbar().picked(tool, state.tool());
+            state.selectTool(tool);
             return true;
         }
         switch (keycode) {

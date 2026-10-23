@@ -52,7 +52,7 @@ public final class GameState {
     private final List<AnimalType> animalTypes = AnimalCatalogLoader.load();
     private final Barn barn = new Barn();
     private final Set<String> unlockedIds = new HashSet<>();
-    private Tool tool = Tool.HAND;
+    private Tool tool = Tool.CURSOR;
     private CropType seed;
     private String message = "Abra a loja para comprar sementes.";
     private PestSystem.Outbreak lastOutbreak = new PestSystem.Outbreak(false, false);
@@ -136,12 +136,13 @@ public final class GameState {
         lastTreasureCoins = 0;
         boolean cleared = tool == Tool.HOE && tile.state() == TileState.DEAD;
         switch (tool) {
+            case CURSOR -> result = ActionResult.fail("Escolha uma ferramenta na barra.");
             case HOE -> {
                 if (tile.state() == TileState.DEAD) {
                     tile.clearDead();
                     result = ActionResult.ok("Planta morta retirada. A terra está pronta para plantar.");
                 } else if (tile.state() != TileState.GRASS)
-                    result = ActionResult.fail("A enxada precisa de grama livre ou de uma planta morta.");
+                    result = ActionResult.fail("A pá precisa de grama livre ou de uma planta morta.");
                 else {
                     tile.plow();
                     if (random.nextInt(100) < TREASURE_CHANCE) {
@@ -153,7 +154,7 @@ public final class GameState {
             }
             case SEED -> {
                 if (tile.state() == TileState.DEAD)
-                    result = ActionResult.fail("Retire a planta morta com a enxada antes de plantar.");
+                    result = ActionResult.fail("Retire a planta morta com a pá antes de plantar.");
                 else if (tile.state() != TileState.PLOWED) result = ActionResult.fail("Este terreno precisa ser arado.");
                 else if (inventory.seeds(seed) == 0)
                     result = ActionResult.fail("Você não possui sementes de " + seed.name() + ".");
@@ -218,6 +219,7 @@ public final class GameState {
                 case HAND -> harvested.harvestXp();
                 case WEEDER, PESTICIDE -> progress.rules().removePestXp();
                 case HOE -> cleared ? progress.rules().clearDeadXp() : 0;
+                case CURSOR -> 0;
                 case FERTILIZER -> 0;
             };
             String levelReward = awardXp(xp);
@@ -229,6 +231,7 @@ public final class GameState {
                 case SEED -> "plant";
                 case WEEDER -> "weed";
                 case PESTICIDE -> "pesticide";
+                case CURSOR -> "cursor";
                 case FERTILIZER -> "fertilize";
             }, 1);
             if (!missionReward.isEmpty()) result = ActionResult.ok(result.message() + " " + missionReward);

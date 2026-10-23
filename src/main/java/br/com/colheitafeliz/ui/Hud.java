@@ -298,10 +298,10 @@ public final class Hud {
             return;
         }
         if (tile.crop() == null) {
-            if (tile.state() == TileState.GRASS) simpleTip(batch, skin, tileX, tileY, "Grama", "Use a enxada (2) para arar");
+            if (tile.state() == TileState.GRASS) simpleTip(batch, skin, tileX, tileY, "Grama", "Use a pá (2) para arar");
             else if (tile.state() == TileState.DEAD)
-                simpleTip(batch, skin, tileX, tileY, tile.withered().name() + " morto", "Use a enxada (2) para retirar");
-            else simpleTip(batch, skin, tileX, tileY, "Terra arada", "Escolha uma semente (4) e plante");
+                simpleTip(batch, skin, tileX, tileY, tile.withered().name() + " morto", "Use a pá (2) para retirar");
+            else simpleTip(batch, skin, tileX, tileY, "Terra arada", "Escolha uma semente (3) e plante");
             return;
         }
         Crop crop = tile.crop();
@@ -329,7 +329,7 @@ public final class Hud {
         float fraction = crop.grownMillisAt(now) / (float) type.growthTime().toMillis();
         boolean paused = tile.pest() == PestState.WEEDS;
         String growth = !crop.watered() ? "Regue para começar"
-                : crop.matureAt(now) ? "Pronta! Use a mão"
+                : crop.matureAt(now) ? "Pronta! Use a luvinha"
                 : paused ? "Pausado pela erva daninha"
                 : formatRemaining(crop.remainingAt(now)) + (crop.dryAt(now) ? " · regue p/ acelerar" : "");
         skin.bar(batch, paused || !crop.watered() ? skin.barGray : skin.barLeaf, x + 48, y + 22, w - 62, 17, fraction, growth);
