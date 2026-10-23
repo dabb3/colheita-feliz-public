@@ -110,6 +110,32 @@ class GameStateTest {
         assertEquals(125, GameState.levelUpCoins(5));
     }
 
+    @Test void fertilizerAdvancesAQuarterOfTheCycleOncePerPlanting() {
+        ManualClock clock = new ManualClock();
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
+        CropType corn = game.catalog().get("milho");
+        assertFalse(game.buyFertilizer().success(), "adubo só no nível 2");
+        game.progress().award(50);
+        assertTrue(game.buyFertilizer().success());
+        assertTrue(game.buyFertilizer().success());
+        game.buySeed(corn);
+        game.selectTool(Tool.HOE);
+        game.act(0, 0);
+        game.selectSeed(corn);
+        game.act(0, 0);
+        game.selectTool(Tool.FERTILIZER);
+        assertFalse(game.act(0, 0).success());
+        assertEquals("Regue antes de adubar.", game.message());
+        game.selectTool(Tool.WATER);
+        game.act(0, 0);
+        game.selectTool(Tool.FERTILIZER);
+        assertTrue(game.act(0, 0).success());
+        assertEquals(1, game.inventory().fertilizer());
+        assertEquals(corn.growthTime().toMillis() / 4, game.farm().tile(0, 0).crop().grownMillisAt(game.now()));
+        assertFalse(game.act(0, 0).success(), "uma vez por plantio");
+        assertEquals(1, game.inventory().fertilizer());
+    }
+
     @Test void plantingWithoutSeedIsRejectedAndLeavesSoilReady() {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);

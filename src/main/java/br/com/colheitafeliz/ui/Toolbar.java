@@ -13,7 +13,7 @@ import com.badlogic.gdx.utils.Align;
 import java.util.List;
 
 /**
- * Bandeja escura translúcida com as seis ferramentas (atalhos 1–6). Com a ferramenta de sementes ativa, uma
+ * Bandeja escura translúcida com as sete ferramentas (atalhos 1–7). Com a ferramenta de sementes ativa, uma
  * segunda bandeja acima lista as sementes do catálogo.
  */
 public final class Toolbar {
@@ -59,7 +59,14 @@ public final class Toolbar {
             else if (tool == hovered) skin.glow(batch, cx, cy, 96, .5f);
             float size = active ? 58 : 52;
             float lift = !active && tool == hovered ? 2 : 0;
+            if (tool == Tool.FERTILIZER) batch.setColor(Palette.FERTILIZER);
             drawFitted(batch, assets.tool(tool), cx, cy + lift, size);
+            batch.setColor(Color.WHITE);
+            if (tool == Tool.FERTILIZER) {
+                int bags = state.inventory().fertilizer();
+                skin.outlined(batch, skin.label, "x" + bags, x + SLOT - 4, y + 15,
+                        bags == 0 ? Palette.BERRY_HI : Palette.ON_COLOR, new Color(0, 0, 0, .7f), 1f, Align.right);
+            }
             skin.text(batch, skin.micro, Integer.toString(i + 1), x + 4, y + SLOT_H - 3,
                     new Color(1, 1, 1, .72f), Align.left);
             if (tool == Tool.SEED) {

@@ -51,6 +51,8 @@ public final class MarketPanel {
     public static Rectangle sellEverythingButton() {
         return new Rectangle(LEFT + WIDTH - 24 - 270, SHEET_Y + SHEET_H + 2, 270, TAB_H - 4);
     }
+    /** "Comprar adubo", no mesmo lugar do Vender tudo, só na aba de sementes. */
+    public static Rectangle fertilizerButton() { return sellEverythingButton(); }
     public static Rectangle cell(int index) {
         float x = SHEET_X + 12 + (index % COLS) * CELL_W;
         float y = SHEET_Y + SHEET_H - 12 - (index / (int) COLS + 1) * CELL_H;
@@ -80,6 +82,7 @@ public final class MarketPanel {
         if (tab(2).contains(x, y)) { showAnimals(); return null; }
         if (animals) return clickAnimals(x, y, state);
         if (selling && sellEverythingButton().contains(x, y)) return state.sellEverything();
+        if (!selling && fertilizerButton().contains(x, y)) return state.buyFertilizer();
         for (int i = 0; i < crops.size(); i++) {
             CropType crop = crops.get(i);
             if (!selling) {
@@ -152,6 +155,14 @@ public final class MarketPanel {
             return;
         }
         for (int i = 0; i < crops.size(); i++) drawItem(batch, skin, assets, state, i, px, py);
+        if (!selling) {
+            boolean unlocked = state.progress().level() >= GameState.FERTILIZER_LEVEL;
+            Rectangle fert = fertilizerButton();
+            button(batch, skin, unlocked ? skin.glassSun : skin.glassDisabled, fert,
+                    unlocked ? "Adubo · " + GameState.FERTILIZER_PRICE + " moedas (tem " + state.inventory().fertilizer() + ")"
+                            : "Adubo · nível " + GameState.FERTILIZER_LEVEL,
+                    unlocked ? Palette.INK_WARM : Palette.INK_MUTED, null, unlocked && fert.contains(px, py));
+        }
         if (selling) {
             int value = state.depositValue();
             Rectangle all = sellEverythingButton();

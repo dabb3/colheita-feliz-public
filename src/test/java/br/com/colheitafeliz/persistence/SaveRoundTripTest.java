@@ -123,6 +123,7 @@ class SaveRoundTripTest {
         clock.advanceSeconds(hen.productionSeconds());
         GameState restored = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state();
         assertEquals(2, restored.barn().size());
+        assertEquals(0, restored.inventory().fertilizer());
         assertEquals(1, restored.inventory().feed("galinha"));
         assertEquals(2, restored.inventory().product("ovo"));
         assertEquals(br.com.colheitafeliz.domain.animal.Animal.Status.READY, restored.barn().get(0).statusAt(restored.now()));
