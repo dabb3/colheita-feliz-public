@@ -7,13 +7,16 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 /**
  * Cenário vivo, como na fazenda do Orkut: casa e casinha do cachorro no alto, cachorro com o potinho, burrinho
- * cochilando, coelho com a cenoura e os animais passeando dentro do cercado. As galinhas são as do jogador:
- * cada uma tem um ninho, que mostra os ovos quando estão prontos; vaca, ovelha e pato ainda são decoração.
+ * cochilando, coelho com a cenoura e, dentro do cercado, os animais do jogador. Cada animal tem um lugar e
+ * um ponto de produto: o ninho da galinha e da pata mostra ovos quando estão prontos; o balde da vaca e o
+ * cesto da ovelha só aparecem com o produto pronto.
  */
 final class Scenery {
     /** Camada de desenho: atrás dos canteiros (o padrão) ou na frente deles. */
@@ -32,6 +35,7 @@ final class Scenery {
         final boolean shadow;
         final boolean insidePen;
         float x, y, targetX, targetY, wait;
+        boolean hidden;
         boolean walking, facingRight;
         float phase;
 
@@ -53,14 +57,20 @@ final class Scenery {
         }
     }
 
-    /** Ninhos das galinhas do jogador, na ordem de compra; cada galinha passeia perto do seu. */
-    static final float[][] NESTS = {{1296, 338}, {1496, 306}, {1186, 372}};
-    private static final float NEST_W = 76;
+    /**
+     * Aparência de um tipo de animal no cercado. Cada lugar é {casaX, casaY, produtoX, produtoY}, na ordem de
+     * compra. {@code empty} nulo esconde o ponto de produto até ficar pronto.
+     */
+    private record Look(Texture idle, Texture walk, float width, float radius, float speed,
+                        Texture ready, Texture empty, float productWidth, float[][] slots) {}
 
-    private final List<Thing> things = new ArrayList<>();
-    private final List<Thing> nests = new ArrayList<>();
-    private final List<Thing> hens = new ArrayList<>();
+    /** Um animal desenhado e o ponto de produto dele. */
+    private record Placed(String typeId, Thing animal, Thing product) {}
+
+    private final Map<String, Look> looks = new HashMap<>();
     private final GameAssets assets;
+    private final List<Thing> things = new ArrayList<>();
+    private final List<Placed> placed = new ArrayList<>();
     private final Pen pen;
     private final Random random = new Random(7);
     private final Texture soft;
@@ -70,6 +80,14 @@ final class Scenery {
         this.pen = pen;
         this.soft = softShadow;
         this.assets = a;
+        looks.put("galinha", new Look(a.chicken, a.chickenWalk, 58, 45, 32, a.nestEggs, a.nestEmpty, 76,
+                new float[][]{{1226, 378, 1296, 338}, {1426, 346, 1496, 306}, {1150, 420, 1186, 372}}));
+        looks.put("pato", new Look(a.duck, null, 50, 0, 0, a.nestEggs, a.nestEmpty, 66,
+                new float[][]{{1560, 370, 1556, 330}, {1500, 400, 1440, 390}}));
+        looks.put("ovelha", new Look(a.sheep, a.sheepWalk, 96, 32, 18, a.woolBasket, null, 46,
+                new float[][]{{1222, 460, 1168, 438}, {1330, 444, 1276, 418}}));
+        looks.put("vaca", new Look(a.cow, a.cowWalk, 158, 40, 16, a.bucket, null, 42,
+                new float[][]{{1446, 462, 1540, 440}}));
         // Casas no alto, a casinha do cachorro à esquerda da casa.
         add(a.dogHouse, null, 410, 556, 214, 0, 0, Layer.BACK, false, false, false);
         add(a.house, null, 735, 540, 420, 0, 0, Layer.BACK, false, false, false);
@@ -78,11 +96,6 @@ final class Scenery {
         add(a.dog, a.dogWalk, 384, 530, 92, 40, 34, Layer.BACK, true, false, true);
         add(a.donkeySleeping, null, 222, 540, 96, 0, 0, Layer.BACK, true, false, false);
         // Dentro do cercado.
-        add(a.bucket, null, 1514, 424, 40, 0, 0, Layer.BACK, true, true, false);
-        add(a.woolBasket, null, 1316, 470, 44, 0, 0, Layer.BACK, true, true, false);
-        add(a.cow, a.cowWalk, 1436, 462, 158, 40, 16, Layer.BACK, true, true, false);
-        add(a.sheep, a.sheepWalk, 1222, 460, 96, 32, 18, Layer.BACK, true, true, true);
-        add(a.duck, null, 1540, 352, 48, 0, 0, Layer.BACK, true, true, false);
         // Coelho com a cenoura no canto de baixo.
         add(a.carrot, null, 168, 140, 54, 0, 0, Layer.FRONT, true, false, false);
         add(a.rabbit, null, 104, 150, 58, 0, 0, Layer.FRONT, true, false, false);
@@ -99,41 +112,58 @@ final class Scenery {
         return thing;
     }
 
-    /** Uma galinha e um ninho por animal do jogador; o ninho mostra ovos quando estão prontos. */
-    void syncHens(List<Animal.Status> statuses) {
-        int count = Math.min(statuses.size(), NESTS.length);
-        while (hens.size() < count) {
-            float[] nest = NESTS[hens.size()];
-            nests.add(add(assets.nestEmpty, null, nest[0], nest[1], NEST_W, 0, 0, Layer.BACK, false, true, false));
-            Thing hen = add(assets.chicken, assets.chickenWalk, nest[0] - 70, nest[1] + 40, 58, 45, 32,
-                    Layer.BACK, true, true, hens.size() % 2 == 0);
-            hen.footCenter = assets.footCenter(hen.idle);
-            hen.wait = random.nextFloat() * 3;
-            hens.add(hen);
+    /** Mantém um animal desenhado por animal do jogador, com o ponto de produto mostrando se está pronto. */
+    void syncAnimals(List<String> typeIds, List<Animal.Status> statuses) {
+        boolean same = placed.size() == typeIds.size();
+        for (int i = 0; same && i < typeIds.size(); i++) same = placed.get(i).typeId().equals(typeIds.get(i));
+        if (!same) rebuild(typeIds);
+        for (int i = 0; i < placed.size(); i++) {
+            Placed p = placed.get(i);
+            Look look = looks.get(p.typeId());
+            boolean ready = statuses.get(i) == Animal.Status.READY;
+            p.product().idle = ready || look.empty() == null ? look.ready() : look.empty();
+            p.product().hidden = !ready && look.empty() == null;
         }
-        while (hens.size() > count) {
-            things.remove(hens.removeLast());
-            things.remove(nests.removeLast());
-        }
-        for (int i = 0; i < count; i++)
-            nests.get(i).idle = statuses.get(i) == Animal.Status.READY ? assets.nestEggs : assets.nestEmpty;
     }
 
-    /** Índice da galinha (ou do ninho dela) sob o ponto, ou -1. */
-    int henAt(float x, float y) {
-        for (int i = 0; i < hens.size(); i++) {
-            Thing nest = nests.get(i), hen = hens.get(i);
-            if (Math.abs(x - nest.x) <= NEST_W / 2f && y >= nest.y - 6 && y <= nest.y + NEST_W * .7f) return i;
-            float h = hen.width * hen.idle.getHeight() / hen.idle.getWidth();
-            if (Math.abs(x - hen.x) <= hen.width / 2f && y >= hen.y - 6 && y <= hen.y + h) return i;
+    private void rebuild(List<String> typeIds) {
+        for (Placed p : placed) { things.remove(p.animal()); things.remove(p.product()); }
+        placed.clear();
+        Map<String, Integer> used = new HashMap<>();
+        for (String id : typeIds) {
+            Look look = looks.get(id);
+            int slot = used.merge(id, 1, Integer::sum) - 1;
+            if (look == null || slot >= look.slots().length) throw new IllegalStateException("No pen slot for " + id);
+            float[] s = look.slots()[slot];
+            Thing product = add(look.empty() != null ? look.empty() : look.ready(), null, s[2], s[3],
+                    look.productWidth(), 0, 0, Layer.BACK, look.empty() == null, true, false);
+            Thing animal = add(look.idle(), look.walk(), s[0], s[1], look.width(), look.radius(), look.speed(),
+                    Layer.BACK, true, true, slot % 2 == 0);
+            animal.footCenter = assets.footCenter(animal.idle);
+            animal.wait = random.nextFloat() * 3;
+            placed.add(new Placed(id, animal, product));
+        }
+    }
+
+    /** Índice (na ordem do jogador) do animal ou do ponto de produto sob o ponto, ou -1. */
+    int animalAt(float x, float y) {
+        for (int i = placed.size() - 1; i >= 0; i--) {
+            Thing product = placed.get(i).product(), animal = placed.get(i).animal();
+            if (!product.hidden && covers(product, x, y)) return i;
+            if (covers(animal, x, y)) return i;
         }
         return -1;
     }
 
-    /** Ponto acima do ninho, para o balão de dica. */
-    float[] henAnchor(int index) {
-        Thing nest = nests.get(index);
-        return new float[]{nest.x, nest.y + 20};
+    private static boolean covers(Thing t, float x, float y) {
+        float h = t.width * t.idle.getHeight() / t.idle.getWidth();
+        return Math.abs(x - t.x) <= t.width / 2f && y >= t.y - 6 && y <= t.y + h;
+    }
+
+    /** Ponto acima do animal, para o balão de dica. */
+    float[] animalAnchor(int index) {
+        Thing animal = placed.get(index).animal();
+        return new float[]{animal.x, animal.y + animal.width * animal.idle.getHeight() / animal.idle.getWidth() - 40};
     }
 
     /** Desenha a camada pedida, de trás para a frente (maior y primeiro). {@code pen} vem no meio da camada BACK. */
@@ -195,6 +225,7 @@ final class Scenery {
     }
 
     private void drawThing(SpriteBatch batch, Thing t) {
+        if (t.hidden) return;
         Texture tex = t.walking && t.walk != null && ((int) (t.phase * 4) % 2 == 0) ? t.walk : t.idle;
         // Pares normalizados compartilham o canvas, a altura visível e a base dos pés.
         float w = t.width, h = w * t.idle.getHeight() / t.idle.getWidth();

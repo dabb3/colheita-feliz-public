@@ -274,11 +274,11 @@ public final class GameState {
         if (progress.level() < known.requiredLevel())
             return report(ActionResult.fail(known.name() + " libera no nível " + known.requiredLevel() + "."));
         if (barn.full(known))
-            return report(ActionResult.fail("O cercado já tem " + known.max() + " " + known.name().toLowerCase() + "s."));
+            return report(ActionResult.fail("O cercado está cheio: cabem " + known.max() + " de " + known.name().toLowerCase() + "."));
         if (wallet.coins() < known.price()) return report(ActionResult.fail("Moedas insuficientes."));
         wallet.debit(known.price());
         barn.add(known);
-        return report(ActionResult.ok(known.name() + " comprada! Dê ração para ela produzir."));
+        return report(ActionResult.ok("Comprou: " + known.name() + "! Dê ração no cercado para produzir."));
     }
 
     public ActionResult buyFeed(AnimalType type) {
@@ -303,8 +303,8 @@ public final class GameState {
                 barn.collect(index, now);
                 inventory.addProduct(type.productId(), type.productYield());
                 lastCollected = type.productYield();
-                ActionResult result = ActionResult.ok("+" + type.productYield() + " " + type.productName().toLowerCase()
-                        + "s no depósito. Dê ração de novo para produzir mais.");
+                ActionResult result = ActionResult.ok("Coletou " + type.productYield() + "× " + type.productName()
+                        + ". Dê ração de novo para produzir mais.");
                 String levelReward = awardXp(type.collectXp());
                 if (!levelReward.isEmpty()) result = ActionResult.ok(result.message() + " " + levelReward);
                 String missionReward = recordDailyMission("collect", 1);
@@ -316,7 +316,7 @@ public final class GameState {
                     return report(ActionResult.fail("Sem ração de " + type.name().toLowerCase() + ". Compre na Loja, aba Animais."));
                 inventory.useFeed(type.id());
                 barn.feed(index, now);
-                return report(ActionResult.ok(type.name() + " alimentada. " + type.productName() + "s em "
+                return report(ActionResult.ok(type.name() + " comeu a ração. " + type.productName() + " pronto em "
                         + formatDuration(type.productionTime()) + "."));
             }
             default -> {
@@ -329,7 +329,7 @@ public final class GameState {
     public ActionResult sellProduct(AnimalType type, boolean all) {
         AnimalType known = animalType(type.id());
         int amount = all ? inventory.product(known.productId()) : Math.min(1, inventory.product(known.productId()));
-        if (amount == 0) return report(ActionResult.fail("Você não possui " + known.productName().toLowerCase() + "s."));
+        if (amount == 0) return report(ActionResult.fail("Você não possui " + known.productName().toLowerCase() + "."));
         inventory.takeProduct(known.productId(), amount);
         int total = Math.multiplyExact(known.productPrice(), amount);
         wallet.credit(total);

@@ -71,15 +71,18 @@ public final class VisualReviewLauncher {
             newcomer.act(0, 0);
             ManualClock rancherClock = new ManualClock();
             rancher = new GameState(rancherClock::instant, rancherClock, catalog, bound -> 99);
-            rancher.progress().award(50 + 75);
-            var hen = rancher.animalType("galinha");
-            rancher.wallet().credit(2 * hen.price() + 3 * hen.feedPrice());
-            rancher.buyAnimal(hen);
-            rancher.buyAnimal(hen);
-            for (int i = 0; i < 3; i++) rancher.buyFeed(hen);
-            rancher.tendAnimal(0);
-            rancherClock.advanceSeconds(hen.productionSeconds());
+            rancher.progress().award(50 + 75 + 100 + 125 + 150);
+            rancher.wallet().credit(10_000);
+            for (String id : new String[]{"galinha", "galinha", "pato", "ovelha", "ovelha", "vaca"}) {
+                var type = rancher.animalType(id);
+                rancher.buyAnimal(type);
+                rancher.buyFeed(type);
+            }
+            for (int i : new int[]{0, 2, 3, 5}) rancher.tendAnimal(i);
+            rancherClock.advanceSeconds(43_200);
             rancher.inventory().addProduct("ovo", 3);
+            rancher.inventory().addProduct("leite", 2);
+            rancher.wallet().debit(rancher.wallet().coins() - 1200);
             renderer = new FarmRenderer(catalog);
             renderer.viewport().update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
             try { Files.createDirectories(output); }
@@ -168,8 +171,7 @@ public final class VisualReviewLauncher {
                 case 13 -> renderer.marketPanel().showAnimals();
                 case 14 -> {
                     renderer.draw(rancher, null, 1);
-                    float[] nest = {1496, 306};
-                    renderer.pointer(nest[0], nest[1] + 20);
+                    renderer.pointer(1446, 500);
                 }
                 case 8 -> {
                     renderer.pestAlert(new PestSystem.Outbreak(false, true));

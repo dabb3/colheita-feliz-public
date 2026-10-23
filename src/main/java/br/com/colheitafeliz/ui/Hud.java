@@ -350,8 +350,8 @@ public final class Hud {
     public void animalTip(SpriteBatch batch, UiSkin skin, Animal animal, Instant now, float x, float y, GameState state) {
         AnimalType type = animal.type();
         String line = switch (animal.statusAt(now)) {
-            case READY -> type.productYield() + " " + type.productName().toLowerCase() + "s prontos · clique para coletar";
-            case PRODUCING -> type.productName() + "s em " + MarketPanel.formatTime(animal.remainingAt(now).toSeconds());
+            case READY -> type.productYield() + "× " + type.productName() + " pronto · clique para coletar";
+            case PRODUCING -> type.productName() + " em " + MarketPanel.formatTime(animal.remainingAt(now).toSeconds());
             case HUNGRY -> state.inventory().feed(type.id()) > 0
                     ? "Com fome · clique para dar ração (" + state.inventory().feed(type.id()) + ")"
                     : "Com fome · compre ração na Loja, aba Animais";

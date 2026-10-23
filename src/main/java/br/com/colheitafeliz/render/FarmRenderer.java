@@ -75,7 +75,7 @@ public final class FarmRenderer implements AutoCloseable {
     public void pointer(float x, float y) { pointerX = x; pointerY = y; }
 
     /** Índice do animal do jogador sob o ponto (galinha ou ninho), ou -1. */
-    public int animalAt(float x, float y) { return scenery.henAt(x, y); }
+    public int animalAt(float x, float y) { return scenery.animalAt(x, y); }
 
     /** Centro do losango do canteiro, em coordenadas lógicas. */
     public Vector2 tileCenter(int col, int row) { return iso.gridToScreen(col, row); }
@@ -142,9 +142,13 @@ public final class FarmRenderer implements AutoCloseable {
         float backgroundHeight = assets.background.getHeight() * backgroundScale;
         batch.draw(assets.background, (viewport.getWorldWidth() - backgroundWidth) / 2f,
                 viewport.getWorldHeight() - backgroundHeight, backgroundWidth, backgroundHeight);
+        List<String> animalTypes = new ArrayList<>();
         List<Animal.Status> statuses = new ArrayList<>();
-        for (Animal animal : state.barn().animals()) statuses.add(animal.statusAt(now));
-        scenery.syncHens(statuses);
+        for (Animal animal : state.barn().animals()) {
+            animalTypes.add(animal.type().id());
+            statuses.add(animal.statusAt(now));
+        }
+        scenery.syncAnimals(animalTypes, statuses);
         scenery.draw(batch, Scenery.Layer.BACK);
         drawTiles(state, now, hoverFarm ? hovered : null);
         drawPlants(state, now);
@@ -158,9 +162,9 @@ public final class FarmRenderer implements AutoCloseable {
             Vector2 p = iso.gridToScreen(hovered.column(), hovered.row());
             hud.drawTooltip(batch, skin, assets, state, hovered.column(), hovered.row(), p.x, p.y);
         } else if (!windowOpen) {
-            int animal = scenery.henAt(pointerX, pointerY);
+            int animal = scenery.animalAt(pointerX, pointerY);
             if (animal >= 0) {
-                float[] anchor = scenery.henAnchor(animal);
+                float[] anchor = scenery.animalAnchor(animal);
                 hud.animalTip(batch, skin, state.barn().get(animal), now, anchor[0], anchor[1], state);
             }
         }

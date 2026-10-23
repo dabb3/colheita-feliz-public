@@ -92,14 +92,28 @@ public final class MarketPanel {
         return null;
     }
 
+    /** Linha de um animal na aba Animais: até 4 linhas, de cima para baixo. */
+    public static Rectangle animalRow(int index) {
+        float h = (SHEET_H - 24) / 4f;
+        return new Rectangle(SHEET_X + 12, SHEET_Y + SHEET_H - 12 - (index + 1) * h, SHEET_W - 24, h);
+    }
+    public static Rectangle buyAnimalButton(int index) { return rowButton(index, 316, 170); }
+    public static Rectangle buyFeedButton(int index) { return rowButton(index, 590, 120); }
+    public static Rectangle sellProductOneButton(int index) { return rowButton(index, 790, 82); }
+    public static Rectangle sellProductAllButton(int index) { return rowButton(index, 878, 58); }
+    private static Rectangle rowButton(int index, float x, float width) {
+        Rectangle r = animalRow(index);
+        return new Rectangle(r.x + x, r.y + r.height / 2f - 34, width, 30);
+    }
+
     private static ActionResult clickAnimals(float x, float y, GameState state) {
         List<AnimalType> types = state.animalTypes();
         for (int t = 0; t < types.size(); t++) {
             AnimalType type = types.get(t);
-            if (cell(3 * t).contains(x, y)) return state.buyAnimal(type);
-            if (cell(3 * t + 1).contains(x, y)) return state.buyFeed(type);
-            if (sellOneButton(3 * t + 2).contains(x, y)) return state.sellProduct(type, false);
-            if (sellAllButton(3 * t + 2).contains(x, y)) return state.sellProduct(type, true);
+            if (buyAnimalButton(t).contains(x, y)) return state.buyAnimal(type);
+            if (buyFeedButton(t).contains(x, y)) return state.buyFeed(type);
+            if (sellProductOneButton(t).contains(x, y)) return state.sellProduct(type, false);
+            if (sellProductAllButton(t).contains(x, y)) return state.sellProduct(type, true);
         }
         return null;
     }
@@ -134,7 +148,7 @@ public final class MarketPanel {
 
         if (animals) {
             List<AnimalType> types = state.animalTypes();
-            for (int t = 0; t < types.size(); t++) drawAnimalItems(batch, skin, assets, state, types.get(t), 3 * t, px, py);
+            for (int t = 0; t < types.size(); t++) drawAnimalRow(batch, skin, assets, state, types.get(t), t, px, py);
             return;
         }
         for (int i = 0; i < crops.size(); i++) drawItem(batch, skin, assets, state, i, px, py);
@@ -189,57 +203,46 @@ public final class MarketPanel {
         }
     }
 
-    /** Três cartões por animal: comprar o animal, comprar ração e vender o produto. */
-    private static void drawAnimalItems(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state,
-                                        AnimalType type, int first, float px, float py) {
+    /** Uma linha por animal: o animal e seu preço, a ração e o produto para vender. */
+    private static void drawAnimalRow(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state,
+                                      AnimalType type, int index, float px, float py) {
+        Rectangle r = animalRow(index);
         boolean unlocked = state.progress().level() >= type.requiredLevel();
         boolean full = state.barn().full(type);
-        card(batch, skin, assets, first, type.name(), state.barn().count(type) + "/" + type.max(), assets.chicken,
-                unlocked, type.price(), type.productYield() + " " + type.productName().toLowerCase() + "s a cada "
-                        + formatTime(type.productionSeconds()), px, py);
-        Rectangle buy = primaryButton(first);
+        float mid = r.y + r.height / 2f;
+        if (index > 0) skin.rect(batch, Palette.CHROME_LO, r.x + 8, r.y + r.height, r.width - 16, 1);
+        batch.setColor(unlocked ? Color.WHITE : new Color(.6f, .6f, .6f, .5f));
+        Toolbar.drawFitted(batch, assets.animal(type.id()), r.x + 52, mid, 84);
+        batch.setColor(Color.WHITE);
+        skin.text(batch, skin.label, type.name() + "  " + state.barn().count(type) + "/" + type.max(), r.x + 108, mid + 24,
+                unlocked ? Palette.INK : Palette.INK_MUTED, Align.left);
+        skin.text(batch, skin.caption, type.productYield() + "× " + type.productName() + " a cada "
+                + formatTime(type.productionSeconds()), r.x + 108, mid + 2, Palette.INK_MUTED, Align.left);
+        skin.text(batch, skin.caption, "+" + type.collectXp() + " XP por coleta", r.x + 108, mid - 18, Palette.SKY_INK, Align.left);
+        Rectangle buy = buyAnimalButton(index);
         boolean canBuy = unlocked && !full;
         button(batch, skin, canBuy ? skin.glassSun : skin.glassDisabled, buy,
-                !unlocked ? "Nível " + type.requiredLevel() : full ? "Cercado cheio" : "Comprar",
+                !unlocked ? "Nível " + type.requiredLevel() : full ? "Cercado cheio" : "Comprar · " + type.price(),
                 canBuy ? Palette.INK_WARM : Palette.INK_MUTED, null, canBuy && buy.contains(px, py));
 
         int feed = state.inventory().feed(type.id());
-        card(batch, skin, assets, first + 1, "Ração", feed > 0 ? "x" + feed : "", assets.bag, unlocked,
-                type.feedPrice(), "1 por ciclo", px, py);
-        Rectangle feedButton = primaryButton(first + 1);
+        Toolbar.drawFitted(batch, assets.bag, r.x + 540, mid + 2, 64);
+        skin.text(batch, skin.label, "Ração x" + feed, r.x + 590, mid + 24, Palette.INK, Align.left);
+        Rectangle feedButton = buyFeedButton(index);
         button(batch, skin, unlocked ? skin.glassSun : skin.glassDisabled, feedButton,
-                unlocked ? "Comprar" : "Nível " + type.requiredLevel(), unlocked ? Palette.INK_WARM : Palette.INK_MUTED,
-                null, unlocked && feedButton.contains(px, py));
+                unlocked ? "Comprar · " + type.feedPrice() : "Nível " + type.requiredLevel(),
+                unlocked ? Palette.INK_WARM : Palette.INK_MUTED, null, unlocked && feedButton.contains(px, py));
 
         int owned = state.inventory().product(type.productId());
-        card(batch, skin, assets, first + 2, type.productName(), owned > 0 ? "x" + owned : "", assets.nestEggs, true,
-                type.productPrice(), "cada", px, py);
+        Toolbar.drawFitted(batch, assets.product(type.id()), r.x + 750, mid + 4, 50);
+        skin.text(batch, skin.label, type.productName() + " x" + owned + " · " + type.productPrice(), r.x + 790, mid + 24,
+                Palette.INK, Align.left);
         boolean any = owned > 0;
-        Rectangle one = sellOneButton(first + 2), all = sellAllButton(first + 2);
+        Rectangle one = sellProductOneButton(index), all = sellProductAllButton(index);
         button(batch, skin, any ? skin.glassNeutral : skin.glassDisabled, one, "Vender 1",
                 any ? Palette.INK : Palette.INK_MUTED, null, any && one.contains(px, py));
         button(batch, skin, any ? skin.glassBerry : skin.glassDisabled, all, "Tudo",
                 any ? Palette.ON_COLOR : Palette.INK_MUTED, any ? Palette.BERRY_INK : null, any && all.contains(px, py));
-    }
-
-    /** Fundo, nome, contador, ícone e linha de preço de um cartão; os botões ficam com quem chama. */
-    private static void card(SpriteBatch batch, UiSkin skin, GameAssets assets, int index, String name, String count,
-                             com.badlogic.gdx.graphics.Texture icon, boolean unlocked, int price, String info,
-                             float px, float py) {
-        Rectangle c = cell(index);
-        if (c.contains(px, py) && unlocked) skin.draw(batch, skin.itemHover, c.x + 4, c.y + 4, c.width - 8, c.height - 8);
-        float cx = c.x + c.width / 2f;
-        skin.text(batch, skin.label, name, cx, c.y + c.height - 16, unlocked ? Palette.INK : Palette.INK_MUTED, Align.center);
-        if (!count.isEmpty()) skin.text(batch, skin.micro, count, c.x + c.width - 12, c.y + c.height - 16, Palette.INK_MUTED, Align.right);
-        batch.setColor(unlocked ? Color.WHITE : new Color(.6f, .6f, .6f, .5f));
-        Toolbar.drawFitted(batch, icon, cx, c.y + c.height - 98, 96);
-        batch.setColor(Color.WHITE);
-        float priceW = 20 + 4 + skin.width(skin.label, Integer.toString(price)) + 6 + skin.width(skin.caption, info);
-        float left = cx - priceW / 2f;
-        Toolbar.drawFitted(batch, assets.coin, left + 10, c.y + 63, 20);
-        skin.text(batch, skin.label, Integer.toString(price), left + 24, c.y + 69, Palette.INK, Align.left);
-        skin.text(batch, skin.caption, info, left + 24 + skin.width(skin.label, Integer.toString(price)) + 6, c.y + 68,
-                Palette.INK_MUTED, Align.left);
     }
 
     static void button(SpriteBatch batch, UiSkin skin, NinePatch patch, Rectangle r, String text,

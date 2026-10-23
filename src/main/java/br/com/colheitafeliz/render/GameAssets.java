@@ -97,6 +97,16 @@ public final class GameAssets implements AutoCloseable {
     }
 
     public Texture crop(CropType type, int stage) { return crops.get(type.id())[stage - 1]; }
+
+    /** Ícone de um animal produtivo pelo id do catálogo de animais. */
+    public Texture animal(String id) {
+        return switch (id) { case "pato" -> duck; case "ovelha" -> sheep; case "vaca" -> cow; default -> chicken; };
+    }
+
+    /** Ícone do produto de um animal: ovos no ninho, lã no cesto, leite no balde. */
+    public Texture product(String id) {
+        return switch (id) { case "ovelha" -> woolBasket; case "vaca" -> bucket; default -> nestEggs; };
+    }
     public Texture seed(CropType type) { return seeds.get(type.id()); }
 
     public Texture tool(br.com.colheitafeliz.game.Tool tool) {
