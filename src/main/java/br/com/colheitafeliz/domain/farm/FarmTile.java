@@ -13,7 +13,7 @@ public final class FarmTile {
     /** Minhocas (0 = nenhuma, até {@link #MAX_INSECTS}); não pausam o crescimento, reduzem a colheita. */
     private int insects;
     private Instant nextInsectCheckAt;
-    /** Cultura da planta morta que fica depois da colheita, até a enxada retirá-la. */
+    /** Cultura da planta morta que fica depois da colheita, até a pá retirá-la. */
     private CropType withered;
     /** Adubo já usado neste ciclo; vale uma vez por plantio. */
     private boolean fertilized;
@@ -33,7 +33,7 @@ public final class FarmTile {
         state = TileState.PLOWED;
     }
 
-    /** A enxada retira a planta morta e deixa a terra arada para o próximo plantio. */
+    /** A pá retira a planta morta e deixa a terra arada para o próximo plantio. */
     public void clearDead() {
         require(TileState.DEAD);
         withered = null;

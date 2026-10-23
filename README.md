@@ -23,7 +23,7 @@ Comece colhendo os dois nabos prontos. Siga as tarefas de primeiros passos para 
 
 | Tecla | Ação |
 | --- | --- |
-| `1`–`7` | Mão, enxada, regador, sementes, pesticida, herbicida, adubo |
+| `1`–`8` | Cursor, pá, sementes, regador, herbicida, pesticida, luvinha, adubo |
 | `B` / `V` | Loja / depósito |
 | `Q` | Missões diárias |
 | `Esc` | Fechar janelas |
@@ -32,7 +32,7 @@ Comece colhendo os dois nabos prontos. Siga as tarefas de primeiros passos para 
 | `T` | Alternar tempo 1× / 60× para desenvolvimento |
 | `F3` | Overlay técnico |
 
-A primeira rega inicia o crescimento. Terra seca reduz a velocidade; ervas daninhas pausam o crescimento e insetos reduzem a colheita. Use herbicida e pesticida para removê-los. Retire a planta morta com a enxada após colher. Venda a produção no depósito. O adubo, comprado na loja, adianta um quarto do ciclo de uma planta regada.
+A primeira rega inicia o crescimento. Terra seca reduz a velocidade; ervas daninhas pausam o crescimento e insetos reduzem a colheita. Use herbicida e pesticida para removê-los. Retire a planta morta com a pá após colher. Venda a produção no depósito. O adubo, comprado na loja, adianta um quarto do ciclo de uma planta regada.
 
 A aba **Animais** da loja vende galinha, pato, ovelha e vaca, liberados por nível, e a ração de cada um. Clique no animal no cercado para dar ração ou coletar o produto pronto; os produtos são vendidos na mesma aba ou no depósito.
 

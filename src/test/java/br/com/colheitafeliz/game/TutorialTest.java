@@ -39,7 +39,7 @@ class TutorialTest {
         assertTrue(game.buySeed(turnip).success());
         assertEquals(3, game.tutorial().stepIndex());
         game.selectTool(Tool.HOE);
-        assertTrue(game.act(0, 0).success(), "a enxada na planta morta conta como arar");
+        assertTrue(game.act(0, 0).success(), "a pá na planta morta conta como arar");
         assertEquals(4, game.tutorial().stepIndex());
         game.selectSeed(turnip);
         assertTrue(game.act(0, 0).success());

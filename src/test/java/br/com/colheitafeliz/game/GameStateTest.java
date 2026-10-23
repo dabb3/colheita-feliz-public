@@ -62,7 +62,7 @@ class GameStateTest {
         assertEquals(TileState.DEAD, game.farm().tile(0, 0).state());
         game.selectSeed(turnip);
         assertFalse(game.act(0, 0).success());
-        assertEquals("Retire a planta morta com a enxada antes de plantar.", game.message());
+        assertEquals("Retire a planta morta com a pá antes de plantar.", game.message());
         game.selectTool(Tool.HOE);
         int xp = game.progress().currentXp();
         assertTrue(game.act(0, 0).success());
@@ -134,6 +134,14 @@ class GameStateTest {
         assertEquals(corn.growthTime().toMillis() / 4, game.farm().tile(0, 0).crop().grownMillisAt(game.now()));
         assertFalse(game.act(0, 0).success(), "uma vez por plantio");
         assertEquals(1, game.inventory().fertilizer());
+    }
+
+    @Test void newGameStartsWithTheCursorThatDoesNotActOnTiles() {
+        ManualClock clock = new ManualClock();
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
+        assertEquals(Tool.CURSOR, game.tool());
+        assertFalse(game.act(0, 0).success());
+        assertEquals(TileState.GRASS, game.farm().tile(0, 0).state());
     }
 
     @Test void plantingWithoutSeedIsRejectedAndLeavesSoilReady() {
