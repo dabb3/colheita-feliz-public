@@ -14,14 +14,31 @@ class VisualInputTest {
     private static float cx(Rectangle r) { return r.x + r.width / 2f; }
     private static float cy(Rectangle r) { return r.y + r.height / 2f; }
 
-    @Test void toolbarHasSixToolsInBarOrder() {
+    @Test void toolbarHasEightToolsInBarOrder() {
         Toolbar toolbar = new Toolbar();
         float y = Toolbar.Y + Toolbar.HEIGHT / 2f;
         for (int i = 0; i < Tool.BAR.size(); i++)
             assertEquals(Tool.BAR.get(i), toolbar.hit(Toolbar.slotX(i) + Toolbar.SLOT / 2f, y));
-        assertEquals(Tool.PESTICIDE, Tool.BAR.get(4));
-        assertEquals(Tool.WEEDER, Tool.BAR.get(5));
+        assertEquals(java.util.List.of(Tool.CURSOR, Tool.HOE, Tool.SEED, Tool.WATER, Tool.WEEDER, Tool.PESTICIDE,
+                Tool.HAND, Tool.FERTILIZER), Tool.BAR);
+        assertEquals("Pá", Tool.HOE.label());
+        assertEquals("Luvinha", Tool.HAND.label());
         assertNull(toolbar.hit(Toolbar.slotX(0) + 10, Toolbar.Y + Toolbar.HEIGHT + 60));
+    }
+
+    @Test void seedTrayOpensWithTheBagAndClosesAfterPickingASeed() {
+        Toolbar toolbar = new Toolbar();
+        assertFalse(toolbar.seedsOpen());
+        toolbar.picked(Tool.SEED, Tool.CURSOR);
+        assertTrue(toolbar.seedsOpen());
+        toolbar.closeSeeds();
+        assertFalse(toolbar.seedsOpen());
+        toolbar.picked(Tool.SEED, Tool.SEED);
+        assertTrue(toolbar.seedsOpen(), "o saco de novo reabre a faixa");
+        toolbar.picked(Tool.SEED, Tool.SEED);
+        assertFalse(toolbar.seedsOpen(), "e com a faixa aberta, fecha");
+        toolbar.picked(Tool.HOE, Tool.SEED);
+        assertFalse(toolbar.seedsOpen());
     }
 
     @Test void shortcutsSitInTheTopRightCorner() {
