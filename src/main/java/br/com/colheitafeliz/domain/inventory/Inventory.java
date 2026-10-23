@@ -10,6 +10,7 @@ public final class Inventory {
     /** Produtos de animais (ovo, leite...) e ração, ambos pelo id. A ração é do animal: "galinha". */
     private final Map<String, Integer> products = new HashMap<>();
     private final Map<String, Integer> feed = new HashMap<>();
+    private int fertilizer;
 
     public int seeds(CropType type) { return seeds.getOrDefault(type.id(), 0); }
     public int produce(CropType type) { return produce.getOrDefault(type.id(), 0); }
@@ -23,6 +24,15 @@ public final class Inventory {
     public void takeProduct(String id, int amount) { take(products, id, amount); }
     public void addFeed(String animalId, int amount) { add(feed, animalId, amount); }
     public void useFeed(String animalId) { take(feed, animalId, 1); }
+    public int fertilizer() { return fertilizer; }
+    public void addFertilizer(int amount) {
+        if (amount < 0) throw new IllegalArgumentException("Negative inventory amount");
+        fertilizer = Math.addExact(fertilizer, amount);
+    }
+    public void useFertilizer() {
+        if (fertilizer == 0) throw new IllegalStateException("Insufficient inventory: fertilizer");
+        fertilizer--;
+    }
 
     public void addSeeds(CropType type, int amount) { add(seeds, type.id(), amount); }
     public void addProduce(CropType type, int amount) { add(produce, type.id(), amount); }
@@ -34,6 +44,11 @@ public final class Inventory {
         produce.clear();
         seedCounts.forEach((id, count) -> add(seeds, id, count));
         produceCounts.forEach((id, count) -> add(produce, id, count));
+    }
+
+    public void restoreFertilizer(int amount) {
+        fertilizer = 0;
+        addFertilizer(amount);
     }
 
     public void restoreAnimalItems(Map<String, Integer> productCounts, Map<String, Integer> feedCounts) {

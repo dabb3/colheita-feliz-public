@@ -117,6 +117,7 @@ public final class GameAssets implements AutoCloseable {
             case SEED -> bag;
             case WEEDER -> weeder;
             case PESTICIDE -> pesticide;
+            case FERTILIZER -> bag;
         };
     }
 

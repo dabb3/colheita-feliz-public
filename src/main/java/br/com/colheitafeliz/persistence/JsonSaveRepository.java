@@ -45,8 +45,9 @@ public final class JsonSaveRepository implements SaveRepository {
             else if (version == 7) migratePlots(data, 7);
             else if (version == 8) migratePlots(data, 5);
             if (version >= 1 && version <= 9) migrateGrowthAnchors(data);
-            // v11 acrescentou insetos, v12 a planta morta e o tutorial, v13 os animais; todos têm padrão vazio.
-            if (version >= 1 && version <= 12) data.addProperty("version", GameSave.VERSION);
+            // v11 acrescentou insetos, v12 a planta morta e o tutorial, v13 os animais, v14 o adubo;
+            // todos têm padrão vazio.
+            if (version >= 1 && version <= 13) data.addProperty("version", GameSave.VERSION);
             GameSave save = gson.fromJson(data, GameSave.class);
             if (save == null || save.version() != GameSave.VERSION || save.snapshot() == null)
                 throw new IOException("Unsupported or incomplete save file");

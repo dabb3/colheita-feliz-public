@@ -101,6 +101,7 @@ public final class InputController extends InputAdapter {
             case WATER -> Cue.WATER;
             case SEED -> Cue.PLANT;
             case WEEDER, PESTICIDE -> Cue.WEED;
+            case FERTILIZER -> Cue.PLANT;
         };
         Vector2 center = renderer.tileCenter(tile.column(), tile.row());
         boolean harvested = !lockedPlot && actionTool == Tool.HAND && result.success();

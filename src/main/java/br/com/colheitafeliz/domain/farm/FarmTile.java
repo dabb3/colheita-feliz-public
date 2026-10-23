@@ -15,6 +15,8 @@ public final class FarmTile {
     private Instant nextInsectCheckAt;
     /** Cultura da planta morta que fica depois da colheita, até a enxada retirá-la. */
     private CropType withered;
+    /** Adubo já usado neste ciclo; vale uma vez por plantio. */
+    private boolean fertilized;
     public static final int MAX_INSECTS = 3;
 
     public TileState state() { return state; }
@@ -24,6 +26,7 @@ public final class FarmTile {
     public PestState pest() { return pest; }
     public Instant nextPestCheckAt() { return nextPestCheckAt; }
     public CropType withered() { return withered; }
+    public boolean fertilized() { return fertilized; }
 
     public void plow() {
         require(TileState.GRASS);
@@ -44,6 +47,7 @@ public final class FarmTile {
         nextPestCheckAt = null;
         insects = 0;
         nextInsectCheckAt = null;
+        fertilized = false;
         state = TileState.GROWING;
     }
 
@@ -70,6 +74,14 @@ public final class FarmTile {
         crop = crop.removePest(now);
         pest = PestState.NONE;
         nextPestCheckAt = now.plus(pestCheckInterval());
+    }
+
+    /** Adubo: adianta {@code fraction} do ciclo de uma planta regada que ainda não está pronta. */
+    public void fertilize(Instant now, double fraction) {
+        require(TileState.GROWING);
+        if (fertilized || !crop.watered() || crop.matureAt(now)) throw new IllegalStateException("Cannot fertilize");
+        crop = crop.advance(now, Math.round(crop.type().growthTime().toMillis() * fraction));
+        fertilized = true;
     }
 
     /** Sorteio de insetos: se {@code infected}, aparece a primeira minhoca; o próximo sorteio é reagendado. */
@@ -116,6 +128,7 @@ public final class FarmTile {
         insects = 0;
         nextInsectCheckAt = null;
         withered = result;
+        fertilized = false;
         state = TileState.DEAD;
         return result;
     }
@@ -130,11 +143,11 @@ public final class FarmTile {
 
     public void restore(TileState state, Crop crop, PestState pest, Instant nextPestCheckAt,
                         int insects, Instant nextInsectCheckAt) {
-        restore(state, crop, pest, nextPestCheckAt, insects, nextInsectCheckAt, null);
+        restore(state, crop, pest, nextPestCheckAt, insects, nextInsectCheckAt, null, false);
     }
 
     public void restore(TileState state, Crop crop, PestState pest, Instant nextPestCheckAt,
-                        int insects, Instant nextInsectCheckAt, CropType withered) {
+                        int insects, Instant nextInsectCheckAt, CropType withered, boolean fertilized) {
         Objects.requireNonNull(state);
         Objects.requireNonNull(pest);
         boolean needsCrop = state == TileState.GROWING || state == TileState.READY;
@@ -150,6 +163,7 @@ public final class FarmTile {
         this.insects = insects;
         this.nextInsectCheckAt = nextInsectCheckAt;
         this.withered = withered;
+        this.fertilized = fertilized && state == TileState.GROWING;
     }
 
     private void require(TileState expected) {
