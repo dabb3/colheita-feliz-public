@@ -1,0 +1,4 @@
+[
+  {"id":"galinha", "name":"Galinha", "price":300, "requiredLevel":3, "feedPrice":20, "productionSeconds":14400,
+   "productId":"ovo", "productName":"Ovo", "productYield":3, "productPrice":45, "collectXp":20, "max":3}
+]
