@@ -42,12 +42,13 @@ public final class VisualReviewLauncher {
                 "01-fazenda.png", "02-estados-do-canteiro.png", "03-tooltip-verme.png", "04-tooltip-seca.png",
                 "05-sementes.png", "06-loja.png", "07-deposito.png", "08-missoes.png",
                 "09-avisos.png", "10-nivel-e-recompensas.png", "11-lote-a-venda.png",
-                "12-primeiros-passos.png", "13-tutorial-nas-missoes.png"
+                "12-primeiros-passos.png", "13-tutorial-nas-missoes.png",
+                "14-loja-animais.png", "15-galinhas-no-cercado.png"
         };
-        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3};
+        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3};
         private final Path output = Path.of(System.getProperty("colheita.visualOutput", "build/visual-review"));
         private FarmRenderer renderer;
-        private GameState fresh, states, rich, newcomer;
+        private GameState fresh, states, rich, newcomer, rancher;
         private int scene, frames;
 
         @Override public void create() {
@@ -68,6 +69,17 @@ public final class VisualReviewLauncher {
             newcomer.startNewFarm();
             newcomer.selectTool(Tool.HAND);
             newcomer.act(0, 0);
+            ManualClock rancherClock = new ManualClock();
+            rancher = new GameState(rancherClock::instant, rancherClock, catalog, bound -> 99);
+            rancher.progress().award(50 + 75);
+            var hen = rancher.animalType("galinha");
+            rancher.wallet().credit(2 * hen.price() + 3 * hen.feedPrice());
+            rancher.buyAnimal(hen);
+            rancher.buyAnimal(hen);
+            for (int i = 0; i < 3; i++) rancher.buyFeed(hen);
+            rancher.tendAnimal(0);
+            rancherClock.advanceSeconds(hen.productionSeconds());
+            rancher.inventory().addProduct("ovo", 3);
             renderer = new FarmRenderer(catalog);
             renderer.viewport().update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
             try { Files.createDirectories(output); }
@@ -115,6 +127,7 @@ public final class VisualReviewLauncher {
                 case 0, 10 -> fresh;
                 case 5, 6, 7, 9 -> rich;
                 case 11, 12 -> newcomer;
+                case 13, 14 -> rancher;
                 default -> states;
             };
             IsoRenderer.GridPosition hovered = switch (scene) {
@@ -152,6 +165,12 @@ public final class VisualReviewLauncher {
                 }
                 case 6 -> renderer.marketPanel().showSell();
                 case 7, 12 -> renderer.missions().toggle();
+                case 13 -> renderer.marketPanel().showAnimals();
+                case 14 -> {
+                    renderer.draw(rancher, null, 1);
+                    float[] nest = {1496, 306};
+                    renderer.pointer(nest[0], nest[1] + 20);
+                }
                 case 8 -> {
                     renderer.pestAlert(new PestSystem.Outbreak(false, true));
                     Rectangle shop = Hud.shortcutBounds(Hud.Shortcut.SHOP);

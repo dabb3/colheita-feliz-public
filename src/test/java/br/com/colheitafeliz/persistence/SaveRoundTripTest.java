@@ -105,6 +105,30 @@ class SaveRoundTripTest {
                 .state().tutorial().active());
     }
 
+    @Test void hensFeedAndEggsSurviveRestartAndKeepProducingOffline() throws IOException {
+        ManualClock clock = new ManualClock();
+        JsonSaveRepository repository = new JsonSaveRepository(directory.resolve("save.json"));
+        GameSession session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
+        GameState state = session.state();
+        state.progress().award(50 + 75);
+        var hen = state.animalType("galinha");
+        state.wallet().credit(2 * hen.price() + 2 * hen.feedPrice());
+        state.buyAnimal(hen);
+        state.buyAnimal(hen);
+        state.buyFeed(hen);
+        state.buyFeed(hen);
+        assertTrue(state.tendAnimal(0).success());
+        state.inventory().addProduct("ovo", 2);
+        session.save();
+        clock.advanceSeconds(hen.productionSeconds());
+        GameState restored = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state();
+        assertEquals(2, restored.barn().size());
+        assertEquals(1, restored.inventory().feed("galinha"));
+        assertEquals(2, restored.inventory().product("ovo"));
+        assertEquals(br.com.colheitafeliz.domain.animal.Animal.Status.READY, restored.barn().get(0).statusAt(restored.now()));
+        assertEquals(br.com.colheitafeliz.domain.animal.Animal.Status.HUNGRY, restored.barn().get(1).statusAt(restored.now()));
+    }
+
     @Test void rejectsUnsupportedSaveVersion() throws IOException {
         Path file = directory.resolve("save.json");
         Files.writeString(file, "{\"version\":99}");
