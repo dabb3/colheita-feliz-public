@@ -1,5 +1,7 @@
 package br.com.colheitafeliz.ui;
 
+import br.com.colheitafeliz.domain.animal.AnimalType;
+import br.com.colheitafeliz.domain.animal.Animal;
 import br.com.colheitafeliz.domain.crop.Crop;
 import br.com.colheitafeliz.domain.crop.CropType;
 import br.com.colheitafeliz.domain.farm.FarmTile;
@@ -342,6 +344,19 @@ public final class Hud {
         if (!crop.matureAt(now) && crop.dryAt(now)) chips.add(new String[]{crop.watered() ? "SECA" : "SEM ÁGUA", "b07a3a"});
         if (chips.isEmpty()) chips.add(new String[]{"SAUDÁVEL", "3a8a14"});
         return chips.size() > 2 ? chips.subList(0, 2) : chips;
+    }
+
+    /** Balão sobre o ninho: o que a galinha está fazendo e o que o clique faz. */
+    public void animalTip(SpriteBatch batch, UiSkin skin, Animal animal, Instant now, float x, float y, GameState state) {
+        AnimalType type = animal.type();
+        String line = switch (animal.statusAt(now)) {
+            case READY -> type.productYield() + " " + type.productName().toLowerCase() + "s prontos · clique para coletar";
+            case PRODUCING -> type.productName() + "s em " + MarketPanel.formatTime(animal.remainingAt(now).toSeconds());
+            case HUNGRY -> state.inventory().feed(type.id()) > 0
+                    ? "Com fome · clique para dar ração (" + state.inventory().feed(type.id()) + ")"
+                    : "Com fome · compre ração na Loja, aba Animais";
+        };
+        simpleTip(batch, skin, x, y, type.name(), line);
     }
 
     private void simpleTip(SpriteBatch batch, UiSkin skin, float tileX, float tileY, String title, String line) {

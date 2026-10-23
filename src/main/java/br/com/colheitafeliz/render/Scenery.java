@@ -1,5 +1,6 @@
 package br.com.colheitafeliz.render;
 
+import br.com.colheitafeliz.domain.animal.Animal;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
@@ -11,8 +12,8 @@ import java.util.Random;
 
 /**
  * Cenário vivo, como na fazenda do Orkut: casa e casinha do cachorro no alto, cachorro com o potinho, burrinho
- * cochilando, coelho com a cenoura e os animais passeando dentro do cercado. Por enquanto é só decoração;
- * os animais produtivos estão nas regras (seção 8).
+ * cochilando, coelho com a cenoura e os animais passeando dentro do cercado. As galinhas são as do jogador:
+ * cada uma tem um ninho, que mostra os ovos quando estão prontos; vaca, ovelha e pato ainda são decoração.
  */
 final class Scenery {
     /** Camada de desenho: atrás dos canteiros (o padrão) ou na frente deles. */
@@ -23,7 +24,8 @@ final class Scenery {
      * um ponto perto de casa e anda até lá, alternando os quadros de passo. Os sprites olham para a esquerda.
      */
     private static final class Thing {
-        final Texture idle, walk;
+        Texture idle;
+        final Texture walk;
         final float width, homeX, homeY, radius, speed;
         float footCenter = .5f;
         final Layer layer;
@@ -51,7 +53,14 @@ final class Scenery {
         }
     }
 
+    /** Ninhos das galinhas do jogador, na ordem de compra; cada galinha passeia perto do seu. */
+    static final float[][] NESTS = {{1296, 338}, {1496, 306}, {1186, 372}};
+    private static final float NEST_W = 76;
+
     private final List<Thing> things = new ArrayList<>();
+    private final List<Thing> nests = new ArrayList<>();
+    private final List<Thing> hens = new ArrayList<>();
+    private final GameAssets assets;
     private final Pen pen;
     private final Random random = new Random(7);
     private final Texture soft;
@@ -60,6 +69,7 @@ final class Scenery {
     Scenery(GameAssets a, Pen pen, Texture softShadow) {
         this.pen = pen;
         this.soft = softShadow;
+        this.assets = a;
         // Casas no alto, a casinha do cachorro à esquerda da casa.
         add(a.dogHouse, null, 410, 556, 214, 0, 0, Layer.BACK, false, false, false);
         add(a.house, null, 735, 540, 420, 0, 0, Layer.BACK, false, false, false);
@@ -68,14 +78,10 @@ final class Scenery {
         add(a.dog, a.dogWalk, 384, 530, 92, 40, 34, Layer.BACK, true, false, true);
         add(a.donkeySleeping, null, 222, 540, 96, 0, 0, Layer.BACK, true, false, false);
         // Dentro do cercado.
-        add(a.nestEggs, null, 1296, 338, 76, 0, 0, Layer.BACK, false, true, false);
-        add(a.nestEmpty, null, 1496, 306, 72, 0, 0, Layer.BACK, false, true, false);
         add(a.bucket, null, 1514, 424, 40, 0, 0, Layer.BACK, true, true, false);
         add(a.woolBasket, null, 1316, 470, 44, 0, 0, Layer.BACK, true, true, false);
         add(a.cow, a.cowWalk, 1436, 462, 158, 40, 16, Layer.BACK, true, true, false);
         add(a.sheep, a.sheepWalk, 1222, 460, 96, 32, 18, Layer.BACK, true, true, true);
-        add(a.chicken, a.chickenWalk, 1186, 396, 60, 45, 34, Layer.BACK, true, true, false);
-        add(a.chicken, a.chickenWalk, 1390, 360, 54, 50, 30, Layer.BACK, true, true, true);
         add(a.duck, null, 1540, 352, 48, 0, 0, Layer.BACK, true, true, false);
         // Coelho com a cenoura no canto de baixo.
         add(a.carrot, null, 168, 140, 54, 0, 0, Layer.FRONT, true, false, false);
@@ -86,9 +92,48 @@ final class Scenery {
         }
     }
 
-    private void add(Texture idle, Texture walk, float x, float y, float width, float radius, float speed,
-                     Layer layer, boolean shadow, boolean insidePen, boolean facingRight) {
-        things.add(new Thing(idle, walk, x, y, width, radius, speed, layer, shadow, insidePen, facingRight));
+    private Thing add(Texture idle, Texture walk, float x, float y, float width, float radius, float speed,
+                      Layer layer, boolean shadow, boolean insidePen, boolean facingRight) {
+        Thing thing = new Thing(idle, walk, x, y, width, radius, speed, layer, shadow, insidePen, facingRight);
+        things.add(thing);
+        return thing;
+    }
+
+    /** Uma galinha e um ninho por animal do jogador; o ninho mostra ovos quando estão prontos. */
+    void syncHens(List<Animal.Status> statuses) {
+        int count = Math.min(statuses.size(), NESTS.length);
+        while (hens.size() < count) {
+            float[] nest = NESTS[hens.size()];
+            nests.add(add(assets.nestEmpty, null, nest[0], nest[1], NEST_W, 0, 0, Layer.BACK, false, true, false));
+            Thing hen = add(assets.chicken, assets.chickenWalk, nest[0] - 70, nest[1] + 40, 58, 45, 32,
+                    Layer.BACK, true, true, hens.size() % 2 == 0);
+            hen.footCenter = assets.footCenter(hen.idle);
+            hen.wait = random.nextFloat() * 3;
+            hens.add(hen);
+        }
+        while (hens.size() > count) {
+            things.remove(hens.removeLast());
+            things.remove(nests.removeLast());
+        }
+        for (int i = 0; i < count; i++)
+            nests.get(i).idle = statuses.get(i) == Animal.Status.READY ? assets.nestEggs : assets.nestEmpty;
+    }
+
+    /** Índice da galinha (ou do ninho dela) sob o ponto, ou -1. */
+    int henAt(float x, float y) {
+        for (int i = 0; i < hens.size(); i++) {
+            Thing nest = nests.get(i), hen = hens.get(i);
+            if (Math.abs(x - nest.x) <= NEST_W / 2f && y >= nest.y - 6 && y <= nest.y + NEST_W * .7f) return i;
+            float h = hen.width * hen.idle.getHeight() / hen.idle.getWidth();
+            if (Math.abs(x - hen.x) <= hen.width / 2f && y >= hen.y - 6 && y <= hen.y + h) return i;
+        }
+        return -1;
+    }
+
+    /** Ponto acima do ninho, para o balão de dica. */
+    float[] henAnchor(int index) {
+        Thing nest = nests.get(index);
+        return new float[]{nest.x, nest.y + 20};
     }
 
     /** Desenha a camada pedida, de trás para a frente (maior y primeiro). {@code pen} vem no meio da camada BACK. */
