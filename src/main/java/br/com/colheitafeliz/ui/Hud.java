@@ -34,9 +34,9 @@ import java.util.List;
  * (floaters), banner de subir de nível e o balão de status do canteiro.
  */
 public final class Hud {
-    public enum Shortcut { ALERTS, MISSIONS, SHOP, DEPOSIT, SOUND, MUSIC, SETTINGS }
+    public enum Shortcut { ALERTS, MISSIONS, SHOP, DEPOSIT, SETTINGS }
     /** Ações do painel de Ajustes, executadas por quem trata a entrada. */
-    public enum Setting { SPEED, DEBUG, SAVE }
+    public enum Setting { MUSIC, EFFECTS, SPEED, DEBUG, SAVE }
     private enum Panel { NONE, ALERTS, SETTINGS }
     public enum ToastKind { NORMAL, REWARD, ALERT }
     public enum FloaterStyle { COIN, XP, ITEM }
@@ -130,7 +130,7 @@ public final class Hud {
         if (state.tutorial().active()) drawTutorial(batch, skin, assets, state.tutorial());
         drawShortcuts(batch, skin, assets, state, px, py);
         if (panel == Panel.ALERTS) drawAlerts(batch, skin, state.alerts());
-        if (panel == Panel.SETTINGS) drawSettings(batch, skin, speed, debug, px, py);
+        if (panel == Panel.SETTINGS) drawSettings(batch, skin, state, speed, debug, px, py);
     }
 
     private static final float GIFT = 50, GIFT_Y = CARD_Y - 8 - GIFT;
@@ -154,7 +154,8 @@ public final class Hud {
             skin.text(batch, skin.caption, "e mais " + (alerts.size() - shown), x + 16, y + 18, Palette.INK_MUTED, Align.left);
     }
 
-    private void drawSettings(SpriteBatch batch, UiSkin skin, double speed, boolean debug, float px, float py) {
+    private void drawSettings(SpriteBatch batch, UiSkin skin, GameState state, double speed, boolean debug,
+                              float px, float py) {
         Rectangle first = settingRow(0), last = settingRow(SETTINGS.length - 1);
         float x = first.x - 10, y = last.y - 12, h = first.y + first.height + 54 - y;
         skin.dropShadow(batch, x, y, PANEL_W, h, 4);
@@ -164,11 +165,15 @@ public final class Hud {
             Rectangle r = settingRow(i);
             if (r.contains(px, py)) skin.draw(batch, skin.itemHover, r.x, r.y, r.width, r.height);
             String label = switch (SETTINGS[i]) {
+                case MUSIC -> "Música (M)";
+                case EFFECTS -> "Efeitos sonoros (N)";
                 case SPEED -> "Tempo acelerado (T)";
                 case DEBUG -> "Overlay técnico (F3)";
                 case SAVE -> "Salvar agora (S)";
             };
             String value = switch (SETTINGS[i]) {
+                case MUSIC -> state.musicEnabled() ? "Ligada" : "Desligada";
+                case EFFECTS -> state.effectsEnabled() ? "Ligados" : "Desligados";
                 case SPEED -> speed > 1 ? "60×" : "1×";
                 case DEBUG -> debug ? "Ligado" : "Desligado";
                 case SAVE -> "";
@@ -249,21 +254,15 @@ public final class Hud {
             if (hover) skin.glow(batch, cx, cy, 100, 1f);
             Texture icon = switch (s) {
                 case ALERTS -> assets.bell; case MISSIONS -> assets.clipboard; case SHOP -> assets.shop;
-                case DEPOSIT -> assets.deposit; case SOUND -> assets.sound; case MUSIC -> assets.music; case SETTINGS -> assets.gear;
+                case DEPOSIT -> assets.deposit; case SETTINGS -> assets.gear;
             };
             batch.setColor(0, 0, 0, .25f);
             Toolbar.drawFitted(batch, icon, cx + 1, cy - 3 + (hover ? 2 : 0), 56);
             batch.setColor(Color.WHITE);
             Toolbar.drawFitted(batch, icon, cx, cy + (hover ? 2 : 0), hover ? 60 : 56);
-            boolean off = s == Shortcut.SOUND && !state.effectsEnabled() || s == Shortcut.MUSIC && !state.musicEnabled();
-            if (off) {
-                batch.setColor(Palette.BERRY);
-                batch.draw(skin.white, cx - 30, cy - 3, 30, 3, 60, 6, 1, 1, 45, 0, 0, 2, 2, false, false);
-                batch.setColor(Color.WHITE);
-            }
             String label = switch (s) {
                 case ALERTS -> "Avisos"; case MISSIONS -> "Missões"; case SHOP -> "Loja"; case DEPOSIT -> "Depósito";
-                case SOUND -> "Som"; case MUSIC -> "Música"; case SETTINGS -> "Ajustes";
+                case SETTINGS -> "Ajustes";
             };
             skin.onScene(batch, skin.label, label, cx, r.y + 14, Align.center);
             if (s == Shortcut.ALERTS && alerts > 0) badge(batch, skin, Integer.toString(alerts), cx + 24, cy + 22);

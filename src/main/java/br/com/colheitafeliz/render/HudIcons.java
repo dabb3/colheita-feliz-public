@@ -25,31 +25,6 @@ final class HudIcons {
         return outlined(p);
     }
 
-    static Pixmap music() {
-        Pixmap p = blank();
-        p.setColor(Color.valueOf("8a63e8"));
-        p.fillCircle(40, 98, 16);
-        p.fillCircle(92, 86, 16);
-        p.fillRectangle(48, 30, 9, 68);
-        p.fillRectangle(100, 18, 9, 68);
-        p.fillTriangle(48, 30, 109, 18, 109, 34);
-        p.fillTriangle(48, 30, 48, 46, 109, 34);
-        return outlined(p);
-    }
-
-    static Pixmap sound() {
-        Pixmap p = blank();
-        p.setColor(Color.valueOf("3a8ad8"));
-        ring(p, 76, 64, 50, 40);
-        ring(p, 76, 64, 32, 23);
-        clear(p, 0, 0, 84, S);
-        p.setColor(Color.valueOf("3a8ad8"));
-        p.fillRectangle(16, 46, 30, 36);
-        p.fillTriangle(44, 46, 80, 16, 80, 112);
-        p.fillTriangle(44, 46, 44, 82, 80, 112);
-        return outlined(p);
-    }
-
     static Pixmap gear() {
         Pixmap p = blank();
         p.setColor(Color.valueOf("9aa3ad"));
@@ -95,20 +70,7 @@ final class HudIcons {
         return p;
     }
 
-    private static void ring(Pixmap p, int x, int y, int outer, int inner) {
-        p.fillCircle(x, y, outer);
-        p.setBlending(Pixmap.Blending.None);
-        p.setColor(0, 0, 0, 0);
-        p.fillCircle(x, y, inner);
-        p.setBlending(Pixmap.Blending.SourceOver);
-    }
 
-    private static void clear(Pixmap p, int x, int y, int w, int h) {
-        p.setBlending(Pixmap.Blending.None);
-        p.setColor(0, 0, 0, 0);
-        p.fillRectangle(x, y, w, h);
-        p.setBlending(Pixmap.Blending.SourceOver);
-    }
 
     /** Contorno escuro de 4 px em volta de tudo que foi desenhado, como nos ícones clássicos. */
     private static Pixmap outlined(Pixmap p) {

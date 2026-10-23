@@ -69,8 +69,6 @@ public final class InputController extends InputAdapter {
                 case MISSIONS -> renderer.missions().toggle();
                 case SHOP -> renderer.marketPanel().showShop();
                 case DEPOSIT -> renderer.marketPanel().showSell();
-                case SOUND -> toggleEffects();
-                case MUSIC -> toggleMusic();
                 case SETTINGS -> renderer.hud().toggleSettings();
             }
             audio.play(Cue.PLOW);
@@ -165,8 +163,8 @@ public final class InputController extends InputAdapter {
                 renderer.hud().closePanel();
             }
             case Input.Keys.F3 -> apply(Hud.Setting.DEBUG);
-            case Input.Keys.M -> toggleMusic();
-            case Input.Keys.N -> toggleEffects();
+            case Input.Keys.M -> apply(Hud.Setting.MUSIC);
+            case Input.Keys.N -> apply(Hud.Setting.EFFECTS);
             case Input.Keys.T -> apply(Hud.Setting.SPEED);
             case Input.Keys.S -> apply(Hud.Setting.SAVE);
             default -> { return false; }
@@ -174,19 +172,17 @@ public final class InputController extends InputAdapter {
         return true;
     }
 
-    private void toggleMusic() {
-        session.state().setMusicEnabled(!session.state().musicEnabled());
-        audio.applySettings();
-        save.run();
-    }
-
-    private void toggleEffects() {
-        session.state().setEffectsEnabled(!session.state().effectsEnabled());
-        save.run();
-    }
-
     private void apply(Hud.Setting setting) {
         switch (setting) {
+            case MUSIC -> {
+                session.state().setMusicEnabled(!session.state().musicEnabled());
+                audio.applySettings();
+                save.run();
+            }
+            case EFFECTS -> {
+                session.state().setEffectsEnabled(!session.state().effectsEnabled());
+                save.run();
+            }
             case SPEED -> session.clock().setSpeed(session.clock().speed() == 1 ? 60 : 1);
             case DEBUG -> renderer.toggleDebug();
             case SAVE -> {

@@ -64,8 +64,6 @@ public final class GameAssets implements AutoCloseable {
     public final Texture coin = load("classic/avatar-ui/moeda-comum.png");
     public final Texture greenCoin = load("classic/avatar-ui/moeda-verde.png");
     public final Texture bell = generated(HudIcons.bell());
-    public final Texture music = generated(HudIcons.music());
-    public final Texture sound = generated(HudIcons.sound());
     public final Texture gear = generated(HudIcons.gear());
     public final Texture clipboard = generated(HudIcons.clipboard());
     public final Texture star = load("classic/ui/icon_xp.png");
