@@ -503,6 +503,32 @@ public final class GameState {
     /** Pragas que surgiram no último {@link #refresh()}. */
     public PestSystem.Outbreak lastOutbreak() { return lastOutbreak; }
 
+    /** Moeda verde: só aparece na HUD por enquanto; a regra de ganho entra com a nova economia. */
+    public int greenCoins() { return 0; }
+
+    /** Um aviso da fazenda: o que está errado e onde. */
+    public record Alert(String title, String detail) {}
+
+    /**
+     * Problemas que pedem ação agora: ervas daninhas, insetos, terra seca e animal com fome. Calculado a cada
+     * chamada, então um aviso some assim que o problema é resolvido.
+     */
+    public List<Alert> alerts() {
+        Instant now = clock.now();
+        List<Alert> alerts = new ArrayList<>();
+        for (int row = 0; row < ROWS; row++) for (int col = 0; col < COLUMNS; col++) {
+            FarmTile tile = farm.tile(col, row);
+            if (!land.isUnlocked(col, row) || tile.state() != TileState.GROWING) continue;
+            String name = tile.crop().type().name();
+            if (tile.pest() == PestState.WEEDS) alerts.add(new Alert("Ervas daninhas", name));
+            if (tile.insects() > 0) alerts.add(new Alert("Insetos", name));
+            if (tile.crop().dryAt(now) && !tile.crop().matureAt(now)) alerts.add(new Alert("Terra seca", name));
+        }
+        for (Animal animal : barn.animals())
+            if (animal.statusAt(now) == Animal.Status.HUNGRY) alerts.add(new Alert("Com fome", animal.type().name()));
+        return alerts;
+    }
+
     /** Moedas do baú do tesouro: crescem com o nível para continuar valendo a pena. */
     public int treasureCoins() { return 20 + 10 * progress.level(); }
 

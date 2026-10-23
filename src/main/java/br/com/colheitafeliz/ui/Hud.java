@@ -34,7 +34,10 @@ import java.util.List;
  * (floaters), banner de subir de nível e o balão de status do canteiro.
  */
 public final class Hud {
-    public enum Shortcut { MISSIONS, SHOP, DEPOSIT }
+    public enum Shortcut { ALERTS, MISSIONS, SHOP, DEPOSIT, SOUND, MUSIC, SETTINGS }
+    /** Ações do painel de Ajustes, executadas por quem trata a entrada. */
+    public enum Setting { SPEED, DEBUG, SAVE }
+    private enum Panel { NONE, ALERTS, SETTINGS }
     public enum ToastKind { NORMAL, REWARD, ALERT }
     public enum FloaterStyle { COIN, XP, ITEM }
 
@@ -52,6 +55,7 @@ public final class Hud {
     private String bannerTitle, bannerSub;
     private long bannerStarted;
     private float shownCoins = -1;
+    private Panel panel = Panel.NONE;
     private long bumpStarted;
 
     // ---------- eventos ----------
@@ -77,7 +81,7 @@ public final class Hud {
     public boolean bannerVisible() { return bannerTitle != null; }
 
     /** Limpa avisos, floaters e banner (usado pela revisão visual entre cenas). */
-    public void reset() { toasts.clear(); floaters.clear(); bannerTitle = null; shownCoins = -1; }
+    public void reset() { toasts.clear(); floaters.clear(); bannerTitle = null; shownCoins = -1; panel = Panel.NONE; }
     public void dismissBanner() { bannerTitle = null; }
 
     // ---------- atalhos ----------
@@ -93,18 +97,91 @@ public final class Hud {
         return null;
     }
 
+    // ---------- painéis do sininho e de ajustes ----------
+
+    private static final float PANEL_W = 340, ROW = 40;
+    private static final Setting[] SETTINGS = Setting.values();
+
+    public void toggleAlerts() { panel = panel == Panel.ALERTS ? Panel.NONE : Panel.ALERTS; }
+    public void toggleSettings() { panel = panel == Panel.SETTINGS ? Panel.NONE : Panel.SETTINGS; }
+    public boolean panelOpen() { return panel != Panel.NONE; }
+    public void closePanel() { panel = Panel.NONE; }
+
+    public static Rectangle settingRow(int index) {
+        Rectangle anchor = shortcutBounds(Shortcut.SETTINGS);
+        float x = anchor.x + anchor.width - PANEL_W, top = anchor.y - 8 - 12;
+        return new Rectangle(x + 10, top - (index + 1) * ROW, PANEL_W - 20, ROW - 4);
+    }
+
+    /** Clique com um painel aberto: devolve o ajuste escolhido, ou nulo; clique fora fecha o painel. */
+    public Setting panelClick(float x, float y) {
+        if (panel == Panel.SETTINGS)
+            for (int i = 0; i < SETTINGS.length; i++) if (settingRow(i).contains(x, y)) return SETTINGS[i];
+        panel = Panel.NONE;
+        return null;
+    }
+
     // ---------- desenho ----------
 
-    public void drawTop(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state, float px, float py) {
+    public void drawTop(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state, float px, float py,
+                        double speed, boolean debug) {
         drawProfile(batch, skin, assets, state);
+        Toolbar.drawFitted(batch, assets.gift, CARD_X + 32, GIFT_Y + GIFT / 2f, GIFT);
         if (state.tutorial().active()) drawTutorial(batch, skin, assets, state.tutorial());
         drawShortcuts(batch, skin, assets, state, px, py);
+        if (panel == Panel.ALERTS) drawAlerts(batch, skin, state.alerts());
+        if (panel == Panel.SETTINGS) drawSettings(batch, skin, speed, debug, px, py);
+    }
+
+    private static final float GIFT = 50, GIFT_Y = CARD_Y - 8 - GIFT;
+
+    private void drawAlerts(SpriteBatch batch, UiSkin skin, List<GameState.Alert> alerts) {
+        Rectangle anchor = shortcutBounds(Shortcut.ALERTS);
+        int shown = Math.min(alerts.size(), 8);
+        float h = 50 + Math.max(1, shown) * 30 + (alerts.size() > shown ? 26 : 0);
+        float x = Math.min(anchor.x, 1600 - 12 - PANEL_W), y = anchor.y - 8 - h;
+        skin.dropShadow(batch, x, y, PANEL_W, h, 4);
+        skin.draw(batch, skin.window, x, y, PANEL_W, h);
+        skin.text(batch, skin.label, "Avisos da fazenda", x + 16, y + h - 16, Palette.INK, Align.left);
+        if (alerts.isEmpty())
+            skin.text(batch, skin.body, "Tudo certo por aqui.", x + 16, y + h - 52, Palette.INK_MUTED, Align.left);
+        for (int i = 0; i < shown; i++) {
+            float ry = y + h - 52 - i * 30;
+            skin.text(batch, skin.label, alerts.get(i).title(), x + 16, ry, Palette.BERRY_INK, Align.left);
+            skin.text(batch, skin.body, alerts.get(i).detail(), x + PANEL_W - 16, ry, Palette.INK_MUTED, Align.right);
+        }
+        if (alerts.size() > shown)
+            skin.text(batch, skin.caption, "e mais " + (alerts.size() - shown), x + 16, y + 18, Palette.INK_MUTED, Align.left);
+    }
+
+    private void drawSettings(SpriteBatch batch, UiSkin skin, double speed, boolean debug, float px, float py) {
+        Rectangle first = settingRow(0), last = settingRow(SETTINGS.length - 1);
+        float x = first.x - 10, y = last.y - 12, h = first.y + first.height + 54 - y;
+        skin.dropShadow(batch, x, y, PANEL_W, h, 4);
+        skin.draw(batch, skin.window, x, y, PANEL_W, h);
+        skin.text(batch, skin.label, "Ajustes", x + 16, y + h - 16, Palette.INK, Align.left);
+        for (int i = 0; i < SETTINGS.length; i++) {
+            Rectangle r = settingRow(i);
+            if (r.contains(px, py)) skin.draw(batch, skin.itemHover, r.x, r.y, r.width, r.height);
+            String label = switch (SETTINGS[i]) {
+                case SPEED -> "Tempo acelerado (T)";
+                case DEBUG -> "Overlay técnico (F3)";
+                case SAVE -> "Salvar agora (S)";
+            };
+            String value = switch (SETTINGS[i]) {
+                case SPEED -> speed > 1 ? "60×" : "1×";
+                case DEBUG -> debug ? "Ligado" : "Desligado";
+                case SAVE -> "";
+            };
+            skin.text(batch, skin.body, label, r.x + 10, r.y + 26, Palette.INK, Align.left);
+            skin.text(batch, skin.label, value, r.x + r.width - 10, r.y + 26, Palette.SKY_INK, Align.right);
+        }
     }
 
     /** Card dos primeiros passos, logo abaixo do perfil: tarefa atual, dica e recompensa. */
     private void drawTutorial(SpriteBatch batch, UiSkin skin, GameAssets assets, Tutorial tutorial) {
         Tutorial.Step step = tutorial.current();
-        float w = 420, h = 96, x = CARD_X, y = CARD_Y - 12 - h;
+        float w = 420, h = 96, x = CARD_X, y = GIFT_Y - 8 - h;
         skin.dropShadow(batch, x, y, w, h, 2);
         skin.draw(batch, skin.hudCard, x, y, w, h);
         skin.text(batch, skin.caption, "Primeiros passos · " + (tutorial.stepIndex() + 1) + "/" + Tutorial.STEPS.size(),
@@ -137,17 +214,25 @@ public final class Hud {
         String name = "Minha fazenda";
         skin.text(batch, skin.label, name, tx, CARD_Y + CARD_H - 14, Palette.INK, Align.left);
         float starX = tx + skin.width(skin.label, name) + 26;
-        Toolbar.drawFitted(batch, assets.star, starX, CARD_Y + CARD_H - 21, 36);
-        skin.outlined(batch, skin.label, Integer.toString(state.progress().level()), starX, CARD_Y + CARD_H - 15,
+        Toolbar.drawFitted(batch, assets.star, starX - 4, CARD_Y + CARD_H - 21, 28);
+        skin.label.getData().setScale(.8f);
+        skin.outlined(batch, skin.label, Integer.toString(state.progress().level()), starX - 4, CARD_Y + CARD_H - 15,
                 Palette.ON_COLOR, Palette.SKY_INK, 1f, Align.center);
-        skin.bar(batch, skin.barSky, tx, CARD_Y + 40, 220, 18,
+        skin.label.getData().setScale(1);
+        skin.micro.getData().setScale(.85f);
+        skin.bar(batch, skin.barSky, tx, CARD_Y + 42, 220, 14,
                 state.progress().currentXp() / (float) state.progress().xpToNext(),
                 state.progress().currentXp() + " / " + state.progress().xpToNext() + " XP");
+        skin.micro.getData().setScale(1);
         float bump = 1;
         float t = (now - bumpStarted) / (float) BUMP_NANOS;
         if (t < 1) bump = 1 + .35f * (float) Math.sin(t * Math.PI);
         Toolbar.drawFitted(batch, assets.coin, tx + 11, CARD_Y + 22, 24 * bump);
-        skin.text(batch, skin.number, formatInt(Math.round(shownCoins)), tx + 28, CARD_Y + 30, Palette.INK, Align.left);
+        String gold = formatInt(Math.round(shownCoins));
+        skin.text(batch, skin.number, gold, tx + 28, CARD_Y + 30, Palette.INK, Align.left);
+        float greenX = tx + 28 + skin.width(skin.number, gold) + 24;
+        Toolbar.drawFitted(batch, assets.greenCoin, greenX, CARD_Y + 22, 24);
+        skin.text(batch, skin.number, formatInt(state.greenCoins()), greenX + 17, CARD_Y + 30, Palette.LEAF_INK, Align.left);
     }
 
     private void drawShortcuts(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state, float px, float py) {
@@ -155,28 +240,42 @@ public final class Hud {
         if (state.tutorial().active()) pending = 1;
         else for (DailyMissionBoard.Mission mission : state.dailyMissions().missions())
             if (!state.dailyMissions().completed(mission)) pending++;
-        boolean produce = false;
-        for (CropType crop : state.catalog().all()) if (state.inventory().produce(crop) > 0) produce = true;
+        boolean produce = state.depositValue() > 0;
+        int alerts = state.alerts().size();
         for (Shortcut s : Shortcut.values()) {
             Rectangle r = shortcutBounds(s);
             boolean hover = r.contains(px, py);
             float cx = r.x + r.width / 2f, cy = r.y + 56;
             if (hover) skin.glow(batch, cx, cy, 100, 1f);
-            Texture icon = switch (s) { case MISSIONS -> assets.gift; case SHOP -> assets.shop; case DEPOSIT -> assets.deposit; };
+            Texture icon = switch (s) {
+                case ALERTS -> assets.bell; case MISSIONS -> assets.clipboard; case SHOP -> assets.shop;
+                case DEPOSIT -> assets.deposit; case SOUND -> assets.sound; case MUSIC -> assets.music; case SETTINGS -> assets.gear;
+            };
             batch.setColor(0, 0, 0, .25f);
             Toolbar.drawFitted(batch, icon, cx + 1, cy - 3 + (hover ? 2 : 0), 56);
             batch.setColor(Color.WHITE);
             Toolbar.drawFitted(batch, icon, cx, cy + (hover ? 2 : 0), hover ? 60 : 56);
-            String label = switch (s) { case MISSIONS -> "Missões"; case SHOP -> "Loja"; case DEPOSIT -> "Depósito"; };
+            boolean off = s == Shortcut.SOUND && !state.effectsEnabled() || s == Shortcut.MUSIC && !state.musicEnabled();
+            if (off) {
+                batch.setColor(Palette.BERRY);
+                batch.draw(skin.white, cx - 30, cy - 3, 30, 3, 60, 6, 1, 1, 45, 0, 0, 2, 2, false, false);
+                batch.setColor(Color.WHITE);
+            }
+            String label = switch (s) {
+                case ALERTS -> "Avisos"; case MISSIONS -> "Missões"; case SHOP -> "Loja"; case DEPOSIT -> "Depósito";
+                case SOUND -> "Som"; case MUSIC -> "Música"; case SETTINGS -> "Ajustes";
+            };
             skin.onScene(batch, skin.label, label, cx, r.y + 14, Align.center);
+            if (s == Shortcut.ALERTS && alerts > 0) badge(batch, skin, Integer.toString(alerts), cx + 24, cy + 22);
             if (s == Shortcut.MISSIONS && pending > 0) badge(batch, skin, Integer.toString(pending), cx + 24, cy + 22);
             if (s == Shortcut.DEPOSIT && produce) badge(batch, skin, "", cx + 22, cy + 22);
         }
     }
 
     private static void badge(SpriteBatch batch, UiSkin skin, String text, float cx, float cy) {
-        float h = text.isEmpty() ? 16 : 22;
-        float w = text.isEmpty() ? 16 : Math.max(22, skin.width(skin.micro, text) + 12);
+        // O badge tem cantos de 11 px: menor que 22 px ele vira um quadrado.
+        float h = 22;
+        float w = text.isEmpty() ? 22 : Math.max(22, skin.width(skin.micro, text) + 12);
         skin.draw(batch, skin.badge, cx - w / 2f, cy - h / 2f, w, h);
         if (!text.isEmpty()) skin.text(batch, skin.micro, text, cx, cy + 4.5f, Palette.ON_COLOR, Align.center);
     }

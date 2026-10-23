@@ -168,7 +168,7 @@ public final class FarmRenderer implements AutoCloseable {
                 hud.animalTip(batch, skin, state.barn().get(animal), now, anchor[0], anchor[1], state);
             }
         }
-        hud.drawTop(batch, skin, assets, state, windowOpen ? -1 : pointerX, windowOpen ? -1 : pointerY);
+        hud.drawTop(batch, skin, assets, state, windowOpen ? -1 : pointerX, windowOpen ? -1 : pointerY, speed, debugVisible);
         toolbar.draw(batch, skin, assets, state, windowOpen ? -1 : pointerX, windowOpen ? -1 : pointerY);
         marketPanel.draw(batch, skin, assets, state, pointerX, pointerY);
         missions.draw(batch, skin, assets, state, pointerX, pointerY);
