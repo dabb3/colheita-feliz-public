@@ -23,7 +23,7 @@ Comece colhendo os dois nabos prontos. Siga as tarefas de primeiros passos para 
 
 | Tecla | Ação |
 | --- | --- |
-| `1`–`6` | Mão, enxada, regador, sementes, pesticida, herbicida |
+| `1`–`7` | Mão, enxada, regador, sementes, pesticida, herbicida, adubo |
 | `B` / `V` | Loja / depósito |
 | `Q` | Missões diárias |
 | `Esc` | Fechar janelas |
@@ -32,13 +32,15 @@ Comece colhendo os dois nabos prontos. Siga as tarefas de primeiros passos para 
 | `T` | Alternar tempo 1× / 60× para desenvolvimento |
 | `F3` | Overlay técnico |
 
-A primeira rega inicia o crescimento. Terra seca reduz a velocidade; ervas daninhas pausam o crescimento e insetos reduzem a colheita. Use herbicida e pesticida para removê-los. Retire a planta morta com a enxada após colher. Venda a produção no depósito.
+A primeira rega inicia o crescimento. Terra seca reduz a velocidade; ervas daninhas pausam o crescimento e insetos reduzem a colheita. Use herbicida e pesticida para removê-los. Retire a planta morta com a enxada após colher. Venda a produção no depósito. O adubo, comprado na loja, adianta um quarto do ciclo de uma planta regada.
 
-Os preços, tempos e rendimentos ficam em [crops.json](assets/data/crops.json); a progressão fica em [progression.json](assets/data/progression.json). O jogo funciona sem dispositivo de áudio.
+A aba **Animais** da loja vende galinha, pato, ovelha e vaca, liberados por nível, e a ração de cada um. Clique no animal no cercado para dar ração ou coletar o produto pronto; os produtos são vendidos na mesma aba ou no depósito.
+
+Os preços, tempos e rendimentos ficam em [crops.json](assets/data/crops.json); a progressão fica em [progression.json](assets/data/progression.json) e os animais em [animals.json](assets/data/animals.json). O jogo funciona sem dispositivo de áudio.
 
 ## Save
 
-O save é local: `save/game.json`, relativo ao diretório de execução. Defina `COLHEITA_SAVE_PATH` para usar outro caminho. Há autosave, progresso offline e migração dos formatos antigos para v12. Faça backup do save antes de trocar de versão. Saves não são versionados.
+O save é local: `save/game.json`, relativo ao diretório de execução. Defina `COLHEITA_SAVE_PATH` para usar outro caminho. Há autosave, progresso offline e migração dos formatos antigos para v14. Faça backup do save antes de trocar de versão. Saves não são versionados.
 
 ## Desenvolvimento e distribuição
 
