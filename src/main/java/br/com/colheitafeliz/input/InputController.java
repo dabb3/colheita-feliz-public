@@ -15,15 +15,16 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
+import java.util.function.BooleanSupplier;
 
 public final class InputController extends InputAdapter {
     private final FarmRenderer renderer;
     private final GameSession session;
     private final AudioManager audio;
-    private final Runnable save;
+    private final BooleanSupplier save;
     private IsoRenderer.GridPosition hovered;
 
-    public InputController(FarmRenderer renderer, GameSession session, AudioManager audio, Runnable save) {
+    public InputController(FarmRenderer renderer, GameSession session, AudioManager audio, BooleanSupplier save) {
         this.renderer = renderer;
         this.session = session;
         this.audio = audio;
@@ -58,11 +59,18 @@ public final class InputController extends InputAdapter {
             return true;
         }
         Hud.Shortcut shortcut = renderer.hud().shortcutHit(p.x, p.y);
+        if (renderer.hud().panelOpen() && shortcut != Hud.Shortcut.ALERTS && shortcut != Hud.Shortcut.SETTINGS) {
+            Hud.Setting setting = renderer.hud().panelClick(p.x, p.y);
+            if (setting != null) apply(setting);
+            return true;
+        }
         if (shortcut != null) {
             switch (shortcut) {
+                case ALERTS -> renderer.hud().toggleAlerts();
                 case MISSIONS -> renderer.missions().toggle();
                 case SHOP -> renderer.marketPanel().showShop();
                 case DEPOSIT -> renderer.marketPanel().showSell();
+                case SETTINGS -> renderer.hud().toggleSettings();
             }
             audio.play(Cue.PLOW);
             return true;
@@ -71,7 +79,7 @@ public final class InputController extends InputAdapter {
         if (tool != null) {
             renderer.toolbar().picked(tool, state.tool());
             state.selectTool(tool);
-            save.run();
+            save.getAsBoolean();
             return true;
         }
         int animal = renderer.animalAt(p.x, p.y);
@@ -134,7 +142,7 @@ public final class InputController extends InputAdapter {
         if (cue == Cue.PLOW && state.lastTreasureCoins() > 0) renderer.treasure(state.lastTreasureCoins());
         if (levelUp) renderer.levelUp(state);
         audio.play(levelUp ? Cue.LEVEL_UP : cue);
-        save.run();
+        save.getAsBoolean();
     }
 
     @Override public boolean keyDown(int keycode) {
@@ -153,21 +161,35 @@ public final class InputController extends InputAdapter {
                 renderer.marketPanel().close();
                 renderer.missions().close();
                 renderer.hud().dismissBanner();
+                renderer.hud().closePanel();
             }
-            case Input.Keys.F3 -> renderer.toggleDebug();
-            case Input.Keys.M -> {
-                state.setMusicEnabled(!state.musicEnabled());
-                audio.applySettings();
-                save.run();
-            }
-            case Input.Keys.N -> {
-                state.setEffectsEnabled(!state.effectsEnabled());
-                save.run();
-            }
-            case Input.Keys.T -> session.clock().setSpeed(session.clock().speed() == 1 ? 60 : 1);
-            case Input.Keys.S -> save.run();
+            case Input.Keys.F3 -> apply(Hud.Setting.DEBUG);
+            case Input.Keys.M -> apply(Hud.Setting.MUSIC);
+            case Input.Keys.N -> apply(Hud.Setting.EFFECTS);
+            case Input.Keys.T -> apply(Hud.Setting.SPEED);
+            case Input.Keys.S -> apply(Hud.Setting.SAVE);
             default -> { return false; }
         }
         return true;
+    }
+
+    private void apply(Hud.Setting setting) {
+        switch (setting) {
+            case MUSIC -> {
+                session.state().setMusicEnabled(!session.state().musicEnabled());
+                audio.applySettings();
+                save.getAsBoolean();
+            }
+            case EFFECTS -> {
+                session.state().setEffectsEnabled(!session.state().effectsEnabled());
+                save.getAsBoolean();
+            }
+            case SPEED -> session.clock().setSpeed(session.clock().speed() == 1 ? 60 : 1);
+            case DEBUG -> renderer.toggleDebug();
+            case SAVE -> {
+                if (save.getAsBoolean()) renderer.hud().toast(null, "", "Jogo salvo.", Hud.ToastKind.NORMAL);
+                else renderer.failure(session.state().message());
+            }
+        }
     }
 }

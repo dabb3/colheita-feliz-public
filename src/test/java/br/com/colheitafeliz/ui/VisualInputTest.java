@@ -41,12 +41,28 @@ class VisualInputTest {
         assertFalse(toolbar.seedsOpen());
     }
 
+    @Test void settingsPanelReturnsTheClickedRowAndClosesOnOutsideClick() {
+        Hud hud = new Hud();
+        assertFalse(hud.panelOpen());
+        hud.toggleSettings();
+        assertTrue(hud.panelOpen());
+        Rectangle save = Hud.settingRow(4);
+        assertEquals(Hud.Setting.SAVE, hud.panelClick(cx(save), cy(save)));
+        Rectangle music = Hud.settingRow(0);
+        assertEquals(Hud.Setting.MUSIC, hud.panelClick(cx(music), cy(music)));
+        assertEquals(null, hud.panelClick(10, 10));
+        assertFalse(hud.panelOpen());
+        hud.toggleAlerts();
+        hud.toggleAlerts();
+        assertFalse(hud.panelOpen());
+    }
+
     @Test void shortcutsSitInTheTopRightCorner() {
         Hud hud = new Hud();
         for (Hud.Shortcut s : Hud.Shortcut.values()) {
             Rectangle r = Hud.shortcutBounds(s);
             assertEquals(s, hud.shortcutHit(cx(r), cy(r)));
-            assertTrue(r.x > 1300 && r.y > 780);
+            assertTrue(r.x > 950 && r.y > 780, "à direita do card do tutorial e acima dos avisos");
         }
         assertNull(hud.shortcutHit(800, 450));
     }
