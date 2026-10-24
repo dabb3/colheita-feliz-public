@@ -67,6 +67,12 @@ class GameStateTest {
         int xp = game.progress().currentXp();
         assertTrue(game.act(0, 0).success());
         assertEquals(xp + 2, game.progress().currentXp());
+        assertEquals(TileState.FALLOW, game.farm().tile(0, 0).state());
+        game.selectSeed(turnip);
+        assertFalse(game.act(0, 0).success());
+        assertEquals("Are a terra seca com a pá antes de plantar.", game.message());
+        game.selectTool(Tool.HOE);
+        assertTrue(game.act(0, 0).success());
         assertEquals(TileState.PLOWED, game.farm().tile(0, 0).state());
         game.selectSeed(turnip);
         assertTrue(game.act(0, 0).success());
@@ -164,6 +170,21 @@ class GameStateTest {
         game.act(0, 0);
         assertTrue(game.alerts().isEmpty());
         assertEquals(0, game.greenCoins());
+    }
+
+    @Test void clearingADeadPlantCanAlsoFindATreasureChest() {
+        ManualClock clock = new ManualClock();
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 0);
+        game.startNewFarm();
+        game.selectTool(Tool.HAND);
+        game.act(0, 0);
+        int coins = game.wallet().coins();
+        game.selectTool(Tool.HOE);
+        assertTrue(game.act(0, 0).success());
+        assertEquals(game.treasureCoins(), game.lastTreasureCoins());
+        assertTrue(game.wallet().coins() >= coins + game.treasureCoins());
+        assertTrue(game.act(0, 0).success(), "arar a terra seca não sorteia outro baú");
+        assertEquals(0, game.lastTreasureCoins());
     }
 
     @Test void plantingWithoutSeedIsRejectedAndLeavesSoilReady() {

@@ -140,21 +140,22 @@ public final class GameState {
             case HOE -> {
                 if (tile.state() == TileState.DEAD) {
                     tile.clearDead();
-                    result = ActionResult.ok("Planta morta retirada. A terra está pronta para plantar.");
+                    result = treasure("Planta morta retirada. Are a terra seca para plantar de novo.");
+                } else if (tile.state() == TileState.FALLOW) {
+                    tile.plow();
+                    result = ActionResult.ok("Terra arada.");
                 } else if (tile.state() != TileState.GRASS)
-                    result = ActionResult.fail("A pá precisa de grama livre ou de uma planta morta.");
+                    result = ActionResult.fail("A pá precisa de grama, terra seca ou uma planta morta.");
                 else {
                     tile.plow();
-                    if (random.nextInt(100) < TREASURE_CHANCE) {
-                        lastTreasureCoins = treasureCoins();
-                        wallet.credit(lastTreasureCoins);
-                        result = ActionResult.ok("Terra arada. Você achou um baú do tesouro: +" + lastTreasureCoins + " moedas!");
-                    } else result = ActionResult.ok("Terra arada.");
+                    result = treasure("Terra arada.");
                 }
             }
             case SEED -> {
                 if (tile.state() == TileState.DEAD)
                     result = ActionResult.fail("Retire a planta morta com a pá antes de plantar.");
+                else if (tile.state() == TileState.FALLOW)
+                    result = ActionResult.fail("Are a terra seca com a pá antes de plantar.");
                 else if (tile.state() != TileState.PLOWED) result = ActionResult.fail("Este terreno precisa ser arado.");
                 else if (inventory.seeds(seed) == 0)
                     result = ActionResult.fail("Você não possui sementes de " + seed.name() + ".");
@@ -527,6 +528,14 @@ public final class GameState {
         for (Animal animal : barn.animals())
             if (animal.statusAt(now) == Animal.Status.HUNGRY) alerts.add(new Alert("Com fome", animal.type().name()));
         return alerts;
+    }
+
+    /** Sorteia o baú do tesouro ao cavar: arar grama ou retirar planta morta. */
+    private ActionResult treasure(String message) {
+        if (random.nextInt(100) >= TREASURE_CHANCE) return ActionResult.ok(message);
+        lastTreasureCoins = treasureCoins();
+        wallet.credit(lastTreasureCoins);
+        return ActionResult.ok(message + " Você achou um baú do tesouro: +" + lastTreasureCoins + " moedas!");
     }
 
     /** Moedas do baú do tesouro: crescem com o nível para continuar valendo a pena. */
