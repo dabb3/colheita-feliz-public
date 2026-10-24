@@ -187,6 +187,34 @@ class GameStateTest {
         assertEquals(0, game.lastTreasureCoins());
     }
 
+    @Test void insectAlertStaysWhenThePlantMatures() {
+        ManualClock clock = new ManualClock();
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
+        CropType corn = game.catalog().get("milho");
+        game.buySeed(corn);
+        game.selectTool(Tool.HOE);
+        game.act(0, 0);
+        game.selectSeed(corn);
+        game.act(0, 0);
+        game.selectTool(Tool.WATER);
+        game.act(0, 0);
+        game.farm().tile(0, 0).checkInsects(game.now(), true);
+        clock.advanceSeconds(900);
+        game.act(0, 0);
+        clock.advanceSeconds(900);
+        game.act(0, 0);
+        clock.advanceSeconds(900);
+        game.refresh();
+        assertEquals(TileState.READY, game.farm().tile(0, 0).state());
+        assertEquals(java.util.List.of(new GameState.Alert("Insetos", "Milho")), game.alerts());
+        game.selectTool(Tool.PESTICIDE);
+        assertTrue(game.act(0, 0).success());
+        assertTrue(game.alerts().isEmpty());
+        game.selectTool(Tool.HAND);
+        game.act(0, 0);
+        assertEquals(3, game.inventory().produce(corn));
+    }
+
     @Test void plantingWithoutSeedIsRejectedAndLeavesSoilReady() {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);

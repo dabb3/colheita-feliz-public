@@ -519,7 +519,9 @@ public final class GameState {
         List<Alert> alerts = new ArrayList<>();
         for (int row = 0; row < ROWS; row++) for (int col = 0; col < COLUMNS; col++) {
             FarmTile tile = farm.tile(col, row);
-            if (!land.isUnlocked(col, row) || tile.state() != TileState.GROWING) continue;
+            // Planta madura ainda pode ter pragas (os insetos comem a colheita); só a terra seca deixa de importar.
+            if (!land.isUnlocked(col, row) || (tile.state() != TileState.GROWING && tile.state() != TileState.READY))
+                continue;
             String name = tile.crop().type().name();
             if (tile.pest() == PestState.WEEDS) alerts.add(new Alert("Ervas daninhas", name));
             if (tile.insects() > 0) alerts.add(new Alert("Insetos", name));
