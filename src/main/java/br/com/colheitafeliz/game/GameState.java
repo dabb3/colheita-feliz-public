@@ -227,7 +227,7 @@ public final class GameState {
             if (!levelReward.isEmpty()) result = ActionResult.ok(result.message() + " " + levelReward);
             String missionReward = recordDailyMission(switch (tool) {
                 case HAND -> "harvest";
-                case HOE -> "plow";
+                case HOE -> cleared ? "clear" : "plow"; // retirar a planta morta deixa terra seca, ainda não arada
                 case WATER -> "water";
                 case SEED -> "plant";
                 case WEEDER -> "weed";

@@ -58,4 +58,27 @@ class TutorialTest {
         assertEquals(100 - 2 * turnip.seedPrice() + harvested + rewards + GameState.levelUpCoins(2),
                 game.wallet().coins());
     }
+
+    @Test void clearingTheDeadPlantDoesNotCompleteThePlowStep() {
+        ManualClock clock = new ManualClock();
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
+        game.startNewFarm();
+        CropType turnip = game.catalog().get("nabo");
+        game.selectTool(Tool.HAND);
+        game.act(0, 0);
+        game.sellEverything();
+        game.buySeed(turnip);
+        assertEquals(3, game.tutorial().stepIndex());
+
+        game.selectTool(Tool.HOE);
+        assertTrue(game.act(0, 0).success());
+        assertEquals(TileState.FALLOW, game.farm().tile(0, 0).state());
+        assertEquals(3, game.tutorial().stepIndex(), "retirar a planta morta não é arar");
+
+        assertTrue(game.act(0, 0).success());
+        assertEquals(4, game.tutorial().stepIndex(), "arar a terra seca conclui o passo");
+        game.selectSeed(turnip);
+        assertTrue(game.act(0, 0).success());
+        assertEquals(5, game.tutorial().stepIndex());
+    }
 }

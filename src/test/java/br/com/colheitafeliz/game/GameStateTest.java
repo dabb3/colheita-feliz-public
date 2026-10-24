@@ -225,4 +225,30 @@ class GameStateTest {
         assertEquals(TileState.PLOWED, game.farm().tile(0, 0).state());
         assertEquals(100, game.wallet().coins());
     }
+
+    @Test void onlyRealPlowingCountsForThePlowMission() {
+        ManualClock clock = new ManualClock();
+        clock.advanceSeconds(2 * 86_400); // a rotação diária só traz "Are 4 terrenos" em alguns dias
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
+        CropType turnip = game.catalog().get("nabo");
+        DailyMissionBoard.Mission plow = game.dailyMissions().missions().stream()
+                .filter(mission -> mission.action().equals("plow")).findFirst().orElseThrow();
+        game.buySeed(turnip);
+        game.selectTool(Tool.HOE);
+        game.act(0, 0);
+        game.selectSeed(turnip);
+        game.act(0, 0);
+        game.selectTool(Tool.WATER);
+        game.act(0, 0);
+        clock.advanceSeconds(900);
+        game.selectTool(Tool.HAND);
+        game.act(0, 0);
+        assertEquals(1, game.dailyMissions().progress(plow));
+
+        game.selectTool(Tool.HOE);
+        assertTrue(game.act(0, 0).success());
+        assertEquals(1, game.dailyMissions().progress(plow), "retirar a planta morta não conta como arar");
+        assertTrue(game.act(0, 0).success());
+        assertEquals(2, game.dailyMissions().progress(plow));
+    }
 }
