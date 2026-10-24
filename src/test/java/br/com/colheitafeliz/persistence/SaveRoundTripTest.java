@@ -310,4 +310,20 @@ class SaveRoundTripTest {
         assertEquals(0, migrated.farm().tile(0, 0).insects());
         assertNotNull(migrated.farm().tile(0, 0).nextInsectCheckAt());
     }
+    @Test void failedWriteReportsTheErrorInsteadOfSuccess() throws IOException {
+        Path blocker = directory.resolve("not-a-folder");
+        Files.writeString(blocker, "x");
+        GameSession session = GameSession.open(new ManualClock(), CropCatalogLoader.load(),
+                new JsonSaveRepository(blocker.resolve("save.json")), bound -> 99);
+        assertFalse(session.trySave());
+        assertTrue(session.state().message().startsWith("Erro ao salvar"), session.state().message());
+    }
+
+    @Test void successfulWriteIsConfirmed() throws IOException {
+        Path file = directory.resolve("save.json");
+        GameSession session = GameSession.open(new ManualClock(), CropCatalogLoader.load(),
+                new JsonSaveRepository(file), bound -> 99);
+        assertTrue(session.trySave());
+        assertTrue(Files.exists(file));
+    }
 }

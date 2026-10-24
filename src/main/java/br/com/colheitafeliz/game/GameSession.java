@@ -49,4 +49,15 @@ public final class GameSession {
     public void save() throws IOException {
         repository.save(state.snapshot(), gameClock.now(), realClock.instant());
     }
+
+    /** Grava e diz se deu certo; na falha, deixa "Erro ao salvar: ..." como mensagem do jogo. */
+    public boolean trySave() {
+        try {
+            save();
+            return true;
+        } catch (IOException e) {
+            state.message("Erro ao salvar: " + e.getMessage());
+            return false;
+        }
+    }
 }

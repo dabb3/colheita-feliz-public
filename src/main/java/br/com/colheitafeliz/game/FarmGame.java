@@ -53,13 +53,10 @@ public final class FarmGame extends ApplicationAdapter {
         }
     }
 
-    private void save() {
-        try {
-            session.save();
-        } catch (IOException e) {
-            session.state().message("Erro ao salvar: " + e.getMessage());
-            Gdx.app.error("save", "Could not save game", e);
-        }
+    private boolean save() {
+        boolean saved = session.trySave();
+        if (!saved) Gdx.app.error("save", session.state().message());
+        return saved;
     }
 
     @Override public void resize(int width, int height) {
