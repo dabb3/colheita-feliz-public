@@ -52,14 +52,14 @@ jobs:
         if: github.event_name == 'pull_request' && always()
         shell: bash
         run: |
-          pip install --quiet spotbugs-to-sarif 2>/dev/null || true
           for report in main test; do
             xml="build/reports/spotbugs/${report}.xml"
             sarif="build/reports/spotbugs/${report}.sarif"
             if [ -f "$xml" ]; then
-              python3 -c "
+              python3 - "$xml" "$sarif" <<'PYEOF'
           import json, sys, xml.etree.ElementTree as ET
-          tree = ET.parse('$xml')
+          xml_path, sarif_path = sys.argv[1], sys.argv[2]
+          tree = ET.parse(xml_path)
           root = tree.getroot()
           results = []
           for bug in root.findall('.//BugInstance'):
@@ -75,12 +75,15 @@ jobs:
                 'region': {'startLine': max(line, 1)}
               }}]
             })
-          sarif = {'version': '2.1.0', '$schema': 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json',
-                   'runs': [{'tool': {'driver': {'name': 'SpotBugs'}}, 'results': results}]}
-          with open('$sarif', 'w') as f:
-            json.dump(sarif, f)
-          print(f'Converted $xml -> $sarif ({len(results)} findings)')
-              " || echo "WARN: failed to convert $xml"
+          sarif_doc = {
+            'version': '2.1.0',
+            '$schema': 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json',
+            'runs': [{'tool': {'driver': {'name': 'SpotBugs'}}, 'results': results}]
+          }
+          with open(sarif_path, 'w') as f:
+            json.dump(sarif_doc, f)
+          print(f'Converted {xml_path} -> {sarif_path} ({len(results)} findings)')
+          PYEOF
             fi
           done
 
