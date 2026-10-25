@@ -36,6 +36,28 @@ jobs:
             bash ./gradlew --no-daemon build distZip
           fi
 
+      - name: Run SpotBugs
+        run: bash ./gradlew --no-daemon spotbugsMain
+
+      - name: Upload SpotBugs report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: spotbugs-report
+          path: build/reports/spotbugs/main/
+          retention-days: 7
+
+      - name: Run JaCoCo coverage
+        run: bash ./gradlew --no-daemon jacocoTestReport
+
+      - name: Upload JaCoCo report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-report
+          path: build/reports/jacoco/test/
+          retention-days: 7
+
       - name: Save desktop distribution
         uses: actions/upload-artifact@v7
         with:
