@@ -1,6 +1,6 @@
 # Colheita Feliz em Java
 
-Jogo desktop de fazenda single-player em Java 21 e libGDX, inspirado em [Fazenda dos Sonhos / Colheita Feliz em C++](https://github.com/davidcreator/colheita-feliz-cpp), de Harlley Bastos. Reimplementação independente e não oficial.
+Jogo desktop de fazenda single-player (por enquanto) em Java 21 e libGDX, inspirado no jogo [Colheita Feliz] original do Orkut. Reimplementação independente e não oficial.
 
 ## Executar e compilar
 
