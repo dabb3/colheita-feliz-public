@@ -72,7 +72,7 @@ public final class FarmGame extends ApplicationAdapter {
 
     /** Seta clássica no lugar do cursor do sistema: recorta o desenho e reduz em etapas até 32 × 32. */
     private static Cursor arrowCursor() {
-        Pixmap source = new Pixmap(Gdx.files.internal("classic/cursor/cursor-action.png"));
+        Pixmap source = new Pixmap(Gdx.files.internal("classic/icons/cursor-action.png"));
         int minX = source.getWidth(), minY = source.getHeight(), maxX = 0, maxY = 0;
         for (int y = 0; y < source.getHeight(); y++)
             for (int x = 0; x < source.getWidth(); x++)

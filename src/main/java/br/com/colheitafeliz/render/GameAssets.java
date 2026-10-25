@@ -17,33 +17,35 @@ public final class GameAssets implements AutoCloseable {
     private final Map<String, Texture[]> crops = new HashMap<>();
     private final Map<String, Texture> seeds = new HashMap<>();
     private final Map<Texture, Float> footCenters = new HashMap<>();
+    /** Maior lado da arte de animal na GPU; os quadros antigos tinham ~460 px e na tela não passam de ~160. */
+    private static final int ANIMAL_SIDE = 512;
     public final Texture background = load("classic/background/background.png");
-    public final Texture grass = load("sprites/tiles/tile_grama.png");
-    public final Texture darkGrass = load("sprites/tiles/tile_grama_escuro.png");
-    public final Texture soil = load("sprites/tiles/tile_terra.png");
-    public final Texture drySoil = load("sprites/tiles/tile_terra_seca.png");
     public final Texture house = load("classic/buildings/main-house.png");
     public final Texture dogHouse = load("classic/buildings/dog-house.png");
     /** Mourão e tábua da cerca do cercado (gerados por tools/art/fence.py). */
-    public final Texture fencePost = load("sprites/fence/mourao.png");
-    public final Texture fenceRail = load("sprites/fence/trilho.png");
-    public final Texture cow = load("sprites/animals/normalized/vaca.png");
-    public final Texture cowWalk = load("sprites/animals/normalized/vaca_andando.png");
-    public final Texture sheep = load("sprites/animals/normalized/ovelha.png");
-    public final Texture sheepWalk = load("sprites/animals/normalized/ovelha_andando.png");
-    public final Texture chicken = load("sprites/animals/normalized/galinha.png");
-    public final Texture chickenWalk = load("sprites/animals/normalized/galinha_andando.png");
-    public final Texture duck = load("sprites/animals/pato.png");
-    public final Texture dog = load("sprites/animals/normalized/cachorro.png");
-    public final Texture dogWalk = load("sprites/animals/normalized/cachorro_andando.png");
-    public final Texture donkeySleeping = load("sprites/animals/burrinho_dormindo.png");
-    public final Texture rabbit = load("sprites/animals/coelho.png");
-    public final Texture carrot = load("sprites/animals/cenoura.png");
-    public final Texture nestEggs = load("sprites/animals/ninho_com_ovos.png");
-    public final Texture nestEmpty = load("sprites/animals/ninho_vazio.png");
-    public final Texture bucket = load("sprites/animals/balde.png");
-    public final Texture woolBasket = load("sprites/animals/cesto_de_la.png");
-    public final Texture bowl = load("sprites/animals/potinho.png");
+    public final Texture fencePost = load("classic/fence/mourao.png");
+    public final Texture fenceRail = load("classic/fence/trilho.png");
+    private final Texture[] cowFrames = animalFrames("classic/animals/vaca/vaca.png", "classic/animals/vaca/vaca-andando.png");
+    public final Texture cow = cowFrames[0];
+    public final Texture cowWalk = cowFrames[1];
+    private final Texture[] sheepFrames = animalFrames("classic/animals/ovelha/ovelha.png", "classic/animals/ovelha/ovelha-andando.png");
+    public final Texture sheep = sheepFrames[0];
+    public final Texture sheepWalk = sheepFrames[1];
+    private final Texture[] chickenFrames = animalFrames("classic/animals/galinha/galinha.png", "classic/animals/galinha/galinha-andando.png");
+    public final Texture chicken = chickenFrames[0];
+    public final Texture chickenWalk = chickenFrames[1];
+    public final Texture duck = animalFrames("classic/animals/pato/pato.png")[0];
+    private final Texture[] dogFrames = animalFrames("classic/animals/cachorro/cachorro.png", "classic/animals/cachorro/cachorro-andando.png");
+    public final Texture dog = dogFrames[0];
+    public final Texture dogWalk = dogFrames[1];
+    public final Texture donkeySleeping = animalFrames("classic/animals/burrinho/burrinho-dormindo.png")[0];
+    public final Texture rabbit = animalFrames("classic/animals/coelho/coelho.png")[0];
+    public final Texture carrot = animalFrames("classic/animals/coelho/cenoura-coelho.png")[0];
+    public final Texture nestEggs = animalFrames("classic/animals/ninho-geral/ninho-com-ovos.png")[0];
+    public final Texture nestEmpty = animalFrames("classic/animals/ninho-geral/ninho-vazio.png")[0];
+    public final Texture bucket = animalFrames("classic/animals/vaca/balde-vaca.png")[0];
+    public final Texture woolBasket = animalFrames("classic/animals/ovelha/la-ovelha.png")[0];
+    public final Texture bowl = animalFrames("classic/animals/cachorro/potinho-cachorro-com-comida.png")[0];
     public final Texture[] weeds = new Texture[4];
     /** Minhocas por quantidade: insects[0] = 1 minhoca ... insects[2] = 3. */
     public final Texture[] insects = new Texture[3];
@@ -51,31 +53,27 @@ public final class GameAssets implements AutoCloseable {
     public final Texture tilePlowed = load("classic/terrain/terra-arada.png");
     public final Texture tileWet = load("classic/terrain/terra-molhada.png");
     public final Texture tileDry = load("classic/terrain/terra-seca.png");
-    public final Texture tileHighlight = load("classic/terrain/terra-adubada.png");
-    public final Texture cursor = load("classic/hud/cursor-ui.png");
-    public final Texture hoe = load("classic/hud/pa-ui.png");
-    public final Texture bag = load("classic/hud/saco-ui.png");
-    public final Texture hand = load("classic/hud/mao-restaurada.png");
-    public final Texture water = load("classic/hud/regador-ui.png");
+    public final Texture tileHighlight = load("classic/terrain/terrain_highlight.png");
+    public final Texture cursor = load("classic/icons/hud/cursor-ui.png");
+    public final Texture hoe = load("classic/icons/hud/pa-ui.png");
+    public final Texture bag = load("classic/icons/hud/saco-ui.png");
+    public final Texture hand = load("classic/icons/hud/mao-restaurada.png");
+    public final Texture water = load("classic/icons/hud/regador-ui.png");
     /** Herbicida (frasco verde): remove ervas daninhas. */
-    public final Texture weeder = load("classic/hud/herbicida-ui.png");
+    public final Texture weeder = load("classic/icons/hud/herbicida-ui.png");
     /** Pesticida (frasco vermelho): remove insetos. */
-    public final Texture pesticide = load("classic/hud/pesticida-ui.png");
-    public final Texture coin = load("classic/avatar-ui/moeda-comum.png");
-    public final Texture greenCoin = load("classic/avatar-ui/moeda-verde.png");
+    public final Texture pesticide = load("classic/icons/hud/pesticida-ui.png");
+    public final Texture coin = load("classic/icons/moeda-comum.png");
+    public final Texture greenCoin = load("classic/icons/moeda-verde.png");
     public final Texture bell = generated(HudIcons.bell());
     public final Texture gear = generated(HudIcons.gear());
     public final Texture clipboard = generated(HudIcons.clipboard());
     public final Texture star = load("classic/icons/xp.png");
-    public final Texture gift = load("classic/icons/asset_presente.jpg");
-    public final Texture shop = load("classic/others-ui/icon-shop.png");
-    public final Texture deposit = load("classic/others-ui/deposit-icon.png");
-    public final Texture statusPanel = load("sprites/icons/hud/esquerdo/painel_status.png");
-    public final Texture coinIcon = load("sprites/icons/hud/esquerdo/ouro.png");
-    public final Texture xpIcon = load("sprites/icons/hud/esquerdo/xp.png");
-    public final Texture avatar = load("sprites/icons/hud/esquerdo/avatar_masculino.png");
-    public final Texture shopIcon = load("sprites/icons/hud/direito/loja.png");
-    public final Texture inventoryIcon = load("sprites/icons/hud/direito/armazen.png");
+    // asset_presente.jpg traz o xadrez de "transparência" pintado na imagem; fica o PNG até sair um com alfa.
+    public final Texture gift = load("classic/icons/icon_gift.png");
+    public final Texture shop = load("classic/icons/icon-shop.png");
+    public final Texture deposit = load("classic/icons/deposit-icon.png");
+    public final Texture avatar = load("classic/icons/avatar_masculino.png");
     public final BitmapFont font;
 
     public GameAssets(CropCatalog catalog) {
@@ -89,17 +87,22 @@ public final class GameAssets implements AutoCloseable {
         font = generator.generateFont(fontParameters);
         generator.dispose();
         for (int i = 0; i < weeds.length; i++)
-            weeds[i] = load("sprites/effects/erva_daninha_" + (i + 1) + ".png");
+            weeds[i] = load(weedPath(i + 1));
         for (int i = 0; i < insects.length; i++)
-            insects[i] = load("sprites/effects/verme_" + (i + 1) + ".png");
+            insects[i] = load(insectPath(i + 1));
         for (CropType type : catalog.all()) {
             Texture[] stages = new Texture[type.stages()];
             for (int i = 0; i < stages.length; i++)
-                stages[i] = load("sprites/crops/" + type.spriteStem() + "_" + (i + 1) + ".png");
+                stages[i] = load(cropPath(type.spriteStem(), i + 1));
             crops.put(type.id(), stages);
-            seeds.put(type.id(), load("sprites/icons/seeds/semente_" + type.spriteStem() + ".png"));
+            seeds.put(type.id(), load(seedPath(type.spriteStem())));
         }
     }
+
+    static String weedPath(int count) { return "classic/effects/erva_daninha_" + count + ".png"; }
+    static String insectPath(int count) { return "classic/effects/verme_" + count + ".png"; }
+    static String cropPath(String stem, int stage) { return "classic/crops/plants_phase_one_to_five/" + stem + "_" + stage + ".png"; }
+    static String seedPath(String stem) { return "classic/crops/seeds/semente_" + stem + ".png"; }
 
     public Texture crop(CropType type, int stage) { return crops.get(type.id())[stage - 1]; }
 
@@ -128,53 +131,79 @@ public final class GameAssets implements AutoCloseable {
     }
 
     private Texture load(String path) {
-        Texture texture;
-        if (path.startsWith("sprites/animals/")) {
-            Pixmap pixels = new Pixmap(Gdx.files.internal(path));
-            if (!path.startsWith("sprites/animals/normalized/")) {
-                // Ignora resíduos quase invisíveis ao localizar a base real da arte.
-                int left = pixels.getWidth(), top = pixels.getHeight(), right = -1, bottom = -1;
-                for (int y = 0; y < pixels.getHeight(); y++)
-                    for (int x = 0; x < pixels.getWidth(); x++)
-                        if ((pixels.getPixel(x, y) & 0xff) > 12) {
-                            left = Math.min(left, x);
-                            right = Math.max(right, x);
-                            top = Math.min(top, y);
-                            bottom = Math.max(bottom, y);
-                        }
-                if (right >= left) {
-                    Pixmap cropped = new Pixmap(right - left + 1, bottom - top + 1, Pixmap.Format.RGBA8888);
-                    cropped.setBlending(Pixmap.Blending.None);
-                    cropped.drawPixmap(pixels, 0, 0, left, top, cropped.getWidth(), cropped.getHeight());
-                    pixels.dispose();
-                    pixels = cropped;
-                }
-            }
-            texture = new Texture(pixels, true);
-            // Cabeça e cauda deslocam o centro da imagem; o apoio vem da faixa inferior.
-            int left = pixels.getWidth(), right = -1;
-            int band = Math.max(1, Math.round(pixels.getHeight() * .12f));
-            for (int y = pixels.getHeight() - band; y < pixels.getHeight(); y++)
+        return register(new Texture(Gdx.files.internal(path), true));
+    }
+
+    /**
+     * Arte de animal vem em telas grandes com margem. Recorta todas pela mesma caixa (a união da arte),
+     * para o quadro parado e o andando manterem escala e apoio ao trocar, e reduz para caber em ANIMAL_SIDE.
+     */
+    private Texture[] animalFrames(String... paths) {
+        Pixmap[] frames = new Pixmap[paths.length];
+        int left = Integer.MAX_VALUE, top = Integer.MAX_VALUE, right = -1, bottom = -1;
+        for (int i = 0; i < paths.length; i++) {
+            Pixmap pixels = frames[i] = new Pixmap(Gdx.files.internal(paths[i]));
+            // Ignora resíduos quase invisíveis ao localizar a base real da arte.
+            for (int y = 0; y < pixels.getHeight(); y++)
                 for (int x = 0; x < pixels.getWidth(); x++)
                     if ((pixels.getPixel(x, y) & 0xff) > 12) {
                         left = Math.min(left, x);
                         right = Math.max(right, x);
+                        top = Math.min(top, y);
+                        bottom = Math.max(bottom, y);
                     }
-            footCenters.put(texture, right >= left ? (left + right + 1f) / (2f * pixels.getWidth()) : .5f);
-            pixels.dispose();
-        } else {
-            texture = new Texture(Gdx.files.internal(path), true);
         }
+        Texture[] textures = new Texture[paths.length];
+        for (int i = 0; i < paths.length; i++) {
+            Pixmap pixels = frames[i];
+            if (right >= left) {
+                Pixmap cropped = new Pixmap(right - left + 1, bottom - top + 1, Pixmap.Format.RGBA8888);
+                cropped.setBlending(Pixmap.Blending.None);
+                cropped.drawPixmap(pixels, 0, 0, left, top, cropped.getWidth(), cropped.getHeight());
+                pixels.dispose();
+                pixels = cropped;
+            }
+            pixels = shrink(pixels);
+            Texture texture = textures[i] = register(new Texture(pixels, true));
+            // Cabeça e cauda deslocam o centro da imagem; o apoio vem da faixa inferior.
+            int footLeft = pixels.getWidth(), footRight = -1;
+            int band = Math.max(1, Math.round(pixels.getHeight() * .12f));
+            for (int y = pixels.getHeight() - band; y < pixels.getHeight(); y++)
+                for (int x = 0; x < pixels.getWidth(); x++)
+                    if ((pixels.getPixel(x, y) & 0xff) > 12) {
+                        footLeft = Math.min(footLeft, x);
+                        footRight = Math.max(footRight, x);
+                    }
+            footCenters.put(texture, footRight >= footLeft ? (footLeft + footRight + 1f) / (2f * pixels.getWidth()) : .5f);
+            pixels.dispose();
+        }
+        return textures;
+    }
+
+    /** Reduz pela metade até o maior lado caber em ANIMAL_SIDE; passos de 2x evitam o serrilhado do bilinear. */
+    private static Pixmap shrink(Pixmap pixels) {
+        while (Math.max(pixels.getWidth(), pixels.getHeight()) > ANIMAL_SIDE) {
+            float scale = Math.max(.5f, (float) ANIMAL_SIDE / Math.max(pixels.getWidth(), pixels.getHeight()));
+            Pixmap smaller = new Pixmap(Math.max(1, Math.round(pixels.getWidth() * scale)),
+                    Math.max(1, Math.round(pixels.getHeight() * scale)), Pixmap.Format.RGBA8888);
+            smaller.setBlending(Pixmap.Blending.None);
+            smaller.setFilter(Pixmap.Filter.BiLinear);
+            smaller.drawPixmap(pixels, 0, 0, pixels.getWidth(), pixels.getHeight(), 0, 0, smaller.getWidth(), smaller.getHeight());
+            pixels.dispose();
+            pixels = smaller;
+        }
+        return pixels;
+    }
+
+    private Texture register(Texture texture) {
         texture.setFilter(Texture.TextureFilter.MipMapLinearLinear, Texture.TextureFilter.Linear);
         textures.add(texture);
         return texture;
     }
 
     private Texture generated(Pixmap pixels) {
-        Texture texture = new Texture(pixels, true);
+        Texture texture = register(new Texture(pixels, true));
         pixels.dispose();
-        texture.setFilter(Texture.TextureFilter.MipMapLinearLinear, Texture.TextureFilter.Linear);
-        textures.add(texture);
         return texture;
     }
 
