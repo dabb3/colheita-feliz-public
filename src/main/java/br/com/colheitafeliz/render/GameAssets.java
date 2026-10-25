@@ -13,12 +13,14 @@ import java.util.List;
 import java.util.Map;
 
 public final class GameAssets implements AutoCloseable {
+    /** Maior lado da arte de animal na GPU; os quadros antigos tinham ~460 px e na tela não passam de ~160. */
+    private static final int ANIMAL_SIDE = 512;
+    static final int WEED_STAGES = 4;
+    static final int INSECT_STAGES = 3;
     private final List<Texture> textures = new ArrayList<>();
     private final Map<String, Texture[]> crops = new HashMap<>();
     private final Map<String, Texture> seeds = new HashMap<>();
     private final Map<Texture, Float> footCenters = new HashMap<>();
-    /** Maior lado da arte de animal na GPU; os quadros antigos tinham ~460 px e na tela não passam de ~160. */
-    private static final int ANIMAL_SIDE = 512;
     public final Texture background = load("classic/background/background.png");
     public final Texture house = load("classic/buildings/main-house.png");
     public final Texture dogHouse = load("classic/buildings/dog-house.png");
@@ -34,26 +36,26 @@ public final class GameAssets implements AutoCloseable {
     private final Texture[] chickenFrames = animalFrames("classic/animals/galinha/galinha.png", "classic/animals/galinha/galinha-andando.png");
     public final Texture chicken = chickenFrames[0];
     public final Texture chickenWalk = chickenFrames[1];
-    public final Texture duck = animalFrames("classic/animals/pato/pato.png")[0];
+    public final Texture duck = animalSprite("classic/animals/pato/pato.png");
     private final Texture[] dogFrames = animalFrames("classic/animals/cachorro/cachorro.png", "classic/animals/cachorro/cachorro-andando.png");
     public final Texture dog = dogFrames[0];
     public final Texture dogWalk = dogFrames[1];
-    public final Texture donkeySleeping = animalFrames("classic/animals/burrinho/burrinho-dormindo.png")[0];
-    public final Texture rabbit = animalFrames("classic/animals/coelho/coelho.png")[0];
-    public final Texture carrot = animalFrames("classic/animals/coelho/cenoura-coelho.png")[0];
-    public final Texture nestEggs = animalFrames("classic/animals/ninho-geral/ninho-com-ovos.png")[0];
-    public final Texture nestEmpty = animalFrames("classic/animals/ninho-geral/ninho-vazio.png")[0];
-    public final Texture bucket = animalFrames("classic/animals/vaca/balde-vaca.png")[0];
-    public final Texture woolBasket = animalFrames("classic/animals/ovelha/la-ovelha.png")[0];
-    public final Texture bowl = animalFrames("classic/animals/cachorro/potinho-cachorro-com-comida.png")[0];
-    public final Texture[] weeds = new Texture[4];
+    public final Texture donkeySleeping = animalSprite("classic/animals/burrinho/burrinho-dormindo.png");
+    public final Texture rabbit = animalSprite("classic/animals/coelho/coelho.png");
+    public final Texture carrot = animalSprite("classic/animals/coelho/cenoura-coelho.png");
+    public final Texture nestEggs = animalSprite("classic/animals/ninho-geral/ninho-com-ovos.png");
+    public final Texture nestEmpty = animalSprite("classic/animals/ninho-geral/ninho-vazio.png");
+    public final Texture bucket = animalSprite("classic/animals/vaca/balde-vaca.png");
+    public final Texture woolBasket = animalSprite("classic/animals/ovelha/la-ovelha.png");
+    public final Texture bowl = animalSprite("classic/animals/cachorro/potinho-cachorro-com-comida.png");
+    public final Texture[] weeds = new Texture[WEED_STAGES];
     /** Minhocas por quantidade: insects[0] = 1 minhoca ... insects[2] = 3. */
-    public final Texture[] insects = new Texture[3];
+    public final Texture[] insects = new Texture[INSECT_STAGES];
     public final Texture tileGrass = load("classic/terrain/grama-default.png");
     public final Texture tilePlowed = load("classic/terrain/terra-arada.png");
     public final Texture tileWet = load("classic/terrain/terra-molhada.png");
     public final Texture tileDry = load("classic/terrain/terra-seca.png");
-    public final Texture tileHighlight = load("classic/terrain/terrain_highlight.png");
+    public final Texture tileHighlight = load("classic/terrain/terra-destaque.png");
     public final Texture cursor = load("classic/icons/hud/cursor-ui.png");
     public final Texture hoe = load("classic/icons/hud/pa-ui.png");
     public final Texture bag = load("classic/icons/hud/saco-ui.png");
@@ -70,7 +72,7 @@ public final class GameAssets implements AutoCloseable {
     public final Texture clipboard = generated(HudIcons.clipboard());
     public final Texture star = load("classic/icons/xp.png");
     // asset_presente.jpg traz o xadrez de "transparência" pintado na imagem; fica o PNG até sair um com alfa.
-    public final Texture gift = load("classic/icons/icon_gift.png");
+    public final Texture gift = load("classic/icons/presente.png");
     public final Texture shop = load("classic/icons/icon-shop.png");
     public final Texture deposit = load("classic/icons/deposit-icon.png");
     public final Texture avatar = load("classic/icons/avatar_masculino.png");
@@ -133,6 +135,8 @@ public final class GameAssets implements AutoCloseable {
     private Texture load(String path) {
         return register(new Texture(Gdx.files.internal(path), true));
     }
+
+    private Texture animalSprite(String path) { return animalFrames(path)[0]; }
 
     /**
      * Arte de animal vem em telas grandes com margem. Recorta todas pela mesma caixa (a união da arte),

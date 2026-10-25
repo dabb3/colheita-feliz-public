@@ -25,8 +25,9 @@ class AssetPathsTest {
                 var literals = ASSET_LITERAL.matcher(Files.readString(file));
                 while (literals.find()) {
                     String path = literals.group(1);
-                    // O AudioManager prefixa "sounds/" nos efeitos.
-                    if (!Files.exists(ASSETS.resolve(path)) && !Files.exists(ASSETS.resolve("sounds").resolve(path)))
+                    // O AudioManager prefixa "sounds/" nos efeitos .wav.
+                    boolean sound = path.endsWith(".wav") && Files.exists(ASSETS.resolve("sounds").resolve(path));
+                    if (!Files.exists(ASSETS.resolve(path)) && !sound)
                         missing.add(file.getFileName() + ": " + path);
                 }
             }
@@ -53,8 +54,8 @@ class AssetPathsTest {
 
     @Test void everyWeedAndInsectStageExists() {
         List<String> missing = new ArrayList<>();
-        for (int count = 1; count <= 4; count++) expect(GameAssets.weedPath(count), missing);
-        for (int count = 1; count <= 3; count++) expect(GameAssets.insectPath(count), missing);
+        for (int count = 1; count <= GameAssets.WEED_STAGES; count++) expect(GameAssets.weedPath(count), missing);
+        for (int count = 1; count <= GameAssets.INSECT_STAGES; count++) expect(GameAssets.insectPath(count), missing);
         assertEquals(List.of(), missing);
     }
 
