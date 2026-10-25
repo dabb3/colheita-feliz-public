@@ -48,17 +48,55 @@ jobs:
           path: build/reports/spotbugs/main/
           retention-days: 7
 
-      - name: Publish SpotBugs to PR
+      - name: Convert SpotBugs XML to SARIF
         if: github.event_name == 'pull_request' && always()
-        uses: jwgmelink/spotbugs-report-action@v1
-        with:
-          path: build/reports/spotbugs/main.xml
+        shell: bash
+        run: |
+          pip install --quiet spotbugs-to-sarif 2>/dev/null || true
+          for report in main test; do
+            xml="build/reports/spotbugs/${report}.xml"
+            sarif="build/reports/spotbugs/${report}.sarif"
+            if [ -f "$xml" ]; then
+              python3 -c "
+          import json, sys, xml.etree.ElementTree as ET
+          tree = ET.parse('$xml')
+          root = tree.getroot()
+          results = []
+          for bug in root.findall('.//BugInstance'):
+            src = bug.find('.//SourceLine')
+            line = int(src.get('start', '0')) if src is not None else 1
+            path = src.get('sourcepath', '') if src is not None else ''
+            results.append({
+              'ruleId': bug.get('type'),
+              'level': 'warning',
+              'message': {'text': (bug.findtext('ShortMessage') or '').strip()},
+              'locations': [{'physicalLocation': {
+                'artifactLocation': {'uri': path},
+                'region': {'startLine': max(line, 1)}
+              }}]
+            })
+          sarif = {'version': '2.1.0', '$schema': 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json',
+                   'runs': [{'tool': {'driver': {'name': 'SpotBugs'}}, 'results': results}]}
+          with open('$sarif', 'w') as f:
+            json.dump(sarif, f)
+          print(f'Converted $xml -> $sarif ({len(results)} findings)')
+              " || echo "WARN: failed to convert $xml"
+            fi
+          done
 
-      - name: Publish SpotBugs Test to PR
+      - name: Upload SpotBugs SARIF to PR
         if: github.event_name == 'pull_request' && always()
-        uses: jwgmelink/spotbugs-report-action@v1
+        uses: github/codeql-action/upload-sarif@v3
         with:
-          path: build/reports/spotbugs/test.xml
+          sarif_file: build/reports/spotbugs/main.sarif
+          category: spotbugs-main
+
+      - name: Upload SpotBugs Test SARIF to PR
+        if: github.event_name == 'pull_request' && always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: build/reports/spotbugs/test.sarif
+          category: spotbugs-test
 
       - name: Run JaCoCo coverage
         run: bash ./gradlew --no-daemon jacocoTestReport
