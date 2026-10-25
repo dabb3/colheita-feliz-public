@@ -43,13 +43,13 @@ Este documento reúne os valores e as regras fornecidos para o projeto. As regra
 
 ### 2.1. Sementes VIP e especiais
 
-| Semente | Preço registrado | Condição |
-|---|---:|---|
-| Batata-doce | 300 ouro | VIP |
-| Amendoim | 2.300 ouro | VIP |
-| Limão | 4.300 ouro | VIP |
-| Noz | 15.500 ouro | VIP |
-| Coco | 6 verdes | Premium |
+| Semente | Preço registrado | Condição | Sprites prontas |
+|---|---:|---|:---:|
+| Batata-doce | 300 ouro | VIP | [x] |
+| Amendoim | 2.300 ouro | VIP | [x] |
+| Limão | 4.300 ouro | VIP | [x] |
+| Noz | 15.500 ouro | VIP | [x] |
+| Coco | 6 verdes | Premium | [x] |
 
 ## 3. Tempos de cultivo e colheitas
 
