@@ -17,6 +17,11 @@ tasks.spotbugsMain {
     reports.create('xml') { required = true }
 }
 
+tasks.spotbugsTest {
+    reports.create('html') { required = true }
+    reports.create('xml') { required = true }
+}
+
 jacoco {
     toolVersion = '0.8.12'
 }

@@ -12,4 +12,8 @@
   <Match>
     <Bug pattern="DCN_NULLPOINTER_EXCEPTION,NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
   </Match>
+  <!-- Baseline: test-only dead stores and ignored return values in assertions -->
+  <Match>
+    <Bug pattern="DLS_DEAD_LOCAL_STORE,RV_RETURN_VALUE_IGNORED,RV_RETURN_VALUE_IGNORED_INFERRED"/>
+  </Match>
 </FindBugsFilter>
