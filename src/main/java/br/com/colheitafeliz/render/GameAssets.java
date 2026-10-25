@@ -71,8 +71,7 @@ public final class GameAssets implements AutoCloseable {
     public final Texture gear = generated(HudIcons.gear());
     public final Texture clipboard = generated(HudIcons.clipboard());
     public final Texture star = load("classic/icons/xp.png");
-    // asset_presente.jpg traz o xadrez de "transparência" pintado na imagem; fica o PNG até sair um com alfa.
-    public final Texture gift = load("classic/icons/presente.png");
+    public final Texture gift = load("classic/icons/asset_presente.jpg");
     public final Texture shop = load("classic/icons/icon-shop.png");
     public final Texture deposit = load("classic/icons/deposit-icon.png");
     public final Texture avatar = load("classic/icons/avatar_masculino.png");
