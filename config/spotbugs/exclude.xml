@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+<!-- Baseline: EI_EXPOSE_REP/EI2 em GameSnapshot (record-like, imutável por contrato) -->
+<Match>
+<Class name="br.com.colheitafeliz.game.GameSnapshot"/>
+<Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+</Match>
+<Match>
+<Class name="br.com.colheitafeliz.audio.AudioManager"/>
+<Bug pattern="EI_EXPOSE_REP2"/>
+</Match>
+<Match>
+<Class name="br.com.colheitafeliz.domain.economy.Market"/>
+<Bug pattern="EI_EXPOSE_REP2"/>
+</Match>
+<Match>
+<Class name="br.com.colheitafeliz.game.GameSession"/>
+<Bug pattern="EI_EXPOSE_REP"/>
+</Match>
+<!-- Baseline: EI_EXPOSE_REP em GameState (retorna referências internas) -->
+<Match>
+<Class name="br.com.colheitafeliz.game.GameState"/>
+<Bug pattern="EI_EXPOSE_REP"/>
+</Match>
+<!-- Baseline: EI_EXPOSE_REP em FarmRenderer -->
+<Match>
+<Class name="br.com.colheitafeliz.render.FarmRenderer"/>
+<Bug pattern="EI_EXPOSE_REP"/>
+</Match>
+<!-- Baseline: Math.addExact usado só para checar overflow, retorno ignorado de propósito -->
+<Match>
+<Class name="br.com.colheitafeliz.domain.economy.Market"/>
+<Method name="buySeed"/>
+<Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT"/>
+</Match>
+<!-- Baseline: null-pointer style em JsonSaveRepository (pacote persistence) -->
+<Match>
+<Class name="br.com.colheitafeliz.persistence.JsonSaveRepository"/>
+<Bug pattern="DCN_NULLPOINTER_EXCEPTION,NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
+</Match>
+<!-- Baseline: test-only — dead stores e retornos ignorados em assertions -->
+<Match>
+<Class name="br.com.colheitafeliz.game.GameStateTest"/>
+<Bug pattern="DLS_DEAD_LOCAL_STORE"/>
+</Match>
+<Match>
+<Class name="br.com.colheitafeliz.game.AnimalTest"/>
+<Bug pattern="RV_RETURN_VALUE_IGNORED,RV_RETURN_VALUE_IGNORED_INFERRED"/>
+</Match>
+</FindBugsFilter>

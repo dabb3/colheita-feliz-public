@@ -11,6 +11,9 @@ jobs:
   build:
     name: Build and verify
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Check out source
         uses: actions/checkout@v7
@@ -35,6 +38,81 @@ jobs:
           else
             bash ./gradlew --no-daemon build distZip
           fi
+
+      - name: Upload SpotBugs report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: spotbugs-report
+          path: |
+            build/reports/spotbugs/main.xml
+            build/reports/spotbugs/main.html
+            build/reports/spotbugs/test.xml
+            build/reports/spotbugs/test.html
+          retention-days: 7
+
+      - name: Convert SpotBugs XML to SARIF
+        if: github.event_name == 'pull_request' && always()
+        shell: bash
+        run: |
+          convert_to_sarif() {
+            local xml="$1" sarif="$2" prefix="$3"
+            [ -f "$xml" ] || return 0
+            python3 - "$xml" "$sarif" "$prefix" <<'PYEOF'
+          import json, sys, xml.etree.ElementTree as ET
+          xml_path, sarif_path, prefix = sys.argv[1], sys.argv[2], sys.argv[3]
+          tree = ET.parse(xml_path)
+          root = tree.getroot()
+          results = []
+          for bug in root.findall('.//BugInstance'):
+            src = bug.find('.//SourceLine')
+            line = int(src.get('start', '0')) if src is not None else 1
+            path = src.get('sourcepath', '') if src is not None else ''
+            if path and prefix:
+              path = prefix + path
+            results.append({
+              'ruleId': bug.get('type'),
+              'level': 'warning',
+              'message': {'text': (bug.findtext('ShortMessage') or '').strip()},
+              'locations': [{'physicalLocation': {
+                'artifactLocation': {'uri': path},
+                'region': {'startLine': max(line, 1)}
+              }}]
+            })
+          sarif_doc = {
+            'version': '2.1.0',
+            '$schema': 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json',
+            'runs': [{'tool': {'driver': {'name': 'SpotBugs'}}, 'results': results}]
+          }
+          with open(sarif_path, 'w') as f:
+            json.dump(sarif_doc, f)
+          print(f'Converted {xml_path} -> {sarif_path} ({len(results)} findings)')
+          PYEOF
+          }
+          convert_to_sarif build/reports/spotbugs/main.xml build/reports/spotbugs/main.sarif "src/main/java/"
+          convert_to_sarif build/reports/spotbugs/test.xml build/reports/spotbugs/test.sarif "src/test/java/"
+
+      - name: Upload SpotBugs SARIF to PR
+        if: github.event_name == 'pull_request' && always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: build/reports/spotbugs/main.sarif
+          category: spotbugs-main
+
+      - name: Upload SpotBugs Test SARIF to PR
+        if: github.event_name == 'pull_request' && always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: build/reports/spotbugs/test.sarif
+          category: spotbugs-test
+
+      - name: Upload JaCoCo report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-report
+          path: build/reports/jacoco/test/
+          retention-days: 7
 
       - name: Save desktop distribution
         uses: actions/upload-artifact@v7
