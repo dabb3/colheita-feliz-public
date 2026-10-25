@@ -50,8 +50,8 @@ public final class GameAssets implements AutoCloseable {
     public final Texture tileGrass = load("classic/terrain/grama-default.png");
     public final Texture tilePlowed = load("classic/terrain/terra-arada.png");
     public final Texture tileWet = load("classic/terrain/terra-molhada.png");
-    public final Texture tileDry = load("classic/terrain/terrain_dry.png");
-    public final Texture tileHighlight = load("classic/terrain/terrain_highlight.png");
+    public final Texture tileDry = load("classic/terrain/terra-seca.png");
+    public final Texture tileHighlight = load("classic/terrain/terra-adubada.png");
     public final Texture cursor = load("classic/hud/cursor-ui.png");
     public final Texture hoe = load("classic/hud/pa-ui.png");
     public final Texture bag = load("classic/hud/saco-ui.png");
@@ -66,8 +66,8 @@ public final class GameAssets implements AutoCloseable {
     public final Texture bell = generated(HudIcons.bell());
     public final Texture gear = generated(HudIcons.gear());
     public final Texture clipboard = generated(HudIcons.clipboard());
-    public final Texture star = load("classic/ui/icon_xp.png");
-    public final Texture gift = load("classic/ui/icon_gift.png");
+    public final Texture star = load("classic/icons/xp.png");
+    public final Texture gift = load("classic/icons/asset_presente.jpg");
     public final Texture shop = load("classic/others-ui/icon-shop.png");
     public final Texture deposit = load("classic/others-ui/deposit-icon.png");
     public final Texture statusPanel = load("sprites/icons/hud/esquerdo/painel_status.png");

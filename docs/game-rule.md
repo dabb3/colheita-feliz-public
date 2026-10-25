@@ -10,38 +10,36 @@ Este documento reúne os valores e as regras fornecidos para o projeto. As regra
 
 ## 2. Sementes e preços de compra
 
-Controle de sprites nas duas tabelas: `[ ]` pendentes; `[x]` prontas. Edite o marcador conforme concluir cada semente.
-
-| Semente | Preço em ouro | Nível mínimo | Sprites prontas |
-|---|---:|---:|:---:|
-| Nabo | 300 | 1 | [x] |
-| Cenoura | 350 | 1 | [x] |
-| Milho | 500 | 1 | [x] |
-| Batata | 650 | 1 | [x] |
-| Berinjela | 800 | 1 | [x] |
-| Tomate | 950 | 5 | [x] |
-| Pimenta | 1.100 | 5 | [x] |
-| Abóbora | 1.250 | 5 | [x] |
-| Ervilha | 1.400 | 5 | [x] |
-| Morango | 1.550 | 10 | [x] |
-| Maçã | 1.800 | 10 | [x] |
-| Melancia | 1.975 | 11 | [x] |
-| Banana | 2.150 | 12 | [x] |
-| Pêssego | 3.075 | 13 | [x] |
-| Laranja | 3.350 | 14 | [x] |
-| Uva | 4.125 | 15 | [x] |
-| Romã | 3.875 | 16 | [x] |
-| Melão | 4.600 | 17 | [x] |
-| Cana | 4.600 | 17 | [x] |
-| Lichia | 4.750 | 19 | [x] |
-| Kiwi | 5.050 | 23 | [x] |
-| Abacaxi | 5.200 | 26 | [x] |
-| Cereja | 5.500 | 28 | [x] |
-| Pitaya | 6.180 | 31 | [x] |
-| Manga | 6.850 | 36 | [x] |
-| Cacau | 8.500 | 40 | [x] |
-| Caviar | 15.000 | 50 | [x] |
-| Goiaba | 15.000 | 50 | [x] |
+| Semente | Preço em ouro | Nível mínimo |
+|---|---:|---:|
+| Nabo | 300 | 1 |
+| Cenoura | 350 | 1 |
+| Milho | 500 | 1 |
+| Batata | 650 | 1 |
+| Berinjela | 800 | 1 |
+| Tomate | 950 | 5 |
+| Pimenta | 1.100 | 5 |
+| Abóbora | 1.250 | 5 |
+| Ervilha | 1.400 | 5 |
+| Morango | 1.550 | 10 |
+| Maçã | 1.800 | 10 |
+| Melancia | 1.975 | 11 |
+| Banana | 2.150 | 12 |
+| Pêssego | 3.075 | 13 |
+| Laranja | 3.350 | 14 |
+| Uva | 4.125 | 15 |
+| Romã | 3.875 | 16 |
+| Melão | 4.600 | 17 |
+| Cana | 4.600 | 17 |
+| Lichia | 4.750 | 19 |
+| Kiwi | 5.050 | 23 |
+| Abacaxi | 5.200 | 26 |
+| Cereja | 5.500 | 28 |
+| Pitaya | 6.180 | 31 |
+| Manga | 6.850 | 36 |
+| Cacau | 8.500 | 40 |
+| Caviar | 15.000 | 50 |
+| Goiaba | 15.000 | 50 |
 
 ### 2.1. Sementes VIP e especiais
 
