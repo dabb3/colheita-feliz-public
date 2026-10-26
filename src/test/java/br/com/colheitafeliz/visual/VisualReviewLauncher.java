@@ -219,7 +219,9 @@ public final class VisualReviewLauncher {
             fresh.selectTool(Tool.HAND);
             states.selectTool(scene == 4 ? Tool.SEED : Tool.HAND);
             rich.selectTool(Tool.HAND);
+            renderer.toolbar().closeSeeds();
             switch (scene) {
+                case 4 -> renderer.toolbar().picked(Tool.SEED, Tool.HAND);
                 case 24 -> {
                     // Nível alto sem VIP: as sementes VIP liberadas pelo nível só saem com o cartão (última cena).
                     fresh.progress().award(new java.math.BigDecimal("20000"));

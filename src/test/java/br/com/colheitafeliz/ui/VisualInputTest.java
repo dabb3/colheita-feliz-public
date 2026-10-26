@@ -7,6 +7,7 @@ import br.com.colheitafeliz.game.GameState;
 import br.com.colheitafeliz.game.Tool;
 import br.com.colheitafeliz.testsupport.ManualClock;
 import com.badlogic.gdx.math.Rectangle;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -106,6 +107,16 @@ class VisualInputTest {
         assertEquals("Pá", Tool.HOE.label());
         assertEquals("Luvinha", Tool.HAND.label());
         assertNull(toolbar.hit(Toolbar.slotX(0) + 10, Toolbar.Y + Toolbar.HEIGHT + 60));
+    }
+
+    @Test void everySeedOfTheCatalogFitsOnScreenAndCanBePicked() {
+        List<CropType> crops = CropCatalogLoader.load().all();
+        Toolbar toolbar = new Toolbar();
+        for (int i = 0; i < crops.size(); i++) {
+            Rectangle r = Toolbar.seedRect(i, crops.size());
+            assertTrue(r.x >= 0 && r.x + r.width <= 1600 && r.y >= 0 && r.y + r.height <= 900, crops.get(i).id());
+            assertEquals(crops.get(i), toolbar.seedHit(cx(r), cy(r), crops), crops.get(i).id());
+        }
     }
 
     @Test void seedTrayOpensWithTheBagAndClosesAfterPickingASeed() {

@@ -9,6 +9,7 @@ import br.com.colheitafeliz.render.UiSkin;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.Align;
 import java.util.List;
 
@@ -20,7 +21,7 @@ public final class Toolbar {
     public static final float SLOT = 72, SLOT_H = 64, GAP = 6, PAD = 10;
     public static final float WIDTH = Tool.BAR.size() * SLOT + (Tool.BAR.size() - 1) * GAP + PAD * 2;
     public static final float X = (1600 - WIDTH) / 2f, Y = 16, HEIGHT = SLOT_H + PAD * 2;
-    private static final float SEED = 62, SEED_GAP = 4, SEED_Y = Y + HEIGHT + 12;
+    private static final float SEED = 62, SEED_GAP = 4, SEED_Y = Y + HEIGHT + 12, SEED_MARGIN = 40;
 
     private boolean seedsOpen;
 
@@ -41,16 +42,33 @@ public final class Toolbar {
     public static float slotX(int index) { return X + PAD + index * (SLOT + GAP); }
 
     public CropType seedHit(float x, float y, List<CropType> crops) {
-        if (y < SEED_Y + PAD || y > SEED_Y + PAD + SEED) return null;
-        float left = seedTrayX(crops.size()) + PAD;
-        for (int i = 0; i < crops.size(); i++) {
-            float sx = left + i * (SEED + SEED_GAP);
-            if (x >= sx && x <= sx + SEED) return crops.get(i);
-        }
+        for (int i = 0; i < crops.size(); i++)
+            if (seedRect(i, crops.size()).contains(x, y)) return crops.get(i);
         return null;
     }
 
-    private static float seedTrayWidth(int count) { return count * SEED + (count - 1) * SEED_GAP + PAD * 2; }
+    /** Quantas sementes cabem numa linha da tela, com margem de {@link #SEED_MARGIN} de cada lado. */
+    private static final int MAX_PER_ROW = (int) ((1600 - 2 * SEED_MARGIN - 2 * PAD + SEED_GAP) / (SEED + SEED_GAP));
+
+    private static int seedRows(int count) { return (count + MAX_PER_ROW - 1) / MAX_PER_ROW; }
+    /** Linhas equilibradas: 33 sementes viram 17 + 16, e não 22 + 11. */
+    private static int seedsPerRow(int count) { return (count + seedRows(count) - 1) / seedRows(count); }
+
+    /** Posição da semente na bandeja: em linhas, de cima para baixo, centradas na tela. */
+    static Rectangle seedRect(int index, int count) {
+        int row = index / seedsPerRow(count), column = index % seedsPerRow(count);
+        return new Rectangle(seedTrayX(count) + PAD + column * (SEED + SEED_GAP),
+                SEED_Y + PAD + (seedRows(count) - 1 - row) * (SEED + SEED_GAP), SEED, SEED);
+    }
+
+    private static float seedTrayWidth(int count) {
+        int perRow = seedsPerRow(count);
+        return perRow * SEED + (perRow - 1) * SEED_GAP + PAD * 2;
+    }
+    private static float seedTrayHeight(int count) {
+        int rows = seedRows(count);
+        return rows * SEED + (rows - 1) * SEED_GAP + PAD * 2;
+    }
     private static float seedTrayX(int count) { return (1600 - seedTrayWidth(count)) / 2f; }
 
     public void draw(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state, float pointerX, float pointerY) {
@@ -93,13 +111,14 @@ public final class Toolbar {
 
     private void drawSeeds(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state, float px, float py) {
         List<CropType> crops = state.catalog().all();
-        float width = seedTrayWidth(crops.size()), x = seedTrayX(crops.size());
-        skin.dropShadow(batch, x, SEED_Y, width, SEED + PAD * 2, 2);
-        skin.draw(batch, skin.tray, x, SEED_Y, width, SEED + PAD * 2);
+        float width = seedTrayWidth(crops.size()), height = seedTrayHeight(crops.size()), x = seedTrayX(crops.size());
+        skin.dropShadow(batch, x, SEED_Y, width, height, 2);
+        skin.draw(batch, skin.tray, x, SEED_Y, width, height);
         CropType hovered = seedHit(px, py, crops);
         for (int i = 0; i < crops.size(); i++) {
             CropType crop = crops.get(i);
-            float sx = x + PAD + i * (SEED + SEED_GAP), sy = SEED_Y + PAD;
+            Rectangle slot = seedRect(i, crops.size());
+            float sx = slot.x, sy = slot.y;
             boolean unlocked = state.unlocked(crop);
             boolean selected = crop.equals(state.seed());
             if (selected) skin.glow(batch, sx + SEED / 2f, sy + SEED / 2f, 92, 1f);
@@ -114,7 +133,7 @@ public final class Toolbar {
         CropType shown = hovered != null ? hovered : state.seed();
         String caption = shown.name() + (state.unlocked(shown)
                 ? " · " + state.inventory().seeds(shown) + " sementes" : " · libera no nível " + shown.requiredLevel());
-        skin.onScene(batch, skin.label, caption, 800, SEED_Y + SEED + PAD * 2 + 22, Align.center);
+        skin.onScene(batch, skin.label, caption, 800, SEED_Y + height + 22, Align.center);
     }
 
     /** Desenha a textura cabendo num quadrado de {@code size}, centrada em (cx, cy), sem distorcer. */
