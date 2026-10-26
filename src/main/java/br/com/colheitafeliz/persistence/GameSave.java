@@ -2,6 +2,8 @@ package br.com.colheitafeliz.persistence;
 
 import br.com.colheitafeliz.game.GameSnapshot;
 
-public record GameSave(int version, String savedAtReal, String gameTime, GameSnapshot snapshot) {
-    public static final int VERSION = 14;
+public record GameSave(int version, String ruleset, String savedAtReal, String gameTime, GameSnapshot snapshot) {
+    public static final int VERSION = 15;
+    public static final String RULESET = "economy-2026-10";
+    public static final String DEFAULT_PATH = "save/game-rules-v1.json";
 }

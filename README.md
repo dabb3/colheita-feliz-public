@@ -40,7 +40,11 @@ Os preços, tempos e rendimentos ficam em [crops.json](assets/data/crops.json); 
 
 ## Save
 
-O save é local: `save/game.json`, relativo ao diretório de execução. Defina `COLHEITA_SAVE_PATH` para usar outro caminho. Há autosave, progresso offline e migração dos formatos antigos para v14. Faça backup do save antes de trocar de versão. Saves não são versionados.
+O save da nova economia é local: `save/game-rules-v1.json`, relativo ao diretório de execução, no formato v15. Defina `COLHEITA_SAVE_PATH` para usar outro caminho. Há autosave e progresso offline. Saves anteriores não são importados nem convertidos; o arquivo antigo permanece preservado. Um destino explícito com versão antiga, futura ou conteúdo inválido impede a carga e não é sobrescrito. Faça backup antes de trocar de versão. Saves não são versionados.
+
+Uma fazenda nova começa com 500 moedas de ouro e 5 verdes. Saldos usam uma casa decimal; XP preserva frações. Produtos mantêm a moeda e o custo de aquisição da semente. A venda soma os lotes elegíveis por moeda, aplica lucro de 15% e arredonda o total para cima em uma casa decimal. Na aba **VIP**, 100 verdes compram 30 dias reais, acumuláveis; enquanto ativo, o lucro é 25%. Produtos exclusivos ficam bloqueados sem VIP e são ignorados em **Vender tudo**.
+
+A substituição do catálogo, dos ciclos e da progressão restante está dividida nas próximas etapas. As regras finais estão em [game-rule.md](docs/game-rule.md); nem todas estão implementadas nesta etapa econômica.
 
 ## Desenvolvimento e distribuição
 

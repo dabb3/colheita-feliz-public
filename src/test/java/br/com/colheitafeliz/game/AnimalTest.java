@@ -60,10 +60,10 @@ class AnimalTest {
         clock.advanceSeconds(hen.productionSeconds());
         game.tendAnimal(0);
         assertFalse(game.dailyMissions().completed(DailyMissionBoard.COLLECT));
-        int coins = game.wallet().coins();
+        java.math.BigDecimal coins = game.wallet().coins();
         assertTrue(game.tendAnimal(1).success());
         assertTrue(game.dailyMissions().completed(DailyMissionBoard.COLLECT));
-        assertEquals(coins + DailyMissionBoard.COLLECT.coins(), game.wallet().coins());
+        assertEquals(coins.add(java.math.BigDecimal.valueOf(DailyMissionBoard.COLLECT.coins())), game.wallet().coins());
     }
 
     @Test void everyAnimalPaysMoreThanItsFeed() {
@@ -78,6 +78,7 @@ class AnimalTest {
         assertFalse(game.buyAnimal(hen).success());
         assertTrue(game.message().contains("nível 3"));
         game.progress().award(50 + 75);
+        game.wallet().debit(br.com.colheitafeliz.domain.economy.Currency.GOLD, game.wallet().coins().subtract(java.math.BigDecimal.valueOf(100)));
         assertFalse(game.buyAnimal(hen).success(), "100 moedas não pagam uma galinha");
         game.wallet().credit(hen.price() * hen.max() + 100);
         for (int i = 0; i < hen.max(); i++) assertTrue(game.buyAnimal(hen).success());
@@ -101,19 +102,19 @@ class AnimalTest {
         assertFalse(game.tendAnimal(0).success());
         assertTrue(game.message().contains("produzindo"));
         clock.advanceSeconds(60);
-        int xp = game.progress().currentXp();
+        java.math.BigDecimal xp = game.progress().currentXp();
         assertTrue(game.tendAnimal(0).success());
         assertEquals(hen.productYield(), game.lastCollected());
         assertEquals(hen.productYield(), game.inventory().product("ovo"));
-        assertEquals(xp + hen.collectXp(), game.progress().currentXp());
+        assertEquals(xp.add(java.math.BigDecimal.valueOf(hen.collectXp())), game.progress().currentXp());
         assertEquals(Animal.Status.HUNGRY, game.barn().get(0).statusAt(game.now()));
 
-        assertEquals(hen.productYield() * hen.productPrice(), game.depositValue());
+        assertEquals(0, java.math.BigDecimal.valueOf(hen.price()).multiply(new java.math.BigDecimal("1.15")).multiply(java.math.BigDecimal.valueOf(hen.productYield())).compareTo(game.depositValue()));
         assertTrue(game.sellProduct(hen, false).success());
         assertEquals(hen.productYield() - 1, game.inventory().product("ovo"));
-        int coins = game.wallet().coins();
+        java.math.BigDecimal coins = game.wallet().coins();
         assertTrue(game.sellEverything().success());
         assertEquals(0, game.inventory().product("ovo"));
-        assertTrue(game.wallet().coins() >= coins + (hen.productYield() - 1) * hen.productPrice());
+        assertTrue(game.wallet().coins().compareTo(coins.add(java.math.BigDecimal.valueOf((hen.productYield() - 1) * hen.productPrice()))) >= 0);
     }
 }

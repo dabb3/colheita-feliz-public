@@ -67,6 +67,7 @@ public final class GameAssets implements AutoCloseable {
     public final Texture pesticide = load("classic/icons/hud/pesticida-ui.png");
     public final Texture coin = load("classic/icons/moeda-comum.png");
     public final Texture greenCoin = load("classic/icons/moeda-verde.png");
+    public final Texture vipCard = load("classic/icons/cartao-vip.png");
     public final Texture bell = generated(HudIcons.bell());
     public final Texture gear = generated(HudIcons.gear());
     public final Texture clipboard = generated(HudIcons.clipboard());

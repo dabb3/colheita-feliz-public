@@ -2,13 +2,14 @@
 
 Este documento reúne os valores e as regras fornecidos para o projeto. As regras de venda abaixo representam a definição de economia do projeto; não constituem uma validação histórica do jogo original.
 
-O alinhamento de `docs/regras-de-negocio.md` e da implementação com estas definições será feito em um PR posterior de correção/implementação, após o merge do PR com as alterações atuais.
+Esta é a fonte normativa dos valores e das regras desejadas. `docs/regras-de-negocio.md` descreve os fluxos e referencia estas seções, sem manter tabelas concorrentes. Definições documentadas não significam funcionalidades implementadas. Decisões complementares confirmadas em 2026-10-26 estão nas seções 10 a 14.
 
 ## 1. Moedas
 
 - **Ouro:** moeda utilizada nos preços e custos indicados como ouro.
 - **Moedas verdes:** moeda utilizada em compras premium e alternativas de aquisição.
 - Nas tabelas de preços, ouro e moedas verdes representam alternativas de compra, não uma soma. As recompensas da seção 8 concedem ambas as moedas cumulativamente.
+- Moedas verdes são obtidas jogando: saldo inicial, recompensas de nível, tarefas diárias e vendas de produtos originados de aquisições em verdes. Não há compra de moeda com dinheiro real, câmbio automático ou integração de pagamentos.
 
 ## 2. Sementes e plantas: tabela consolidada
 
@@ -18,36 +19,36 @@ As vendas comuns usam acréscimo de 15% e as VIP, de 25%. Os valores abaixo são
 
 Os tempos são as durações nominais de crescimento do estágio 1 ao 5, sujeitos à rega e às pausas por pragas e insetos. O total de temporadas inclui a primeira colheita. A sequência de XP corresponde às colheitas da primeira até a última temporada, calculada conforme a seção 3.1.
 
-| Semente | Condição | Nível mínimo | Compra por semente | Venda comum por unidade | Venda VIP por unidade | Primeira colheita | Intervalo após próximas coletas | Temporadas | Unidades por colheita | XP por temporada | Sprites prontas registradas |
+| Semente | Condição | Nível mínimo | Compra por semente | Venda comum por unidade | Venda VIP por unidade | Primeira colheita | Intervalo após próximas coletas | Temporadas | Unidades por colheita | XP por temporada | Cinco estágios em disco |
 |---|---|---:|---|---|---|---|---|---:|---:|---|---|
-| Nabo | Comum | 1 | 300 ouro | 345 ouro | 375 ouro | 10 h | Não se aplica | 1 | 1 | 15 | Não registrado nesta regra |
-| Cenoura | Comum | 1 | 350 ouro | 402,5 ouro | 437,5 ouro | 15 h | Não se aplica | 1 | 1 | 22,5 | Não registrado nesta regra |
-| Milho | Comum | 2 | 500 ouro | 575 ouro | 625 ouro | 20 h | Não se aplica | 1 | 1 | 30 | Não registrado nesta regra |
-| Batata | Comum | 3 | 650 ouro | 747,5 ouro | 812,5 ouro | 22 h | Não se aplica | 1 | 1 | 33 | Não registrado nesta regra |
-| Berinjela | Comum | 4 | 800 ouro | 920 ouro | 1.000 ouro | 24 h | Não se aplica | 1 | 1 | 36 | Não registrado nesta regra |
-| Tomate | Comum | 5 | 950 ouro | 1.092,5 ouro | 1.187,5 ouro | 26 h | 8 h | 2 | 1 | 39 → 19,5 | Não registrado nesta regra |
-| Pimenta | Comum | 5 | 1.100 ouro | 1.265 ouro | 1.375 ouro | 28 h | 9 h | 2 | 1 | 42 → 21 | Não registrado nesta regra |
-| Abóbora | Comum | 7 | 1.250 ouro | 1.437,5 ouro | 1.562,5 ouro | 29 h | 10 h | 2 | 1 | 43,5 → 21,75 | Não registrado nesta regra |
-| Ervilha | Comum | 9 | 1.400 ouro | 1.610 ouro | 1.750 ouro | 30 h | 11 h | 2 | 1 | 45 → 22,5 | Não registrado nesta regra |
-| Morango | Comum | 11 | 1.550 ouro | 1.782,5 ouro | 1.937,5 ouro | 31 h | 12 h | 3 | 1 | 46,5 → 23,25 → 11,625 | Não registrado nesta regra |
-| Maçã | Comum | 13 | 1.800 ouro | 2.070 ouro | 2.250 ouro | 42 h | 14 h | 3 | 1 | 63 → 31,5 → 15,75 | Não registrado nesta regra |
-| Melancia | Comum | 16 | 1.975 ouro | 2.271,3 ouro | 2.468,8 ouro | 46 h | 16 h | 3 | 1 | 69 → 34,5 → 17,25 | Não registrado nesta regra |
-| Banana | Comum | 19 | 2.150 ouro | 2.472,5 ouro | 2.687,5 ouro | 50 h | 18 h | 3 | 1 | 75 → 37,5 → 18,75 | Não registrado nesta regra |
-| Pêssego | Comum | 22 | 3.075 ouro | 3.536,3 ouro | 3.843,8 ouro | 54 h | 20 h | 3 | 1 | 81 → 40,5 → 20,25 | Não registrado nesta regra |
-| Laranja | Comum | 25 | 3.350 ouro | 3.852,5 ouro | 4.187,5 ouro | 60 h | 22 h | 3 | 1 | 90 → 45 → 22,5 | Não registrado nesta regra |
-| Uva | Comum | 28 | 4.125 ouro | 4.743,8 ouro | 5.156,3 ouro | 66 h | 24 h | 4 | 1 | 99 → 49,5 → 24,75 → 12,375 | Não registrado nesta regra |
-| Romã | Comum | 31 | 3.875 ouro | 4.456,3 ouro | 4.843,8 ouro | 68 h | 33 h | 4 | 1 | 102 → 51 → 25,5 → 12,75 | Não registrado nesta regra |
-| Melão | Comum | 35 | 4.600 ouro | 5.290 ouro | 5.750 ouro | 70 h | 35 h | 4 | 1 | 105 → 52,5 → 26,25 → 13,125 | Não registrado nesta regra |
-| Cana | Comum | 39 | 4.600 ouro | 5.290 ouro | 5.750 ouro | 72 h | 37 h | 4 | 1 | 108 → 54 → 27 → 13,5 | Não registrado nesta regra |
-| Lichia | Comum | 43 | 4.750 ouro | 5.462,5 ouro | 5.937,5 ouro | 74 h | 39 h | 4 | 1 | 111 → 55,5 → 27,75 → 13,875 | Não registrado nesta regra |
-| Kiwi | Comum | 45 | 5.050 ouro | 5.807,5 ouro | 6.312,5 ouro | 76 h | 41 h | 4 | 1 | 114 → 57 → 28,5 → 14,25 | Não registrado nesta regra |
-| Abacaxi | Comum | 47 | 5.200 ouro | 5.980 ouro | 6.500 ouro | 78 h | 43 h | 4 | 1 | 117 → 58,5 → 29,25 → 14,625 | Não registrado nesta regra |
-| Cereja | Comum | 49 | 5.500 ouro | 6.325 ouro | 6.875 ouro | 80 h | 45 h | 4 | 1 | 120 → 60 → 30 → 15 | Não registrado nesta regra |
-| Pitaya | Comum | 51 | 6.180 ouro | 7.107 ouro | 7.725 ouro | 82 h | 47 h | 4 | 1 | 123 → 61,5 → 30,75 → 15,375 | Não registrado nesta regra |
-| Manga | Comum | 53 | 6.850 ouro | 7.877,5 ouro | 8.562,5 ouro | 84 h | 49 h | 4 | 1 | 126 → 63 → 31,5 → 15,75 | Não registrado nesta regra |
-| Cacau | Comum | 55 | 8.500 ouro | 9.775 ouro | 10.625 ouro | 86 h | 51 h | 4 | 1 | 129 → 64,5 → 32,25 → 16,125 | Não registrado nesta regra |
-| Goiaba | Comum | 57 | 15.000 ouro | 17.250 ouro | 18.750 ouro | 96 h | 60 h | 4 | 1 | 144 → 72 → 36 → 18 | Não registrado nesta regra |
-| Caviar | Comum | 60 | 25.000 ouro | 28.750 ouro | 31.250 ouro | 168 h | 84 h | 5 | 1 | 252 → 126 → 63 → 31,5 → 15,75 | Não registrado nesta regra |
+| Nabo | Comum | 1 | 300 ouro | 345 ouro | 375 ouro | 10 h | Não se aplica | 1 | 1 | 15 | Sim |
+| Cenoura | Comum | 1 | 350 ouro | 402,5 ouro | 437,5 ouro | 15 h | Não se aplica | 1 | 1 | 22,5 | Sim |
+| Milho | Comum | 2 | 500 ouro | 575 ouro | 625 ouro | 20 h | Não se aplica | 1 | 1 | 30 | Sim |
+| Batata | Comum | 3 | 650 ouro | 747,5 ouro | 812,5 ouro | 22 h | Não se aplica | 1 | 1 | 33 | Sim |
+| Berinjela | Comum | 4 | 800 ouro | 920 ouro | 1.000 ouro | 24 h | Não se aplica | 1 | 1 | 36 | Sim |
+| Tomate | Comum | 5 | 950 ouro | 1.092,5 ouro | 1.187,5 ouro | 26 h | 8 h | 2 | 1 | 39 → 19,5 | Sim |
+| Pimenta | Comum | 5 | 1.100 ouro | 1.265 ouro | 1.375 ouro | 28 h | 9 h | 2 | 1 | 42 → 21 | Sim |
+| Abóbora | Comum | 7 | 1.250 ouro | 1.437,5 ouro | 1.562,5 ouro | 29 h | 10 h | 2 | 1 | 43,5 → 21,75 | Sim |
+| Ervilha | Comum | 9 | 1.400 ouro | 1.610 ouro | 1.750 ouro | 30 h | 11 h | 2 | 1 | 45 → 22,5 | Sim |
+| Morango | Comum | 11 | 1.550 ouro | 1.782,5 ouro | 1.937,5 ouro | 31 h | 12 h | 3 | 1 | 46,5 → 23,25 → 11,625 | Sim |
+| Maçã | Comum | 13 | 1.800 ouro | 2.070 ouro | 2.250 ouro | 42 h | 14 h | 3 | 1 | 63 → 31,5 → 15,75 | Sim |
+| Melancia | Comum | 16 | 1.975 ouro | 2.271,3 ouro | 2.468,8 ouro | 46 h | 16 h | 3 | 1 | 69 → 34,5 → 17,25 | Sim |
+| Banana | Comum | 19 | 2.150 ouro | 2.472,5 ouro | 2.687,5 ouro | 50 h | 18 h | 3 | 1 | 75 → 37,5 → 18,75 | Sim |
+| Pêssego | Comum | 22 | 3.075 ouro | 3.536,3 ouro | 3.843,8 ouro | 54 h | 20 h | 3 | 1 | 81 → 40,5 → 20,25 | Sim |
+| Laranja | Comum | 25 | 3.350 ouro | 3.852,5 ouro | 4.187,5 ouro | 60 h | 22 h | 3 | 1 | 90 → 45 → 22,5 | Sim |
+| Uva | Comum | 28 | 4.125 ouro | 4.743,8 ouro | 5.156,3 ouro | 66 h | 24 h | 4 | 1 | 99 → 49,5 → 24,75 → 12,375 | Sim |
+| Romã | Comum | 31 | 3.875 ouro | 4.456,3 ouro | 4.843,8 ouro | 68 h | 33 h | 4 | 1 | 102 → 51 → 25,5 → 12,75 | Sim |
+| Melão | Comum | 35 | 4.600 ouro | 5.290 ouro | 5.750 ouro | 70 h | 35 h | 4 | 1 | 105 → 52,5 → 26,25 → 13,125 | Sim |
+| Cana | Comum | 39 | 4.600 ouro | 5.290 ouro | 5.750 ouro | 72 h | 37 h | 4 | 1 | 108 → 54 → 27 → 13,5 | Sim |
+| Lichia | Comum | 43 | 4.750 ouro | 5.462,5 ouro | 5.937,5 ouro | 74 h | 39 h | 4 | 1 | 111 → 55,5 → 27,75 → 13,875 | Sim |
+| Kiwi | Comum | 45 | 5.050 ouro | 5.807,5 ouro | 6.312,5 ouro | 76 h | 41 h | 4 | 1 | 114 → 57 → 28,5 → 14,25 | Sim |
+| Abacaxi | Comum | 47 | 5.200 ouro | 5.980 ouro | 6.500 ouro | 78 h | 43 h | 4 | 1 | 117 → 58,5 → 29,25 → 14,625 | Sim |
+| Cereja | Comum | 49 | 5.500 ouro | 6.325 ouro | 6.875 ouro | 80 h | 45 h | 4 | 1 | 120 → 60 → 30 → 15 | Sim |
+| Pitaya | Comum | 51 | 6.180 ouro | 7.107 ouro | 7.725 ouro | 82 h | 47 h | 4 | 1 | 123 → 61,5 → 30,75 → 15,375 | Sim |
+| Manga | Comum | 53 | 6.850 ouro | 7.877,5 ouro | 8.562,5 ouro | 84 h | 49 h | 4 | 1 | 126 → 63 → 31,5 → 15,75 | Sim |
+| Cacau | Comum | 55 | 8.500 ouro | 9.775 ouro | 10.625 ouro | 86 h | 51 h | 4 | 1 | 129 → 64,5 → 32,25 → 16,125 | Sim |
+| Goiaba | Comum | 57 | 15.000 ouro | 17.250 ouro | 18.750 ouro | 96 h | 60 h | 4 | 1 | 144 → 72 → 36 → 18 | Sim |
+| Caviar | Comum | 60 | 25.000 ouro | 28.750 ouro | 31.250 ouro | 168 h | 84 h | 5 | 1 | 252 → 126 → 63 → 31,5 → 15,75 | Sim |
 | Batata-doce | VIP | 10 | 4 verdes | Bloqueada sem VIP | 5 verdes | 12 h | 6 h | 2 | 1 | 18 → 9 | Sim |
 | Amendoim | VIP | 20 | 8 verdes | Bloqueada sem VIP | 10 verdes | 24 h | 12 h | 3 | 1 | 36 → 18 → 9 | Sim |
 | Limão | VIP | 30 | 12 verdes | Bloqueada sem VIP | 15 verdes | 36 h | 18 h | 4 | 1 | 54 → 27 → 13,5 → 6,75 | Sim |
@@ -59,6 +60,8 @@ Os tempos são as durações nominais de crescimento do estágio 1 ao 5, sujeito
 Plantar consome uma semente e inicia a temporada no estágio 1. A primeira rega é necessária para iniciar o crescimento. As durações da tabela da seção 2 são de crescimento efetivo, não uma garantia de tempo corrido independentemente dos cuidados.
 
 Nas plantas com várias temporadas, o intervalo da próxima temporada começa após a coleta da atual, repetindo a progressão do estágio 1 ao 5. Cada temporada mantém o comportamento de uma planta de temporada única: rega continua necessária, e pragas e insetos continuam funcionando normalmente. Após a última colheita da última temporada, a planta morre.
+
+O intervalo úmido é `max(5 min, duração nominal da temporada atual / 3)`. Terra seca cresce a 50% depois da primeira rega; uma temporada ainda não regada não cresce. Cada nova temporada zera crescimento, rega, pragas, insetos e uso de fertilizante. A fórmula de XP continua usando a primeira duração, não o intervalo úmido nem a duração posterior.
 
 Pragas e insetos têm a mesma penalidade: pausam o crescimento, preservando o progresso, até sua remoção. Insetos não reduzem a quantidade colhida. As ferramentas de remoção continuam correspondendo ao tipo: herbicida para as pragas tratadas com herbicida e pesticida para insetos. Se ambas as condições estiverem presentes, o crescimento só retoma após remover ambas.
 
@@ -107,6 +110,7 @@ Na coluna de crescimento, os tempos representam bebê → jovem e jovem → adul
 - Cada unidade de produto animal tem como custo-base o preço de compra do animal que a produziu, na moeda usada na aquisição. Uma galinha de 8.000 ouro produz ovos com custo-base de 8.000 ouro cada.
 - Animais de crescimento só podem ser vendidos na fase adulta. Seu custo-base de venda é o preço de compra do próprio animal, na moeda usada na aquisição. Após a venda, o animal é removido.
 - O perfil comum ou VIP é determinado no momento da venda.
+- Todo animal começa alimentado a 100%, sem compra adicional de ração: 8 h para produtores, 12 h para animais de crescimento e 6 h para protetores. Essa alimentação faz parte da aquisição; não é item gratuito no inventário.
 - Cada alimentação atende um único animal, sem acumular duração. Só é permitido alimentar quando o animal estiver com fome; enquanto houver tempo de alimentação restante, uma nova alimentação é bloqueada. Isso também vale para protetores. Animais de crescimento usam ração genérica de crescimento; produtores usam ração genérica de produtor.
 - A falta de alimento pausa os tempos de crescimento e produção, preservando o progresso. Ao alimentar novamente, a etapa retoma somente o tempo restante, sem reiniciar.
 - Produtores são comprados adultos e produzem uma única unidade em um único ciclo. O produto pronto espera a coleta, sem acumular produção. Após a coleta única, o animal desaparece e o produto permanece no armazém para venda conforme a seção 6. Para produzir novamente, é necessário comprar outro animal.
@@ -119,6 +123,12 @@ Na coluna de crescimento, os tempos representam bebê → jovem e jovem → adul
 Todos os protetores são comprados adultos e duram 30 dias. Após esse prazo, o animal é removido e o jogador precisa comprá-lo novamente. A falta de alimento pausa a proteção, sem estender a duração de 30 dias. Protetores não podem ser revendidos.
 
 Os protetores não concedem XP por nenhuma ação. Sua única função é bloquear ações de outros jogadores na fazenda, incluindo roubos de plantações, em uma futura implementação multiplayer. Essa definição não indica que o roubo ou o multiplayer já estejam implementados.
+
+Existem exatamente cinco tipos de protetores: Cão Robô, Cão Mastiff, Avestruz, Cabra e Cavalo, com os preços, níveis e limites da tabela 4.1. O cão normal não integra o catálogo jogável. Cada protetor alimentado e dentro dos 30 dias de validade protege 20% das terras plantáveis do dono. Cinco protetores ativos dão 100% de proteção e impedem qualquer furto. Animais com fome ou expirados não contribuem. A cobertura máxima é 100%; não há mordida, multa ou transferência de ouro como regra substituta.
+
+As terras protegidas são escolhidas aleatoriamente, sem repetição, entre os terrenos plantáveis liberados do jogador. A quantidade é `min(terrenos_liberados, teto(terrenos_liberados × protetores_ativos ÷ 5))`. Portanto, com seis terrenos e um protetor ativo, dois terrenos ficam protegidos. Com zero protetores, nenhum; com cinco, todos. O percentual representa cobertura de terras, não uma chance independente de 20% em cada tentativa.
+
+Para concretizar o sorteio, a implementação mantém a seleção enquanto os terrenos liberados e o conjunto de protetores ativos não mudarem. Uma alteração nesses conjuntos refaz a seleção com aleatoriedade injetável. A seleção é persistida: repetir tentativa de furto, abrir uma janela ou reabrir o jogo não sorteia outra vez. Essa estabilidade é decisão técnica para impedir novas tentativas até obter uma cobertura favorável.
 
 Cada protetor aceita qualquer ração genérica: a de crescimento (80 ouro) ou a de produtor (120 ouro), conforme a seção 5. Em ambos os casos, cada compra alimenta um único protetor por 6 h, sem acumular duração. Sem alimento, sua proteção fica pausada até ser alimentado novamente.
 
@@ -171,6 +181,8 @@ valor_total_venda = teto(total_sem_arredondar × 10) ÷ 10
 O multiplicador é 1,15 para o perfil comum e 1,25 para VIP. A função teto arredonda para o inteiro imediatamente superior, preservando valores já inteiros. O valor unitário não é arredondado antes da multiplicação pela quantidade. Por exemplo, dois ovos de uma galinha adquirida por 9 moedas verdes rendem 20,7 moedas verdes no perfil comum (9 × 1,15 × 2), embora uma venda isolada de um ovo renda 10,4 moedas verdes.
 
 O benefício VIP acrescenta **10 pontos percentuais** ao acréscimo padrão: 15% + 10% = 25%.
+
+No comando **Vender tudo**, produtos VIP bloqueados são ignorados e permanecem no armazém; os demais são vendidos normalmente. Para cada moeda, somam-se os valores exatos de todos os itens/lotes elegíveis e aplica-se o teto de uma casa decimal uma única vez ao total dessa moeda. Ouro e verdes nunca são somados nem convertidos. Esta unidade de arredondamento por operação e moeda é a decisão técnica adotada para concretizar a regra de arredondar o total.
 
 ### 6.2. Exemplo: nabo
 
@@ -276,4 +288,67 @@ Com a precisão registrada, 2,25 resulta em 2,3 e 2,20 permanece 2,2. O arredond
 | Liberação automática ou ação de compra/resgate | automatica, recompensas em moedas devem ser transferidas ao jogador imediatamente e o saldo atualizado |
 | Confirmar ou corrigir 207.000 ouro no nível 25 | corrigido |
 
-As regras serão alinhadas com a implementação e com `docs/regras-de-negocio.md` no PR posterior indicado na abertura deste documento.
+## 10. Início, tutorial e remoção do legado
+
+- Uma fazenda nova começa no nível 1, com zero XP, **500 ouro e 5 verdes**, sem sementes, produtos, animais, ração, fertilizantes ou plantas prontas.
+- Mantém a matriz de 6 colunas por 5 linhas e os cinco terrenos iniciais da primeira coluna. Os demais terrenos custam **50 verdes cada**, na ordem sequencial existente. Os requisitos de nível por linha continuam 2, 3, 4 e 5; o preço antigo em ouro deixa de existir.
+- Arroz, repolho e girassol não integram o catálogo novo. Não oferecer seus itens, plantios ou compras. A presença dos PNGs no disco não os torna conteúdo jogável.
+- Não converter saldo, itens, culturas em andamento, animais, adubo ou progresso dos saves legados para a economia nova. O jogo novo começa vazio, com apenas os saldos iniciais definidos acima.
+- A implementação deve separar o save da nova economia dos saves legados, preservando os arquivos antigos em disco. Não apagar, sobrescrever ou reinicializar silenciosamente um save existente, inclusive quando houver caminho explícito em `COLHEITA_SAVE_PATH`.
+- O tutorial somente orienta. A sequência será comprar, arar, plantar, regar, aguardar a maturação, colher e vender. Não concede moedas, sementes, itens nem XP extra; ações reais continuam concedendo o XP normal da seção 11.
+- Não há presentes em sementes, itens grátis, nabos iniciais prontos ou recompensas de conclusão do tutorial. A tabela de nível concede apenas as moedas da seção 8. As fontes financeiras do núcleo novo são as descritas neste documento; o bônus legado de baú ao arar não será mantido.
+
+## 11. Curva de nível e XP das ações
+
+A intenção é uma progressão lenta, que recompense persistência. A referência de balanceamento é aproximadamente 30 dias para alcançar o nível 30 em uma rotina ativa; não é prazo garantido para qualquer rotina.
+
+Curva inicial calculada para implementação, com `N` igual ao nível atual:
+
+```text
+xp_para_proximo_nivel(N) = 25 + 3 × (N − 1)²
+xp_acumulado_para_nivel(L) = 25 × (L − 1) + (L − 2) × (L − 1) × (2 × L − 3) ÷ 2
+```
+
+O nível 2 exige 25 XP acumulados; o nível 5 exige 142; o nível 10 exige 837; o nível 30 exige 23.867. Passar do nível 29 ao 30 exige 2.377 XP. XP excedente é preservado e um ganho pode atravessar vários níveis. A fórmula não estabelece nível máximo; recompensas além do nível 61 continuam sem definição.
+
+| Ação válida | XP |
+| --- | ---: |
+| Plantar uma semente | 5 |
+| Regar terra seca | 3 |
+| Remover ervas | 5 |
+| Remover insetos | 5 |
+| Retirar planta morta | 2 |
+| Arar grama, comprar, vender produtos já coletados, alimentar e furtar | 0 |
+
+Colheitas usam a seção 3.1. Animais usam a tabela 4.1, inclusive XP pela venda do animal de crescimento adulto. Venda de produto animal já coletado não concede novamente o XP da coleta. Ação recusada não concede XP. Tutorial e tarefas não acrescentam XP às ações.
+
+A calibração local de 2026-10-26 registra hipóteses e limites. O coeficiente da curva é escolha técnica calculada, não resultado de teste jogável. Ajustes futuros exigem repetir a calibração e atualizar esta fonte.
+
+## 12. Tarefas diárias
+
+O limite de recompensa de **tarefas e missões diárias, somadas, é 2 verdes por dia UTC**. Esse limite não bloqueia recompensas de nível nem receitas de venda em verdes.
+
+Para concretizar o limite sem criar presentes ou outra fonte de XP, o planejamento adota duas tarefas fixas, cada uma paga uma vez:
+
+- **Cuidar da fazenda:** realizar uma ação válida de plantar, regar, remover praga/insetos, colher, retirar planta morta, alimentar ou coletar um animal: 1 verde.
+- **Movimentar a fazenda:** realizar uma compra ou venda válida de semente, produto, animal, ração, fertilizante, VIP ou terreno: 1 verde.
+
+Não concedem ouro, XP adicional, sementes ou itens. A primeira ação elegível conclui a respectiva tarefa. Uma operação pode concluir ambas quando satisfizer ambas as condições. Eventos recusados, passagem do tempo e login sem ação não contam. Alimentação incluída na aquisição não é uma ação manual de alimentar.
+
+As tarefas já contam durante o tutorial, não exigem gastar mais que o saldo inicial e não dependem de colher diariamente culturas longas. Renovam à meia-noite UTC, persistindo dia, progresso e pagamentos para impedir recompensa duplicada. A troca de dia não gera recompensa automática por dias ausentes.
+
+## 13. Furto de temporadas
+
+Uma visita só pode furtar planta cujo ciclo da temporada atual esteja completo e cujo terreno não esteja protegido. Não existe piso de produção garantido ao dono nem janela exclusiva inicial de colheita.
+
+Um furto bem-sucedido transfere a única unidade daquela temporada para o visitante e consome a temporada do dono. O dono não recebe produto nem XP por essa perda; o visitante recebe o produto sem XP. O produto preserva cultura, moeda e custo-base da semente que o originou; o VIP aplicado à venda é o do vendedor no momento da venda.
+
+Se restarem temporadas, a planta volta ao estágio 1 da temporada seguinte, com relógio zerado, primeira rega pendente e limite de fertilizante renovado. Se era a última temporada, vira planta morta. O furto não remove o terreno nem as próximas temporadas. Exemplo: uma planta de três temporadas furtada uma vez deixa apenas duas temporadas possíveis ao dono, se não houver novos furtos.
+
+Só uma coleta ou furto pode consumir cada temporada. A implementação social deverá resolver concorrência e duplicação de pedidos na autoridade responsável pelo estado, sem confiar em pedidos do cliente. Proteção segue 4.3. Não estender automaticamente essa regra aos produtos de animais: o escopo confirmado aqui é a plantação.
+
+## 14. Assets e estado de entrega
+
+Reutilizar os assets existentes, com mapeamento explícito de nomes do catálogo para nomes de arquivos. A presença no disco deve ser conferida para os cinco estágios e a semente de cada cultura, fases e produtos animais e ícones de itens. A implementação deve conferir o carregamento e o resultado visual no jogo; inventário de caminhos não substitui revisão visual.
+
+O alinhamento destes textos e a existência dos planos não significam que a economia nova, o VIP ou o social estejam implementados. O acompanhamento da entrega fica em `regras-de-negocio.md` e nos planos vinculados.

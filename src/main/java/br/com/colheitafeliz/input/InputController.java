@@ -124,7 +124,7 @@ public final class InputController extends InputAdapter {
     }
 
     /** Valores antes da ação, para calcular o que o jogador ganhou. */
-    private record Snapshot(int level, int xp, int coins) {
+    private record Snapshot(int level, java.math.BigDecimal xp, java.math.BigDecimal coins) {
         Snapshot(GameState state) {
             this(state.progress().level(), state.progress().currentXp(), state.wallet().coins());
         }
@@ -137,8 +137,8 @@ public final class InputController extends InputAdapter {
             return;
         }
         boolean levelUp = state.progress().level() > before.level();
-        int xpGained = levelUp ? 0 : state.progress().currentXp() - before.xp();
-        renderer.reward(x, y, harvested, produced, xpGained, state.wallet().coins() - before.coins());
+        java.math.BigDecimal xpGained = levelUp ? java.math.BigDecimal.ZERO : state.progress().currentXp().subtract(before.xp());
+        renderer.reward(x, y, harvested, produced, xpGained, state.wallet().coins().subtract(before.coins()));
         if (cue == Cue.PLOW && state.lastTreasureCoins() > 0) renderer.treasure(state.lastTreasureCoins());
         if (levelUp) renderer.levelUp(state);
         audio.play(levelUp ? Cue.LEVEL_UP : cue);

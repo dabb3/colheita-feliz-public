@@ -3,6 +3,7 @@ package br.com.colheitafeliz.domain.farm;
 import br.com.colheitafeliz.domain.crop.Crop;
 import br.com.colheitafeliz.domain.crop.CropType;
 import java.time.Instant;
+import br.com.colheitafeliz.domain.inventory.ItemLot;
 import java.util.Objects;
 
 public final class FarmTile {
@@ -41,8 +42,12 @@ public final class FarmTile {
     }
 
     public void plant(CropType type, Instant now) {
+        plant(type, now, new Crop(type, now).origin());
+    }
+
+    public void plant(CropType type, Instant now, ItemLot origin) {
         require(TileState.PLOWED);
-        crop = new Crop(type, now);
+        crop = new Crop(type, now, origin);
         pest = PestState.NONE;
         nextPestCheckAt = null;
         insects = 0;

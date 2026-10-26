@@ -36,9 +36,13 @@ public final class GameSession {
         Instant initial = loaded.map(save -> save.resumedGameTime(realClock.instant()))
                 .orElseGet(realClock::instant);
         AdjustableGameClock gameClock = new AdjustableGameClock(realClock, initial);
-        GameState state = loaded.map(save -> GameState.restore(gameClock, realClock, catalog, save.snapshot(), random))
-                .orElseGet(() -> new GameState(gameClock, realClock, catalog, random));
-        return new GameSession(realClock, repository, gameClock, state, loaded.isEmpty());
+        try {
+            GameState state = loaded.map(save -> GameState.restore(gameClock, realClock, catalog, save.snapshot(), random))
+                    .orElseGet(() -> new GameState(gameClock, realClock, catalog, random));
+            return new GameSession(realClock, repository, gameClock, state, loaded.isEmpty());
+        } catch (RuntimeException e) {
+            throw new IOException("Invalid saved game state", e);
+        }
     }
 
     public GameState state() { return state; }

@@ -42,7 +42,7 @@ class SaveRoundTripTest {
         clock.advanceSeconds(450);
         GameSession reopened = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
         GameState restored = reopened.state();
-        assertEquals(70, restored.wallet().coins());
+        assertEquals(0, java.math.BigDecimal.valueOf(470).compareTo(restored.wallet().coins()));
         assertEquals(1, restored.inventory().seeds(turnip));
         assertEquals(0, restored.inventory().seeds(tomato));
         assertEquals(TileState.GROWING, restored.farm().tile(0, 3).state());
@@ -50,7 +50,7 @@ class SaveRoundTripTest {
         assertEquals(Tool.WATER, restored.tool());
         assertEquals(tomato, restored.seed());
         reopened.save();
-        assertEquals(70, GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state().wallet().coins());
+        assertEquals(0, java.math.BigDecimal.valueOf(470).compareTo(GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state().wallet().coins()));
     }
 
     @Test void offlineGrowthContinuesAndHarvestedProduceSurvivesAnotherRestart() throws IOException {
@@ -75,14 +75,14 @@ class SaveRoundTripTest {
         reopened.save();
         GameSession again = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
         assertEquals(3, again.state().inventory().produce(corn));
-        assertEquals(75, again.state().wallet().coins());
+        assertEquals(0, java.math.BigDecimal.valueOf(475).compareTo(again.state().wallet().coins()));
         assertEquals(TileState.DEAD, again.state().farm().tile(0, 0).state());
         assertEquals(corn, again.state().farm().tile(0, 0).withered());
         assertTrue(again.state().sellProduce(corn).success());
-        assertEquals(100, again.state().wallet().coins());
+        assertEquals(0, new java.math.BigDecimal("503.8").compareTo(again.state().wallet().coins()));
     }
 
-    @Test void tutorialProgressSurvivesRestartAndOldSavesSkipIt() throws IOException {
+    @Test void tutorialProgressSurvivesRestart() throws IOException {
         ManualClock clock = new ManualClock();
         Path file = directory.resolve("save.json");
         JsonSaveRepository repository = new JsonSaveRepository(file);
@@ -97,12 +97,6 @@ class SaveRoundTripTest {
         assertEquals(1, reopened.state().tutorial().stepIndex());
         assertEquals(TileState.READY, reopened.state().farm().tile(0, 1).state());
 
-        JsonObject old = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
-        old.addProperty("version", 11);
-        old.getAsJsonObject("snapshot").remove("tutorialStep");
-        Files.writeString(file, old.toString());
-        assertFalse(GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99)
-                .state().tutorial().active());
     }
 
     @Test void hensFeedAndEggsSurviveRestartAndKeepProducingOffline() throws IOException {
@@ -118,7 +112,7 @@ class SaveRoundTripTest {
         state.buyFeed(hen);
         state.buyFeed(hen);
         assertTrue(state.tendAnimal(0).success());
-        state.inventory().addProduct("ovo", 2);
+        state.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("ovo", br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(state.animalType("galinha").price()), 2, false));
         session.save();
         clock.advanceSeconds(hen.productionSeconds());
         GameState restored = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state();
@@ -156,7 +150,7 @@ class SaveRoundTripTest {
         assertEquals(TileState.READY, reopened.state().farm().tile(0, 0).state());
     }
 
-    @Test void versionTwoPersistsPestProgressAndAudioPreferences() throws IOException {
+    @Test void persistsPestProgressAndAudioPreferences() throws IOException {
         ManualClock clock = new ManualClock();
         JsonSaveRepository repository = new JsonSaveRepository(directory.resolve("save.json"));
         GameSession session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 0);
@@ -177,7 +171,7 @@ class SaveRoundTripTest {
         GameSession reopened = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
         assertEquals(PestState.WEEDS, reopened.state().farm().tile(0, 0).pest());
         assertEquals(TileState.GROWING, reopened.state().farm().tile(0, 0).state());
-        assertEquals(8, reopened.state().progress().currentXp());
+        assertEquals(0, java.math.BigDecimal.valueOf(8).compareTo(reopened.state().progress().currentXp()));
         assertFalse(reopened.state().musicEnabled());
         assertFalse(reopened.state().effectsEnabled());
         reopened.state().selectTool(Tool.WEEDER);
@@ -187,69 +181,9 @@ class SaveRoundTripTest {
                 bound -> 99).state().farm().tile(0, 0).pest());
     }
 
-    @Test void loadsPhaseTwoVersionOneSaveAndUpgradesOnNextWrite() throws IOException {
-        ManualClock clock = new ManualClock();
-        Path file = directory.resolve("save.json");
-        JsonSaveRepository repository = new JsonSaveRepository(file);
-        GameSession session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
-        CropType turnip = session.state().catalog().get("nabo");
-        session.state().buySeed(turnip);
-        session.state().selectTool(Tool.HOE);
-        session.state().act(0, 1);
-        session.save();
-        JsonObject old = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
-        old.addProperty("version", 1);
-        JsonObject snapshot = old.getAsJsonObject("snapshot");
-        for (String field : new String[]{"level", "currentXp", "unlockedCropIds",
-                "musicEnabled", "effectsEnabled"}) snapshot.remove(field);
-        snapshot.getAsJsonArray("tiles").forEach(tile -> {
-            JsonObject object = tile.getAsJsonObject();
-            object.remove("pest");
-            object.remove("pestAt");
-            object.remove("nextPestCheckAt");
-        });
-        Files.writeString(file, old.toString());
-        GameSession migrated = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
-        assertEquals(90, migrated.state().wallet().coins());
-        assertEquals(1, migrated.state().inventory().seeds(turnip));
-        assertEquals(TileState.PLOWED, migrated.state().farm().tile(0, 1).state());
-        assertEquals(1, migrated.state().progress().level());
-        assertTrue(migrated.state().musicEnabled());
-        assertTrue(migrated.state().effectsEnabled());
-        migrated.save();
-        assertEquals(GameSave.VERSION, JsonParser.parseString(Files.readString(file)).getAsJsonObject()
-                .get("version").getAsInt());
-    }
 
-    @Test void versionNineGrowthIsKeptAndMigrationCountsAsFreshWatering() throws IOException {
-        ManualClock clock = new ManualClock();
-        Path file = directory.resolve("save.json");
-        JsonSaveRepository repository = new JsonSaveRepository(file);
-        GameSession session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
-        CropType tomato = session.state().catalog().get("tomate");
-        session.state().buySeed(tomato);
-        session.state().selectTool(Tool.HOE);
-        session.state().act(0, 0);
-        session.state().selectSeed(tomato);
-        session.state().act(0, 0);
-        session.state().selectTool(Tool.WATER);
-        session.state().act(0, 0);
-        session.save();
-        JsonObject old = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
-        old.addProperty("version", 9);
-        java.time.Instant gameTime = java.time.Instant.parse(old.get("gameTime").getAsString());
-        JsonObject tile = old.getAsJsonObject("snapshot").getAsJsonArray("tiles").get(0).getAsJsonObject();
-        tile.remove("growthAnchorAt");
-        tile.remove("grownAtAnchorMillis");
-        tile.addProperty("plantedAt", gameTime.minusSeconds(1300).toString());
-        tile.addProperty("wateredAt", gameTime.minusSeconds(1200).toString());
-        Files.writeString(file, old.toString());
-        GameState migrated = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state();
-        var crop = migrated.farm().tile(0, 0).crop();
-        assertEquals(1_200_000, crop.grownMillisAt(migrated.now()));
-        assertEquals(3, crop.stageAt(migrated.now()));
-        assertFalse(crop.dryAt(migrated.now()));
-    }
+
+
 
     @Test void unlockedCropRemainsAvailableAfterRestart() throws IOException {
         ManualClock clock = new ManualClock();
@@ -280,7 +214,7 @@ class SaveRoundTripTest {
         assertTrue(restored.buySeed(potato).success());
     }
 
-    @Test void insectsSurviveSaveAndOldSavesStartWithout() throws IOException {
+    @Test void insectsSurviveSave() throws IOException {
         ManualClock clock = new ManualClock();
         Path file = directory.resolve("save.json");
         JsonSaveRepository repository = new JsonSaveRepository(file);
@@ -299,16 +233,6 @@ class SaveRoundTripTest {
         session.save();
         assertEquals(2, GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99)
                 .state().farm().tile(0, 0).insects());
-        JsonObject old = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
-        old.addProperty("version", 10);
-        old.getAsJsonObject("snapshot").getAsJsonArray("tiles").forEach(t -> {
-            t.getAsJsonObject().remove("insects");
-            t.getAsJsonObject().remove("nextInsectCheckAt");
-        });
-        Files.writeString(file, old.toString());
-        GameState migrated = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state();
-        assertEquals(0, migrated.farm().tile(0, 0).insects());
-        assertNotNull(migrated.farm().tile(0, 0).nextInsectCheckAt());
     }
     @Test void failedWriteReportsTheErrorInsteadOfSuccess() throws IOException {
         Path blocker = directory.resolve("not-a-folder");
