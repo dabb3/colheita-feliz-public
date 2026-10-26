@@ -101,6 +101,23 @@ class NewEconomySaveTest {
         }
     }
 
+    @Test void saveRefusesFileReplacedAfterOpen() throws IOException {
+        var clock = new ManualClock();
+        Path file = directory.resolve("replaced.json");
+        var catalog = CropCatalogLoader.load();
+        var session = GameSession.open(clock, catalog, new JsonSaveRepository(file), bound -> 99);
+        assertTrue(session.trySave());
+        for (String replacement : new String[]{"{\"version\":14}", "not-json"}) {
+            Files.writeString(file, replacement);
+            assertFalse(session.trySave());
+            assertTrue(session.state().message().startsWith("Erro ao salvar"));
+            assertEquals(replacement, Files.readString(file));
+            assertThrows(IOException.class, () -> new JsonSaveRepository(file).save(
+                    session.state().snapshot(), clock.instant(), clock.instant()));
+            assertEquals(replacement, Files.readString(file));
+        }
+    }
+
     @Test void malformedNewSaveIsNotAFreshGame() throws IOException {
         Path file = directory.resolve("invalid.json");
         Files.writeString(file, "{\"version\":15,\"ruleset\":\"economy-2026-10\",\"snapshot\":{}}");

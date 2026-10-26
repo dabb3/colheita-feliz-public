@@ -55,7 +55,10 @@ public final class FarmGame extends ApplicationAdapter {
 
     private boolean save() {
         boolean saved = session.trySave();
-        if (!saved) Gdx.app.error("save", session.state().message());
+        if (!saved) {
+            Gdx.app.error("save", session.state().message());
+            if (renderer != null) renderer.failure(session.state().message());
+        }
         return saved;
     }
 
