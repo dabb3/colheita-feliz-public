@@ -5,6 +5,7 @@ import br.com.colheitafeliz.domain.crop.CropCatalog;
 import br.com.colheitafeliz.domain.crop.CropType;
 import br.com.colheitafeliz.game.ActionResult;
 import br.com.colheitafeliz.game.GameState;
+import br.com.colheitafeliz.game.GameText;
 import br.com.colheitafeliz.render.GameAssets;
 import br.com.colheitafeliz.render.Palette;
 import br.com.colheitafeliz.render.UiSkin;
@@ -160,7 +161,7 @@ public final class MarketPanel {
             skin.text(batch, skin.label, "Cartão VIP · 30 dias · 100 verdes", center, BOTTOM + 265, Palette.INK, Align.center);
             skin.text(batch, skin.body, "Venda com acréscimo de 25%. Renovação acumula mais 30 dias.",
                     center, BOTTOM + 225, Palette.INK_MUTED, Align.center);
-            skin.text(batch, skin.body, state.vipActive() ? "Ativo até " + java.time.format.DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm").withZone(java.time.ZoneId.systemDefault()).format(state.vip().expiresAt()) : "VIP inativo",
+            skin.text(batch, skin.body, state.vipActive() ? "Ativo até " + GameText.vipExpiry(state.vip().expiresAt(), java.time.ZoneId.systemDefault()) : "VIP inativo",
                     center, BOTTOM + 195, Palette.INK_MUTED, Align.center);
             Rectangle buy = vipButton();
             button(batch, skin, skin.glassSun, buy, "Comprar cartão VIP", Palette.INK_WARM, null, buy.contains(px, py));
@@ -211,16 +212,16 @@ public final class MarketPanel {
             skin.text(batch, skin.label, vipBlocked ? "VIP necessário" : "Nível " + crop.requiredLevel(), cx, c.y + c.height - 93, Palette.INK, Align.center);
         }
         String info = selling ? "cada" : formatTime(crop.growthSeconds());
-        String price = java.math.BigDecimal.valueOf(crop.seedPrice()).multiply(new java.math.BigDecimal(selling ? (state.vipActive() ? "1.25" : "1.15") : "1")).setScale(1, java.math.RoundingMode.CEILING).toPlainString();
+        String price = GameText.money(java.math.BigDecimal.valueOf(crop.seedPrice()).multiply(new java.math.BigDecimal(selling ? (state.vipActive() ? "1.25" : "1.15") : "1")).setScale(1, java.math.RoundingMode.CEILING));
         boolean green = false;
         if (vipBlocked) {
             var origin = state.inventory().produceLots().stream().filter(lot -> lot.itemId().equals(crop.id())).findFirst().orElseThrow();
-            price = origin.unitCost().multiply(new java.math.BigDecimal("1.15")).setScale(1, java.math.RoundingMode.CEILING).toPlainString();
+            price = GameText.money(origin.unitCost().multiply(new java.math.BigDecimal("1.15")).setScale(1, java.math.RoundingMode.CEILING));
             green = origin.currency() == br.com.colheitafeliz.domain.economy.Currency.GREEN;
         }
         if (!quote.isEmpty()) {
             var first = quote.entrySet().iterator().next();
-            price = first.getValue().toPlainString();
+            price = GameText.money(first.getValue());
             green = first.getKey() == br.com.colheitafeliz.domain.economy.Currency.GREEN;
         }
         float priceW = 20 + 4 + skin.width(skin.label, price) + 6 + skin.width(skin.caption, info);

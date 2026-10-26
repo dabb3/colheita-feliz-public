@@ -9,6 +9,7 @@ import br.com.colheitafeliz.domain.farm.PestState;
 import br.com.colheitafeliz.domain.farm.TileState;
 import br.com.colheitafeliz.game.DailyMissionBoard;
 import br.com.colheitafeliz.game.GameState;
+import br.com.colheitafeliz.game.GameText;
 import br.com.colheitafeliz.game.Tutorial;
 import br.com.colheitafeliz.game.LandExpansion;
 import br.com.colheitafeliz.render.GameAssets;
@@ -54,7 +55,7 @@ public final class Hud {
     private final List<Floater> floaters = new ArrayList<>();
     private String bannerTitle, bannerSub;
     private long bannerStarted;
-    private float shownCoins = -1;
+    private java.math.BigDecimal lastGold;
     private Panel panel = Panel.NONE;
     private long bumpStarted;
 
@@ -81,7 +82,7 @@ public final class Hud {
     public boolean bannerVisible() { return bannerTitle != null; }
 
     /** Limpa avisos, floaters e banner (usado pela revisão visual entre cenas). */
-    public void reset() { toasts.clear(); floaters.clear(); bannerTitle = null; shownCoins = -1; panel = Panel.NONE; }
+    public void reset() { toasts.clear(); floaters.clear(); bannerTitle = null; lastGold = null; panel = Panel.NONE; }
     public void dismissBanner() { bannerTitle = null; }
 
     // ---------- atalhos ----------
@@ -204,13 +205,10 @@ public final class Hud {
     }
 
     private void drawProfile(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state) {
-        float coins = state.wallet().coins().floatValue();
+        var coins = state.wallet().coins();
         long now = System.nanoTime();
-        if (shownCoins < 0 || coins < shownCoins) shownCoins = coins;
-        else if (coins > shownCoins) {
-            shownCoins = Math.min(coins, shownCoins + Math.max(1, (coins - shownCoins) / 8f));
-            if (now - bumpStarted > BUMP_NANOS) bumpStarted = now;
-        }
+        if (lastGold != null && coins.compareTo(lastGold) > 0) bumpStarted = now;
+        lastGold = coins;
         skin.dropShadow(batch, CARD_X, CARD_Y, CARD_W, CARD_H, 2);
         skin.draw(batch, skin.hudCard, CARD_X, CARD_Y, CARD_W, CARD_H);
         skin.draw(batch, skin.sheet, CARD_X + 8, CARD_Y + 10, 72, 72);
@@ -227,17 +225,17 @@ public final class Hud {
         skin.micro.getData().setScale(.85f);
         skin.bar(batch, skin.barSky, tx, CARD_Y + 42, 220, 14,
                 state.progress().currentXp().floatValue() / state.progress().xpToNext().floatValue(),
-                state.progress().currentXp() + " / " + state.progress().xpToNext() + " XP");
+                GameText.xp(state.progress().currentXp()) + " / " + GameText.xp(state.progress().xpToNext()) + " XP");
         skin.micro.getData().setScale(1);
         float bump = 1;
         float t = (now - bumpStarted) / (float) BUMP_NANOS;
         if (t < 1) bump = 1 + .35f * (float) Math.sin(t * Math.PI);
         Toolbar.drawFitted(batch, assets.coin, tx + 11, CARD_Y + 22, 24 * bump);
-        String gold = state.wallet().coins().setScale(1).toPlainString();
+        String gold = GameText.money(state.wallet().coins());
         skin.text(batch, skin.number, gold, tx + 28, CARD_Y + 30, Palette.INK, Align.left);
         float greenX = tx + 28 + skin.width(skin.number, gold) + 24;
         Toolbar.drawFitted(batch, assets.greenCoin, greenX, CARD_Y + 22, 24);
-        skin.text(batch, skin.number, state.greenCoins().setScale(1).toPlainString(), greenX + 17, CARD_Y + 30, Palette.LEAF_INK, Align.left);
+        skin.text(batch, skin.number, GameText.money(state.greenCoins()), greenX + 17, CARD_Y + 30, Palette.LEAF_INK, Align.left);
     }
 
     private void drawShortcuts(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state, float px, float py) {

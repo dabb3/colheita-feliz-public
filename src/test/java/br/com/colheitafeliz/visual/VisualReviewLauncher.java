@@ -43,9 +43,9 @@ public final class VisualReviewLauncher {
                 "05-sementes.png", "06-loja.png", "07-deposito.png", "08-missoes.png",
                 "09-avisos.png", "10-nivel-e-recompensas.png", "11-lote-a-venda.png",
                 "12-primeiros-passos.png", "13-tutorial-nas-missoes.png",
-                "14-loja-animais.png", "15-galinhas-no-cercado.png", "16-vip.png", "17-saldos-e-xp-decimais.png", "18-deposito-duas-moedas.png", "19-deposito-vip-bloqueado.png", "20-falha-autosave.png"
+                "14-loja-animais.png", "15-galinhas-no-cercado.png", "16-vip.png", "17-saldos-e-xp-decimais.png", "18-deposito-duas-moedas.png", "19-deposito-vip-bloqueado.png", "20-falha-autosave.png", "21-aviso-vip.png"
         };
-        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
         private final Path output = Path.of(System.getProperty("colheita.visualOutput", "build/visual-review"));
         private FarmRenderer renderer;
         private GameState fresh, states, rich, newcomer, rancher;
@@ -128,7 +128,7 @@ public final class VisualReviewLauncher {
             if (frames == 0) setUp(scene);
             GameState state = switch (scene) {
                 case 0, 10, 17, 18, 19 -> fresh;
-                case 5, 6, 7, 9, 15, 16 -> rich;
+                case 5, 6, 7, 9, 15, 16, 20 -> rich;
                 case 11, 12 -> newcomer;
                 case 13, 14 -> rancher;
                 default -> states;
@@ -161,6 +161,7 @@ public final class VisualReviewLauncher {
             states.selectTool(scene == 4 ? Tool.SEED : Tool.HAND);
             rich.selectTool(Tool.HAND);
             switch (scene) {
+                case 20 -> renderer.hud().toast(null, "", rich.message(), Hud.ToastKind.NORMAL);
                 case 19 -> {
                     var file = output.resolve("blocked-parent");
                     try {

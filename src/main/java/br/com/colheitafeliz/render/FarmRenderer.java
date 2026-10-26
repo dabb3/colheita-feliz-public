@@ -9,6 +9,7 @@ import br.com.colheitafeliz.domain.farm.PestSystem;
 import br.com.colheitafeliz.domain.farm.TileState;
 import br.com.colheitafeliz.game.DailyMissionBoard;
 import br.com.colheitafeliz.game.GameState;
+import br.com.colheitafeliz.game.GameText;
 import br.com.colheitafeliz.game.LandExpansion;
 import br.com.colheitafeliz.ui.Hud;
 import br.com.colheitafeliz.ui.MarketPanel;
@@ -104,11 +105,11 @@ public final class FarmRenderer implements AutoCloseable {
         }
         if (coins.signum() != 0) {
             float fx = left + index * spacing; long delay = index++ * 150_000_000L;
-            hud.floater(fx, y, assets.coin, (coins.signum() > 0 ? "+" : "") + coins, Hud.FloaterStyle.COIN, delay);
+            hud.floater(fx, y, assets.coin, (coins.signum() > 0 ? "+" : "") + GameText.money(coins), Hud.FloaterStyle.COIN, delay);
         }
         if (xp.signum() > 0) {
             float fx = left + index * spacing; long delay = index * 150_000_000L;
-            hud.floater(fx, y, assets.star, "+" + xp, Hud.FloaterStyle.XP, delay);
+            hud.floater(fx, y, assets.star, "+" + GameText.xp(xp), Hud.FloaterStyle.XP, delay);
         }
     }
 

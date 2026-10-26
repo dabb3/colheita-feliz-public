@@ -115,7 +115,7 @@ public final class GameState {
         VipStatus renewed = vip.purchase(realClock.instant());
         wallet.debit(Currency.GREEN, price);
         vip = renewed;
-        return report(ActionResult.ok("VIP ativo até " + vip.expiresAt() + "."));
+        return report(ActionResult.ok("VIP ativo até " + GameText.vipExpiry(vip.expiresAt(), java.time.ZoneId.systemDefault()) + "."));
     }
 
     public AnimalType animalType(String id) {
@@ -303,7 +303,7 @@ public final class GameState {
         List<String> parts = new ArrayList<>();
         for (Currency currency : Currency.values()) {
             BigDecimal value = totals.getOrDefault(currency, BigDecimal.ZERO);
-            if (value.signum() > 0) parts.add(value.setScale(1).toPlainString() + (currency == Currency.GOLD ? " ouro" : " verdes"));
+            if (value.signum() > 0) parts.add(GameText.money(value) + (currency == Currency.GOLD ? " ouro" : " verdes"));
         }
         return parts.isEmpty() ? "0,0" : String.join(", ", parts);
     }
