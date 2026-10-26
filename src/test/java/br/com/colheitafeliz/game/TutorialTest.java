@@ -56,7 +56,7 @@ class TutorialTest {
         java.math.BigDecimal harvested = java.math.BigDecimal.valueOf(turnip.harvestYield() * turnip.seedPrice())
                 .multiply(new java.math.BigDecimal("1.15")).setScale(1, java.math.RoundingMode.CEILING);
         assertEquals(2, game.progress().level(), "o tutorial termina já no nível 2");
-        assertEquals(0, java.math.BigDecimal.valueOf(500 - 2 * turnip.seedPrice() + rewards + GameState.levelUpCoins(2))
-                .add(harvested).compareTo(game.wallet().coins()));
+        assertEquals(0, java.math.BigDecimal.valueOf(500 - 2 * turnip.seedPrice() + rewards)
+                .add(ProgressionLoader.load().rewardFor(2).gold()).add(harvested).compareTo(game.wallet().coins()));
     }
 }

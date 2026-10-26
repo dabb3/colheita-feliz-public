@@ -182,12 +182,13 @@ public final class MarketPanel {
                     unlocked ? Palette.INK_WARM : Palette.INK_MUTED, null, unlocked && fert.contains(px, py));
         }
         if (selling) {
-            String value = GameState.formatTotals(state.depositTotals());
+            var totals = state.depositTotals();
+            String value = GameState.formatTotals(totals);
             Rectangle all = sellEverythingButton();
-            button(batch, skin, !state.depositTotals().isEmpty() ? skin.glassBerry : skin.glassDisabled, all,
-                    !state.depositTotals().isEmpty() ? "Vender tudo · " + value : "Depósito vazio",
-                    !state.depositTotals().isEmpty() ? Palette.ON_COLOR : Palette.INK_MUTED, !state.depositTotals().isEmpty() ? Palette.BERRY_INK : null,
-                    !state.depositTotals().isEmpty() && all.contains(px, py));
+            button(batch, skin, !totals.isEmpty() ? skin.glassBerry : skin.glassDisabled, all,
+                    !totals.isEmpty() ? "Vender tudo · " + value : "Depósito vazio",
+                    !totals.isEmpty() ? Palette.ON_COLOR : Palette.INK_MUTED, !totals.isEmpty() ? Palette.BERRY_INK : null,
+                    !totals.isEmpty() && all.contains(px, py));
         }
     }
 

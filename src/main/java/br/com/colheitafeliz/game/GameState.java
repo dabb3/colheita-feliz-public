@@ -465,9 +465,6 @@ public final class GameState {
                 + (levelReward.isEmpty() ? "" : " " + levelReward);
     }
 
-    /** Moedas de presente ao chegar a um nível. */
-    public static int levelUpCoins(int level) { return ProgressionLoader.load().rewardFor(level).gold().intValueExact(); }
-
     /** Dá XP e, para cada nível tabelado alcançado, as duas moedas; não concede sementes. */
     private String awardXp(int xp) {
         int before = progress.level();

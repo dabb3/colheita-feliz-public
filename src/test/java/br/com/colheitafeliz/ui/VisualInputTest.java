@@ -96,7 +96,7 @@ class VisualInputTest {
         assertFalse(modal.click(cx(MarketPanel.cell(5)), cy(MarketPanel.cell(5)), game).success());
         modal.click(cx(MarketPanel.tab(1)), cy(MarketPanel.tab(1)), game);
         assertTrue(modal.selling());
-        game.inventory().addProduce(turnip, 3);
+        game.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot(turnip.id(), br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(turnip.seedPrice()), 3, false));
         assertTrue(modal.click(cx(MarketPanel.sellOneButton(0)), cy(MarketPanel.sellOneButton(0)), game).success());
         assertEquals(2, game.inventory().produce(turnip));
         assertTrue(modal.click(cx(MarketPanel.sellAllButton(0)), cy(MarketPanel.sellAllButton(0)), game).success());

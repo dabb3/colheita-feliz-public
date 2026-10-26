@@ -69,11 +69,4 @@ public final class Market {
         inventory.addSeeds(type, 1);
     }
 
-    public void sellProduce(CropType type) {
-        sellProduce(type, 1);
-    }
-
-    public void sellProduce(CropType type, int amount) {
-        sellProduce(type.id(), amount, false);
-    }
 }

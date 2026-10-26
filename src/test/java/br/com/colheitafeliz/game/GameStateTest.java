@@ -94,8 +94,8 @@ class GameStateTest {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
         assertFalse(game.sellEverything().success());
-        game.inventory().addProduce(game.catalog().get("nabo"), 2);
-        game.inventory().addProduce(game.catalog().get("milho"), 3);
+        game.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("nabo", br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(game.catalog().get("nabo").seedPrice()), 2, false));
+        game.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("milho", br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(game.catalog().get("milho").seedPrice()), 3, false));
         assertEquals(0, new java.math.BigDecimal("109.3").compareTo(game.depositValue()));
         assertTrue(game.sellEverything().success());
         assertEquals(0, game.depositValue().signum());
@@ -103,11 +103,10 @@ class GameStateTest {
         assertTrue(game.wallet().coins().compareTo(new java.math.BigDecimal("609.3")) >= 0);
     }
 
-    @Test void levelUpGivesCoinsForEveryLevelReached() {
-        ManualClock clock = new ManualClock();
-        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
-        assertEquals(0, GameState.levelUpCoins(2));
-        assertEquals(9000, GameState.levelUpCoins(5));
+    @Test void levelRewardsMatchTheConfiguredTable() {
+        var rules = ProgressionLoader.load();
+        assertEquals(0, rules.rewardFor(2).gold().signum());
+        assertEquals(0, new java.math.BigDecimal("9000").compareTo(rules.rewardFor(5).gold()));
     }
 
     @Test void fertilizerAdvancesAQuarterOfTheCycleOncePerPlanting() {

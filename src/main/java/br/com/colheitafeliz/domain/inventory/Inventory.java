@@ -48,24 +48,27 @@ public final class Inventory {
     }
     private static void addLot(List<ItemLot> lots, ItemLot lot) {
         Objects.requireNonNull(lot);
-        int current = quantities(lots).getOrDefault(lot.itemId(), 0);
+        int current = quantity(lots, lot.itemId());
         if (lot.quantity() > Integer.MAX_VALUE - current) throw new ArithmeticException("Inventory quantity overflow");
         lots.add(lot);
+    }
+    private static int quantity(List<ItemLot> lots, String id) {
+        Objects.requireNonNull(id);
+        int count = 0;
+        for (ItemLot lot : lots) if (lot.itemId().equals(id)) count = Math.addExact(count, lot.quantity());
+        return count;
     }
     private static Map<String, Integer> quantities(List<ItemLot> lots) {
         Map<String, Integer> counts = new HashMap<>();
         for (ItemLot lot : lots) counts.merge(lot.itemId(), lot.quantity(), Math::addExact);
         return Map.copyOf(counts);
     }
-    public int seeds(CropType type) { return seedSnapshot().getOrDefault(type.id(), 0); }
-    public int produce(CropType type) { return produceSnapshot().getOrDefault(type.id(), 0); }
+    public int seeds(CropType type) { return quantity(seedLots, type.id()); }
+    public int produce(CropType type) { return quantity(produceLots, type.id()); }
     public Map<String, Integer> seedSnapshot() { return quantities(seedLots); }
     public Map<String, Integer> produceSnapshot() { return quantities(produceLots); }
     public void addSeeds(CropType type, int amount) {
         addSeedLot(new ItemLot(type.id(), Currency.GOLD, BigDecimal.valueOf(type.seedPrice()), amount, false));
-    }
-    public void addProduce(CropType type, int amount) {
-        addProduceLot(new ItemLot(type.id(), Currency.GOLD, BigDecimal.valueOf(type.seedPrice()), amount, false));
     }
     public void useSeed(CropType type) { takeSeed(type.id()); }
     public void takeProduce(CropType type, int amount) { takeProduct(type.id(), amount); }
@@ -80,7 +83,7 @@ public final class Inventory {
         }
         replaceProduceLots(remaining);
     }
-    public int product(String id) { return produceSnapshot().getOrDefault(id, 0); }
+    public int product(String id) { return quantity(produceLots, id); }
     public int feed(String animalId) { return feed.getOrDefault(animalId, 0); }
     public Map<String, Integer> feedSnapshot() { return Map.copyOf(feed); }
     public void addFeed(String animalId, int amount) { add(feed, animalId, amount); }
