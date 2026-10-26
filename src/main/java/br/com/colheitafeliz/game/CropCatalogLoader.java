@@ -15,8 +15,19 @@ public final class CropCatalogLoader {
         InputStream stream = CropCatalogLoader.class.getResourceAsStream("/data/crops.json");
         if (stream == null) throw new IllegalStateException("Missing crops.json");
         try (InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
-            return new CropCatalog(Arrays.asList(new Gson().fromJson(reader, CropType[].class)));
-        } catch (Exception e) {
+            return load(reader);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Invalid crop catalog", e);
+        }
+    }
+
+    /** Lê um catálogo em JSON; qualquer linha inválida recusa o catálogo inteiro, sem cultura padrão. */
+    static CropCatalog load(java.io.Reader reader) {
+        try {
+            CropType[] crops = new Gson().fromJson(reader, CropType[].class);
+            if (crops == null) throw new IllegalArgumentException("Empty crop catalog");
+            return new CropCatalog(Arrays.asList(crops));
+        } catch (RuntimeException e) {
             throw new IllegalStateException("Invalid crop catalog", e);
         }
     }

@@ -1,6 +1,9 @@
 package br.com.colheitafeliz.game;
 
 import br.com.colheitafeliz.domain.crop.CropType;
+import br.com.colheitafeliz.domain.economy.Currency;
+import br.com.colheitafeliz.domain.inventory.ItemLot;
+import java.math.BigDecimal;
 import br.com.colheitafeliz.domain.farm.TileState;
 import br.com.colheitafeliz.testsupport.ManualClock;
 import org.junit.jupiter.api.Test;
@@ -10,10 +13,10 @@ class GameStateTest {
     @Test void completeFarmCycleStoresProduceUntilSold() {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);
-        CropType corn = game.catalog().get("milho");
+        CropType corn = game.catalog().get("nabo");
         assertEquals(0, java.math.BigDecimal.valueOf(500).compareTo(game.wallet().coins()));
         assertTrue(game.buySeed(corn).success());
-        assertEquals(0, java.math.BigDecimal.valueOf(475).compareTo(game.wallet().coins()));
+        assertEquals(0, java.math.BigDecimal.valueOf(200).compareTo(game.wallet().coins()));
         game.selectSeed(corn);
         assertFalse(game.act(0, 0).success());
         game.selectTool(Tool.HOE);
@@ -23,11 +26,11 @@ class GameStateTest {
         assertEquals(0, game.inventory().seeds(corn));
         game.selectTool(Tool.WATER);
         assertTrue(game.act(0, 0).success());
-        clock.advanceSeconds(900);
+        clock.advanceSeconds(12_000);
         assertTrue(game.act(0, 0).success());
-        clock.advanceSeconds(900);
+        clock.advanceSeconds(12_000);
         assertTrue(game.act(0, 0).success());
-        clock.advanceSeconds(900);
+        clock.advanceSeconds(12_000);
         game.refresh();
         assertEquals(TileState.READY, game.farm().tile(0, 0).state());
         game.selectTool(Tool.HAND);
@@ -37,7 +40,7 @@ class GameStateTest {
         java.math.BigDecimal coins = game.wallet().coins();
         assertFalse(game.act(0, 0).success());
         assertTrue(game.sellProduce(corn).success());
-        assertEquals(coins.add(new java.math.BigDecimal("28.8")), game.wallet().coins());
+        assertEquals(coins.add(new java.math.BigDecimal("345")), game.wallet().coins());
         assertEquals(0, game.inventory().produce(corn));
         assertFalse(game.sellAllProduce(corn).success());
         assertFalse(game.sellProduce(corn).success());
@@ -47,15 +50,18 @@ class GameStateTest {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
         CropType turnip = game.catalog().get("nabo");
-        game.buySeed(turnip);
-        game.buySeed(turnip);
+        game.wallet().credit(300);
+        assertTrue(game.buySeed(turnip).success());
+        assertTrue(game.buySeed(turnip).success());
         game.selectTool(Tool.HOE);
         game.act(0, 0);
         game.selectSeed(turnip);
         game.act(0, 0);
         game.selectTool(Tool.WATER);
-        game.act(0, 0);
-        clock.advanceSeconds(900);
+        for (int third = 0; third < 3; third++) {
+            assertTrue(game.act(0, 0).success());
+            clock.advanceSeconds(12_000);
+        }
         game.selectTool(Tool.HAND);
         assertTrue(game.act(0, 0).success());
         assertEquals(TileState.DEAD, game.farm().tile(0, 0).state());
@@ -93,13 +99,13 @@ class GameStateTest {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
         assertFalse(game.sellEverything().success());
-        game.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("nabo", br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(game.catalog().get("nabo").seedPrice()), 2, false));
-        game.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("milho", br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(game.catalog().get("milho").seedPrice()), 3, false));
-        assertEquals(0, new java.math.BigDecimal("109.3").compareTo(game.depositValue()));
+        game.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("nabo", br.com.colheitafeliz.domain.economy.Currency.GOLD, game.catalog().get("nabo").seedPrice().getValue(), 2, false));
+        game.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("milho", br.com.colheitafeliz.domain.economy.Currency.GOLD, game.catalog().get("milho").seedPrice().getValue(), 3, false));
+        assertEquals(0, new java.math.BigDecimal("2415").compareTo(game.depositValue()));
         assertTrue(game.sellEverything().success());
         assertEquals(0, game.depositValue().signum());
         assertEquals(0, game.inventory().produce(game.catalog().get("milho")));
-        assertTrue(game.wallet().coins().compareTo(new java.math.BigDecimal("609.3")) >= 0);
+        assertTrue(game.wallet().coins().compareTo(new java.math.BigDecimal("2915")) >= 0);
     }
 
     @Test void levelRewardsMatchTheConfiguredTable() {
@@ -116,7 +122,8 @@ class GameStateTest {
         game.progress().award(50);
         assertTrue(game.buyFertilizer().success());
         assertTrue(game.buyFertilizer().success());
-        game.buySeed(corn);
+        game.wallet().credit(1000);
+        assertTrue(game.buySeed(corn).success());
         game.selectTool(Tool.HOE);
         game.act(0, 0);
         game.selectSeed(corn);
@@ -167,7 +174,7 @@ class GameStateTest {
     @Test void insectsPauseTheCropWithAnAlertUntilPesticide() {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
-        CropType corn = game.catalog().get("milho");
+        CropType corn = game.catalog().get("nabo");
         game.buySeed(corn);
         game.selectTool(Tool.HOE);
         game.act(0, 0);
@@ -176,17 +183,17 @@ class GameStateTest {
         game.selectTool(Tool.WATER);
         game.act(0, 0);
         game.farm().tile(0, 0).checkInsects(game.now(), true);
-        clock.advanceSeconds(2700);
+        clock.advanceSeconds(36_000);
         game.refresh();
         assertEquals(TileState.GROWING, game.farm().tile(0, 0).state(), "insetos pausam o crescimento");
-        assertTrue(game.alerts().contains(new GameState.Alert("Insetos", "Milho")));
+        assertTrue(game.alerts().contains(new GameState.Alert("Insetos", "Nabo")));
         game.selectTool(Tool.PESTICIDE);
         assertTrue(game.act(0, 0).success());
-        assertFalse(game.alerts().contains(new GameState.Alert("Insetos", "Milho")));
+        assertFalse(game.alerts().contains(new GameState.Alert("Insetos", "Nabo")));
         game.selectTool(Tool.WATER);
         for (int i = 0; i < 3; i++) {
             assertTrue(game.act(0, 0).success());
-            clock.advanceSeconds(900);
+            clock.advanceSeconds(12_000);
         }
         game.refresh();
         assertEquals(TileState.READY, game.farm().tile(0, 0).state());
@@ -204,5 +211,68 @@ class GameStateTest {
         assertFalse(game.act(0, 0).success());
         assertEquals(TileState.PLOWED, game.farm().tile(0, 0).state());
         assertEquals(0, java.math.BigDecimal.valueOf(500).compareTo(game.wallet().coins()));
+    }
+
+    @Test void vipSeedNeedsAnActiveVipAndItsOwnCurrencyToBuyAndPlant() {
+        ManualClock clock = new ManualClock();
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
+        CropType sweetPotato = game.catalog().get("batata-doce");
+        game.progress().award(new BigDecimal("100000"));
+        game.wallet().credit(Currency.GREEN, new BigDecimal("200"));
+        assertFalse(game.buySeed(sweetPotato, Currency.GREEN).success(), "sem VIP não compra");
+        assertTrue(game.buyVip().success());
+        assertFalse(game.buySeed(sweetPotato, Currency.GOLD).success(), "semente VIP não sai por ouro");
+        assertFalse(game.buySeed(game.catalog().get("nabo"), Currency.GREEN).success(), "nabo não sai por verdes");
+        assertTrue(game.buySeed(sweetPotato, Currency.GREEN).success());
+        assertEquals(0, new BigDecimal("101").compareTo(game.greenCoins()));
+        ItemLot seed = game.inventory().seedLots().getFirst();
+        assertEquals(new ItemLot("batata-doce", Currency.GREEN, new BigDecimal("4"), 1, true), seed);
+
+        clock.advanceSeconds(java.time.Duration.ofDays(31).toSeconds());
+        assertFalse(game.vipActive());
+        game.selectTool(Tool.HOE);
+        assertTrue(game.act(0, 0).success());
+        game.selectSeed(sweetPotato);
+        assertFalse(game.act(0, 0).success(), "VIP expirado bloqueia o plantio");
+        assertEquals(1, game.inventory().seeds(sweetPotato));
+        assertEquals(TileState.PLOWED, game.farm().tile(0, 0).state());
+    }
+
+    @Test void vipCropPlantedBeforeExpiryIsTendedAndHarvestedButItsProduceIsBlocked() {
+        ManualClock clock = new ManualClock();
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
+        CropType sweetPotato = game.catalog().get("batata-doce");
+        game.progress().award(new BigDecimal("100000"));
+        game.wallet().credit(Currency.GREEN, new BigDecimal("200"));
+        assertTrue(game.buyVip().success());
+        assertTrue(game.buySeed(sweetPotato, Currency.GREEN).success());
+        clock.advanceSeconds(java.time.Duration.ofDays(30).minusHours(1).toSeconds());
+        game.selectTool(Tool.HOE);
+        game.act(0, 0);
+        game.selectSeed(sweetPotato);
+        assertTrue(game.act(0, 0).success());
+
+        clock.advanceSeconds(7200);
+        assertFalse(game.vipActive());
+        game.selectTool(Tool.WATER);
+        for (int i = 0; i < 3; i++) {
+            assertTrue(game.act(0, 0).success(), "rega continua permitida");
+            clock.advanceSeconds(java.time.Duration.ofHours(4).toSeconds());
+        }
+        game.refresh();
+        assertEquals(TileState.READY, game.farm().tile(0, 0).state());
+        game.selectTool(Tool.HAND);
+        assertTrue(game.act(0, 0).success(), "colheita continua permitida");
+        assertEquals(1, game.inventory().produce(sweetPotato));
+        assertTrue(game.depositTotals().isEmpty());
+        assertFalse(game.sellEverything().success());
+        assertFalse(game.sellAllProduce(sweetPotato).success());
+        assertEquals(1, game.inventory().produce(sweetPotato));
+
+        BigDecimal green = game.greenCoins();
+        assertTrue(game.buyVip().success());
+        assertTrue(game.sellAllProduce(sweetPotato).success());
+        assertEquals(0, green.subtract(new BigDecimal("100")).add(new BigDecimal("5")).compareTo(game.greenCoins()),
+                "a venda devolve verdes, nunca ouro");
     }
 }

@@ -15,14 +15,14 @@ public final class TestCrops {
 
     /** Morango: 31 h na primeira temporada, 12 h nas duas seguintes. */
     public static CropType strawberry() {
-        return new CropType("morango", "Morango", 1550, 1783, 111_600, 5, "morango", 11, 1, 0,
-                43_200, 3, false, Map.of(Currency.GOLD, new BigDecimal("1550")));
+        return new CropType("morango", "Morango", 111_600, 43_200, 3, 5, "morango", 11, false,
+                Map.of(Currency.GOLD, new BigDecimal("1550")));
     }
 
     /** Nabo: 10 h, uma temporada, 15 XP. */
     public static CropType turnip() {
-        return new CropType("nabo", "Nabo", 300, 345, 36_000, 5, "nabo", 1, 1, 0,
-                0, 1, false, Map.of(Currency.GOLD, new BigDecimal("300")));
+        return new CropType("nabo", "Nabo", 36_000, 0, 1, 5, "nabo", 1, false,
+                Map.of(Currency.GOLD, new BigDecimal("300")));
     }
 
     public static ItemLot origin(CropType type) {

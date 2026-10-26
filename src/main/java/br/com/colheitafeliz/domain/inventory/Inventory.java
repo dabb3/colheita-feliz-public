@@ -68,7 +68,7 @@ public final class Inventory {
     public Map<String, Integer> seedSnapshot() { return quantities(seedLots); }
     public Map<String, Integer> produceSnapshot() { return quantities(produceLots); }
     public void addSeeds(CropType type, int amount) {
-        addSeedLot(new ItemLot(type.id(), Currency.GOLD, BigDecimal.valueOf(type.seedPrice()), amount, false));
+        addSeedLot(new ItemLot(type.id(), type.seedPrice().getKey(), type.seedPrice().getValue(), amount, type.vipOnly()));
     }
     public void useSeed(CropType type) { takeSeed(type.id()); }
     public void takeProduce(CropType type, int amount) { takeProduct(type.id(), amount); }

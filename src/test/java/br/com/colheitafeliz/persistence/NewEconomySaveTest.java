@@ -55,7 +55,7 @@ class NewEconomySaveTest {
         state.selectTool(br.com.colheitafeliz.game.Tool.WATER);
         assertTrue(state.act(0, 0).success());
         session.save();
-        clock.advanceSeconds(1000);
+        clock.advanceSeconds(60_000);
         state = GameSession.open(clock, catalog, repository, bound -> 99).state();
         state.selectTool(br.com.colheitafeliz.game.Tool.HAND);
         assertTrue(state.act(0, 0).success());

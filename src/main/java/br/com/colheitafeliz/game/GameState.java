@@ -56,7 +56,6 @@ public final class GameState {
     private final Tutorial tutorial = new Tutorial(true);
     private final List<AnimalType> animalTypes = AnimalCatalogLoader.load();
     private final Barn barn = new Barn();
-    private final Set<String> unlockedIds = new HashSet<>();
     private Tool tool = Tool.CURSOR;
     private CropType seed;
     private String message = "Abra a loja para comprar sementes.";
@@ -92,7 +91,6 @@ public final class GameState {
         progress = new PlayerProgress(ProgressionLoader.load(), level, currentXp);
         dailyMissions = new DailyMissionBoard(LocalDate.now(realClock));
         seed = catalog.all().getFirst();
-        unlockAvailable();
     }
 
     public Farm farm() { return farm; }
@@ -131,7 +129,8 @@ public final class GameState {
     public void setMusicEnabled(boolean enabled) { musicEnabled = enabled; }
     public void setEffectsEnabled(boolean enabled) { effectsEnabled = enabled; }
     public void message(String message) { this.message = message; }
-    public boolean unlocked(CropType type) { return unlockedIds.contains(type.id()); }
+    /** Uma cultura fica disponível a partir do seu nível mínimo. */
+    public boolean unlocked(CropType type) { return progress.level() >= type.requiredLevel(); }
     public void selectTool(Tool tool) { this.tool = Objects.requireNonNull(tool); }
 
     public ActionResult selectSeed(CropType type) {
@@ -177,6 +176,8 @@ public final class GameState {
                 else if (tile.state() != TileState.PLOWED) result = ActionResult.fail("Este terreno precisa ser arado.");
                 else if (inventory.seeds(seed) == 0)
                     result = ActionResult.fail("Você não possui sementes de " + seed.name() + ".");
+                else if (seed.vipOnly() && !vipActive())
+                    result = ActionResult.fail(seed.name() + " exige cartão VIP ativo para plantar.");
                 else {
                     tile.plant(seed, now, inventory.takeSeed(seed.id()));
                     result = ActionResult.ok(seed.name() + " plantado. Use o regador.");
@@ -272,14 +273,24 @@ public final class GameState {
         return report(ActionResult.ok("Novo lote liberado por " + plot.price() + " moedas!"));
     }
 
+    /** Compra na única moeda que a cultura aceita. */
     public ActionResult buySeed(CropType type) {
+        return buySeed(type, catalog.get(type.id()).seedPrice().getKey());
+    }
+
+    public ActionResult buySeed(CropType type, Currency currency) {
         CropType known = catalog.get(type.id());
         if (!unlocked(known))
             return report(ActionResult.fail(known.name() + " libera no nível " + known.requiredLevel() + "."));
+        if (known.vipOnly() && !vipActive())
+            return report(ActionResult.fail(known.name() + " exige cartão VIP ativo."));
+        BigDecimal price = known.seedPrices().get(Objects.requireNonNull(currency));
+        if (price == null)
+            return report(ActionResult.fail(known.name() + " não é vendida por " + currencyName(currency) + "."));
         try {
-            market.buySeed(known);
+            market.buySeed(known, currency);
             ActionResult result = ActionResult.ok("+1 semente de " + known.name()
-                    + " | -" + known.seedPrice() + " moedas");
+                    + " | -" + GameText.money(price) + " " + currencyName(currency));
             String missionReward = recordDailyMission("buy", 1);
             if (!missionReward.isEmpty()) result = ActionResult.ok(result.message() + " " + missionReward);
             return report(result);
@@ -287,6 +298,8 @@ public final class GameState {
             return report(ActionResult.fail("Moedas insuficientes."));
         }
     }
+
+    private static String currencyName(Currency currency) { return currency == Currency.GOLD ? "ouro" : "verdes"; }
 
     public ActionResult sellProduce(CropType type) { return sellProduce(type, 1); }
 
@@ -430,7 +443,7 @@ public final class GameState {
     public void startNewFarm() {
         CropType turnip = catalog.get("nabo");
         Instant plantedAt = clock.now().minus(turnip.growthTime(1)).minusSeconds(60);
-        var price = turnip.seedPrices().entrySet().iterator().next();
+        var price = turnip.seedPrice();
         ItemLot origin = new ItemLot(turnip.id(), price.getKey(), price.getValue(), 1, turnip.vipOnly());
         for (int row = 0; row < 2; row++) {
             Crop ready = new Crop(turnip, plantedAt, plantedAt, null, plantedAt, turnip.growthTime(1).toMillis(), origin, 1);
@@ -479,14 +492,9 @@ public final class GameState {
             if (reward.gold().signum() > 0) rewards.merge(Currency.GOLD, reward.gold(), BigDecimal::add);
             if (reward.green().signum() > 0) rewards.merge(Currency.GREEN, reward.green(), BigDecimal::add);
         }
-        unlockAvailable();
         return "Nível " + progress.level() + " alcançado!" + (rewards.isEmpty() ? "" : " +" + formatTotals(rewards) + ".");
     }
 
-    private void unlockAvailable() {
-        for (CropType crop : catalog.all())
-            if (crop.requiredLevel() <= progress.level()) unlockedIds.add(crop.id());
-    }
 
     public boolean refresh() {
         Instant now = clock.now();
@@ -589,7 +597,7 @@ public final class GameState {
         game.dailyMissions.restore(snapshot.dailyMissionDay(), snapshot.dailyMissionProgress(),
                 snapshot.completedDailyMissions(), LocalDate.now(realClock));
         if (snapshot.unlockedCropIds() != null)
-            for (String id : snapshot.unlockedCropIds()) game.unlockedIds.add(catalog.get(id).id());
+            for (String id : snapshot.unlockedCropIds()) catalog.get(id);
         for (var lot : snapshot.seeds()) catalog.get(lot.itemId());
         for (var lot : snapshot.produce()) {
             boolean animalProduct = game.animalTypes.stream().anyMatch(type -> type.productId().equals(lot.itemId()));

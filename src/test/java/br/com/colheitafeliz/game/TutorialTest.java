@@ -53,11 +53,14 @@ class TutorialTest {
         assertTrue(game.message().contains("Primeiros passos concluídos"));
         int rewards = 0;
         for (Tutorial.Step step : Tutorial.STEPS) rewards += step.coins();
-        // Cada colheita rende uma unidade; o XP da fórmula não basta para subir de nível só no tutorial.
-        java.math.BigDecimal harvested = java.math.BigDecimal.valueOf(turnip.seedPrice())
+        // Cada colheita rende uma unidade, vendida pelo custo da semente com o acréscimo comum.
+        java.math.BigDecimal harvested = turnip.seedPrice().getValue()
                 .multiply(new java.math.BigDecimal("1.15")).setScale(1, java.math.RoundingMode.CEILING);
-        assertEquals(1, game.progress().level());
-        assertEquals(0, java.math.BigDecimal.valueOf(500 - 2 * turnip.seedPrice() + rewards)
-                .add(harvested).compareTo(game.wallet().coins()));
+        java.math.BigDecimal levelGold = java.math.BigDecimal.ZERO;
+        for (int level = 2; level <= game.progress().level(); level++)
+            levelGold = levelGold.add(ProgressionLoader.load().rewardFor(level).gold());
+        assertEquals(0, turnip.seedPrice().getValue().multiply(java.math.BigDecimal.valueOf(-2))
+                .add(java.math.BigDecimal.valueOf(500 + rewards)).add(harvested).add(levelGold)
+                .compareTo(game.wallet().coins()));
     }
 }

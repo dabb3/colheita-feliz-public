@@ -8,11 +8,11 @@ import java.util.Map;
 
 /**
  * Uma cultura do catálogo. A primeira temporada dura {@code growthSeconds}; as seguintes, {@code regrowthSeconds}.
- * O XP de cada colheita sai da fórmula da regra (horas da primeira temporada × 1,5, metade a cada temporada).
+ * Cada temporada rende uma unidade; a venda deriva do lote (moeda e preço da semente) e o XP sai da fórmula da
+ * regra (horas da primeira temporada × 1,5, metade a cada temporada). {@code seedPrices} lista as moedas aceitas.
  */
-public record CropType(String id, String name, int seedPrice, int salePrice,
-                       long growthSeconds, int stages, String spriteStem, int requiredLevel,
-                       int harvestYield, int harvestXp, long regrowthSeconds, int seasons, boolean vipOnly,
+public record CropType(String id, String name, long growthSeconds, long regrowthSeconds, int seasons,
+                       int stages, String spriteStem, int requiredLevel, boolean vipOnly,
                        Map<Currency, BigDecimal> seedPrices) {
     private static final BigDecimal SECONDS_PER_HOUR = BigDecimal.valueOf(3600);
     private static final BigDecimal XP_PER_HOUR = new BigDecimal("1.5");
@@ -20,10 +20,9 @@ public record CropType(String id, String name, int seedPrice, int salePrice,
     public CropType {
         if (id == null || id.isBlank() || name == null || name.isBlank()
                 || spriteStem == null || spriteStem.isBlank()
-                || seedPrice <= 0 || salePrice <= 0 || growthSeconds <= 0 || stages < 2
-                || requiredLevel < 1 || harvestYield < 1 || harvestXp < 0
+                || growthSeconds <= 0 || stages < 2 || requiredLevel < 1
                 || seasons < 1 || (seasons == 1) != (regrowthSeconds == 0) || regrowthSeconds < 0)
-            throw new IllegalArgumentException("Invalid crop definition");
+            throw new IllegalArgumentException("Invalid crop definition: " + id);
         if (seedPrices == null || seedPrices.isEmpty() || seedPrices.values().stream()
                 .anyMatch(price -> price == null || price.signum() <= 0))
             throw new IllegalArgumentException("Invalid seed prices: " + id);
@@ -45,6 +44,12 @@ public record CropType(String id, String name, int seedPrice, int salePrice,
     public BigDecimal harvestXp(int season) {
         requireSeason(season);
         return firstHarvestXp(growthSeconds).divide(BigDecimal.valueOf(2).pow(season - 1));
+    }
+
+    /** Moeda e preço de compra quando a cultura aceita uma única moeda, como todas as da regra atual. */
+    public Map.Entry<Currency, BigDecimal> seedPrice() {
+        if (seedPrices.size() != 1) throw new IllegalStateException("Crop accepts more than one currency: " + id);
+        return seedPrices.entrySet().iterator().next();
     }
 
     private void requireSeason(int season) {
