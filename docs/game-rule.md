@@ -2,149 +2,152 @@
 
 Este documento reúne os valores e as regras fornecidos para o projeto. As regras de venda abaixo representam a definição de economia do projeto; não constituem uma validação histórica do jogo original.
 
+O alinhamento de `docs/regras-de-negocio.md` e da implementação com estas definições será feito em um PR posterior de correção/implementação, após o merge do PR com as alterações atuais.
+
 ## 1. Moedas
 
 - **Ouro:** moeda utilizada nos preços e custos indicados como ouro.
 - **Moedas verdes:** moeda utilizada em compras premium e alternativas de aquisição.
-- Nas tabelas com preços em ambas as moedas, os valores representam alternativas de compra, não uma soma.
+- Nas tabelas de preços, ouro e moedas verdes representam alternativas de compra, não uma soma. As recompensas da seção 8 concedem ambas as moedas cumulativamente.
 
-## 2. Sementes e preços de compra
+## 2. Sementes e plantas: tabela consolidada
 
-| Semente | Preço em ouro | Nível mínimo |
-|---|---:|---:|
-| Nabo | 300 | 1 |
-| Cenoura | 350 | 1 |
-| Milho | 500 | 1 |
-| Batata | 650 | 1 |
-| Berinjela | 800 | 1 |
-| Tomate | 950 | 5 |
-| Pimenta | 1.100 | 5 |
-| Abóbora | 1.250 | 5 |
-| Ervilha | 1.400 | 5 |
-| Morango | 1.550 | 10 |
-| Maçã | 1.800 | 10 |
-| Melancia | 1.975 | 11 |
-| Banana | 2.150 | 12 |
-| Pêssego | 3.075 | 13 |
-| Laranja | 3.350 | 14 |
-| Uva | 4.125 | 15 |
-| Romã | 3.875 | 16 |
-| Melão | 4.600 | 17 |
-| Cana | 4.600 | 17 |
-| Lichia | 4.750 | 19 |
-| Kiwi | 5.050 | 23 |
-| Abacaxi | 5.200 | 26 |
-| Cereja | 5.500 | 28 |
-| Pitaya | 6.180 | 31 |
-| Manga | 6.850 | 36 |
-| Cacau | 8.500 | 40 |
-| Caviar | 15.000 | 50 |
-| Goiaba | 15.000 | 50 |
+O preço de compra é por semente. A venda é por unidade colhida, na mesma moeda da aquisição; o custo-base é o preço da semente. Todas as culturas rendem uma unidade por terreno em cada temporada. As sementes VIP exigem cartão VIP ativo para compra, plantio e venda dos produtos, conforme as seções 7 e 9.2.
 
-### 2.1. Sementes VIP e especiais
+As vendas comuns usam acréscimo de 15% e as VIP, de 25%. Os valores abaixo são para venda de uma unidade, arredondados para cima em uma casa decimal; para várias unidades, arredonda-se apenas o total, conforme a seção 6. O bloqueio de venda sem VIP prevalece para as culturas VIP.
 
-| Semente | Preço registrado | Condição | Sprites prontas |
-|---|---:|---|:---:|
-| Batata-doce | 300 ouro | VIP | [x] |
-| Amendoim | 2.300 ouro | VIP | [x] |
-| Limão | 4.300 ouro | VIP | [x] |
-| Noz | 15.500 ouro | VIP | [x] |
-| Coco | 6 verdes | Premium | [x] |
+Os tempos são as durações nominais de crescimento do estágio 1 ao 5, sujeitos à rega e às pausas por pragas e insetos. O total de temporadas inclui a primeira colheita. A sequência de XP corresponde às colheitas da primeira até a última temporada, calculada conforme a seção 3.1.
 
-## 3. Tempos de cultivo e colheitas
+| Semente | Condição | Nível mínimo | Compra por semente | Venda comum por unidade | Venda VIP por unidade | Primeira colheita | Intervalo após próximas coletas | Temporadas | Unidades por colheita | XP por temporada | Sprites prontas registradas |
+|---|---|---:|---|---|---|---|---|---:|---:|---|---|
+| Nabo | Comum | 1 | 300 ouro | 345 ouro | 375 ouro | 10 h | Não se aplica | 1 | 1 | 15 | Não registrado nesta regra |
+| Cenoura | Comum | 1 | 350 ouro | 402,5 ouro | 437,5 ouro | 15 h | Não se aplica | 1 | 1 | 22,5 | Não registrado nesta regra |
+| Milho | Comum | 2 | 500 ouro | 575 ouro | 625 ouro | 20 h | Não se aplica | 1 | 1 | 30 | Não registrado nesta regra |
+| Batata | Comum | 3 | 650 ouro | 747,5 ouro | 812,5 ouro | 22 h | Não se aplica | 1 | 1 | 33 | Não registrado nesta regra |
+| Berinjela | Comum | 4 | 800 ouro | 920 ouro | 1.000 ouro | 24 h | Não se aplica | 1 | 1 | 36 | Não registrado nesta regra |
+| Tomate | Comum | 5 | 950 ouro | 1.092,5 ouro | 1.187,5 ouro | 26 h | 8 h | 2 | 1 | 39 → 19,5 | Não registrado nesta regra |
+| Pimenta | Comum | 5 | 1.100 ouro | 1.265 ouro | 1.375 ouro | 28 h | 9 h | 2 | 1 | 42 → 21 | Não registrado nesta regra |
+| Abóbora | Comum | 7 | 1.250 ouro | 1.437,5 ouro | 1.562,5 ouro | 29 h | 10 h | 2 | 1 | 43,5 → 21,75 | Não registrado nesta regra |
+| Ervilha | Comum | 9 | 1.400 ouro | 1.610 ouro | 1.750 ouro | 30 h | 11 h | 2 | 1 | 45 → 22,5 | Não registrado nesta regra |
+| Morango | Comum | 11 | 1.550 ouro | 1.782,5 ouro | 1.937,5 ouro | 31 h | 12 h | 3 | 1 | 46,5 → 23,25 → 11,625 | Não registrado nesta regra |
+| Maçã | Comum | 13 | 1.800 ouro | 2.070 ouro | 2.250 ouro | 42 h | 14 h | 3 | 1 | 63 → 31,5 → 15,75 | Não registrado nesta regra |
+| Melancia | Comum | 16 | 1.975 ouro | 2.271,3 ouro | 2.468,8 ouro | 46 h | 16 h | 3 | 1 | 69 → 34,5 → 17,25 | Não registrado nesta regra |
+| Banana | Comum | 19 | 2.150 ouro | 2.472,5 ouro | 2.687,5 ouro | 50 h | 18 h | 3 | 1 | 75 → 37,5 → 18,75 | Não registrado nesta regra |
+| Pêssego | Comum | 22 | 3.075 ouro | 3.536,3 ouro | 3.843,8 ouro | 54 h | 20 h | 3 | 1 | 81 → 40,5 → 20,25 | Não registrado nesta regra |
+| Laranja | Comum | 25 | 3.350 ouro | 3.852,5 ouro | 4.187,5 ouro | 60 h | 22 h | 3 | 1 | 90 → 45 → 22,5 | Não registrado nesta regra |
+| Uva | Comum | 28 | 4.125 ouro | 4.743,8 ouro | 5.156,3 ouro | 66 h | 24 h | 4 | 1 | 99 → 49,5 → 24,75 → 12,375 | Não registrado nesta regra |
+| Romã | Comum | 31 | 3.875 ouro | 4.456,3 ouro | 4.843,8 ouro | 68 h | 33 h | 4 | 1 | 102 → 51 → 25,5 → 12,75 | Não registrado nesta regra |
+| Melão | Comum | 35 | 4.600 ouro | 5.290 ouro | 5.750 ouro | 70 h | 35 h | 4 | 1 | 105 → 52,5 → 26,25 → 13,125 | Não registrado nesta regra |
+| Cana | Comum | 39 | 4.600 ouro | 5.290 ouro | 5.750 ouro | 72 h | 37 h | 4 | 1 | 108 → 54 → 27 → 13,5 | Não registrado nesta regra |
+| Lichia | Comum | 43 | 4.750 ouro | 5.462,5 ouro | 5.937,5 ouro | 74 h | 39 h | 4 | 1 | 111 → 55,5 → 27,75 → 13,875 | Não registrado nesta regra |
+| Kiwi | Comum | 45 | 5.050 ouro | 5.807,5 ouro | 6.312,5 ouro | 76 h | 41 h | 4 | 1 | 114 → 57 → 28,5 → 14,25 | Não registrado nesta regra |
+| Abacaxi | Comum | 47 | 5.200 ouro | 5.980 ouro | 6.500 ouro | 78 h | 43 h | 4 | 1 | 117 → 58,5 → 29,25 → 14,625 | Não registrado nesta regra |
+| Cereja | Comum | 49 | 5.500 ouro | 6.325 ouro | 6.875 ouro | 80 h | 45 h | 4 | 1 | 120 → 60 → 30 → 15 | Não registrado nesta regra |
+| Pitaya | Comum | 51 | 6.180 ouro | 7.107 ouro | 7.725 ouro | 82 h | 47 h | 4 | 1 | 123 → 61,5 → 30,75 → 15,375 | Não registrado nesta regra |
+| Manga | Comum | 53 | 6.850 ouro | 7.877,5 ouro | 8.562,5 ouro | 84 h | 49 h | 4 | 1 | 126 → 63 → 31,5 → 15,75 | Não registrado nesta regra |
+| Cacau | Comum | 55 | 8.500 ouro | 9.775 ouro | 10.625 ouro | 86 h | 51 h | 4 | 1 | 129 → 64,5 → 32,25 → 16,125 | Não registrado nesta regra |
+| Goiaba | Comum | 57 | 15.000 ouro | 17.250 ouro | 18.750 ouro | 96 h | 60 h | 4 | 1 | 144 → 72 → 36 → 18 | Não registrado nesta regra |
+| Caviar | Comum | 60 | 25.000 ouro | 28.750 ouro | 31.250 ouro | 168 h | 84 h | 5 | 1 | 252 → 126 → 63 → 31,5 → 15,75 | Não registrado nesta regra |
+| Batata-doce | VIP | 10 | 4 verdes | Bloqueada sem VIP | 5 verdes | 12 h | 6 h | 2 | 1 | 18 → 9 | Sim |
+| Amendoim | VIP | 20 | 8 verdes | Bloqueada sem VIP | 10 verdes | 24 h | 12 h | 3 | 1 | 36 → 18 → 9 | Sim |
+| Limão | VIP | 30 | 12 verdes | Bloqueada sem VIP | 15 verdes | 36 h | 18 h | 4 | 1 | 54 → 27 → 13,5 → 6,75 | Sim |
+| Noz | VIP | 40 | 16 verdes | Bloqueada sem VIP | 20 verdes | 48 h | 24 h | 5 | 1 | 72 → 36 → 18 → 9 → 4,5 | Sim |
+| Coco | VIP | 50 | 20 verdes | Bloqueada sem VIP | 25 verdes | 60 h | 30 h | 6 | 1 | 90 → 45 → 22,5 → 11,25 → 5,625 → 2,8125 | Sim |
 
-A primeira colheita é contada a partir do plantio. As próximas colheitas seguem o intervalo indicado. O total de temporadas inclui a primeira colheita.
+## 3. Cultivo, temporadas e XP
 
-| Semente | Primeira colheita | Próximas colheitas | Total de temporadas |
-|---|---:|---:|---:|
-| Nabo | 10 h | — | 1 |
-| Cenoura | 15 h | — | 1 |
-| Milho | 20 h | — | 1 |
-| Batata | 22 h | — | 1 |
-| Berinjela | 24 h | — | 1 |
-| Tomate | 26 h | A cada 8 h | 2 |
-| Pimenta | 28 h | A cada 9 h | 2 |
-| Abóbora | 29 h | A cada 10 h | 2 |
-| Ervilha | 30 h | A cada 11 h | 2 |
-| Morango | 31 h | A cada 12 h | 3 |
-| Maçã | 42 h | A cada 14 h | 3 |
-| Melancia | 46 h | A cada 16 h | 3 |
-| Banana | 50 h | A cada 18 h | 3 |
-| Pêssego | 54 h | A cada 20 h | 3 |
-| Laranja | 60 h | A cada 22 h | 3 |
-| Uva | 66 h | A cada 24 h | 4 |
-| Romã | 68 h | A cada 33 h | 4 |
-| Melão | 70 h | A cada 35 h | 4 |
-| Cana | 72 h | A cada 37 h | 4 |
-| Lichia | 74 h | A cada 39 h | 4 |
-| Kiwi | 76 h | A cada 41 h | 4 |
-| Abacaxi | 78 h | A cada 43 h | 4 |
-| Cereja | 80 h | A cada 45 h | 4 |
-| Pitaya | 82 h | A cada 47 h | 4 |
-| Manga | 84 h | A cada 49 h | 4 |
-| Cacau | 86 h | A cada 51 h | 4 |
-| Goiaba | 96 h | A cada 60 h | 4 |
-| Caviar | 168 h | A cada 84 h | 4 |
+Plantar consome uma semente e inicia a temporada no estágio 1. A primeira rega é necessária para iniciar o crescimento. As durações da tabela da seção 2 são de crescimento efetivo, não uma garantia de tempo corrido independentemente dos cuidados.
+
+Nas plantas com várias temporadas, o intervalo da próxima temporada começa após a coleta da atual, repetindo a progressão do estágio 1 ao 5. Cada temporada mantém o comportamento de uma planta de temporada única: rega continua necessária, e pragas e insetos continuam funcionando normalmente. Após a última colheita da última temporada, a planta morre.
+
+Pragas e insetos têm a mesma penalidade: pausam o crescimento, preservando o progresso, até sua remoção. Insetos não reduzem a quantidade colhida. As ferramentas de remoção continuam correspondendo ao tipo: herbicida para as pragas tratadas com herbicida e pesticida para insetos. Se ambas as condições estiverem presentes, o crescimento só retoma após remover ambas.
+
+### 3.1. XP de colheita
+
+O XP da primeira colheita é a duração nominal da primeira colheita em horas multiplicada por 1,5. Cada temporada seguinte concede metade do XP da anterior, sem recalcular a base usando o intervalo das próximas colheitas.
+
+```text
+xp_primeira_colheita = horas_primeira_colheita × 1,5
+xp_temporada_n = xp_primeira_colheita ÷ 2^(n − 1)
+```
+
+O nabo, com primeira colheita de 10 h, concede 15 XP. O morango, com 31 h e três temporadas, concede 46,5 XP, 23,25 XP e 11,625 XP. A aplicação de fertilizante não altera a duração nominal usada como base de XP.
+
+O XP preserva integralmente os valores fracionários resultantes da fórmula, sem arredondamento ou truncamento, tanto na concessão por colheita quanto no saldo acumulado. Por exemplo, 11,625 XP e 2,8125 XP são valores válidos. A regra de arredondamento de moedas da seção 9.1 não se aplica ao XP.
+
 
 ## 4. Animais
 
-### 4.1. Funções e produtos
+### 4.1. Tabela consolidada
 
-| Animal | Função ou produto informado |
-|---|---|
-| Galinha | Produzia ovos. |
-| Vaca leiteira | Produzia leite. |
-| Ovelha | Produzia lã. |
-| Abelha | Produzia mel. |
-| Pavão | Produzia penas. |
-| Porco | Crescia para ser vendido. |
-| Burro | Crescia para ser vendido. |
-| Pombo | Crescia para ser vendido. |
-| Coelho | Crescia para ser vendido. |
+Nos preços, a ordem é **ouro / moedas verdes**. A compra usa uma das moedas e a venda devolve a moeda usada na aquisição. Para produtores, o preço de venda corresponde a **uma unidade do produto**; para animais de crescimento, ao **animal adulto**. Os valores de venda foram calculados com os acréscimos da seção 6 e arredondados para cima em uma casa decimal. Em vendas de várias unidades, o arredondamento é aplicado somente ao total, conforme a seção 9.1.
 
-A função ou o produto do pato não foi informado.
+Na coluna de crescimento, os tempos representam bebê → jovem e jovem → adulto, seguidos do total. Na produção, a duração começa na compra e existe apenas um ciclo por animal; não há produções seguintes. Os tempos dependem da alimentação. O limite de quantidade é por tipo de animal.
 
-### 4.2. Preços de aquisição
+| Animal | Tipo / produto vendido | Nível / limite | Compra: ouro / verdes | Venda comum: ouro / verdes | Venda VIP: ouro / verdes | Crescimento: bebê → jovem → adulto | Produção: primeira / seguintes | Unidades por ciclo / total de ciclos | Alimentação: custo e duração | XP | Encerramento |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Galinha | Produção / ovo | 10 / 1 | 8.000 / 9 | 9.200 / 10,4 | 10.000 / 11,3 | Comprado adulto | 8 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 100 por coleta | Após coleta única |
+| Abelha | Produção / mel | 14 / 1 | 28.000 / 28 | 32.200 / 32,2 | 35.000 / 35 | Comprado adulto | 12 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 140 por coleta | Após coleta única |
+| Pombo | Crescimento / adulto | 18 / 1 | 36.000 / 36 | 41.400 / 41,4 | 45.000 / 45 | 12 h + 24 h = 36 h | Não se aplica | Venda única | 80 ouro / 12 h | 180 por venda | Após venda adulta |
+| Coelho | Crescimento / adulto | 24 / 1 | 60.000 / 59 | 69.000 / 67,9 | 75.000 / 73,8 | 16 h + 32 h = 48 h | Não se aplica | Venda única | 80 ouro / 12 h | 240 por venda | Após venda adulta |
+| Pato | Produção / ovo de pato | 28 / 1 | 70.000 / 69 | 80.500 / 79,4 | 87.500 / 86,3 | Comprado adulto | 16 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 280 por coleta | Após coleta única |
+| Pavão | Produção / pena | 32 / 1 | 100.000 / 99 | 115.000 / 113,9 | 125.000 / 123,8 | Comprado adulto | 28 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 320 por coleta | Após coleta única |
+| Porco | Crescimento / adulto | 36 / 1 | 150.000 / 100 | 172.500 / 115 | 187.500 / 125 | 20 h + 40 h = 60 h | Não se aplica | Venda única | 80 ouro / 12 h | 360 por venda | Após venda adulta |
+| Burro | Crescimento / adulto | 40 / 1 | 150.000 / 100 | 172.500 / 115 | 187.500 / 125 | 24 h + 48 h = 72 h | Não se aplica | Venda única | 80 ouro / 12 h | 400 por venda | Após venda adulta |
+| Ovelha | Produção / lã | 44 / 1 | 180.000 / 120 | 207.000 / 138 | 225.000 / 150 | Comprado adulto | 20 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 440 por coleta | Após coleta única |
+| Vaca leiteira | Produção / leite | 48 / 1 | 220.000 / 180 | 253.000 / 207 | 275.000 / 225 | Comprado adulto | 24 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 480 por coleta | Após coleta única |
+| Cão Robô | Proteção de plantações | 10 / 1 | 20.000 / 15 | Não pode vender | Não pode vender | Comprado adulto | Não produz | Não se aplica | 80 ou 120 ouro / 6 h | 0 | Removido após 30 dias |
+| Cão Mastiff | Proteção de plantações | 20 / 1 | 50.000 / 50 | Não pode vender | Não pode vender | Comprado adulto | Não produz | Não se aplica | 80 ou 120 ouro / 6 h | 0 | Removido após 30 dias |
+| Avestruz | Proteção de plantações | 30 / 1 | 80.000 / 75 | Não pode vender | Não pode vender | Comprado adulto | Não produz | Não se aplica | 80 ou 120 ouro / 6 h | 0 | Removido após 30 dias |
+| Cabra | Proteção de plantações | 40 / 1 | 120.000 / 100 | Não pode vender | Não pode vender | Comprado adulto | Não produz | Não se aplica | 80 ou 120 ouro / 6 h | 0 | Removido após 30 dias |
+| Cavalo | Proteção de plantações | 50 / 1 | 150.000 / 120 | Não pode vender | Não pode vender | Comprado adulto | Não produz | Não se aplica | 80 ou 120 ouro / 6 h | 0 | Removido após 30 dias |
 
-| Animal | Ouro | Moedas verdes |
-|---|---:|---:|
-| Galinha | 8.000 | 9 |
-| Abelha | 28.000 | 28 |
-| Pombo | 36.000 | 36 |
-| Coelho | 60.000 | 59 |
-| Pato | 70.000 | 69 |
-| Pavão | 100.000 | 99 |
-| Porco | 150.000 | 100 |
-| Burro | 150.000 | 100 |
-| Ovelha | 180.000 | 120 |
-| Vaca leiteira | 220.000 | 180 |
+### 4.2. Regras de produção, crescimento e alimentação
 
-### 4.3. Animais de proteção
+- Cada unidade de produto animal tem como custo-base o preço de compra do animal que a produziu, na moeda usada na aquisição. Uma galinha de 8.000 ouro produz ovos com custo-base de 8.000 ouro cada.
+- Animais de crescimento só podem ser vendidos na fase adulta. Seu custo-base de venda é o preço de compra do próprio animal, na moeda usada na aquisição. Após a venda, o animal é removido.
+- O perfil comum ou VIP é determinado no momento da venda.
+- Cada alimentação atende um único animal, sem acumular duração. Só é permitido alimentar quando o animal estiver com fome; enquanto houver tempo de alimentação restante, uma nova alimentação é bloqueada. Isso também vale para protetores. Animais de crescimento usam ração genérica de crescimento; produtores usam ração genérica de produtor.
+- A falta de alimento pausa os tempos de crescimento e produção, preservando o progresso. Ao alimentar novamente, a etapa retoma somente o tempo restante, sem reiniciar.
+- Produtores são comprados adultos e produzem uma única unidade em um único ciclo. O produto pronto espera a coleta, sem acumular produção. Após a coleta única, o animal desaparece e o produto permanece no armazém para venda conforme a seção 6. Para produzir novamente, é necessário comprar outro animal.
+- Cada animal de crescimento permite uma única venda na fase adulta. Cada produtor permite a venda de seu único produto, sem novos ciclos. Os protetores continuam sem possibilidade de revenda.
+- Com o jogo fechado, o tempo avança normalmente, a 1×, respeitando a alimentação e a espera pela coleta.
+- O sono é apenas visual: não pausa nem altera produção, crescimento ou proteção. As restrições por falta de alimento continuam valendo.
 
-| Protetor | Ouro | Moedas verdes |
-|---|---:|---:|
-| Cabra | 120.000 | 100 |
-| Cavalo | 150.000 | 120 |
-| Avestruz | 80.000 | 75 |
-| Cão Robô | 20.000 | 15 |
-| Cão Mastiff | 50.000 | 50 |
+### 4.3. Regras de proteção
 
-As mecânicas específicas de proteção não foram informadas.
+Todos os protetores são comprados adultos e duram 30 dias. Após esse prazo, o animal é removido e o jogador precisa comprá-lo novamente. A falta de alimento pausa a proteção, sem estender a duração de 30 dias. Protetores não podem ser revendidos.
+
+Os protetores não concedem XP por nenhuma ação. Sua única função é bloquear ações de outros jogadores na fazenda, incluindo roubos de plantações, em uma futura implementação multiplayer. Essa definição não indica que o roubo ou o multiplayer já estejam implementados.
+
+Cada protetor aceita qualquer ração genérica: a de crescimento (80 ouro) ou a de produtor (120 ouro), conforme a seção 5. Em ambos os casos, cada compra alimenta um único protetor por 6 h, sem acumular duração. Sem alimento, sua proteção fica pausada até ser alimentado novamente.
+
+Os dados desta seção representam regras documentadas, não uma confirmação de implementação no jogo.
+
 
 ## 5. Custos para manter a fazenda
 
-| Item | Preço | Efeito registrado |
-|---|---:|---|
-| Alimento para galinha | 40 ouro | Alimentava por 8 h |
-| Alimento para vaca | 60 ouro | Alimentava por 8 h |
-| Alimento para porco | 60 ouro | Alimentava por 12 h |
-| Alimento genérico: animais que crescem | 80 ouro | Alimentava por 12 h |
-| Alimento genérico: animais que produzem | 120 ouro | Alimentava por 8 h |
-| Fertilizante comum | 50 ouro | Reduzia 1 h |
-| Fertilizante rápido | 350 ouro ou 1 verde | Reduzia 2 h 30 min |
-| Superfertilizante | 1.000 ouro ou 2 verdes | Reduzia 5 h 30 min |
-| Fertilizante do amor | 1 verde | Reduzia 1 h na plantação de amigos |
-| Cartão VIP | 100 verdes | Acesso VIP por 30 dias |
+| Item | Preço | Efeito registrado | Nível mínimo |
+|---|---:|---|---:|
+| Alimento genérico: animais que crescem | 80 ouro | Alimentava por 12 h | 1 |
+| Alimento genérico: animais que produzem | 120 ouro | Alimentava por 8 h | 1 |
+| Fertilizante comum | 50 ouro | Reduzia 1 h | 10 |
+| Fertilizante rápido | 350 ouro ou 1 verde | Reduzia 2 h 30 min | 20 |
+| Superfertilizante | 1.000 ouro ou 2 verdes | Reduzia 5 h 30 min | 35 |
+| Fertilizante do amor | 1 verde | Reduzia 1 h na plantação de amigos | 15 |
+| Cartão VIP | 100 verdes | Acesso VIP por 30 dias | 1 |
+
+Cada compra de ração alimenta apenas um animal. Animais de crescimento usam ração genérica de crescimento; animais produtores usam ração genérica de produtor. Não é permitido acumular duração de alimentação. Os protetores seguem o intervalo específico de 6 h da seção 4.3.
+
+### 5.1. Aplicação de fertilizantes
+
+É permitido aplicar **um fertilizante por planta em cada temporada**, considerando todos os tipos e todos os jogadores em conjunto. Trocar de tipo ou de jogador não permite uma segunda aplicação na mesma temporada. O fertilizante do amor segue esse mesmo limite compartilhado. A temporada seguinte permite uma nova aplicação.
+
+A redução afeta o **tempo restante até a colheita da temporada atual**, abrangendo a progressão do estágio 1 ao 5, e não apenas o estágio visual atual. Se ela alcançar ou superar esse tempo, o restante fica em zero e a planta fica pronta para colher. O excedente é perdido, sem passar para a próxima temporada. O fertilizante não realiza a coleta: a próxima temporada só começa após o jogador colher a atual; na última temporada, a coleta faz a planta morrer.
+
+O morango leva 31 h para ir do estágio 1 ao 5 na primeira temporada e 12 h em cada uma das duas seguintes. Cada temporada permite uma aplicação de qualquer fertilizante para reduzir seu tempo restante. Se faltam 4 h para colher e o fertilizante reduz 5 h, a planta fica pronta imediatamente e a hora excedente é perdida. Após a coleta, se ainda houver temporada, começa uma nova contagem de 12 h, sujeita aos cuidados normais.
+
+Nenhum fertilizante pode ser aplicado a uma planta não saudável: seca, com praga ou com insetos. É necessário regar e remover as pragas e os insetos presentes antes da aplicação.
 
 ## 6. Regra geral de venda
 
@@ -160,11 +163,12 @@ A regra abrange os itens vendíveis de cultivo, animais de produção e animais 
 ### 6.1. Fórmulas
 
 ```text
-valor_venda_comum = custo_base × 1,15
-valor_venda_vip   = custo_base × 1,25
-
-valor_total_venda = valor_venda_unitario × quantidade_vendida
+valor_unitario_sem_arredondar = custo_base × multiplicador_do_perfil
+total_sem_arredondar = valor_unitario_sem_arredondar × quantidade_vendida
+valor_total_venda = teto(total_sem_arredondar × 10) ÷ 10
 ```
+
+O multiplicador é 1,15 para o perfil comum e 1,25 para VIP. A função teto arredonda para o inteiro imediatamente superior, preservando valores já inteiros. O valor unitário não é arredondado antes da multiplicação pela quantidade. Por exemplo, dois ovos de uma galinha adquirida por 9 moedas verdes rendem 20,7 moedas verdes no perfil comum (9 × 1,15 × 2), embora uma venda isolada de um ovo renda 10,4 moedas verdes.
 
 O benefício VIP acrescenta **10 pontos percentuais** ao acréscimo padrão: 15% + 10% = 25%.
 
@@ -182,23 +186,94 @@ O percentual representa um acréscimo sobre o custo-base. O lucro líquido da at
 ## 7. Cartão VIP
 
 - **Preço:** 100 moedas verdes.
-- **Duração:** 30 dias.
-- **Acesso exclusivo:** sementes e animais indisponíveis para jogadores comuns.
+- **Duração:** 30 dias por compra, com ativação imediata no ato da compra.
+- **Renovação:** com VIP ativo, cada compra soma 30 dias ao prazo restante; com VIP expirado, inicia 30 dias a partir da compra. Dez compras consecutivas, uma de cada vez, acumulam 300 dias de duração concedida.
+- O cartão não fica armazenado no depósito nem aguarda uso manual: a compra aplica o benefício imediatamente.
+- **Acesso exclusivo:** sementes VIP indisponíveis para jogadores comuns.
 - **Venda:** acréscimo de 25% sobre o custo-base de todos os itens vendíveis enquanto o benefício estiver ativo.
-- As sementes identificadas como VIP estão listadas na seção 2.1.
-- A lista de animais exclusivos VIP não foi informada.
+- As sementes identificadas como VIP estão listadas na tabela consolidada da seção 2.
+- Não existem animais exclusivos VIP.
+- Após o término, sementes VIP armazenadas não podem ser plantadas. Plantações VIP existentes continuam permitindo cuidados e colheitas, mas seus produtos armazenados ficam bloqueados para uso e venda até a renovação. As regras detalhadas estão na seção 9.2.
 
-## 8. Definições pendentes para implementação
+## 8. Recompensas ao subir de nível
 
-Os pontos abaixo não foram especificados nos dados fornecidos:
+Esta tabela substitui as recompensas de nível anteriores, sem somá-las. Cada nível listado concede automaticamente ouro e moedas verdes cumulativamente, atualizando o saldo ao subir de nível. Níveis não listados não concedem recompensas de nível. O planejamento de recompensas abrange até o nível 61, conforme a tabela atualizada. Recompensas posteriores ao nível 61 serão definidas no futuro.
 
-- Quantidade de unidades produzidas por colheita ou ciclo de produção animal.
-- Tempos e número de ciclos de produção ou crescimento dos animais.
-- Custo-base de cada produto animal, como ovos, leite, lã, mel e penas.
-- Moeda e custo-base usados na venda de itens adquiridos com moedas verdes.
-- Regra de arredondamento para preços com casas decimais.
-- Níveis mínimos, tempos e temporadas das sementes VIP e especiais.
-- Comportamento dos itens exclusivos após o término do cartão VIP.
-- Possibilidade de revenda de sementes não plantadas, protetores e consumíveis.
+| Nível | Ouro | Moedas verdes |
+|---|---:|---:|
+| 5 | 9.000 | 1 |
+| 7 | 18.000 | 2 |
+| 9 | 27.000 | 3 |
+| 11 | 45.000 | 5 |
+| 13 | 63.000 | 7 |
+| 15 | 81.000 | 9 |
+| 17 | 108.000 | 12 |
+| 19 | 135.000 | 15 |
+| 21 | 162.000 | 18 |
+| 23 | 207.000 | 23 |
+| 25 | 300.000 | 30 |
+| 27 | 450.000 | 50 |
+| 29 | 540.000 | 60 |
+| 31 | 630.000 | 70 |
+| 33 | 720.000 | 80 |
+| 35 | 810.000 | 90 |
+| 37 | 900.000 | 100 |
+| 39 | 990.000 | 110 |
+| 41 | 1.080.000 | 120 |
+| 43 | 1.170.000 | 130 |
+| 45 | 1.260.000 | 140 |
+| 47 | 1.350.000 | 150 |
+| 50 | 1.500.000 | 155 |
+| 53 | 1.650.000 | 160 |
+| 56 | 1.800.000 | 165 |
+| 58 | 1.950.000 | 170 |
+| 61 | 2.100.000 | 180 |
 
-Essas definições não alteram as tabelas nem os percentuais registrados neste documento.
+
+
+## 9. Regras complementares para implementação
+
+As tabelas abaixo complementam as regras das seções anteriores. Os valores são definições para implementação e não representam funcionalidades já implementadas.
+
+### 9.1. Arredondamento de preços
+
+| Regra | Definição |
+|---|---|
+| Casas decimais permitidas para ouro | 1 |
+| Casas decimais permitidas para moedas verdes | 1 |
+| Método de arredondamento (para baixo, para cima ou mais próximo) | Sempre para cima, na precisão de uma casa decimal registrada acima. |
+| Tratamento de empate no arredondamento | Não se aplica: qualquer fração além da precisão permitida é arredondada para cima. |
+| Momento do arredondamento (por unidade ou após multiplicar pela quantidade) | após multiplicar pela quantidade |
+
+Com a precisão registrada, 2,25 resulta em 2,3 e 2,20 permanece 2,2. O arredondamento é aplicado ao total da venda, após multiplicar pela quantidade.
+
+### 9.2. Exclusividade e término do VIP
+
+| Regra | Definição |
+|---|---|
+| Sementes VIP no inventário após o término | Plantio e uso bloqueados até a renovação do cartão VIP; as sementes permanecem no inventário. |
+| Plantações VIP em andamento após o término | Continuam normalmente, permitindo rega, demais cuidados e colheitas. Os produtos coletados ficam sujeitos ao bloqueio de uso e venda enquanto o VIP estiver expirado. |
+| Novas colheitas de plantações VIP após o término | Permitidas; os produtos entram no armazém com uso e venda bloqueados até a renovação do cartão VIP. |
+| Produtos VIP armazenados após o término | Uso e venda bloqueados até a renovação do cartão VIP, inclusive para produtos coletados antes do vencimento. Com VIP ativo, podem ser vendidos normalmente. |
+| Perfil aplicado à venda após o término (no momento da venda ou outra regra) | no momento da venda |
+
+### 9.3. Revenda de itens
+
+| Categoria | Revenda permitida? | Custo-base ou fórmula de revenda | Moeda recebida | Aplicar acréscimo comum/VIP da seção 6? | Restrições |
+|---|---|---|---|---|---|
+| Sementes não plantadas | Não | Não se aplica | Não se aplica | Não se aplica | Revenda proibida |
+| Alimentos | Não | Não se aplica | Não se aplica | Não se aplica | Revenda proibida |
+| Fertilizantes | Não | Não se aplica | Não se aplica | Não se aplica | Revenda proibida |
+| Cartão VIP | Não | Não se aplica | Não se aplica | Não se aplica | Benefício aplicado na compra; não há cartão não utilizado no depósito |
+
+### 9.4. Recompensas de nível
+
+| Regra | Definição |
+|---|---|
+| Natureza dos valores da seção 8 (recompensas ou custos de expansão) | recompensas ao subir de nivel |
+| Relação entre ouro e moedas verdes (alternativas ou cumulativos) | cumulativos |
+| O que cada nível libera ou concede | recompensas listadas na secao 8 |
+| Liberação automática ou ação de compra/resgate | automatica, recompensas em moedas devem ser transferidas ao jogador imediatamente e o saldo atualizado |
+| Confirmar ou corrigir 207.000 ouro no nível 25 | corrigido |
+
+As regras serão alinhadas com a implementação e com `docs/regras-de-negocio.md` no PR posterior indicado na abertura deste documento.
