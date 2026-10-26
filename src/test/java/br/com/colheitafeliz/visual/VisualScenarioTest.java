@@ -13,7 +13,7 @@ class VisualScenarioTest {
         var clock = new ManualClock();
         var state = new GameState(clock::instant, clock, catalog, bound -> 99);
         var turnip = catalog.get("nabo");
-        long interval = turnip.growthTime().toSeconds() / (turnip.stages() - 1);
+        long interval = turnip.growthTime(1).toSeconds() / (turnip.stages() - 1);
         for (int row = 0; row < 5; row++) {
             if (row > 0) clock.advanceSeconds(interval);
             // Keep earlier rows moist so each row stays exactly one stage apart.

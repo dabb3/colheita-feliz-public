@@ -3,8 +3,13 @@ package br.com.colheitafeliz.domain;
 import br.com.colheitafeliz.domain.crop.CropCatalog;
 import br.com.colheitafeliz.domain.crop.CropType;
 import br.com.colheitafeliz.domain.farm.FarmTile;
+import br.com.colheitafeliz.domain.farm.PestState;
 import br.com.colheitafeliz.domain.farm.TileState;
+import br.com.colheitafeliz.domain.inventory.ItemLot;
 import br.com.colheitafeliz.game.CropCatalogLoader;
+import br.com.colheitafeliz.testsupport.TestCrops;
+import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -41,7 +46,7 @@ class CropAndTileTest {
         assertEquals(5, tile.crop().stageAt(start.plusSeconds(3200)));
         tile.refresh(start.plusSeconds(3200));
         assertEquals(TileState.READY, tile.state());
-        assertEquals(corn, tile.harvest(start.plusSeconds(3200)));
+        assertEquals(corn.id(), tile.harvest(start.plusSeconds(3200)).itemId());
         assertEquals(TileState.DEAD, tile.state());
         assertEquals(corn, tile.withered());
         assertNull(tile.crop());
@@ -94,6 +99,118 @@ class CropAndTileTest {
         }
         assertEquals(3, corn.harvestYield());
         assertEquals(150, catalog.get("melancia").harvestXp());
+    }
+
+    @Test void strawberrySeasonsShortenAfterTheFirstAndHalveTheirXp() {
+        CropType strawberry = TestCrops.strawberry();
+        assertEquals(Duration.ofHours(31), strawberry.growthTime(1));
+        assertEquals(Duration.ofHours(12), strawberry.growthTime(2));
+        assertEquals(Duration.ofHours(12), strawberry.growthTime(3));
+        assertEquals(0, new BigDecimal("46.5").compareTo(strawberry.harvestXp(1)));
+        assertEquals(0, new BigDecimal("23.25").compareTo(strawberry.harvestXp(2)));
+        assertEquals(0, new BigDecimal("11.625").compareTo(strawberry.harvestXp(3)));
+        assertThrows(IllegalArgumentException.class, () -> strawberry.growthTime(4));
+    }
+
+    @Test void eachSeasonYieldsOneUnitOfTheOriginAndTheLastOneKillsThePlant() {
+        CropType strawberry = TestCrops.strawberry();
+        ItemLot origin = TestCrops.origin(strawberry);
+        FarmTile tile = new FarmTile();
+        tile.plow();
+        tile.plant(strawberry, start, origin);
+        Instant t = start;
+        for (int season = 1; season <= 3; season++) {
+            assertEquals(season, tile.crop().season());
+            assertEquals(strawberry.growthTime(season), tile.crop().currentDuration());
+            t = TestCrops.growUntilReady(tile, t);
+            assertEquals(origin, tile.harvest(t));
+        }
+        assertEquals(TileState.DEAD, tile.state());
+        assertEquals(strawberry, tile.withered());
+        assertNull(tile.crop());
+    }
+
+    @Test void intermediateHarvestRestartsAtStageOneUnwateredAndWithShorterMoisture() {
+        CropType strawberry = TestCrops.strawberry();
+        FarmTile tile = new FarmTile();
+        tile.plow();
+        tile.plant(strawberry, start, TestCrops.origin(strawberry));
+        tile.water(start);
+        assertEquals(Duration.ofHours(10).plusMinutes(20), tile.crop().moistDuration());
+        tile.fertilize(start, .25);
+        tile.checkInsects(start.plusSeconds(60), true);
+        tile.removeInsects(start.plusSeconds(60));
+        Instant ready = TestCrops.growUntilReady(tile, start.plusSeconds(60));
+        tile.harvest(ready);
+        assertEquals(TileState.GROWING, tile.state());
+        assertEquals(2, tile.crop().season());
+        assertEquals(1, tile.crop().stageAt(ready));
+        assertFalse(tile.crop().watered());
+        assertFalse(tile.fertilized());
+        assertEquals(PestState.NONE, tile.pest());
+        assertEquals(0, tile.insects());
+        assertNull(tile.nextPestCheckAt());
+        assertNull(tile.nextInsectCheckAt());
+        assertEquals(Duration.ofHours(4), tile.crop().moistDuration());
+        assertEquals(0, tile.crop().grownMillisAt(ready.plusSeconds(3600)));
+    }
+
+    @Test void repeatedHarvestCannotSkipSeason() {
+        CropType strawberry = TestCrops.strawberry();
+        FarmTile tile = new FarmTile();
+        tile.plow();
+        tile.plant(strawberry, start, TestCrops.origin(strawberry));
+        Instant ready = TestCrops.growUntilReady(tile, start);
+        tile.harvest(ready);
+        assertThrows(IllegalStateException.class, () -> tile.harvest(ready));
+        assertEquals(2, tile.crop().season());
+    }
+
+    @Test void bothPestsShareOnePause() {
+        CropType strawberry = TestCrops.strawberry();
+        FarmTile tile = new FarmTile();
+        tile.plow();
+        tile.plant(strawberry, start, TestCrops.origin(strawberry));
+        tile.water(start);
+        Instant weeds = start.plusSeconds(3600);
+        tile.checkPest(weeds, true);
+        long grown = tile.crop().grownMillisAt(weeds);
+        assertEquals(3_600_000, grown);
+        tile.checkInsects(weeds.plusSeconds(600), true);
+        assertEquals(grown, tile.crop().grownMillisAt(weeds.plusSeconds(7200)));
+        tile.removePest(weeds.plusSeconds(1800));
+        assertEquals(grown, tile.crop().grownMillisAt(weeds.plusSeconds(7200)));
+        tile.removeInsects(weeds.plusSeconds(7200));
+        assertEquals(grown + 600_000, tile.crop().grownMillisAt(weeds.plusSeconds(7800)));
+    }
+
+    @Test void insectsAlonePauseGrowthAndKeepTheProgressExactly() {
+        CropType strawberry = TestCrops.strawberry();
+        FarmTile tile = new FarmTile();
+        tile.plow();
+        tile.plant(strawberry, start, TestCrops.origin(strawberry));
+        tile.water(start);
+        Instant insects = start.plusSeconds(3600);
+        tile.checkInsects(insects, true);
+        tile.worsenInsects(insects.plusSeconds(100));
+        assertEquals(3_600_000, tile.crop().grownMillisAt(insects.plusSeconds(5000)));
+        tile.removeInsects(insects.plusSeconds(5000));
+        assertEquals(4_600_000, tile.crop().grownMillisAt(insects.plusSeconds(6000)));
+    }
+
+    @Test void insectsNeverReduceYield() {
+        CropType strawberry = TestCrops.strawberry();
+        FarmTile tile = new FarmTile();
+        tile.plow();
+        tile.plant(strawberry, start, TestCrops.origin(strawberry));
+        tile.water(start);
+        tile.checkInsects(start.plusSeconds(60), true);
+        tile.worsenInsects(start.plusSeconds(120));
+        tile.worsenInsects(start.plusSeconds(180));
+        assertEquals(FarmTile.MAX_INSECTS, tile.insects());
+        tile.removeInsects(start.plusSeconds(240));
+        Instant ready = TestCrops.growUntilReady(tile, start.plusSeconds(240));
+        assertEquals(1, tile.harvest(ready).quantity());
     }
 
     @Test void cannotHarvestBeforeMaturity() {

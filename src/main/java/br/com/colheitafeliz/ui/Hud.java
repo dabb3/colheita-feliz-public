@@ -416,17 +416,17 @@ public final class Hud {
             cx -= cw + 4;
         }
         Toolbar.drawFitted(batch, assets.coin, x + 26, y + 78, 26);
-        skin.text(batch, skin.caption, "Produção", x + 48, y + 95, Palette.INK_MUTED, Align.left);
-        int yield = tile.harvestYield();
-        skin.bar(batch, skin.barSun, x + 48, y + 66, w - 62, 17, yield / (float) type.harvestYield(),
-                yield + " / " + type.harvestYield() + (yield == 1 ? " unidade" : " unidades"));
+        skin.text(batch, skin.caption, "Temporada", x + 48, y + 95, Palette.INK_MUTED, Align.left);
+        skin.bar(batch, skin.barSun, x + 48, y + 66, w - 62, 17, crop.season() / (float) type.seasons(),
+                crop.season() + " / " + type.seasons() + " · 1 unidade");
         Toolbar.drawFitted(batch, assets.crop(type, Math.max(1, crop.stageAt(now))), x + 26, y + 34, 32);
         skin.text(batch, skin.caption, "Crescimento", x + 48, y + 51, Palette.INK_MUTED, Align.left);
-        float fraction = crop.grownMillisAt(now) / (float) type.growthTime().toMillis();
-        boolean paused = tile.pest() == PestState.WEEDS;
+        float fraction = crop.grownMillisAt(now) / (float) crop.currentDuration().toMillis();
+        boolean paused = crop.paused();
         String growth = !crop.watered() ? "Regue para começar"
                 : crop.matureAt(now) ? "Pronta! Use a luvinha"
-                : paused ? "Pausado pela erva daninha"
+                : paused ? (tile.pest() == PestState.WEEDS && tile.insects() > 0 ? "Pausado por erva e insetos"
+                        : tile.pest() == PestState.WEEDS ? "Pausado pela erva daninha" : "Pausado pelos insetos")
                 : formatRemaining(crop.remainingAt(now)) + (crop.dryAt(now) ? " · regue p/ acelerar" : "");
         skin.bar(batch, paused || !crop.watered() ? skin.barGray : skin.barLeaf, x + 48, y + 22, w - 62, 17, fraction, growth);
     }

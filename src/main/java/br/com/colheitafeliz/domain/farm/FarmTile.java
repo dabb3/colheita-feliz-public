@@ -11,12 +11,12 @@ public final class FarmTile {
     private Crop crop;
     private PestState pest = PestState.NONE;
     private Instant nextPestCheckAt;
-    /** Minhocas (0 = nenhuma, até {@link #MAX_INSECTS}); não pausam o crescimento, reduzem a colheita. */
+    /** Minhocas (0 = nenhuma, até {@link #MAX_INSECTS}); pausam o crescimento como as ervas, sem reduzir a colheita. */
     private int insects;
     private Instant nextInsectCheckAt;
     /** Cultura da planta morta que fica depois da colheita, até a pá retirá-la. */
     private CropType withered;
-    /** Adubo já usado neste ciclo; vale uma vez por plantio. */
+    /** Adubo já usado nesta temporada; vale uma vez por temporada. */
     private boolean fertilized;
     public static final int MAX_INSECTS = 3;
 
@@ -42,12 +42,18 @@ public final class FarmTile {
     }
 
     public void plant(CropType type, Instant now) {
-        plant(type, now, new Crop(type, now).origin());
+        var price = type.seedPrices().entrySet().iterator().next();
+        plant(type, now, new ItemLot(type.id(), price.getKey(), price.getValue(), 1, type.vipOnly()));
     }
 
     public void plant(CropType type, Instant now, ItemLot origin) {
         require(TileState.PLOWED);
-        crop = new Crop(type, now, origin);
+        startSeason(new Crop(type, now, origin));
+    }
+
+    /** Planta nova ou próxima temporada: estágio 1, sem rega, pragas, insetos nem adubo. */
+    private void startSeason(Crop next) {
+        crop = next;
         pest = PestState.NONE;
         nextPestCheckAt = null;
         insects = 0;
@@ -69,15 +75,15 @@ public final class FarmTile {
             throw new IllegalStateException("Pest check not allowed");
         nextPestCheckAt = now.plus(pestCheckInterval());
         if (infected) {
-            crop = crop.infect(now);
+            crop = crop.pause(now);
             pest = PestState.WEEDS;
         }
     }
 
     public void removePest(Instant now) {
         if (pest != PestState.WEEDS) throw new IllegalStateException("No weeds");
-        crop = crop.removePest(now);
         pest = PestState.NONE;
+        if (insects == 0) crop = crop.resume(now);
         nextPestCheckAt = now.plus(pestCheckInterval());
     }
 
@@ -85,7 +91,7 @@ public final class FarmTile {
     public void fertilize(Instant now, double fraction) {
         require(TileState.GROWING);
         if (fertilized || !crop.watered() || crop.matureAt(now)) throw new IllegalStateException("Cannot fertilize");
-        crop = crop.advance(now, Math.round(crop.type().growthTime().toMillis() * fraction));
+        crop = crop.advance(now, Math.round(crop.currentDuration().toMillis() * fraction));
         fertilized = true;
     }
 
@@ -95,7 +101,10 @@ public final class FarmTile {
         if (insects != 0 || crop == null || !crop.watered())
             throw new IllegalStateException("Insect check not allowed");
         nextInsectCheckAt = now.plus(pestCheckInterval());
-        if (infected) insects = 1;
+        if (infected) {
+            crop = crop.pause(now);
+            insects = 1;
+        }
     }
 
     /** Insetos ignorados se multiplicam a cada intervalo, até {@link #MAX_INSECTS}. */
@@ -109,13 +118,8 @@ public final class FarmTile {
     public void removeInsects(Instant now) {
         if (insects == 0) throw new IllegalStateException("No insects");
         insects = 0;
+        if (pest == PestState.NONE) crop = crop.resume(now);
         nextInsectCheckAt = now.plus(pestCheckInterval());
-    }
-
-    /** Unidades que a colheita rende agora: cada minhoca tira uma, mas sempre sobra pelo menos uma. */
-    public int harvestYield() {
-        if (crop == null) return 0;
-        return Math.max(1, crop.type().harvestYield() - insects);
     }
 
     public void refresh(Instant now) {
@@ -123,19 +127,27 @@ public final class FarmTile {
         if (state == TileState.GROWING && crop.matureAt(now)) state = TileState.READY;
     }
 
-    public CropType harvest(Instant now) {
+    /**
+     * Colhe uma unidade, com a origem da semente. Se restam temporadas, a planta recomeça no estágio 1 da próxima;
+     * se era a última, vira planta morta.
+     */
+    public ItemLot harvest(Instant now) {
         refresh(now);
         require(TileState.READY);
-        CropType result = crop.type();
+        Crop done = crop;
+        if (done.season() < done.type().seasons()) {
+            startSeason(new Crop(done.type(), now, done.origin(), done.season() + 1));
+            return done.origin();
+        }
         crop = null;
         pest = PestState.NONE;
         nextPestCheckAt = null;
         insects = 0;
         nextInsectCheckAt = null;
-        withered = result;
+        withered = done.type();
         fertilized = false;
         state = TileState.DEAD;
-        return result;
+        return done.origin();
     }
 
     public void restore(TileState state, Crop crop) {
@@ -157,7 +169,7 @@ public final class FarmTile {
         Objects.requireNonNull(pest);
         boolean needsCrop = state == TileState.GROWING || state == TileState.READY;
         if (needsCrop != (crop != null) || (state == TileState.READY && !crop.watered())
-                || (pest == PestState.WEEDS) != (crop != null && crop.pestAt() != null)
+                || (pest == PestState.WEEDS || insects > 0) != (crop != null && crop.paused())
                 || insects < 0 || insects > MAX_INSECTS || (insects > 0 && (crop == null || !crop.watered()))
                 || (state == TileState.DEAD) != (withered != null))
             throw new IllegalArgumentException("Invalid tile snapshot");
@@ -176,7 +188,11 @@ public final class FarmTile {
     }
 
     private java.time.Duration pestCheckInterval() {
-        long seconds = crop.type().growthSeconds();
-        return java.time.Duration.ofSeconds(Math.max(20, seconds / 10));
+        return pestCheckInterval(crop);
+    }
+
+    /** Intervalo entre sorteios de pragas: um décimo da temporada atual, no mínimo 20 s. */
+    public static java.time.Duration pestCheckInterval(Crop crop) {
+        return java.time.Duration.ofSeconds(Math.max(20, crop.currentDuration().toSeconds() / 10));
     }
 }

@@ -32,15 +32,14 @@ class GameStateTest {
         assertEquals(TileState.READY, game.farm().tile(0, 0).state());
         game.selectTool(Tool.HAND);
         assertTrue(game.act(0, 0).success());
-        assertEquals(3, game.inventory().produce(corn));
+        assertEquals(1, game.inventory().produce(corn));
         // Watering three times may complete today's watering mission, so compare against the balance here.
         java.math.BigDecimal coins = game.wallet().coins();
         assertFalse(game.act(0, 0).success());
         assertTrue(game.sellProduce(corn).success());
         assertEquals(coins.add(new java.math.BigDecimal("28.8")), game.wallet().coins());
-        assertTrue(game.sellAllProduce(corn).success());
-        assertEquals(coins.add(new java.math.BigDecimal("86.3")), game.wallet().coins());
         assertEquals(0, game.inventory().produce(corn));
+        assertFalse(game.sellAllProduce(corn).success());
         assertFalse(game.sellProduce(corn).success());
     }
 
@@ -130,7 +129,7 @@ class GameStateTest {
         game.selectTool(Tool.FERTILIZER);
         assertTrue(game.act(0, 0).success());
         assertEquals(1, game.inventory().fertilizer());
-        assertEquals(corn.growthTime().toMillis() / 4, game.farm().tile(0, 0).crop().grownMillisAt(game.now()));
+        assertEquals(corn.growthTime(1).toMillis() / 4, game.farm().tile(0, 0).crop().grownMillisAt(game.now()));
         assertFalse(game.act(0, 0).success(), "uma vez por plantio");
         assertEquals(1, game.inventory().fertilizer());
     }
@@ -165,7 +164,7 @@ class GameStateTest {
         assertEquals(0, java.math.BigDecimal.valueOf(5).compareTo(game.greenCoins()));
     }
 
-    @Test void insectAlertStaysWhenThePlantMatures() {
+    @Test void insectsPauseTheCropWithAnAlertUntilPesticide() {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
         CropType corn = game.catalog().get("milho");
@@ -177,20 +176,23 @@ class GameStateTest {
         game.selectTool(Tool.WATER);
         game.act(0, 0);
         game.farm().tile(0, 0).checkInsects(game.now(), true);
-        clock.advanceSeconds(900);
-        game.act(0, 0);
-        clock.advanceSeconds(900);
-        game.act(0, 0);
-        clock.advanceSeconds(900);
+        clock.advanceSeconds(2700);
         game.refresh();
-        assertEquals(TileState.READY, game.farm().tile(0, 0).state());
-        assertEquals(java.util.List.of(new GameState.Alert("Insetos", "Milho")), game.alerts());
+        assertEquals(TileState.GROWING, game.farm().tile(0, 0).state(), "insetos pausam o crescimento");
+        assertTrue(game.alerts().contains(new GameState.Alert("Insetos", "Milho")));
         game.selectTool(Tool.PESTICIDE);
         assertTrue(game.act(0, 0).success());
-        assertTrue(game.alerts().isEmpty());
+        assertFalse(game.alerts().contains(new GameState.Alert("Insetos", "Milho")));
+        game.selectTool(Tool.WATER);
+        for (int i = 0; i < 3; i++) {
+            assertTrue(game.act(0, 0).success());
+            clock.advanceSeconds(900);
+        }
+        game.refresh();
+        assertEquals(TileState.READY, game.farm().tile(0, 0).state());
         game.selectTool(Tool.HAND);
-        game.act(0, 0);
-        assertEquals(3, game.inventory().produce(corn));
+        assertTrue(game.act(0, 0).success());
+        assertEquals(1, game.inventory().produce(corn));
     }
 
     @Test void plantingWithoutSeedIsRejectedAndLeavesSoilReady() {

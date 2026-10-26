@@ -1,12 +1,12 @@
 [
-  {"id":"nabo", "name":"Nabo", "seedPrice":10, "salePrice":20, "growthSeconds":600, "stages":5, "spriteStem":"nabo", "requiredLevel":1, "harvestYield":1, "harvestXp":10},
-  {"id":"cenoura", "name":"Cenoura", "seedPrice":15, "salePrice":18, "growthSeconds":1200, "stages":5, "spriteStem":"cenoura", "requiredLevel":1, "harvestYield":2, "harvestXp":15},
-  {"id":"tomate", "name":"Tomate", "seedPrice":20, "salePrice":17, "growthSeconds":1800, "stages":5, "spriteStem":"tomate", "requiredLevel":1, "harvestYield":3, "harvestXp":20},
-  {"id":"milho", "name":"Milho", "seedPrice":25, "salePrice":25, "growthSeconds":2700, "stages":5, "spriteStem":"milho", "requiredLevel":1, "harvestYield":3, "harvestXp":25},
-  {"id":"morango", "name":"Morango", "seedPrice":30, "salePrice":19, "growthSeconds":2400, "stages":5, "spriteStem":"morango", "requiredLevel":1, "harvestYield":4, "harvestXp":25},
-  {"id":"batata", "name":"Batata", "seedPrice":30, "salePrice":28, "growthSeconds":3600, "stages":5, "spriteStem":"batata","requiredLevel":2, "harvestYield":4, "harvestXp":35},
-  {"id":"arroz", "name":"Arroz", "seedPrice":40, "salePrice":36, "growthSeconds":7200, "stages":5, "spriteStem":"arroz", "requiredLevel":2, "harvestYield":6, "harvestXp":55},
-  {"id":"repolho", "name":"Repolho", "seedPrice":35, "salePrice":55, "growthSeconds":5400, "stages":5, "spriteStem":"repolho", "requiredLevel":2, "harvestYield":3, "harvestXp":45},
-  {"id":"girassol", "name":"Girassol", "seedPrice":60, "salePrice":110, "growthSeconds":14400, "stages":5, "spriteStem":"girassol", "requiredLevel":3, "harvestYield":4, "harvestXp":90},
-  {"id":"melancia", "name":"Melancia", "seedPrice":100, "salePrice":320, "growthSeconds":28800, "stages":5, "spriteStem":"melancia", "requiredLevel":4, "harvestYield":3, "harvestXp":150}
+  {"id":"nabo", "name":"Nabo", "seedPrice":10, "salePrice":20, "growthSeconds":600, "stages":5, "spriteStem":"nabo", "requiredLevel":1, "harvestYield":1, "harvestXp":10, "regrowthSeconds":0, "seasons":1, "vipOnly":false, "seedPrices":{"GOLD":10}},
+  {"id":"cenoura", "name":"Cenoura", "seedPrice":15, "salePrice":18, "growthSeconds":1200, "stages":5, "spriteStem":"cenoura", "requiredLevel":1, "harvestYield":2, "harvestXp":15, "regrowthSeconds":0, "seasons":1, "vipOnly":false, "seedPrices":{"GOLD":15}},
+  {"id":"tomate", "name":"Tomate", "seedPrice":20, "salePrice":17, "growthSeconds":1800, "stages":5, "spriteStem":"tomate", "requiredLevel":1, "harvestYield":3, "harvestXp":20, "regrowthSeconds":0, "seasons":1, "vipOnly":false, "seedPrices":{"GOLD":20}},
+  {"id":"milho", "name":"Milho", "seedPrice":25, "salePrice":25, "growthSeconds":2700, "stages":5, "spriteStem":"milho", "requiredLevel":1, "harvestYield":3, "harvestXp":25, "regrowthSeconds":0, "seasons":1, "vipOnly":false, "seedPrices":{"GOLD":25}},
+  {"id":"morango", "name":"Morango", "seedPrice":30, "salePrice":19, "growthSeconds":2400, "stages":5, "spriteStem":"morango", "requiredLevel":1, "harvestYield":4, "harvestXp":25, "regrowthSeconds":0, "seasons":1, "vipOnly":false, "seedPrices":{"GOLD":30}},
+  {"id":"batata", "name":"Batata", "seedPrice":30, "salePrice":28, "growthSeconds":3600, "stages":5, "spriteStem":"batata","requiredLevel":2, "harvestYield":4, "harvestXp":35, "regrowthSeconds":0, "seasons":1, "vipOnly":false, "seedPrices":{"GOLD":30}},
+  {"id":"arroz", "name":"Arroz", "seedPrice":40, "salePrice":36, "growthSeconds":7200, "stages":5, "spriteStem":"arroz", "requiredLevel":2, "harvestYield":6, "harvestXp":55, "regrowthSeconds":0, "seasons":1, "vipOnly":false, "seedPrices":{"GOLD":40}},
+  {"id":"repolho", "name":"Repolho", "seedPrice":35, "salePrice":55, "growthSeconds":5400, "stages":5, "spriteStem":"repolho", "requiredLevel":2, "harvestYield":3, "harvestXp":45, "regrowthSeconds":0, "seasons":1, "vipOnly":false, "seedPrices":{"GOLD":35}},
+  {"id":"girassol", "name":"Girassol", "seedPrice":60, "salePrice":110, "growthSeconds":14400, "stages":5, "spriteStem":"girassol", "requiredLevel":3, "harvestYield":4, "harvestXp":90, "regrowthSeconds":0, "seasons":1, "vipOnly":false, "seedPrices":{"GOLD":60}},
+  {"id":"melancia", "name":"Melancia", "seedPrice":100, "salePrice":320, "growthSeconds":28800, "stages":5, "spriteStem":"melancia", "requiredLevel":4, "harvestYield":3, "harvestXp":150, "regrowthSeconds":0, "seasons":1, "vipOnly":false, "seedPrices":{"GOLD":100}}
 ]

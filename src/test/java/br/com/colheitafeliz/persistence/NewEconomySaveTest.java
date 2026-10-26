@@ -30,7 +30,7 @@ class NewEconomySaveTest {
         session.state().inventory().addProduceLot(lot);
         session.save();
         var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
-        assertEquals(15, json.get("version").getAsInt());
+        assertEquals(16, json.get("version").getAsInt());
         assertEquals("economy-2026-10", json.get("ruleset").getAsString());
         var restored = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state();
         assertEquals(0, new BigDecimal("500.1").compareTo(restored.wallet().coins()));
@@ -90,7 +90,7 @@ class NewEconomySaveTest {
         var clock = new ManualClock();
         var session = GameSession.open(clock, CropCatalogLoader.load(),
                 new JsonSaveRepository(directory.resolve("fresh.json")), bound -> 99);
-        for (int version : new int[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 99}) {
+        for (int version : new int[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 99}) {
             Path file = directory.resolve("legacy-" + version + ".json");
             String bytes = "{\"version\":" + version + ",\"snapshot\":{\"coins\":99999}}";
             Files.writeString(file, bytes);
@@ -118,9 +118,23 @@ class NewEconomySaveTest {
         }
     }
 
+    @Test void firstEconomySaveIsRefusedAndPreservedAfterTheCatalogChange() throws IOException {
+        Path file = directory.resolve("economy-v15.json");
+        var clock = new ManualClock();
+        var session = GameSession.open(clock, CropCatalogLoader.load(), new JsonSaveRepository(file), bound -> 99);
+        session.save();
+        var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+        json.addProperty("version", 15);
+        Files.writeString(file, json.toString());
+        String before = Files.readString(file);
+        IOException refused = assertThrows(IOException.class, () -> new JsonSaveRepository(file).load());
+        assertTrue(refused.getMessage().startsWith("Incompatible save"), refused.getMessage());
+        assertEquals(before, Files.readString(file));
+    }
+
     @Test void malformedNewSaveIsNotAFreshGame() throws IOException {
         Path file = directory.resolve("invalid.json");
-        Files.writeString(file, "{\"version\":15,\"ruleset\":\"economy-2026-10\",\"snapshot\":{}}");
+        Files.writeString(file, "{\"version\":16,\"ruleset\":\"economy-2026-10\",\"snapshot\":{}}");
         String before = Files.readString(file);
         var clock = new ManualClock();
         assertThrows(IOException.class, () -> GameSession.open(clock, CropCatalogLoader.load(), new JsonSaveRepository(file)));

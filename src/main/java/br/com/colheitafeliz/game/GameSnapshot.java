@@ -36,8 +36,8 @@ public record GameSnapshot(BigDecimal coins, List<br.com.colheitafeliz.domain.in
     /** Um animal do cercado: o tipo e quando comeu pela última vez (nulo = com fome). */
     public record AnimalSnapshot(String typeId, String fedAt) {}
     public record TileSnapshot(TileState state, String cropId, String plantedAt, String wateredAt,
-                               String pest, String pestAt, String nextPestCheckAt,
+                               String pest, String pausedAt, String nextPestCheckAt,
                                String growthAnchorAt, long grownAtAnchorMillis,
                                int insects, String nextInsectCheckAt, boolean fertilized,
-                               br.com.colheitafeliz.domain.inventory.ItemLot origin) {}
+                               br.com.colheitafeliz.domain.inventory.ItemLot origin, int season) {}
 }

@@ -1,7 +1,11 @@
 package br.com.colheitafeliz.persistence;
 
+import br.com.colheitafeliz.domain.crop.CropCatalog;
 import br.com.colheitafeliz.domain.crop.CropType;
+import br.com.colheitafeliz.domain.farm.FarmTile;
 import br.com.colheitafeliz.domain.farm.TileState;
+import br.com.colheitafeliz.testsupport.TestCrops;
+import java.time.Instant;
 import br.com.colheitafeliz.domain.farm.PestState;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -53,6 +57,32 @@ class SaveRoundTripTest {
         assertEquals(0, java.math.BigDecimal.valueOf(470).compareTo(GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state().wallet().coins()));
     }
 
+    @Test void secondSeasonSurvivesSaveWithOriginWateringAndProgress() throws IOException {
+        ManualClock clock = new ManualClock();
+        CropType strawberry = TestCrops.strawberry();
+        CropCatalog catalog = new CropCatalog(CropCatalogLoader.load().all().stream()
+                .map(type -> type.id().equals(strawberry.id()) ? strawberry : type).toList());
+        JsonSaveRepository repository = new JsonSaveRepository(directory.resolve("season.json"));
+        GameSession session = GameSession.open(clock, catalog, repository, bound -> 99);
+        FarmTile tile = session.state().farm().tile(0, 3);
+        tile.plow();
+        tile.plant(strawberry, clock.instant(), TestCrops.origin(strawberry));
+        Instant ready = TestCrops.growUntilReady(tile, clock.instant());
+        tile.harvest(ready);
+        tile.water(ready);
+        clock.advanceSeconds(java.time.Duration.between(clock.instant(), ready).toSeconds() + 3600);
+        long grown = tile.crop().grownMillisAt(clock.instant());
+        session.save();
+
+        FarmTile restored = GameSession.open(clock, catalog, repository, bound -> 99).state().farm().tile(0, 3);
+        assertEquals(TileState.GROWING, restored.state());
+        assertEquals(2, restored.crop().season());
+        assertEquals(TestCrops.origin(strawberry), restored.crop().origin());
+        assertEquals(ready, restored.crop().wateredAt());
+        assertEquals(grown, restored.crop().grownMillisAt(clock.instant()));
+        assertEquals(java.time.Duration.ofHours(4), restored.crop().moistDuration());
+    }
+
     @Test void offlineGrowthContinuesAndHarvestedProduceSurvivesAnotherRestart() throws IOException {
         ManualClock clock = new ManualClock();
         JsonSaveRepository repository = new JsonSaveRepository(directory.resolve("save.json"));
@@ -74,7 +104,7 @@ class SaveRoundTripTest {
         reopened.state().act(0, 0);
         reopened.save();
         GameSession again = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
-        assertEquals(3, again.state().inventory().produce(corn));
+        assertEquals(1, again.state().inventory().produce(corn));
         assertEquals(0, java.math.BigDecimal.valueOf(475).compareTo(again.state().wallet().coins()));
         assertEquals(TileState.DEAD, again.state().farm().tile(0, 0).state());
         assertEquals(corn, again.state().farm().tile(0, 0).withered());

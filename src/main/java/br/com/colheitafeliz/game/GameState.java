@@ -151,6 +151,7 @@ public final class GameState {
         tile.refresh(now);
         ActionResult result;
         CropType harvested = null;
+        int harvestedSeason = 0;
         lastTreasureCoins = 0;
         boolean cleared = tool == Tool.HOE && tile.state() == TileState.DEAD;
         switch (tool) {
@@ -218,26 +219,25 @@ public final class GameState {
                 if (tile.state() != TileState.READY)
                     result = ActionResult.fail("A planta ainda não está madura.");
                 else {
-                    int amount = tile.harvestYield();
-                    int lost = tile.insects() == 0 ? 0 : tile.crop().type().harvestYield() - amount;
-                    inventory.addProduceLot(tile.crop().origin().withQuantity(amount));
-                    harvested = tile.harvest(now);
-                    lastHarvestAmount = amount;
-                    result = ActionResult.ok("+" + amount + " " + harvested.name() + " no depósito."
-                            + (lost > 0 ? " Os insetos comeram " + lost + "." : " Venda na loja."));
+                    // A temporada é lida antes da colheita, que já avança para a próxima.
+                    harvested = tile.crop().type();
+                    harvestedSeason = tile.crop().season();
+                    inventory.addProduceLot(tile.harvest(now));
+                    lastHarvestAmount = 1;
+                    result = ActionResult.ok("+1 " + harvested.name() + " no depósito."
+                            + (tile.state() == TileState.GROWING ? " Regue para a próxima temporada." : " Venda na loja."));
                 }
             }
             default -> throw new IllegalStateException("Unknown tool");
         }
         if (result.success()) {
-            int xp = switch (tool) {
-                case SEED -> progress.rules().plantXp();
-                case WATER -> progress.rules().waterXp();
-                case HAND -> harvested.harvestXp();
-                case WEEDER, PESTICIDE -> progress.rules().removePestXp();
-                case HOE -> cleared ? progress.rules().clearDeadXp() : 0;
-                case CURSOR -> 0;
-                case FERTILIZER -> 0;
+            BigDecimal xp = switch (tool) {
+                case SEED -> BigDecimal.valueOf(progress.rules().plantXp());
+                case WATER -> BigDecimal.valueOf(progress.rules().waterXp());
+                case HAND -> harvested.harvestXp(harvestedSeason);
+                case WEEDER, PESTICIDE -> BigDecimal.valueOf(progress.rules().removePestXp());
+                case HOE -> BigDecimal.valueOf(cleared ? progress.rules().clearDeadXp() : 0);
+                case CURSOR, FERTILIZER -> BigDecimal.ZERO;
             };
             String levelReward = awardXp(xp);
             if (!levelReward.isEmpty()) result = ActionResult.ok(result.message() + " " + levelReward);
@@ -357,7 +357,7 @@ public final class GameState {
                 lastCollected = type.productYield();
                 ActionResult result = ActionResult.ok("Coletou " + type.productYield() + "× " + type.productName()
                         + ". Dê ração de novo para produzir mais.");
-                String levelReward = awardXp(type.collectXp());
+                String levelReward = awardXp(BigDecimal.valueOf(type.collectXp()));
                 if (!levelReward.isEmpty()) result = ActionResult.ok(result.message() + " " + levelReward);
                 String missionReward = recordDailyMission("collect", 1);
                 if (!missionReward.isEmpty()) result = ActionResult.ok(result.message() + " " + missionReward);
@@ -429,9 +429,11 @@ public final class GameState {
      */
     public void startNewFarm() {
         CropType turnip = catalog.get("nabo");
-        Instant plantedAt = clock.now().minus(turnip.growthTime()).minusSeconds(60);
+        Instant plantedAt = clock.now().minus(turnip.growthTime(1)).minusSeconds(60);
+        var price = turnip.seedPrices().entrySet().iterator().next();
+        ItemLot origin = new ItemLot(turnip.id(), price.getKey(), price.getValue(), 1, turnip.vipOnly());
         for (int row = 0; row < 2; row++) {
-            Crop ready = new Crop(turnip, plantedAt, plantedAt, null, plantedAt, turnip.growthTime().toMillis());
+            Crop ready = new Crop(turnip, plantedAt, plantedAt, null, plantedAt, turnip.growthTime(1).toMillis(), origin, 1);
             farm.tile(0, row).restore(TileState.READY, ready);
         }
         tutorial.restore(0);
@@ -449,7 +451,7 @@ public final class GameState {
             xp += mission.xp();
         }
         if (xp == 0) return "";
-        String levelReward = awardXp(xp);
+        String levelReward = awardXp(BigDecimal.valueOf(xp));
         return "Missão diária concluída: +" + coins + " moedas, +" + xp + " XP!"
                 + (levelReward.isEmpty() ? "" : " " + levelReward);
     }
@@ -458,7 +460,7 @@ public final class GameState {
         Tutorial.Step done = tutorial.record(action);
         if (done == null) return "";
         wallet.credit(done.coins());
-        String levelReward = awardXp(done.xp());
+        String levelReward = awardXp(BigDecimal.valueOf(done.xp()));
         String next = tutorial.active() ? " Agora: " + tutorial.current().title() + "."
                 : " Primeiros passos concluídos! As missões diárias começam agora.";
         return "Tarefa concluída: +" + done.coins() + " moedas, +" + done.xp() + " XP!" + next
@@ -466,7 +468,7 @@ public final class GameState {
     }
 
     /** Dá XP e, para cada nível tabelado alcançado, as duas moedas; não concede sementes. */
-    private String awardXp(int xp) {
+    private String awardXp(BigDecimal xp) {
         int before = progress.level();
         if (progress.award(xp) == 0) return "";
         Map<Currency, BigDecimal> rewards = new java.util.EnumMap<>(Currency.class);
@@ -545,11 +547,12 @@ public final class GameState {
                     crop != null ? crop.type().id() : tile.withered() == null ? null : tile.withered().id(),
                     crop == null ? null : crop.plantedAt().toString(),
                     crop == null || crop.wateredAt() == null ? null : crop.wateredAt().toString(),
-                    tile.pest().name(), crop == null || crop.pestAt() == null ? null : crop.pestAt().toString(),
+                    tile.pest().name(), crop == null || crop.pausedAt() == null ? null : crop.pausedAt().toString(),
                     tile.nextPestCheckAt() == null ? null : tile.nextPestCheckAt().toString(),
                     crop == null || crop.growthAnchorAt() == null ? null : crop.growthAnchorAt().toString(),
                     crop == null ? 0 : crop.grownAtAnchorMillis(), tile.insects(),
-                    tile.nextInsectCheckAt() == null ? null : tile.nextInsectCheckAt().toString(), tile.fertilized(), crop == null ? null : crop.origin()));
+                    tile.nextInsectCheckAt() == null ? null : tile.nextInsectCheckAt().toString(), tile.fertilized(), crop == null ? null : crop.origin(),
+                    crop == null ? 0 : crop.season()));
         }
         List<String> unlocked = catalog.all().stream().filter(this::unlocked).map(CropType::id).toList();
         return new GameSnapshot(wallet.coins(), inventory.seedLots(), inventory.produceLots(),
@@ -607,12 +610,11 @@ public final class GameState {
             boolean dead = tile.state() == TileState.DEAD;
             Crop crop = tile.cropId() == null || dead ? null : new Crop(catalog.get(tile.cropId()),
                     Instant.parse(tile.plantedAt()), tile.wateredAt() == null ? null : Instant.parse(tile.wateredAt()),
-                    tile.pestAt() == null ? null : Instant.parse(tile.pestAt()),
+                    tile.pausedAt() == null ? null : Instant.parse(tile.pausedAt()),
                     tile.growthAnchorAt() == null ? null : Instant.parse(tile.growthAnchorAt()),
-                    tile.grownAtAnchorMillis(), tile.origin());
+                    tile.grownAtAnchorMillis(), tile.origin(), tile.season());
             Instant next = tile.nextPestCheckAt() == null
-                    ? (crop != null && crop.watered()
-                    ? clock.now().plusSeconds(Math.max(20, crop.type().growthSeconds() / 10)) : null)
+                    ? (crop != null && crop.watered() ? clock.now().plus(FarmTile.pestCheckInterval(crop)) : null)
                     : Instant.parse(tile.nextPestCheckAt());
             Instant nextInsects = tile.nextInsectCheckAt() == null
                     ? (crop != null && crop.watered() ? next : null)
