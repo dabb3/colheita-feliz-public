@@ -5,6 +5,7 @@ import br.com.colheitafeliz.domain.crop.CropCatalog;
 import br.com.colheitafeliz.domain.crop.CropType;
 import br.com.colheitafeliz.game.ActionResult;
 import br.com.colheitafeliz.game.GameState;
+import br.com.colheitafeliz.game.GameText;
 import br.com.colheitafeliz.render.GameAssets;
 import br.com.colheitafeliz.render.Palette;
 import br.com.colheitafeliz.render.UiSkin;
@@ -22,7 +23,7 @@ import java.util.List;
  */
 public final class MarketPanel {
     public static final float LEFT = 300, BOTTOM = 130, WIDTH = 1000, HEIGHT = 620;
-    private static final float BAR = 46, TAB_W = 190, TAB_H = 36, COLS = 5;
+    private static final float BAR = 46, TAB_W = 140, TAB_H = 36, COLS = 5;
     private static final float SHEET_X = LEFT + 18, SHEET_Y = BOTTOM + 18, SHEET_W = WIDTH - 36;
     private static final float SHEET_H = HEIGHT - BAR - 18 - TAB_H - 12;
     private static final float CELL_W = (SHEET_W - 24) / COLS, CELL_H = (SHEET_H - 24) / 2;
@@ -30,11 +31,13 @@ public final class MarketPanel {
     private boolean open;
     private boolean selling;
     private boolean animals;
+    private boolean vip;
 
     public MarketPanel(CropCatalog catalog) { crops = catalog.all(); }
-    public void showShop() { open = true; selling = false; animals = false; }
-    public void showSell() { open = true; selling = true; animals = false; }
-    public void showAnimals() { open = true; selling = false; animals = true; }
+    public void showShop() { open = true; selling = false; animals = false; vip = false; }
+    public void showSell() { open = true; selling = true; animals = false; vip = false; }
+    public void showAnimals() { open = true; selling = false; animals = true; vip = false; }
+    public void showVip() { open = true; selling = false; animals = false; vip = true; }
     public boolean animals() { return animals; }
     public void close() { open = false; }
     public boolean isOpen() { return open; }
@@ -49,10 +52,11 @@ public final class MarketPanel {
     }
     /** "Vender tudo", à direita das abas, só no depósito. */
     public static Rectangle sellEverythingButton() {
-        return new Rectangle(LEFT + WIDTH - 24 - 270, SHEET_Y + SHEET_H + 2, 270, TAB_H - 4);
+        return new Rectangle(LEFT + WIDTH - 24 - 370, SHEET_Y + SHEET_H + 2, 370, TAB_H - 4);
     }
     /** "Comprar adubo", no mesmo lugar do Vender tudo, só na aba de sementes. */
     public static Rectangle fertilizerButton() { return sellEverythingButton(); }
+    public static Rectangle vipButton() { return new Rectangle(LEFT + WIDTH / 2 - 150, BOTTOM + 110, 300, 40); }
     public static Rectangle cell(int index) {
         float x = SHEET_X + 12 + (index % COLS) * CELL_W;
         float y = SHEET_Y + SHEET_H - 12 - (index / (int) COLS + 1) * CELL_H;
@@ -80,6 +84,8 @@ public final class MarketPanel {
         if (tab(0).contains(x, y)) { showShop(); return null; }
         if (tab(1).contains(x, y)) { showSell(); return null; }
         if (tab(2).contains(x, y)) { showAnimals(); return null; }
+        if (tab(3).contains(x, y)) { showVip(); return null; }
+        if (vip) return vipButton().contains(x, y) ? state.buyVip() : null;
         if (animals) return clickAnimals(x, y, state);
         if (selling && sellEverythingButton().contains(x, y)) return state.sellEverything();
         if (!selling && fertilizerButton().contains(x, y)) return state.buyFertilizer();
@@ -136,8 +142,8 @@ public final class MarketPanel {
         skin.text(batch, skin.title, "×", close.x + close.width / 2f, close.y + 27,
                 overClose ? Palette.ON_COLOR : Palette.INK_MUTED, Align.center);
 
-        String[] tabs = {"Comprar sementes", "Vender colheita", "Animais"};
-        int activeIndex = animals ? 2 : selling ? 1 : 0;
+        String[] tabs = {"Sementes", "Colheitas", "Animais", "VIP"};
+        int activeIndex = vip ? 3 : animals ? 2 : selling ? 1 : 0;
         for (int i = 0; i < tabs.length; i++) {
             Rectangle t = tab(i);
             boolean active = i == activeIndex;
@@ -149,6 +155,18 @@ public final class MarketPanel {
         Rectangle activeTab = tab(activeIndex);
         skin.rect(batch, Palette.WINDOW, activeTab.x + 1, SHEET_Y + SHEET_H - 2, activeTab.width - 2, 3);
 
+        if (vip) {
+            float center = LEFT + WIDTH / 2;
+            Toolbar.drawFitted(batch, assets.vipCard, center, BOTTOM + 355, 130);
+            skin.text(batch, skin.label, "Cartão VIP · 30 dias · 100 verdes", center, BOTTOM + 265, Palette.INK, Align.center);
+            skin.text(batch, skin.body, "Venda com acréscimo de 25%. Renovação acumula mais 30 dias.",
+                    center, BOTTOM + 225, Palette.INK_MUTED, Align.center);
+            skin.text(batch, skin.body, state.vipActive() ? "Ativo até " + GameText.vipExpiry(state.vip().expiresAt(), java.time.ZoneId.systemDefault()) : "VIP inativo",
+                    center, BOTTOM + 195, Palette.INK_MUTED, Align.center);
+            Rectangle buy = vipButton();
+            button(batch, skin, skin.glassSun, buy, "Comprar cartão VIP", Palette.INK_WARM, null, buy.contains(px, py));
+            return;
+        }
         if (animals) {
             List<AnimalType> types = state.animalTypes();
             for (int t = 0; t < types.size(); t++) drawAnimalRow(batch, skin, assets, state, types.get(t), t, px, py);
@@ -164,20 +182,23 @@ public final class MarketPanel {
                     unlocked ? Palette.INK_WARM : Palette.INK_MUTED, null, unlocked && fert.contains(px, py));
         }
         if (selling) {
-            int value = state.depositValue();
+            var totals = state.depositTotals();
+            String value = GameState.formatTotals(totals);
             Rectangle all = sellEverythingButton();
-            button(batch, skin, value > 0 ? skin.glassBerry : skin.glassDisabled, all,
-                    value > 0 ? "Vender tudo · " + value + " moedas" : "Depósito vazio",
-                    value > 0 ? Palette.ON_COLOR : Palette.INK_MUTED, value > 0 ? Palette.BERRY_INK : null,
-                    value > 0 && all.contains(px, py));
+            button(batch, skin, !totals.isEmpty() ? skin.glassBerry : skin.glassDisabled, all,
+                    !totals.isEmpty() ? "Vender tudo · " + value : "Depósito vazio",
+                    !totals.isEmpty() ? Palette.ON_COLOR : Palette.INK_MUTED, !totals.isEmpty() ? Palette.BERRY_INK : null,
+                    !totals.isEmpty() && all.contains(px, py));
         }
     }
 
     private void drawItem(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state, int i, float px, float py) {
         CropType crop = crops.get(i);
         Rectangle c = cell(i);
-        boolean unlocked = selling || state.unlocked(crop);
         int owned = selling ? state.inventory().produce(crop) : state.inventory().seeds(crop);
+        var quote = selling ? state.quoteItem(crop.id()) : java.util.Map.<br.com.colheitafeliz.domain.economy.Currency, java.math.BigDecimal>of();
+        boolean vipBlocked = selling && owned > 0 && quote.isEmpty();
+        boolean unlocked = selling ? !vipBlocked : state.unlocked(crop);
         boolean hover = c.contains(px, py) && unlocked && (!selling || owned > 0);
         if (hover) skin.draw(batch, skin.itemHover, c.x + 4, c.y + 4, c.width - 8, c.height - 8);
         float cx = c.x + c.width / 2f;
@@ -189,15 +210,26 @@ public final class MarketPanel {
         if (!unlocked) {
             float w = skin.width(skin.label, "Nível " + crop.requiredLevel()) + 16;
             skin.draw(batch, skin.sheet, cx - w / 2f, c.y + c.height - 112, w, 26);
-            skin.text(batch, skin.label, "Nível " + crop.requiredLevel(), cx, c.y + c.height - 93, Palette.INK, Align.center);
+            skin.text(batch, skin.label, vipBlocked ? "VIP necessário" : "Nível " + crop.requiredLevel(), cx, c.y + c.height - 93, Palette.INK, Align.center);
         }
         String info = selling ? "cada" : formatTime(crop.growthSeconds());
-        int price = selling ? crop.salePrice() : crop.seedPrice();
-        float priceW = 20 + 4 + skin.width(skin.label, Integer.toString(price)) + 6 + skin.width(skin.caption, info);
+        String price = GameText.money(java.math.BigDecimal.valueOf(crop.seedPrice()).multiply(new java.math.BigDecimal(selling ? (state.vipActive() ? "1.25" : "1.15") : "1")).setScale(1, java.math.RoundingMode.CEILING));
+        boolean green = false;
+        if (vipBlocked) {
+            var origin = state.inventory().produceLots().stream().filter(lot -> lot.itemId().equals(crop.id())).findFirst().orElseThrow();
+            price = GameText.money(origin.unitCost().multiply(new java.math.BigDecimal("1.15")).setScale(1, java.math.RoundingMode.CEILING));
+            green = origin.currency() == br.com.colheitafeliz.domain.economy.Currency.GREEN;
+        }
+        if (!quote.isEmpty()) {
+            var first = quote.entrySet().iterator().next();
+            price = GameText.money(first.getValue());
+            green = first.getKey() == br.com.colheitafeliz.domain.economy.Currency.GREEN;
+        }
+        float priceW = 20 + 4 + skin.width(skin.label, price) + 6 + skin.width(skin.caption, info);
         float left = cx - priceW / 2f;
-        Toolbar.drawFitted(batch, assets.coin, left + 10, c.y + 63, 20);
-        skin.text(batch, skin.label, Integer.toString(price), left + 24, c.y + 69, Palette.INK, Align.left);
-        skin.text(batch, skin.caption, info, left + 24 + skin.width(skin.label, Integer.toString(price)) + 6, c.y + 68,
+        Toolbar.drawFitted(batch, green ? assets.greenCoin : assets.coin, left + 10, c.y + 63, 20);
+        skin.text(batch, skin.label, price, left + 24, c.y + 69, Palette.INK, Align.left);
+        skin.text(batch, skin.caption, info, left + 24 + skin.width(skin.label, price) + 6, c.y + 68,
                 Palette.INK_MUTED, Align.left);
         if (!selling) {
             Rectangle b = primaryButton(i);
@@ -205,7 +237,7 @@ public final class MarketPanel {
                     unlocked ? "Comprar" : "Bloqueado", unlocked ? Palette.INK_WARM : Palette.INK_MUTED, null,
                     b.contains(px, py) && unlocked);
         } else {
-            boolean any = owned > 0;
+            boolean any = owned > 0 && !vipBlocked;
             Rectangle one = sellOneButton(i), all = sellAllButton(i);
             button(batch, skin, any ? skin.glassNeutral : skin.glassDisabled, one, "Vender 1",
                     any ? Palette.INK : Palette.INK_MUTED, null, any && one.contains(px, py));
@@ -246,7 +278,7 @@ public final class MarketPanel {
 
         int owned = state.inventory().product(type.productId());
         Toolbar.drawFitted(batch, assets.product(type.id()), r.x + 750, mid + 4, 50);
-        skin.text(batch, skin.label, type.productName() + " x" + owned + " · " + type.productPrice(), r.x + 790, mid + 24,
+        skin.text(batch, skin.label, type.productName() + " x" + owned + " · " + GameState.formatTotals(state.quoteItem(type.productId())), r.x + 790, mid + 24,
                 Palette.INK, Align.left);
         boolean any = owned > 0;
         Rectangle one = sellProductOneButton(index), all = sellProductAllButton(index);

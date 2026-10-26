@@ -1,1 +1,118 @@
-{"levelBaseXp":50,"levelStepXp":25,"plantXp":5,"waterXp":3,"removePestXp":5,"clearDeadXp":2}
+{
+  "levelBaseXp": 50,
+  "levelStepXp": 25,
+  "plantXp": 5,
+  "waterXp": 3,
+  "removePestXp": 5,
+  "clearDeadXp": 2,
+  "levelRewards": {
+    "5": {
+      "gold": 9000,
+      "green": 1
+    },
+    "7": {
+      "gold": 18000,
+      "green": 2
+    },
+    "9": {
+      "gold": 27000,
+      "green": 3
+    },
+    "11": {
+      "gold": 45000,
+      "green": 5
+    },
+    "13": {
+      "gold": 63000,
+      "green": 7
+    },
+    "15": {
+      "gold": 81000,
+      "green": 9
+    },
+    "17": {
+      "gold": 108000,
+      "green": 12
+    },
+    "19": {
+      "gold": 135000,
+      "green": 15
+    },
+    "21": {
+      "gold": 162000,
+      "green": 18
+    },
+    "23": {
+      "gold": 207000,
+      "green": 23
+    },
+    "25": {
+      "gold": 300000,
+      "green": 30
+    },
+    "27": {
+      "gold": 450000,
+      "green": 50
+    },
+    "29": {
+      "gold": 540000,
+      "green": 60
+    },
+    "31": {
+      "gold": 630000,
+      "green": 70
+    },
+    "33": {
+      "gold": 720000,
+      "green": 80
+    },
+    "35": {
+      "gold": 810000,
+      "green": 90
+    },
+    "37": {
+      "gold": 900000,
+      "green": 100
+    },
+    "39": {
+      "gold": 990000,
+      "green": 110
+    },
+    "41": {
+      "gold": 1080000,
+      "green": 120
+    },
+    "43": {
+      "gold": 1170000,
+      "green": 130
+    },
+    "45": {
+      "gold": 1260000,
+      "green": 140
+    },
+    "47": {
+      "gold": 1350000,
+      "green": 150
+    },
+    "50": {
+      "gold": 1500000,
+      "green": 155
+    },
+    "53": {
+      "gold": 1650000,
+      "green": 160
+    },
+    "56": {
+      "gold": 1800000,
+      "green": 165
+    },
+    "58": {
+      "gold": 1950000,
+      "green": 170
+    },
+    "61": {
+      "gold": 2100000,
+      "green": 180
+    }
+  }
+}

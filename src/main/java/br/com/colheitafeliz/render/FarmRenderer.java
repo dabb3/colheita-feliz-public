@@ -9,6 +9,7 @@ import br.com.colheitafeliz.domain.farm.PestSystem;
 import br.com.colheitafeliz.domain.farm.TileState;
 import br.com.colheitafeliz.game.DailyMissionBoard;
 import br.com.colheitafeliz.game.GameState;
+import br.com.colheitafeliz.game.GameText;
 import br.com.colheitafeliz.game.LandExpansion;
 import br.com.colheitafeliz.ui.Hud;
 import br.com.colheitafeliz.ui.MarketPanel;
@@ -91,20 +92,24 @@ public final class FarmRenderer implements AutoCloseable {
 
     /** Números que sobem do ponto da ação: itens colhidos, XP e moedas. */
     public void reward(float x, float y, CropType harvested, int produced, int xp, int coins) {
-        int count = (harvested != null && produced > 0 ? 1 : 0) + (coins != 0 ? 1 : 0) + (xp > 0 ? 1 : 0);
+        reward(x, y, harvested, produced, java.math.BigDecimal.valueOf(xp), java.math.BigDecimal.valueOf(coins));
+    }
+
+    public void reward(float x, float y, CropType harvested, int produced, java.math.BigDecimal xp, java.math.BigDecimal coins) {
+        int count = (harvested != null && produced > 0 ? 1 : 0) + (coins.signum() != 0 ? 1 : 0) + (xp.signum() > 0 ? 1 : 0);
         float spacing = 78, left = x - (count - 1) * spacing / 2f;
         int index = 0;
         if (harvested != null && produced > 0) {
             float fx = left + index * spacing; long delay = index++ * 150_000_000L;
             hud.floater(fx, y, assets.crop(harvested, harvested.stages()), "+" + produced, Hud.FloaterStyle.ITEM, delay);
         }
-        if (coins != 0) {
+        if (coins.signum() != 0) {
             float fx = left + index * spacing; long delay = index++ * 150_000_000L;
-            hud.floater(fx, y, assets.coin, (coins > 0 ? "+" : "") + coins, Hud.FloaterStyle.COIN, delay);
+            hud.floater(fx, y, assets.coin, (coins.signum() > 0 ? "+" : "") + GameText.money(coins), Hud.FloaterStyle.COIN, delay);
         }
-        if (xp > 0) {
+        if (xp.signum() > 0) {
             float fx = left + index * spacing; long delay = index * 150_000_000L;
-            hud.floater(fx, y, assets.star, "+" + xp, Hud.FloaterStyle.XP, delay);
+            hud.floater(fx, y, assets.star, "+" + GameText.xp(xp), Hud.FloaterStyle.XP, delay);
         }
     }
 
@@ -256,7 +261,7 @@ public final class FarmRenderer implements AutoCloseable {
         if (next == null) return;
         Vector2 p = iso.gridToScreen(next.column(), next.row());
         boolean levelOk = state.progress().level() >= next.requiredLevel();
-        boolean ready = levelOk && state.wallet().coins() >= next.price();
+        boolean ready = levelOk && state.wallet().coins().compareTo(java.math.BigDecimal.valueOf(next.price())) >= 0;
         String main = levelOk ? Hud.formatInt(next.price()) : "Nível " + next.requiredLevel();
         String sub = levelOk ? "Comprar lote" : next.price() + " moedas";
         float mainW = skin.width(skin.button, main) + (levelOk ? 22 : 0);
@@ -315,7 +320,7 @@ public final class FarmRenderer implements AutoCloseable {
         LandExpansion.Plot nextPlot = state.land().next();
         boolean plotAvailable = nextPlot != null
                 && state.progress().level() >= nextPlot.requiredLevel()
-                && state.wallet().coins() >= nextPlot.price();
+                && state.wallet().coins().compareTo(java.math.BigDecimal.valueOf(nextPlot.price())) >= 0;
         if (notificationStateInitialized && plotAvailable
                 && (!observedPlotAvailable || nextPlot.id() != observedNextPlotId))
             hud.toast(assets.coin, "Lote disponível.", "Clique na plaquinha para comprar.", Hud.ToastKind.NORMAL);

@@ -53,9 +53,10 @@ class TutorialTest {
         assertTrue(game.message().contains("Primeiros passos concluídos"));
         int rewards = 0;
         for (Tutorial.Step step : Tutorial.STEPS) rewards += step.coins();
-        int harvested = turnip.harvestYield() * turnip.salePrice();
+        java.math.BigDecimal harvested = java.math.BigDecimal.valueOf(turnip.harvestYield() * turnip.seedPrice())
+                .multiply(new java.math.BigDecimal("1.15")).setScale(1, java.math.RoundingMode.CEILING);
         assertEquals(2, game.progress().level(), "o tutorial termina já no nível 2");
-        assertEquals(100 - 2 * turnip.seedPrice() + harvested + rewards + GameState.levelUpCoins(2),
-                game.wallet().coins());
+        assertEquals(0, java.math.BigDecimal.valueOf(500 - 2 * turnip.seedPrice() + rewards)
+                .add(ProgressionLoader.load().rewardFor(2).gold()).add(harvested).compareTo(game.wallet().coins()));
     }
 }

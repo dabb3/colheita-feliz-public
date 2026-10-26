@@ -26,7 +26,7 @@ public final class FarmGame extends ApplicationAdapter {
         try {
             session = GameSession.open(Clock.systemUTC(), catalog,
                     new JsonSaveRepository(Path.of(System.getenv().getOrDefault(
-                            "COLHEITA_SAVE_PATH", "save/game.json"))));
+                            "COLHEITA_SAVE_PATH", br.com.colheitafeliz.persistence.GameSave.DEFAULT_PATH))));
         } catch (IOException e) {
             throw new IllegalStateException("Could not load saved game", e);
         }
@@ -55,7 +55,10 @@ public final class FarmGame extends ApplicationAdapter {
 
     private boolean save() {
         boolean saved = session.trySave();
-        if (!saved) Gdx.app.error("save", session.state().message());
+        if (!saved) {
+            Gdx.app.error("save", session.state().message());
+            if (renderer != null) renderer.failure(session.state().message());
+        }
         return saved;
     }
 

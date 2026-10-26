@@ -3,19 +3,41 @@ package br.com.colheitafeliz.game;
 import br.com.colheitafeliz.domain.farm.TileState;
 import java.util.List;
 import java.util.Map;
+import java.math.BigDecimal;
 
-public record GameSnapshot(int coins, Map<String, Integer> seeds, Map<String, Integer> produce,
+public record GameSnapshot(BigDecimal coins, List<br.com.colheitafeliz.domain.inventory.ItemLot> seeds, List<br.com.colheitafeliz.domain.inventory.ItemLot> produce,
                            List<TileSnapshot> tiles, String selectedSeedId, Tool tool,
-                           int level, int currentXp, List<String> unlockedCropIds,
+                           int level, BigDecimal currentXp, List<String> unlockedCropIds,
                            boolean musicEnabled, boolean effectsEnabled,
                            String dailyMissionDay, Map<String, Integer> dailyMissionProgress,
                            List<String> completedDailyMissions, List<Integer> unlockedPlotIds,
                            Integer tutorialStep, List<AnimalSnapshot> animals,
-                           Map<String, Integer> animalProducts, Map<String, Integer> feed, int fertilizer) {
+                           Map<String, Integer> feed, int fertilizer,
+                           BigDecimal greenCoins, String vipExpiresAt) {
+    public GameSnapshot {
+        if (coins == null || greenCoins == null || coins.signum() < 0 || greenCoins.signum() < 0
+                || coins.stripTrailingZeros().scale() > 1 || greenCoins.stripTrailingZeros().scale() > 1
+                || currentXp == null || currentXp.signum() < 0 || level < 1 || fertilizer < 0
+                || selectedSeedId == null || selectedSeedId.isBlank() || tool == null
+                || tutorialStep == null || dailyMissionDay == null || unlockedPlotIds == null)
+            throw new IllegalArgumentException("Invalid farm snapshot");
+        seeds = List.copyOf(seeds);
+        produce = List.copyOf(produce);
+        tiles = List.copyOf(tiles);
+        if (tiles.size() != GameState.COLUMNS * GameState.ROWS)
+            throw new IllegalArgumentException("Invalid farm dimensions");
+        unlockedCropIds = List.copyOf(unlockedCropIds);
+        dailyMissionProgress = Map.copyOf(dailyMissionProgress);
+        completedDailyMissions = List.copyOf(completedDailyMissions);
+        unlockedPlotIds = List.copyOf(unlockedPlotIds);
+        animals = List.copyOf(animals);
+        feed = Map.copyOf(feed);
+    }
     /** Um animal do cercado: o tipo e quando comeu pela última vez (nulo = com fome). */
     public record AnimalSnapshot(String typeId, String fedAt) {}
     public record TileSnapshot(TileState state, String cropId, String plantedAt, String wateredAt,
                                String pest, String pestAt, String nextPestCheckAt,
                                String growthAnchorAt, long grownAtAnchorMillis,
-                               int insects, String nextInsectCheckAt, boolean fertilized) {}
+                               int insects, String nextInsectCheckAt, boolean fertilized,
+                               br.com.colheitafeliz.domain.inventory.ItemLot origin) {}
 }

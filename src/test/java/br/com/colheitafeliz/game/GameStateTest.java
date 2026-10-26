@@ -11,9 +11,9 @@ class GameStateTest {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);
         CropType corn = game.catalog().get("milho");
-        assertEquals(100, game.wallet().coins());
+        assertEquals(0, java.math.BigDecimal.valueOf(500).compareTo(game.wallet().coins()));
         assertTrue(game.buySeed(corn).success());
-        assertEquals(75, game.wallet().coins());
+        assertEquals(0, java.math.BigDecimal.valueOf(475).compareTo(game.wallet().coins()));
         game.selectSeed(corn);
         assertFalse(game.act(0, 0).success());
         game.selectTool(Tool.HOE);
@@ -34,12 +34,12 @@ class GameStateTest {
         assertTrue(game.act(0, 0).success());
         assertEquals(3, game.inventory().produce(corn));
         // Watering three times may complete today's watering mission, so compare against the balance here.
-        int coins = game.wallet().coins();
+        java.math.BigDecimal coins = game.wallet().coins();
         assertFalse(game.act(0, 0).success());
         assertTrue(game.sellProduce(corn).success());
-        assertEquals(coins + 25, game.wallet().coins());
+        assertEquals(coins.add(new java.math.BigDecimal("28.8")), game.wallet().coins());
         assertTrue(game.sellAllProduce(corn).success());
-        assertEquals(coins + 75, game.wallet().coins());
+        assertEquals(coins.add(new java.math.BigDecimal("86.3")), game.wallet().coins());
         assertEquals(0, game.inventory().produce(corn));
         assertFalse(game.sellProduce(corn).success());
     }
@@ -64,9 +64,9 @@ class GameStateTest {
         assertFalse(game.act(0, 0).success());
         assertEquals("Retire a planta morta com a pá antes de plantar.", game.message());
         game.selectTool(Tool.HOE);
-        int xp = game.progress().currentXp();
+        java.math.BigDecimal xp = game.progress().currentXp();
         assertTrue(game.act(0, 0).success());
-        assertEquals(xp + 2, game.progress().currentXp());
+        assertEquals(xp.add(java.math.BigDecimal.valueOf(2)), game.progress().currentXp());
         assertEquals(TileState.PLOWED, game.farm().tile(0, 0).state());
         game.selectSeed(turnip);
         assertTrue(game.act(0, 0).success());
@@ -78,7 +78,7 @@ class GameStateTest {
         lucky.selectTool(Tool.HOE);
         assertTrue(lucky.act(0, 0).success());
         assertEquals(30, lucky.lastTreasureCoins());
-        assertEquals(130, lucky.wallet().coins());
+        assertEquals(0, java.math.BigDecimal.valueOf(530).compareTo(lucky.wallet().coins()));
         assertTrue(lucky.message().contains("baú do tesouro"));
         lucky.progress().award(50);
         assertEquals(40, lucky.treasureCoins());
@@ -87,27 +87,26 @@ class GameStateTest {
         unlucky.selectTool(Tool.HOE);
         assertTrue(unlucky.act(0, 0).success());
         assertEquals(0, unlucky.lastTreasureCoins());
-        assertEquals(100, unlucky.wallet().coins());
+        assertEquals(0, java.math.BigDecimal.valueOf(500).compareTo(unlucky.wallet().coins()));
     }
 
     @Test void sellEverythingEmptiesTheDepositAtOnce() {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
         assertFalse(game.sellEverything().success());
-        game.inventory().addProduce(game.catalog().get("nabo"), 2);
-        game.inventory().addProduce(game.catalog().get("milho"), 3);
-        assertEquals(2 * 20 + 3 * 25, game.depositValue());
+        game.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("nabo", br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(game.catalog().get("nabo").seedPrice()), 2, false));
+        game.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("milho", br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(game.catalog().get("milho").seedPrice()), 3, false));
+        assertEquals(0, new java.math.BigDecimal("109.3").compareTo(game.depositValue()));
         assertTrue(game.sellEverything().success());
-        assertEquals(0, game.depositValue());
+        assertEquals(0, game.depositValue().signum());
         assertEquals(0, game.inventory().produce(game.catalog().get("milho")));
-        assertTrue(game.wallet().coins() >= 100 + 115);
+        assertTrue(game.wallet().coins().compareTo(new java.math.BigDecimal("609.3")) >= 0);
     }
 
-    @Test void levelUpGivesCoinsForEveryLevelReached() {
-        ManualClock clock = new ManualClock();
-        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
-        assertEquals(50, GameState.levelUpCoins(2));
-        assertEquals(125, GameState.levelUpCoins(5));
+    @Test void levelRewardsMatchTheConfiguredTable() {
+        var rules = ProgressionLoader.load();
+        assertEquals(0, rules.rewardFor(2).gold().signum());
+        assertEquals(0, new java.math.BigDecimal("9000").compareTo(rules.rewardFor(5).gold()));
     }
 
     @Test void fertilizerAdvancesAQuarterOfTheCycleOncePerPlanting() {
@@ -163,7 +162,7 @@ class GameStateTest {
         game.selectTool(Tool.PESTICIDE);
         game.act(0, 0);
         assertTrue(game.alerts().isEmpty());
-        assertEquals(0, game.greenCoins());
+        assertEquals(0, java.math.BigDecimal.valueOf(5).compareTo(game.greenCoins()));
     }
 
     @Test void insectAlertStaysWhenThePlantMatures() {
@@ -202,6 +201,6 @@ class GameStateTest {
         game.selectSeed(game.catalog().get("nabo"));
         assertFalse(game.act(0, 0).success());
         assertEquals(TileState.PLOWED, game.farm().tile(0, 0).state());
-        assertEquals(100, game.wallet().coins());
+        assertEquals(0, java.math.BigDecimal.valueOf(500).compareTo(game.wallet().coins()));
     }
 }

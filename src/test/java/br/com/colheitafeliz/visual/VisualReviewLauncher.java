@@ -43,9 +43,9 @@ public final class VisualReviewLauncher {
                 "05-sementes.png", "06-loja.png", "07-deposito.png", "08-missoes.png",
                 "09-avisos.png", "10-nivel-e-recompensas.png", "11-lote-a-venda.png",
                 "12-primeiros-passos.png", "13-tutorial-nas-missoes.png",
-                "14-loja-animais.png", "15-galinhas-no-cercado.png"
+                "14-loja-animais.png", "15-galinhas-no-cercado.png", "16-vip.png", "17-saldos-e-xp-decimais.png", "18-deposito-duas-moedas.png", "19-deposito-vip-bloqueado.png", "20-falha-autosave.png", "21-aviso-vip.png"
         };
-        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3};
+        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12};
         private final Path output = Path.of(System.getProperty("colheita.visualOutput", "build/visual-review"));
         private FarmRenderer renderer;
         private GameState fresh, states, rich, newcomer, rancher;
@@ -60,7 +60,7 @@ public final class VisualReviewLauncher {
             rich.progress().award(60);
             rich.progress().award(80);
             rich.refresh();
-            for (CropType crop : catalog.all()) if (crop.requiredLevel() <= 3) rich.inventory().addProduce(crop, 2);
+            for (CropType crop : catalog.all()) if (crop.requiredLevel() <= 3) rich.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot(crop.id(), br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(crop.seedPrice()), 2, false));
             for (int i = 0; i < 4; i++) rich.buySeed(catalog.get("nabo"));
             rich.dailyMissions().record("buy", 3, rich.dailyMissions().day());
             rich.dailyMissions().record("plant", 1, rich.dailyMissions().day());
@@ -80,9 +80,9 @@ public final class VisualReviewLauncher {
             }
             for (int i : new int[]{0, 2, 3, 5}) rancher.tendAnimal(i);
             rancherClock.advanceSeconds(43_200);
-            rancher.inventory().addProduct("ovo", 3);
-            rancher.inventory().addProduct("leite", 2);
-            rancher.wallet().debit(rancher.wallet().coins() - 1200);
+            rancher.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("ovo", br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(rancher.animalType("galinha").productPrice()), 3, false));
+            rancher.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("leite", br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(rancher.animalType("vaca").productPrice()), 2, false));
+            rancher.wallet().debit(br.com.colheitafeliz.domain.economy.Currency.GOLD, rancher.wallet().coins().subtract(java.math.BigDecimal.valueOf(1200)));
             renderer = new FarmRenderer(catalog);
             renderer.viewport().update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
             try { Files.createDirectories(output); }
@@ -127,8 +127,8 @@ public final class VisualReviewLauncher {
         @Override public void render() {
             if (frames == 0) setUp(scene);
             GameState state = switch (scene) {
-                case 0, 10 -> fresh;
-                case 5, 6, 7, 9 -> rich;
+                case 0, 10, 17, 18, 19 -> fresh;
+                case 5, 6, 7, 9, 15, 16, 20 -> rich;
                 case 11, 12 -> newcomer;
                 case 13, 14 -> rancher;
                 default -> states;
@@ -161,6 +161,37 @@ public final class VisualReviewLauncher {
             states.selectTool(scene == 4 ? Tool.SEED : Tool.HAND);
             rich.selectTool(Tool.HAND);
             switch (scene) {
+                case 20 -> renderer.hud().toast(null, "", rich.message(), Hud.ToastKind.NORMAL);
+                case 19 -> {
+                    var file = output.resolve("blocked-parent");
+                    try {
+                        Files.createDirectories(output);
+                        Files.writeString(file, "fixture");
+                        var session = br.com.colheitafeliz.game.GameSession.open(new ManualClock(), fresh.catalog(),
+                                new br.com.colheitafeliz.persistence.JsonSaveRepository(file.resolve("save.json")), bound -> 99);
+                        if (session.trySave()) throw new IllegalStateException("Expected failed save fixture");
+                        renderer.failure(session.state().message());
+                    } catch (IOException e) { throw new IllegalStateException(e); }
+                }
+                case 17 -> {
+                    fresh.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("nabo", br.com.colheitafeliz.domain.economy.Currency.GOLD, new java.math.BigDecimal("1975"), 2, false));
+                    fresh.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("cenoura", br.com.colheitafeliz.domain.economy.Currency.GREEN, new java.math.BigDecimal("9"), 2, false));
+                    renderer.marketPanel().showSell();
+                }
+                case 18 -> {
+                    fresh.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("milho", br.com.colheitafeliz.domain.economy.Currency.GREEN, new java.math.BigDecimal("4"), 1, true));
+                    renderer.marketPanel().showSell();
+                }
+                case 15 -> {
+                    rich.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GREEN, new java.math.BigDecimal("100"));
+                    rich.buyVip();
+                    renderer.marketPanel().showVip();
+                }
+                case 16 -> {
+                    rich.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GOLD, new java.math.BigDecimal("0.1"));
+                    rich.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GREEN, new java.math.BigDecimal("0.1"));
+                    rich.progress().award(new java.math.BigDecimal("14.4375"));
+                }
                 case 5 -> {
                     renderer.marketPanel().showShop();
                     Rectangle cell = MarketPanel.cell(1);

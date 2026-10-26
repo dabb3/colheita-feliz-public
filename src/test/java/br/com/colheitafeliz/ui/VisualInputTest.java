@@ -11,6 +11,21 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class VisualInputTest {
+    @Test void vipTabBuysWithGreensAndDoesNotClickThrough() {
+        var clock = new ManualClock();
+        var game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
+        var panel = new MarketPanel(game.catalog());
+        panel.showShop();
+        panel.click(cx(MarketPanel.tab(3)), cy(MarketPanel.tab(3)), game);
+        assertFalse(panel.click(cx(MarketPanel.vipButton()), cy(MarketPanel.vipButton()), game).success());
+        game.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GREEN, new java.math.BigDecimal("95"));
+        assertTrue(panel.click(cx(MarketPanel.vipButton()), cy(MarketPanel.vipButton()), game).success());
+        assertTrue(game.vipActive());
+        assertEquals(0, java.math.BigDecimal.ZERO.compareTo(game.greenCoins()));
+        assertEquals(0, new java.math.BigDecimal("500").compareTo(game.wallet().coins()));
+        assertTrue(panel.handles(0, 0));
+    }
+
     private static float cx(Rectangle r) { return r.x + r.width / 2f; }
     private static float cy(Rectangle r) { return r.y + r.height / 2f; }
 
@@ -81,7 +96,7 @@ class VisualInputTest {
         assertFalse(modal.click(cx(MarketPanel.cell(5)), cy(MarketPanel.cell(5)), game).success());
         modal.click(cx(MarketPanel.tab(1)), cy(MarketPanel.tab(1)), game);
         assertTrue(modal.selling());
-        game.inventory().addProduce(turnip, 3);
+        game.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot(turnip.id(), br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(turnip.seedPrice()), 3, false));
         assertTrue(modal.click(cx(MarketPanel.sellOneButton(0)), cy(MarketPanel.sellOneButton(0)), game).success());
         assertEquals(2, game.inventory().produce(turnip));
         assertTrue(modal.click(cx(MarketPanel.sellAllButton(0)), cy(MarketPanel.sellAllButton(0)), game).success());
