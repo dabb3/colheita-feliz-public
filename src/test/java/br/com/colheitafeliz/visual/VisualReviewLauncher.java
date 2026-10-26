@@ -45,7 +45,7 @@ public final class VisualReviewLauncher {
                 "12-primeiros-passos.png", "13-tutorial-nas-missoes.png",
                 "14-loja-animais.png", "15-galinhas-no-cercado.png", "16-vip.png", "17-saldos-e-xp-decimais.png", "18-deposito-duas-moedas.png", "19-deposito-vip-bloqueado.png", "20-falha-autosave.png", "21-aviso-vip.png"
         };
-        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12};
         private final Path output = Path.of(System.getProperty("colheita.visualOutput", "build/visual-review"));
         private FarmRenderer renderer;
         private GameState fresh, states, rich, newcomer, rancher;
