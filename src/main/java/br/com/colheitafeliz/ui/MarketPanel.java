@@ -32,12 +32,21 @@ public final class MarketPanel {
     private boolean selling;
     private boolean animals;
     private boolean vip;
+    /** Página da grade de culturas (sementes e colheitas), com {@link #PAGE_SIZE} entradas cada. */
+    private int page;
+    public static final int PAGE_SIZE = 10;
 
     public MarketPanel(CropCatalog catalog) { crops = catalog.all(); }
-    public void showShop() { open = true; selling = false; animals = false; vip = false; }
-    public void showSell() { open = true; selling = true; animals = false; vip = false; }
-    public void showAnimals() { open = true; selling = false; animals = true; vip = false; }
-    public void showVip() { open = true; selling = false; animals = false; vip = true; }
+    public void showShop() { open = true; selling = false; animals = false; vip = false; page = 0; }
+    public void showSell() { open = true; selling = true; animals = false; vip = false; page = 0; }
+    public void showAnimals() { open = true; selling = false; animals = true; vip = false; page = 0; }
+    public void showVip() { open = true; selling = false; animals = false; vip = true; page = 0; }
+    public int page() { return page; }
+    public int pageCount() { return (crops.size() + PAGE_SIZE - 1) / PAGE_SIZE; }
+    public void nextPage() { page = Math.min(pageCount() - 1, page + 1); }
+    public void previousPage() { page = Math.max(0, page - 1); }
+    /** Entradas da página atual, a partir de {@code page * PAGE_SIZE}. */
+    private int visibleCrops() { return Math.min(PAGE_SIZE, crops.size() - page * PAGE_SIZE); }
     public boolean animals() { return animals; }
     public void close() { open = false; }
     public boolean isOpen() { return open; }
@@ -57,6 +66,9 @@ public final class MarketPanel {
     /** "Comprar adubo", no mesmo lugar do Vender tudo, só na aba de sementes. */
     public static Rectangle fertilizerButton() { return sellEverythingButton(); }
     public static Rectangle vipButton() { return new Rectangle(LEFT + WIDTH / 2 - 150, BOTTOM + 110, 300, 40); }
+    /** Setas de página na barra de título, à esquerda, dentro da janela. */
+    public static Rectangle previousPageButton() { return new Rectangle(LEFT + 14, BOTTOM + HEIGHT - BAR + 7, 34, 32); }
+    public static Rectangle nextPageButton() { return new Rectangle(LEFT + 14 + 34 + 64, BOTTOM + HEIGHT - BAR + 7, 34, 32); }
     public static Rectangle cell(int index) {
         float x = SHEET_X + 12 + (index % COLS) * CELL_W;
         float y = SHEET_Y + SHEET_H - 12 - (index / (int) COLS + 1) * CELL_H;
@@ -89,8 +101,10 @@ public final class MarketPanel {
         if (animals) return clickAnimals(x, y, state);
         if (selling && sellEverythingButton().contains(x, y)) return state.sellEverything();
         if (!selling && fertilizerButton().contains(x, y)) return state.buyFertilizer();
-        for (int i = 0; i < crops.size(); i++) {
-            CropType crop = crops.get(i);
+        if (previousPageButton().contains(x, y)) { previousPage(); return null; }
+        if (nextPageButton().contains(x, y)) { nextPage(); return null; }
+        for (int i = 0; i < visibleCrops(); i++) {
+            CropType crop = crops.get(page * PAGE_SIZE + i);
             if (!selling) {
                 if (cell(i).contains(x, y)) return state.buySeed(crop);
                 continue;
@@ -172,7 +186,8 @@ public final class MarketPanel {
             for (int t = 0; t < types.size(); t++) drawAnimalRow(batch, skin, assets, state, types.get(t), t, px, py);
             return;
         }
-        for (int i = 0; i < crops.size(); i++) drawItem(batch, skin, assets, state, i, px, py);
+        for (int i = 0; i < visibleCrops(); i++) drawItem(batch, skin, assets, state, i, px, py);
+        drawPager(batch, skin, px, py);
         if (!selling) {
             boolean unlocked = state.progress().level() >= GameState.FERTILIZER_LEVEL;
             Rectangle fert = fertilizerButton();
@@ -193,7 +208,7 @@ public final class MarketPanel {
     }
 
     private void drawItem(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state, int i, float px, float py) {
-        CropType crop = crops.get(i);
+        CropType crop = crops.get(page * PAGE_SIZE + i);
         Rectangle c = cell(i);
         int owned = selling ? state.inventory().produce(crop) : state.inventory().seeds(crop);
         var quote = selling ? state.quoteItem(crop.id()) : java.util.Map.<br.com.colheitafeliz.domain.economy.Currency, java.math.BigDecimal>of();
@@ -234,9 +249,11 @@ public final class MarketPanel {
                 Palette.INK_MUTED, Align.left);
         if (!selling) {
             Rectangle b = primaryButton(i);
-            button(batch, skin, unlocked ? skin.glassSun : skin.glassDisabled, b,
-                    unlocked ? "Comprar" : "Bloqueado", unlocked ? Palette.INK_WARM : Palette.INK_MUTED, null,
-                    b.contains(px, py) && unlocked);
+            // Semente VIP liberada pelo nível ainda exige o cartão ativo para compra (seção 9.2).
+            boolean buyable = unlocked && (!crop.vipOnly() || state.vipActive());
+            button(batch, skin, buyable ? skin.glassSun : skin.glassDisabled, b,
+                    buyable ? "Comprar" : unlocked ? "Só com VIP" : "Bloqueado", buyable ? Palette.INK_WARM : Palette.INK_MUTED, null,
+                    b.contains(px, py) && buyable);
         } else {
             boolean any = owned > 0 && !vipBlocked;
             Rectangle one = sellOneButton(i), all = sellAllButton(i);
@@ -287,6 +304,18 @@ public final class MarketPanel {
                 any ? Palette.INK : Palette.INK_MUTED, null, any && one.contains(px, py));
         button(batch, skin, any ? skin.glassBerry : skin.glassDisabled, all, "Tudo",
                 any ? Palette.ON_COLOR : Palette.INK_MUTED, any ? Palette.BERRY_INK : null, any && all.contains(px, py));
+    }
+
+    /** "‹ 2/4 ›" na barra de título; a seta da ponta fica desabilitada. */
+    private void drawPager(SpriteBatch batch, UiSkin skin, float px, float py) {
+        Rectangle previous = previousPageButton(), next = nextPageButton();
+        boolean hasPrevious = page > 0, hasNext = page < pageCount() - 1;
+        button(batch, skin, hasPrevious ? skin.glassNeutral : skin.glassDisabled, previous, "<",
+                hasPrevious ? Palette.INK : Palette.INK_MUTED, null, hasPrevious && previous.contains(px, py));
+        skin.text(batch, skin.label, (page + 1) + "/" + pageCount(), (previous.x + previous.width + next.x) / 2f,
+                previous.y + previous.height / 2f + 7, Palette.INK, Align.center);
+        button(batch, skin, hasNext ? skin.glassNeutral : skin.glassDisabled, next, ">",
+                hasNext ? Palette.INK : Palette.INK_MUTED, null, hasNext && next.contains(px, py));
     }
 
     static void button(SpriteBatch batch, UiSkin skin, NinePatch patch, Rectangle r, String text,

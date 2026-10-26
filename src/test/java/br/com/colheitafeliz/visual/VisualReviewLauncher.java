@@ -24,6 +24,7 @@ import com.badlogic.gdx.utils.ScreenUtils;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 
 /** Cenas reproduzíveis do HUD "Flash 2010 remasterizado". Não lê nem grava o save do jogador. */
 public final class VisualReviewLauncher {
@@ -43,18 +44,21 @@ public final class VisualReviewLauncher {
                 "05-sementes.png", "06-loja.png", "07-deposito.png", "08-missoes.png",
                 "09-avisos.png", "10-nivel-e-recompensas.png", "11-lote-a-venda.png",
                 "12-primeiros-passos.png", "13-tutorial-nas-missoes.png",
-                "14-loja-animais.png", "15-galinhas-no-cercado.png", "16-vip.png", "17-saldos-e-xp-decimais.png", "18-deposito-duas-moedas.png", "19-deposito-vip-bloqueado.png", "20-falha-autosave.png", "21-aviso-vip.png"
+                "14-loja-animais.png", "15-galinhas-no-cercado.png", "16-vip.png", "17-saldos-e-xp-decimais.png", "18-deposito-duas-moedas.png", "19-deposito-vip-bloqueado.png", "20-falha-autosave.png", "21-aviso-vip.png",
+                "22-cinco-estagios.png", "23-pragas-simultaneas.png", "24-temporada-reiniciada.png", "25-loja-ultima-pagina.png"
         };
-        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12};
+        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3};
         private final Path output = Path.of(System.getProperty("colheita.visualOutput", "build/visual-review"));
         private FarmRenderer renderer;
-        private GameState fresh, states, rich, newcomer, rancher;
+        private GameState fresh, states, rich, newcomer, rancher, stages, seasons;
         private int scene, frames;
 
         @Override public void create() {
             CropCatalog catalog = CropCatalogLoader.load();
             fresh = new GameState(new ManualClock()::instant, catalog, bound -> 99);
             states = buildStates(catalog);
+            stages = buildStages(catalog);
+            seasons = buildSeasons(catalog);
             rich = new GameState(new ManualClock()::instant, catalog, bound -> 99);
             rich.wallet().credit(1150);
             rich.progress().award(60);
@@ -89,28 +93,75 @@ public final class VisualReviewLauncher {
             catch (IOException e) { throw new IllegalStateException("Cannot create visual review folder", e); }
         }
 
-        /** Primeira coluna: nabo úmido, nabo seco, morango com 2 vermes, nabo com erva daninha e nabo pronto. */
+        /**
+         * Primeira coluna, todos nabos (10 h, úmidos por 3 h 20 min): úmido, seco, com 2 vermes, com erva e vermes ao
+         * mesmo tempo, e pronto. As pragas pausam o crescimento; a seca só o reduz à metade.
+         */
         private static GameState buildStates(CropCatalog catalog) {
             ManualClock clock = new ManualClock();
             GameState game = new GameState(clock::instant, catalog, bound -> 99);
             CropType turnip = catalog.get("nabo");
-            CropType strawberry = catalog.get("morango");
-            for (int i = 0; i < 4; i++) game.buySeed(turnip);
-            game.buySeed(strawberry);
-            plant(game, turnip, 4);
-            plant(game, strawberry, 2);
-            clock.advanceSeconds(300);
-            game.selectTool(Tool.WATER);
-            game.act(0, 4);
-            for (int row : new int[]{0, 1, 3}) plant(game, turnip, row);
-            clock.advanceSeconds(320);
-            game.selectTool(Tool.WATER);
-            for (int row : new int[]{0, 3}) game.act(0, row);
+            game.wallet().credit(1500);
+            for (int row = 0; row < 5; row++) {
+                game.buySeed(turnip);
+                plant(game, turnip, row);
+            }
+            water(game, 1, 2, 3, 4);
+            clock.advanceSeconds(12_000);
+            water(game, 0, 4);
             FarmTile worms = game.farm().tile(0, 2);
             worms.checkInsects(clock.instant(), true);
             worms.worsenInsects(clock.instant());
-            game.farm().tile(0, 3).checkPest(clock.instant(), true);
+            FarmTile both = game.farm().tile(0, 3);
+            both.checkPest(clock.instant(), true);
+            both.checkInsects(clock.instant(), true);
+            clock.advanceSeconds(12_000);
+            water(game, 4);
+            clock.advanceSeconds(6_000);
+            water(game, 0);
+            clock.advanceSeconds(6_000);
             game.farm().refresh(clock.instant());
+            game.selectTool(Tool.HAND);
+            return game;
+        }
+
+        /** Cinco nabos, um estágio de diferença por linha: do pronto (linha 0) ao recém-regado (linha 4). */
+        private static GameState buildStages(CropCatalog catalog) {
+            ManualClock clock = new ManualClock();
+            GameState game = new GameState(clock::instant, catalog, bound -> 99);
+            CropType turnip = catalog.get("nabo");
+            game.wallet().credit(1500);
+            long quarter = turnip.growthTime(1).toSeconds() / (turnip.stages() - 1);
+            for (int row = 0; row < 5; row++) {
+                // A terra seca a cada terço e um estágio leva um quarto: passos de um doze avos acertam os dois.
+                for (int tick = 0; row > 0 && tick < 3; tick++) {
+                    clock.advanceSeconds(quarter / 3);
+                    for (int earlier = 0; earlier < row; earlier++) {
+                        var crop = game.farm().tile(0, earlier).crop();
+                        if (crop.dryAt(clock.instant()) && !crop.matureAt(clock.instant())) water(game, earlier);
+                    }
+                }
+                game.buySeed(turnip);
+                plant(game, turnip, row);
+                water(game, row);
+            }
+            game.farm().refresh(clock.instant());
+            game.selectTool(Tool.HAND);
+            return game;
+        }
+
+        /** Tomate (duas temporadas) logo depois da primeira colheita: estágio 1 da temporada 2, sem rega. */
+        private static GameState buildSeasons(CropCatalog catalog) {
+            ManualClock clock = new ManualClock();
+            GameState game = new GameState(clock::instant, catalog, bound -> 99);
+            CropType tomato = catalog.get("tomate");
+            FarmTile tile = game.farm().tile(0, 0);
+            tile.plow();
+            tile.plant(tomato, clock.instant());
+            Instant ready = br.com.colheitafeliz.testsupport.TestCrops.growUntilReady(tile, clock.instant());
+            clock.advanceSeconds(java.time.Duration.between(clock.instant(), ready).toSeconds());
+            game.inventory().addProduceLot(tile.harvest(clock.instant()));
+            clock.advanceSeconds(600);
             game.selectTool(Tool.HAND);
             return game;
         }
@@ -120,8 +171,11 @@ public final class VisualReviewLauncher {
             game.act(0, row);
             game.selectSeed(crop);
             game.act(0, row);
+        }
+
+        private static void water(GameState game, int... rows) {
             game.selectTool(Tool.WATER);
-            game.act(0, row);
+            for (int row : rows) game.act(0, row);
         }
 
         @Override public void render() {
@@ -131,6 +185,9 @@ public final class VisualReviewLauncher {
                 case 5, 6, 7, 9, 15, 16, 20 -> rich;
                 case 11, 12 -> newcomer;
                 case 13, 14 -> rancher;
+                case 21 -> stages;
+                case 23 -> seasons;
+                case 24 -> fresh;
                 default -> states;
             };
             IsoRenderer.GridPosition hovered = switch (scene) {
@@ -138,6 +195,8 @@ public final class VisualReviewLauncher {
                 case 3 -> new IsoRenderer.GridPosition(0, 1);
                 case 10 -> new IsoRenderer.GridPosition(1, 0);
                 case 11 -> new IsoRenderer.GridPosition(0, 0);
+                case 22 -> new IsoRenderer.GridPosition(0, 3);
+                case 23 -> new IsoRenderer.GridPosition(0, 0);
                 default -> null;
             };
             if (hovered != null) {
@@ -161,6 +220,12 @@ public final class VisualReviewLauncher {
             states.selectTool(scene == 4 ? Tool.SEED : Tool.HAND);
             rich.selectTool(Tool.HAND);
             switch (scene) {
+                case 24 -> {
+                    // Nível alto sem VIP: as sementes VIP liberadas pelo nível só saem com o cartão (última cena).
+                    fresh.progress().award(new java.math.BigDecimal("20000"));
+                    renderer.marketPanel().showShop();
+                    for (int i = 0; i < 3; i++) renderer.marketPanel().nextPage();
+                }
                 case 20 -> renderer.hud().toast(null, "", rich.message(), Hud.ToastKind.NORMAL);
                 case 19 -> {
                     var file = output.resolve("blocked-parent");
@@ -212,7 +277,7 @@ public final class VisualReviewLauncher {
                 case 9 -> {
                     renderer.levelUp(rich);
                     Vector2 p = renderer.tileCenter(0, 0);
-                    renderer.reward(p.x, p.y + 70, rich.catalog().get("morango"), 4, 25, 0);
+                    renderer.reward(p.x, p.y + 70, rich.catalog().get("morango"), 1, 25, 0);
                 }
                 default -> { }
             }
