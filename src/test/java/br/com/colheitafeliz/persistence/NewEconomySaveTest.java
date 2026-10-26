@@ -132,6 +132,12 @@ class NewEconomySaveTest {
         assertEquals(before, Files.readString(file));
     }
 
+    @Test void defaultPathChangesWithTheFormatSoTheFirstEconomySaveDoesNotBlockTheGame() {
+        // A main da etapa 1 grava v15 em game-rules-v1.json; o v16 abre num arquivo novo e deixa aquele intacto.
+        assertNotEquals("save/game-rules-v1.json", GameSave.DEFAULT_PATH);
+        assertEquals("save/game-rules-v2.json", GameSave.DEFAULT_PATH);
+    }
+
     @Test void malformedNewSaveIsNotAFreshGame() throws IOException {
         Path file = directory.resolve("invalid.json");
         Files.writeString(file, "{\"version\":16,\"ruleset\":\"economy-2026-10\",\"snapshot\":{}}");
