@@ -351,7 +351,8 @@ public final class GameState {
         lastCollected = 0;
         switch (animal.statusAt(now)) {
             case READY -> {
-                inventory.addProduceLot(new ItemLot(type.productId(), Currency.GOLD, BigDecimal.valueOf(type.price()), type.productYield(), false));
+                // Base temporária do catálogo repetível; PR4 usa aquisição real e remove o produtor após uma coleta.
+                inventory.addProduceLot(new ItemLot(type.productId(), Currency.GOLD, BigDecimal.valueOf(type.productPrice()), type.productYield(), false));
                 barn.collect(index, now);
                 lastCollected = type.productYield();
                 ActionResult result = ActionResult.ok("Coletou " + type.productYield() + "× " + type.productName()

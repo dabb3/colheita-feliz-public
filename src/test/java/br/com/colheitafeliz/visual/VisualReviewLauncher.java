@@ -80,8 +80,8 @@ public final class VisualReviewLauncher {
             }
             for (int i : new int[]{0, 2, 3, 5}) rancher.tendAnimal(i);
             rancherClock.advanceSeconds(43_200);
-            rancher.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("ovo", br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(rancher.animalType("galinha").price()), 3, false));
-            rancher.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("leite", br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(rancher.animalType("vaca").price()), 2, false));
+            rancher.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("ovo", br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(rancher.animalType("galinha").productPrice()), 3, false));
+            rancher.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("leite", br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(rancher.animalType("vaca").productPrice()), 2, false));
             rancher.wallet().debit(br.com.colheitafeliz.domain.economy.Currency.GOLD, rancher.wallet().coins().subtract(java.math.BigDecimal.valueOf(1200)));
             renderer = new FarmRenderer(catalog);
             renderer.viewport().update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);

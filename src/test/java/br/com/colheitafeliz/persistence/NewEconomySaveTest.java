@@ -66,6 +66,26 @@ class NewEconomySaveTest {
         assertEquals(0, new BigDecimal("11.3").compareTo(state.depositTotals().get(Currency.GREEN)));
     }
 
+    @Test void collectedAnimalBaseSurvivesSave() throws IOException {
+        var clock = new ManualClock();
+        var catalog = CropCatalogLoader.load();
+        var repository = new JsonSaveRepository(directory.resolve("animal.json"));
+        var session = GameSession.open(clock, catalog, repository, bound -> 99);
+        var state = session.state();
+        state.progress().award(125);
+        var hen = state.animalType("galinha");
+        assertTrue(state.buyAnimal(hen).success());
+        assertTrue(state.buyFeed(hen).success());
+        assertTrue(state.tendAnimal(0).success());
+        clock.advanceSeconds(hen.productionSeconds());
+        assertTrue(state.tendAnimal(0).success());
+        session.save();
+        var restored = GameSession.open(clock, catalog, repository, bound -> 99).state();
+        assertEquals(0, new BigDecimal("45").compareTo(restored.inventory().produceLots().getFirst().unitCost()));
+        assertEquals(Currency.GOLD, restored.inventory().produceLots().getFirst().currency());
+        assertEquals(0, new BigDecimal("155.3").compareTo(restored.depositValue()));
+    }
+
     @Test void legacyAndFutureFilesAreNeverImportedOrOverwritten() throws IOException {
         var clock = new ManualClock();
         var session = GameSession.open(clock, CropCatalogLoader.load(),

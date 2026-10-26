@@ -71,6 +71,15 @@ class EconomyRulesTest {
         assertTrue(inventory.produceLots().isEmpty());
     }
 
+    @Test void separateSalesRoundEachOperation() {
+        Inventory inventory = new Inventory();
+        inventory.addProduceLot(new ItemLot("ovo", Currency.GOLD, decimal("45"), 3, false));
+        var wallet = new Wallet(0);
+        var market = new Market(wallet, inventory);
+        for (int i = 0; i < 3; i++) market.sellProduce("ovo", 1, false);
+        assertEquals(0, decimal("155.4").compareTo(wallet.coins()));
+    }
+
     @Test void invalidLotsAndMoneyAreRejected() {
         assertThrows(IllegalArgumentException.class, () -> new ItemLot("nabo", Currency.GOLD, decimal("0"), 1, false));
         assertThrows(IllegalArgumentException.class, () -> new ItemLot("nabo", Currency.GOLD, decimal("300"), 0, false));
