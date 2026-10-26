@@ -44,6 +44,7 @@ class SaveRoundTripTest {
         session.save();
         assertTrue(Files.readString(file).contains("\"version\": " + GameSave.VERSION));
         assertTrue(Files.readString(file).contains("\"wateredAt\""));
+        assertFalse(Files.readString(file).contains("unlockedCropIds"), "a liberação vem do nível, não do save");
         clock.advanceSeconds(13_500);
         GameSession reopened = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
         GameState restored = reopened.state();

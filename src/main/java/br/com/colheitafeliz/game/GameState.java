@@ -522,7 +522,7 @@ public final class GameState {
         List<Alert> alerts = new ArrayList<>();
         for (int row = 0; row < ROWS; row++) for (int col = 0; col < COLUMNS; col++) {
             FarmTile tile = farm.tile(col, row);
-            // Planta madura ainda pode ter pragas (os insetos comem a colheita); só a terra seca deixa de importar.
+            // Planta pronta ainda aparece aqui; só a terra seca deixa de importar depois da maturação.
             if (!land.isUnlocked(col, row) || (tile.state() != TileState.GROWING && tile.state() != TileState.READY))
                 continue;
             String name = tile.crop().type().name();
@@ -560,9 +560,8 @@ public final class GameState {
                     tile.nextInsectCheckAt() == null ? null : tile.nextInsectCheckAt().toString(), tile.fertilized(), crop == null ? null : crop.origin(),
                     crop == null ? 0 : crop.season()));
         }
-        List<String> unlocked = catalog.all().stream().filter(this::unlocked).map(CropType::id).toList();
         return new GameSnapshot(wallet.coins(), inventory.seedLots(), inventory.produceLots(),
-                tiles, seed.id(), tool, progress.level(), progress.currentXp(), unlocked,
+                tiles, seed.id(), tool, progress.level(), progress.currentXp(),
                 musicEnabled, effectsEnabled, dailyMissions.day().toString(),
                 dailyMissions.progressSnapshot(), dailyMissions.completedSnapshot(), land.snapshot(),
                 tutorial.stepIndex(), barn.animals().stream().map(animal -> new GameSnapshot.AnimalSnapshot(
@@ -594,8 +593,6 @@ public final class GameState {
         game.dailyMissions.animalsAvailable(snapshot.animals() != null && !snapshot.animals().isEmpty());
         game.dailyMissions.restore(snapshot.dailyMissionDay(), snapshot.dailyMissionProgress(),
                 snapshot.completedDailyMissions(), LocalDate.now(realClock));
-        if (snapshot.unlockedCropIds() != null)
-            for (String id : snapshot.unlockedCropIds()) catalog.get(id);
         for (var lot : snapshot.seeds()) catalog.get(lot.itemId());
         for (var lot : snapshot.produce()) {
             boolean animalProduct = game.animalTypes.stream().anyMatch(type -> type.productId().equals(lot.itemId()));

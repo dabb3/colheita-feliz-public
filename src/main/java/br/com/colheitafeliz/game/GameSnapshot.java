@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 
 public record GameSnapshot(BigDecimal coins, List<br.com.colheitafeliz.domain.inventory.ItemLot> seeds, List<br.com.colheitafeliz.domain.inventory.ItemLot> produce,
                            List<TileSnapshot> tiles, String selectedSeedId, Tool tool,
-                           int level, BigDecimal currentXp, List<String> unlockedCropIds,
+                           int level, BigDecimal currentXp,
                            boolean musicEnabled, boolean effectsEnabled,
                            String dailyMissionDay, Map<String, Integer> dailyMissionProgress,
                            List<String> completedDailyMissions, List<Integer> unlockedPlotIds,
@@ -26,7 +26,6 @@ public record GameSnapshot(BigDecimal coins, List<br.com.colheitafeliz.domain.in
         tiles = List.copyOf(tiles);
         if (tiles.size() != GameState.COLUMNS * GameState.ROWS)
             throw new IllegalArgumentException("Invalid farm dimensions");
-        unlockedCropIds = List.copyOf(unlockedCropIds);
         dailyMissionProgress = Map.copyOf(dailyMissionProgress);
         completedDailyMissions = List.copyOf(completedDailyMissions);
         unlockedPlotIds = List.copyOf(unlockedPlotIds);
