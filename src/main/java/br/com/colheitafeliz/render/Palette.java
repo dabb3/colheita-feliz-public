@@ -59,7 +59,6 @@ public final class Palette {
     public static final Color DRY_PLANT = rgb("e8d79a");
     public static final Color DEAD_PLANT = rgb("b5894f");
     /** O adubo usa o saco das sementes tingido de verde até ter arte própria. */
-    public static final Color FERTILIZER = rgb("9fd45e");
 
     private static Color rgb(String hex) { return Color.valueOf(hex); }
 

@@ -87,11 +87,15 @@ public final class FarmTile {
         nextPestCheckAt = now.plus(pestCheckInterval());
     }
 
-    /** Adubo: adianta {@code fraction} do ciclo de uma planta regada que ainda não está pronta. */
-    public void fertilize(Instant now, double fraction) {
+    /**
+     * Fertilizante: reduz o tempo restante da temporada atual em {@code reduction}; o que passar do restante se perde.
+     * Uma vez por temporada, só em planta regada, úmida, sem pragas e ainda não pronta.
+     */
+    public void fertilize(Instant now, java.time.Duration reduction) {
         require(TileState.GROWING);
-        if (fertilized || !crop.watered() || crop.matureAt(now)) throw new IllegalStateException("Cannot fertilize");
-        crop = crop.advance(now, Math.round(crop.currentDuration().toMillis() * fraction));
+        if (fertilized || crop.dryAt(now) || crop.paused() || crop.matureAt(now) || reduction.isNegative())
+            throw new IllegalStateException("Cannot fertilize");
+        crop = crop.advance(now, reduction.toMillis());
         fertilized = true;
     }
 

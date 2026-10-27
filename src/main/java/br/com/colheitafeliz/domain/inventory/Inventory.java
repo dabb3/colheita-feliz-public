@@ -12,7 +12,8 @@ public final class Inventory {
     private final List<ItemLot> produceLots = new ArrayList<>();
     /** Produtos de animais (ovo, leite...) e ração, ambos pelo id. A ração é do animal: "galinha". */
     private final Map<String, Integer> feed = new HashMap<>();
-    private int fertilizer;
+    /** Fertilizantes por id do catálogo. */
+    private final Map<String, Integer> fertilizers = new HashMap<>();
 
     public void addSeedLot(ItemLot lot) { addLot(seedLots, lot); }
     public void addProduceLot(ItemLot lot) { addLot(produceLots, lot); }
@@ -83,18 +84,14 @@ public final class Inventory {
     public Map<String, Integer> feedSnapshot() { return Map.copyOf(feed); }
     public void addFeed(String animalId, int amount) { add(feed, animalId, amount); }
     public void useFeed(String animalId) { take(feed, animalId, 1); }
-    public int fertilizer() { return fertilizer; }
-    public void addFertilizer(int amount) {
-        if (amount < 0) throw new IllegalArgumentException("Negative inventory amount");
-        fertilizer = Math.addExact(fertilizer, amount);
-    }
-    public void useFertilizer() {
-        if (fertilizer == 0) throw new IllegalStateException("Insufficient inventory: fertilizer");
-        fertilizer--;
-    }
-    public void restoreFertilizer(int amount) {
-        if (amount < 0) throw new IllegalArgumentException("Negative inventory amount");
-        fertilizer = amount;
+    public int fertilizer(String id) { return fertilizers.getOrDefault(id, 0); }
+    public Map<String, Integer> fertilizerSnapshot() { return Map.copyOf(fertilizers); }
+    public void addFertilizer(String id, int amount) { add(fertilizers, id, amount); }
+    public void useFertilizer(String id) { take(fertilizers, id, 1); }
+    public void restoreFertilizers(Map<String, Integer> counts) {
+        Map<String, Integer> checked = checkedCounts(counts);
+        fertilizers.clear();
+        fertilizers.putAll(checked);
     }
     public void restoreFeed(Map<String, Integer> feedCounts) {
         Map<String, Integer> checkedFeed = checkedCounts(feedCounts);

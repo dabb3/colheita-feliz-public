@@ -3,6 +3,8 @@ package br.com.colheitafeliz.ui;
 import br.com.colheitafeliz.domain.animal.AnimalType;
 import br.com.colheitafeliz.domain.crop.CropCatalog;
 import br.com.colheitafeliz.domain.crop.CropType;
+import br.com.colheitafeliz.domain.crop.FertilizerType;
+import br.com.colheitafeliz.domain.economy.Currency;
 import br.com.colheitafeliz.game.ActionResult;
 import br.com.colheitafeliz.game.GameState;
 import br.com.colheitafeliz.game.GameText;
@@ -32,15 +34,19 @@ public final class MarketPanel {
     private boolean selling;
     private boolean animals;
     private boolean vip;
+    /** Lista de fertilizantes, aberta pelo botão do topo da aba Sementes. */
+    private boolean fertilizers;
     /** Página da grade de culturas (sementes e colheitas), com {@link #PAGE_SIZE} entradas cada. */
     private int page;
     public static final int PAGE_SIZE = 10;
 
     public MarketPanel(CropCatalog catalog) { crops = catalog.all(); }
-    public void showShop() { open = true; selling = false; animals = false; vip = false; page = 0; }
-    public void showSell() { open = true; selling = true; animals = false; vip = false; page = 0; }
-    public void showAnimals() { open = true; selling = false; animals = true; vip = false; page = 0; }
-    public void showVip() { open = true; selling = false; animals = false; vip = true; page = 0; }
+    public void showShop() { open = true; selling = false; animals = false; vip = false; fertilizers = false; page = 0; }
+    public void showSell() { open = true; selling = true; animals = false; vip = false; fertilizers = false; page = 0; }
+    public void showAnimals() { open = true; selling = false; animals = true; vip = false; fertilizers = false; page = 0; }
+    public void showVip() { open = true; selling = false; animals = false; vip = true; fertilizers = false; page = 0; }
+    public void showFertilizers() { showShop(); fertilizers = true; }
+    public boolean fertilizers() { return fertilizers; }
     public int page() { return page; }
     public int pageCount() { return (crops.size() + PAGE_SIZE - 1) / PAGE_SIZE; }
     public void nextPage() { page = Math.min(pageCount() - 1, page + 1); }
@@ -63,8 +69,10 @@ public final class MarketPanel {
     public static Rectangle sellEverythingButton() {
         return new Rectangle(LEFT + WIDTH - 24 - 370, SHEET_Y + SHEET_H + 2, 370, TAB_H - 4);
     }
-    /** "Comprar adubo", no mesmo lugar do Vender tudo, só na aba de sementes. */
+    /** "Fertilizantes", no mesmo lugar do Vender tudo, só na aba de sementes: abre a lista de fertilizantes. */
     public static Rectangle fertilizerButton() { return sellEverythingButton(); }
+    /** Compra do fertilizante da linha {@code index}: {@code currency} 0 = ouro, 1 = verdes. */
+    public static Rectangle buyFertilizerButton(int index, int currency) { return rowButton(index, 600 + currency * 160, 150); }
     public static Rectangle vipButton() { return new Rectangle(LEFT + WIDTH / 2 - 150, BOTTOM + 110, 300, 40); }
     /** Setas de página na barra de título, à esquerda, dentro da janela. */
     public static Rectangle previousPageButton() { return new Rectangle(LEFT + 14, BOTTOM + HEIGHT - BAR + 7, 34, 32); }
@@ -98,9 +106,10 @@ public final class MarketPanel {
         if (tab(2).contains(x, y)) { showAnimals(); return null; }
         if (tab(3).contains(x, y)) { showVip(); return null; }
         if (vip) return vipButton().contains(x, y) ? state.buyVip() : null;
+        if (fertilizers) return clickFertilizers(x, y, state);
         if (animals) return clickAnimals(x, y, state);
         if (selling && sellEverythingButton().contains(x, y)) return state.sellEverything();
-        if (!selling && fertilizerButton().contains(x, y)) return state.buyFertilizer();
+        if (!selling && fertilizerButton().contains(x, y)) { showFertilizers(); return null; }
         if (previousPageButton().contains(x, y)) { previousPage(); return null; }
         if (nextPageButton().contains(x, y)) { nextPage(); return null; }
         for (int i = 0; i < visibleCrops(); i++) {
@@ -129,6 +138,15 @@ public final class MarketPanel {
         return new Rectangle(r.x + x, r.y + r.height / 2f - 34, width, 30);
     }
 
+    private static ActionResult clickFertilizers(float x, float y, GameState state) {
+        List<FertilizerType> types = state.fertilizers();
+        for (int t = 0; t < types.size(); t++)
+            for (Currency currency : Currency.values())
+                if (types.get(t).prices().containsKey(currency) && buyFertilizerButton(t, currency.ordinal()).contains(x, y))
+                    return state.buyFertilizer(types.get(t).id(), currency);
+        return null;
+    }
+
     private static ActionResult clickAnimals(float x, float y, GameState state) {
         List<AnimalType> types = state.animalTypes();
         for (int t = 0; t < types.size(); t++) {
@@ -148,7 +166,7 @@ public final class MarketPanel {
         skin.draw(batch, skin.window, LEFT, BOTTOM, WIDTH, HEIGHT);
         skin.draw(batch, skin.windowBar, LEFT + 1, BOTTOM + HEIGHT - BAR, WIDTH - 2, BAR - 1);
         skin.rect(batch, Palette.CHROME_LO, LEFT + 1, BOTTOM + HEIGHT - BAR, WIDTH - 2, 1);
-        skin.shadowed(batch, skin.title, selling ? "Depósito" : animals ? "Animais" : "Loja", LEFT + WIDTH / 2f, BOTTOM + HEIGHT - 14,
+        skin.shadowed(batch, skin.title, selling ? "Depósito" : animals ? "Animais" : fertilizers ? "Fertilizantes" : "Loja", LEFT + WIDTH / 2f, BOTTOM + HEIGHT - 14,
                 Palette.INK, Palette.WINDOW, Align.center);
         Rectangle close = closeButton();
         boolean overClose = close.contains(px, py);
@@ -181,6 +199,11 @@ public final class MarketPanel {
             button(batch, skin, skin.glassSun, buy, "Comprar cartão VIP", Palette.INK_WARM, null, buy.contains(px, py));
             return;
         }
+        if (fertilizers) {
+            List<FertilizerType> types = state.fertilizers();
+            for (int t = 0; t < types.size(); t++) drawFertilizerRow(batch, skin, assets, state, types.get(t), t, px, py);
+            return;
+        }
         if (animals) {
             List<AnimalType> types = state.animalTypes();
             for (int t = 0; t < types.size(); t++) drawAnimalRow(batch, skin, assets, state, types.get(t), t, px, py);
@@ -189,12 +212,8 @@ public final class MarketPanel {
         for (int i = 0; i < visibleCrops(); i++) drawItem(batch, skin, assets, state, i, px, py);
         drawPager(batch, skin, px, py);
         if (!selling) {
-            boolean unlocked = state.progress().level() >= GameState.FERTILIZER_LEVEL;
             Rectangle fert = fertilizerButton();
-            button(batch, skin, unlocked ? skin.glassSun : skin.glassDisabled, fert,
-                    unlocked ? "Adubo · " + GameState.FERTILIZER_PRICE + " moedas (tem " + state.inventory().fertilizer() + ")"
-                            : "Adubo · nível " + GameState.FERTILIZER_LEVEL,
-                    unlocked ? Palette.INK_WARM : Palette.INK_MUTED, null, unlocked && fert.contains(px, py));
+            button(batch, skin, skin.glassSun, fert, "Fertilizantes", Palette.INK_WARM, null, fert.contains(px, py));
         }
         if (selling) {
             var totals = state.depositTotals();
@@ -304,6 +323,30 @@ public final class MarketPanel {
                 any ? Palette.INK : Palette.INK_MUTED, null, any && one.contains(px, py));
         button(batch, skin, any ? skin.glassBerry : skin.glassDisabled, all, "Tudo",
                 any ? Palette.ON_COLOR : Palette.INK_MUTED, any ? Palette.BERRY_INK : null, any && all.contains(px, py));
+    }
+
+    /** Linha de um fertilizante: ícone, efeito, nível, estoque e um botão de compra por moeda aceita. */
+    private void drawFertilizerRow(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state,
+                                   FertilizerType type, int index, float px, float py) {
+        Rectangle r = animalRow(index);
+        float mid = r.y + r.height / 2f;
+        boolean unlocked = state.progress().level() >= type.requiredLevel();
+        batch.setColor(unlocked ? Color.WHITE : new Color(.6f, .6f, .6f, .5f));
+        Toolbar.drawFitted(batch, assets.fertilizer(type.id()), r.x + 44, mid, 64);
+        batch.setColor(Color.WHITE);
+        skin.text(batch, skin.label, type.name() + " · tem " + state.inventory().fertilizer(type.id()), r.x + 92, mid + 24,
+                unlocked ? Palette.INK : Palette.INK_MUTED, Align.left);
+        String effect = "Reduz " + Hud.formatRemaining(type.reduction()) + " da temporada · nível " + type.requiredLevel()
+                + (type.friendsOnly() ? " · só na plantação de amigos" : "");
+        skin.text(batch, skin.body, effect, r.x + 92, mid - 2, Palette.INK_MUTED, Align.left);
+        for (Currency currency : Currency.values()) {
+            java.math.BigDecimal price = type.prices().get(currency);
+            if (price == null) continue;
+            Rectangle b = buyFertilizerButton(index, currency.ordinal());
+            String text = unlocked ? GameText.money(price) + (currency == Currency.GOLD ? " ouro" : " verdes") : "Nível " + type.requiredLevel();
+            button(batch, skin, unlocked ? skin.glassSun : skin.glassDisabled, b, text,
+                    unlocked ? Palette.INK_WARM : Palette.INK_MUTED, null, unlocked && b.contains(px, py));
+        }
     }
 
     /** "‹ 2/4 ›" na barra de título; a seta da ponta fica desabilitada. */

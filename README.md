@@ -23,7 +23,7 @@ Comece colhendo os dois nabos prontos. Siga as tarefas de primeiros passos para 
 
 | Tecla | Ação |
 | --- | --- |
-| `1`–`8` | Cursor, pá, sementes, regador, herbicida, pesticida, luvinha, adubo |
+| `1`–`8` | Cursor, pá, sementes, regador, herbicida, pesticida, luvinha, fertilizante |
 | `B` / `V` | Loja / depósito |
 | `Q` | Missões diárias |
 | `Esc` | Fechar janelas |
@@ -32,7 +32,7 @@ Comece colhendo os dois nabos prontos. Siga as tarefas de primeiros passos para 
 | `T` | Alternar tempo 1× / 60× para desenvolvimento |
 | `F3` | Overlay técnico |
 
-A primeira rega inicia o crescimento. Terra seca reduz a velocidade; ervas daninhas e insetos pausam o crescimento até serem removidos (com os dois, só retoma após remover ambos) e não reduzem a colheita. Use herbicida e pesticida para removê-los. Cada temporada rende uma unidade; nas culturas com várias temporadas, a planta recomeça no estágio 1 após a coleta e precisa de nova rega. Retire a planta morta com a pá após a última colheita. Venda a produção no depósito. O adubo, comprado na loja, adianta um quarto do ciclo de uma planta regada.
+A primeira rega inicia o crescimento. Terra seca reduz a velocidade; ervas daninhas e insetos pausam o crescimento até serem removidos (com os dois, só retoma após remover ambos) e não reduzem a colheita. Use herbicida e pesticida para removê-los. Cada temporada rende uma unidade; nas culturas com várias temporadas, a planta recomeça no estágio 1 após a coleta e precisa de nova rega. Retire a planta morta com a pá após a última colheita. Venda a produção no depósito. Os fertilizantes (comum, rápido, super e do amor) ficam no botão **Fertilizantes** da loja e são escolhidos pela bandeja da ferramenta 8. Cada planta aceita um por temporada, qualquer que seja o tipo; ele reduz o tempo restante da temporada atual (o excedente se perde) e só vale em planta regada, úmida e sem pragas. O do amor é só para a plantação de amigos.
 
 A aba **Animais** da loja vende galinha, pato, ovelha e vaca, liberados por nível, e a ração de cada um. Clique no animal no cercado para dar ração ou coletar o produto pronto; os produtos são vendidos na mesma aba ou no depósito.
 
