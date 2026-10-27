@@ -213,6 +213,37 @@ class ProgressAndPestTest {
         assertEquals(0, xp.add(turnip.harvestXp(1)).compareTo(game.progress().currentXp()));
     }
 
+    @Test void removingOnePestOnlyAnnouncesGrowthWhenTheOtherIsGone() {
+        ManualClock clock = new ManualClock();
+        GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);
+        CropType turnip = game.catalog().get("nabo");
+        game.buySeed(turnip);
+        game.selectTool(Tool.HOE);
+        game.act(0, 0);
+        game.selectSeed(turnip);
+        game.act(0, 0);
+        game.selectTool(Tool.WATER);
+        game.act(0, 0);
+        FarmTile tile = game.farm().tile(0, 0);
+        tile.checkPest(clock.instant(), true);
+        tile.checkInsects(clock.instant(), true);
+        game.selectTool(Tool.WEEDER);
+        assertTrue(game.act(0, 0).success());
+        assertFalse(game.message().contains("voltou a crescer"), game.message());
+        assertTrue(game.message().contains("insetos"), game.message());
+        game.selectTool(Tool.PESTICIDE);
+        assertTrue(game.act(0, 0).success());
+        assertTrue(game.message().contains("voltou a crescer"), game.message());
+        assertFalse(game.message().contains("protegida"), "insetos não reduzem mais a colheita");
+
+        tile.checkInsects(clock.instant(), true);
+        tile.checkPest(clock.instant(), true);
+        game.selectTool(Tool.PESTICIDE);
+        assertTrue(game.act(0, 0).success());
+        assertFalse(game.message().contains("voltou a crescer"), game.message());
+        assertTrue(game.message().contains("ervas"), game.message());
+    }
+
     @Test void herbicideOnlyRemovesWeedsAndPesticideOnlyInsects() {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);

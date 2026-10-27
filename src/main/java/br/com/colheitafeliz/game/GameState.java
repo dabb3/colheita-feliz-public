@@ -195,7 +195,11 @@ public final class GameState {
             case WEEDER -> {
                 if (tile.pest() != PestState.WEEDS)
                     result = ActionResult.fail("Não há ervas daninhas aqui. O herbicida é para ervas.");
-                else { tile.removePest(now); result = ActionResult.ok("Ervas removidas. Planta voltou a crescer."); }
+                else {
+                    tile.removePest(now);
+                    result = ActionResult.ok("Ervas removidas." + (tile.insects() > 0
+                            ? " Ainda há insetos: use o pesticida." : " Planta voltou a crescer."));
+                }
             }
             case FERTILIZER -> {
                 if (tile.state() != TileState.GROWING) result = ActionResult.fail("O adubo é para plantas em crescimento.");
@@ -212,7 +216,11 @@ public final class GameState {
             case PESTICIDE -> {
                 if (tile.insects() == 0)
                     result = ActionResult.fail("Não há insetos aqui. O pesticida é para minhocas.");
-                else { tile.removeInsects(now); result = ActionResult.ok("Insetos eliminados. A colheita está protegida."); }
+                else {
+                    tile.removeInsects(now);
+                    result = ActionResult.ok("Insetos eliminados." + (tile.pest() == PestState.WEEDS
+                            ? " Ainda há ervas daninhas: use o herbicida." : " Planta voltou a crescer."));
+                }
             }
             case HAND -> {
                 if (tile.state() != TileState.READY)
