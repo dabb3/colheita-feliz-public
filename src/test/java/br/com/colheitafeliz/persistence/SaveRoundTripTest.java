@@ -113,6 +113,23 @@ class SaveRoundTripTest {
         assertEquals(1, restored.inventory().fertilizer("super"));
     }
 
+    @Test void stageTwoSaveWithoutFertilizerFieldsOpensWithEmptyStock() throws IOException {
+        ManualClock clock = new ManualClock();
+        Path file = directory.resolve("stage-two.json");
+        GameSession.open(clock, CropCatalogLoader.load(), new JsonSaveRepository(file), bound -> 99).save();
+        // Um v16 da etapa 2: sem os fertilizantes por tipo e com o contador único do adubo antigo.
+        JsonObject save = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+        JsonObject snapshot = save.getAsJsonObject("snapshot");
+        snapshot.remove("fertilizers");
+        snapshot.remove("selectedFertilizerId");
+        snapshot.addProperty("fertilizer", 3);
+        Files.writeString(file, save.toString());
+
+        GameState restored = GameSession.open(clock, CropCatalogLoader.load(), new JsonSaveRepository(file), bound -> 99).state();
+        for (var type : restored.fertilizers()) assertEquals(0, restored.inventory().fertilizer(type.id()), type.id());
+        assertEquals("comum", restored.selectedFertilizer().id());
+    }
+
     @Test void offlineGrowthContinuesAndHarvestedProduceSurvivesAnotherRestart() throws IOException {
         ManualClock clock = new ManualClock();
         JsonSaveRepository repository = new JsonSaveRepository(directory.resolve("save.json"));

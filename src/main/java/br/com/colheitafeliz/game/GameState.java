@@ -36,7 +36,6 @@ public final class GameState {
     public static final int STARTING_COINS = 500;
     /** Chance, em %, de achar um baú do tesouro ao arar grama. */
     public static final int TREASURE_CHANCE = 5;
-    /** Adubo: preço, nível para comprar e fração do ciclo que ele adianta. */
 
     private final Farm farm = new Farm(COLUMNS, ROWS);
     private final Inventory inventory = new Inventory();
@@ -209,8 +208,8 @@ public final class GameState {
                 else if (type.friendsOnly()) result = ActionResult.fail(type.name() + " só vale na plantação de amigos.");
                 else if (inventory.fertilizer(type.id()) == 0) result = ActionResult.fail("Sem " + type.name().toLowerCase() + ". Compre na Loja.");
                 else if (tile.fertilized()) result = ActionResult.fail("Esta planta já recebeu fertilizante nesta temporada.");
-                else if (tile.crop().dryAt(now)) result = ActionResult.fail("Regue antes de adubar.");
-                else if (tile.crop().paused()) result = ActionResult.fail("Remova as pragas e os insetos antes de adubar.");
+                else if (tile.crop().dryAt(now)) result = ActionResult.fail("Regue antes de fertilizar.");
+                else if (tile.crop().paused()) result = ActionResult.fail("Remova as pragas e os insetos antes de fertilizar.");
                 else {
                     inventory.useFertilizer(type.id());
                     tile.fertilize(now, type.reduction());

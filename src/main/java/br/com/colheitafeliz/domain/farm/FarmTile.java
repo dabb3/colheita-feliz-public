@@ -16,7 +16,7 @@ public final class FarmTile {
     private Instant nextInsectCheckAt;
     /** Cultura da planta morta que fica depois da colheita, até a pá retirá-la. */
     private CropType withered;
-    /** Adubo já usado nesta temporada; vale uma vez por temporada. */
+    /** Fertilizante já usado nesta temporada; vale uma vez por temporada. */
     private boolean fertilized;
     public static final int MAX_INSECTS = 3;
 
@@ -51,7 +51,7 @@ public final class FarmTile {
         startSeason(new Crop(type, now, origin));
     }
 
-    /** Planta nova ou próxima temporada: estágio 1, sem rega, pragas, insetos nem adubo. */
+    /** Planta nova ou próxima temporada: estágio 1, sem rega, pragas, insetos nem fertilizante. */
     private void startSeason(Crop next) {
         crop = next;
         pest = PestState.NONE;

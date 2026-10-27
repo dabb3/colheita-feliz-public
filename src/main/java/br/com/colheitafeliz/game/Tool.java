@@ -7,7 +7,7 @@ package br.com.colheitafeliz.game;
 public enum Tool {
     CURSOR, HAND, HOE, WATER, SEED, WEEDER, PESTICIDE, FERTILIZER;
 
-    /** Ordem de exibição e atalhos 1–8: cursor, pá, sementes, regador, herbicida, pesticida, luvinha, adubo. */
+    /** Ordem de exibição e atalhos 1–8: cursor, pá, sementes, regador, herbicida, pesticida, luvinha, fertilizante. */
     public static final java.util.List<Tool> BAR = java.util.List.of(CURSOR, HOE, SEED, WATER, WEEDER, PESTICIDE, HAND, FERTILIZER);
 
     public String label() {
@@ -19,7 +19,7 @@ public enum Tool {
             case SEED -> "Sementes";
             case WEEDER -> "Herbicida";
             case PESTICIDE -> "Pesticida";
-            case FERTILIZER -> "Adubo";
+            case FERTILIZER -> "Fertilizante";
         };
     }
 }
