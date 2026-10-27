@@ -1,8 +1,6 @@
 package br.com.colheitafeliz.domain.inventory;
 
 import br.com.colheitafeliz.domain.crop.CropType;
-import br.com.colheitafeliz.domain.economy.Currency;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -67,9 +65,6 @@ public final class Inventory {
     public int produce(CropType type) { return quantity(produceLots, type.id()); }
     public Map<String, Integer> seedSnapshot() { return quantities(seedLots); }
     public Map<String, Integer> produceSnapshot() { return quantities(produceLots); }
-    public void addSeeds(CropType type, int amount) {
-        addSeedLot(new ItemLot(type.id(), Currency.GOLD, BigDecimal.valueOf(type.seedPrice()), amount, false));
-    }
     public void useSeed(CropType type) { takeSeed(type.id()); }
     public void takeProduce(CropType type, int amount) { takeProduct(type.id(), amount); }
     public void takeProduct(String id, int amount) {

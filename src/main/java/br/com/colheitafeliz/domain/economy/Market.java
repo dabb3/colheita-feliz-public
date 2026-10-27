@@ -63,10 +63,13 @@ public final class Market {
         return Map.copyOf(totals);
     }
 
-    public void buySeed(CropType type) {
+    /** Compra uma semente na moeda pedida; o lote guarda moeda, preço e exclusividade VIP para a venda. */
+    public void buySeed(CropType type, Currency currency) {
+        BigDecimal price = type.seedPrices().get(currency);
+        if (price == null) throw new IllegalArgumentException(type.id() + " is not sold for " + currency);
         Math.addExact(inventory.seeds(type), 1);
-        wallet.debit(type.seedPrice());
-        inventory.addSeeds(type, 1);
+        wallet.debit(currency, price);
+        inventory.addSeedLot(new ItemLot(type.id(), currency, price, 1, type.vipOnly()));
     }
 
 }

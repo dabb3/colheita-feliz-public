@@ -416,19 +416,32 @@ public final class Hud {
             cx -= cw + 4;
         }
         Toolbar.drawFitted(batch, assets.coin, x + 26, y + 78, 26);
-        skin.text(batch, skin.caption, "Produção", x + 48, y + 95, Palette.INK_MUTED, Align.left);
-        int yield = tile.harvestYield();
-        skin.bar(batch, skin.barSun, x + 48, y + 66, w - 62, 17, yield / (float) type.harvestYield(),
-                yield + " / " + type.harvestYield() + (yield == 1 ? " unidade" : " unidades"));
+        skin.text(batch, skin.caption, "Temporada", x + 48, y + 95, Palette.INK_MUTED, Align.left);
+        skin.bar(batch, skin.barSun, x + 48, y + 66, w - 62, 17, crop.season() / (float) type.seasons(),
+                seasonLine(crop, state.vipActive()));
         Toolbar.drawFitted(batch, assets.crop(type, Math.max(1, crop.stageAt(now))), x + 26, y + 34, 32);
         skin.text(batch, skin.caption, "Crescimento", x + 48, y + 51, Palette.INK_MUTED, Align.left);
-        float fraction = crop.grownMillisAt(now) / (float) type.growthTime().toMillis();
-        boolean paused = tile.pest() == PestState.WEEDS;
-        String growth = !crop.watered() ? "Regue para começar"
-                : crop.matureAt(now) ? "Pronta! Use a luvinha"
-                : paused ? "Pausado pela erva daninha"
-                : formatRemaining(crop.remainingAt(now)) + (crop.dryAt(now) ? " · regue p/ acelerar" : "");
-        skin.bar(batch, paused || !crop.watered() ? skin.barGray : skin.barLeaf, x + 48, y + 22, w - 62, 17, fraction, growth);
+        float fraction = crop.grownMillisAt(now) / (float) crop.currentDuration().toMillis();
+        boolean paused = crop.paused();
+        skin.bar(batch, paused || !crop.watered() ? skin.barGray : skin.barLeaf, x + 48, y + 22, w - 62, 17, fraction,
+                growthLine(tile, now));
+    }
+
+    /** Temporada atual e o que a colheita rende: sempre uma unidade, ou o bloqueio de venda sem VIP. */
+    static String seasonLine(Crop crop, boolean vipActive) {
+        return crop.season() + " / " + crop.type().seasons() + " · "
+                + (crop.type().vipOnly() && !vipActive ? "venda bloqueada sem VIP" : "1 unidade");
+    }
+
+    /** Estado do crescimento: rega pendente, pronta, pausa pelas pragas ou tempo restante (e a seca a 50%). */
+    static String growthLine(FarmTile tile, Instant now) {
+        Crop crop = tile.crop();
+        boolean weeds = tile.pest() == PestState.WEEDS, insects = tile.insects() > 0;
+        if (!crop.watered()) return "Regue para começar";
+        if (crop.matureAt(now)) return "Pronta! Use a luvinha";
+        if (crop.paused()) return weeds && insects ? "Pausado por erva e insetos"
+                : weeds ? "Pausado pela erva daninha" : "Pausado pelos insetos";
+        return formatRemaining(crop.remainingAt(now)) + (crop.dryAt(now) ? " · seca: cresce a 50%" : "");
     }
 
     private static List<String[]> chips(FarmTile tile, Instant now) {

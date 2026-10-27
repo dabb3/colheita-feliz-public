@@ -1,7 +1,11 @@
 package br.com.colheitafeliz.persistence;
 
+import br.com.colheitafeliz.domain.crop.CropCatalog;
 import br.com.colheitafeliz.domain.crop.CropType;
+import br.com.colheitafeliz.domain.farm.FarmTile;
 import br.com.colheitafeliz.domain.farm.TileState;
+import br.com.colheitafeliz.testsupport.TestCrops;
+import java.time.Instant;
 import br.com.colheitafeliz.domain.farm.PestState;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -26,10 +30,11 @@ class SaveRoundTripTest {
         JsonSaveRepository repository = new JsonSaveRepository(file);
         GameSession session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
         GameState state = session.state();
-        CropType tomato = state.catalog().get("tomate");
+        CropType tomato = state.catalog().get("cenoura");
         CropType turnip = state.catalog().get("nabo");
-        state.buySeed(tomato);
-        state.buySeed(turnip);
+        state.wallet().credit(1000);
+        assertTrue(state.buySeed(tomato).success());
+        assertTrue(state.buySeed(turnip).success());
         state.selectTool(Tool.HOE);
         state.act(0, 3);
         state.selectSeed(tomato);
@@ -39,10 +44,11 @@ class SaveRoundTripTest {
         session.save();
         assertTrue(Files.readString(file).contains("\"version\": " + GameSave.VERSION));
         assertTrue(Files.readString(file).contains("\"wateredAt\""));
-        clock.advanceSeconds(450);
+        assertFalse(Files.readString(file).contains("unlockedCropIds"), "a liberação vem do nível, não do save");
+        clock.advanceSeconds(13_500);
         GameSession reopened = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
         GameState restored = reopened.state();
-        assertEquals(0, java.math.BigDecimal.valueOf(470).compareTo(restored.wallet().coins()));
+        assertEquals(0, java.math.BigDecimal.valueOf(850).compareTo(restored.wallet().coins()));
         assertEquals(1, restored.inventory().seeds(turnip));
         assertEquals(0, restored.inventory().seeds(tomato));
         assertEquals(TileState.GROWING, restored.farm().tile(0, 3).state());
@@ -50,7 +56,33 @@ class SaveRoundTripTest {
         assertEquals(Tool.WATER, restored.tool());
         assertEquals(tomato, restored.seed());
         reopened.save();
-        assertEquals(0, java.math.BigDecimal.valueOf(470).compareTo(GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state().wallet().coins()));
+        assertEquals(0, java.math.BigDecimal.valueOf(850).compareTo(GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state().wallet().coins()));
+    }
+
+    @Test void secondSeasonSurvivesSaveWithOriginWateringAndProgress() throws IOException {
+        ManualClock clock = new ManualClock();
+        CropType strawberry = TestCrops.strawberry();
+        CropCatalog catalog = new CropCatalog(CropCatalogLoader.load().all().stream()
+                .map(type -> type.id().equals(strawberry.id()) ? strawberry : type).toList());
+        JsonSaveRepository repository = new JsonSaveRepository(directory.resolve("season.json"));
+        GameSession session = GameSession.open(clock, catalog, repository, bound -> 99);
+        FarmTile tile = session.state().farm().tile(0, 3);
+        tile.plow();
+        tile.plant(strawberry, clock.instant(), TestCrops.origin(strawberry));
+        Instant ready = TestCrops.growUntilReady(tile, clock.instant());
+        tile.harvest(ready);
+        tile.water(ready);
+        clock.advanceSeconds(java.time.Duration.between(clock.instant(), ready).toSeconds() + 3600);
+        long grown = tile.crop().grownMillisAt(clock.instant());
+        session.save();
+
+        FarmTile restored = GameSession.open(clock, catalog, repository, bound -> 99).state().farm().tile(0, 3);
+        assertEquals(TileState.GROWING, restored.state());
+        assertEquals(2, restored.crop().season());
+        assertEquals(TestCrops.origin(strawberry), restored.crop().origin());
+        assertEquals(ready, restored.crop().wateredAt());
+        assertEquals(grown, restored.crop().grownMillisAt(clock.instant()));
+        assertEquals(java.time.Duration.ofHours(4), restored.crop().moistDuration());
     }
 
     @Test void offlineGrowthContinuesAndHarvestedProduceSurvivesAnotherRestart() throws IOException {
@@ -58,7 +90,7 @@ class SaveRoundTripTest {
         JsonSaveRepository repository = new JsonSaveRepository(directory.resolve("save.json"));
         GameSession session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
         GameState state = session.state();
-        CropType corn = state.catalog().get("milho");
+        CropType corn = state.catalog().get("nabo");
         state.buySeed(corn);
         state.selectTool(Tool.HOE);
         state.act(0, 0);
@@ -67,19 +99,21 @@ class SaveRoundTripTest {
         state.selectTool(Tool.WATER);
         state.act(0, 0);
         session.save();
-        clock.advanceSeconds(4500);
+        clock.advanceSeconds(60_000);
         GameSession reopened = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
         assertEquals(TileState.READY, reopened.state().farm().tile(0, 0).state());
         reopened.state().selectTool(Tool.HAND);
         reopened.state().act(0, 0);
         reopened.save();
         GameSession again = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
-        assertEquals(3, again.state().inventory().produce(corn));
-        assertEquals(0, java.math.BigDecimal.valueOf(475).compareTo(again.state().wallet().coins()));
+        assertEquals(1, again.state().inventory().produce(corn));
+        assertEquals(0, java.math.BigDecimal.valueOf(200).compareTo(again.state().wallet().coins()));
         assertEquals(TileState.DEAD, again.state().farm().tile(0, 0).state());
         assertEquals(corn, again.state().farm().tile(0, 0).withered());
         assertTrue(again.state().sellProduce(corn).success());
-        assertEquals(0, new java.math.BigDecimal("503.8").compareTo(again.state().wallet().coins()));
+        // 345 de venda completa a missão "Venda produtos por 100 moedas" quando ela está na rotação do dia.
+        int mission = again.state().message().contains("Missão diária concluída") ? 35 : 0;
+        assertEquals(0, java.math.BigDecimal.valueOf(545 + mission).compareTo(again.state().wallet().coins()));
     }
 
     @Test void tutorialProgressSurvivesRestart() throws IOException {
@@ -134,7 +168,7 @@ class SaveRoundTripTest {
         ManualClock clock = new ManualClock();
         JsonSaveRepository repository = new JsonSaveRepository(directory.resolve("save.json"));
         GameSession session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
-        CropType corn = session.state().catalog().get("milho");
+        CropType corn = session.state().catalog().get("nabo");
         session.state().buySeed(corn);
         session.state().selectTool(Tool.HOE);
         session.state().act(0, 0);
@@ -143,7 +177,7 @@ class SaveRoundTripTest {
         session.state().selectTool(Tool.WATER);
         session.state().act(0, 0);
         session.clock().setSpeed(60);
-        clock.advanceSeconds(75);
+        clock.advanceSeconds(1_000);
         session.save();
         clock.advanceSeconds(20);
         GameSession reopened = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
@@ -162,16 +196,18 @@ class SaveRoundTripTest {
         session.state().act(0, 0);
         session.state().selectTool(Tool.WATER);
         session.state().act(0, 0);
-        clock.advanceSeconds(300);
+        clock.advanceSeconds(12_000);
+        session.state().act(0, 0);
+        clock.advanceSeconds(6_000);
         session.state().refresh();
         session.state().setMusicEnabled(false);
         session.state().setEffectsEnabled(false);
         session.save();
-        clock.advanceSeconds(300);
+        clock.advanceSeconds(18_000);
         GameSession reopened = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
         assertEquals(PestState.WEEDS, reopened.state().farm().tile(0, 0).pest());
         assertEquals(TileState.GROWING, reopened.state().farm().tile(0, 0).state());
-        assertEquals(0, java.math.BigDecimal.valueOf(8).compareTo(reopened.state().progress().currentXp()));
+        assertEquals(0, java.math.BigDecimal.valueOf(11).compareTo(reopened.state().progress().currentXp()));
         assertFalse(reopened.state().musicEnabled());
         assertFalse(reopened.state().effectsEnabled());
         reopened.state().selectTool(Tool.WEEDER);
@@ -190,18 +226,21 @@ class SaveRoundTripTest {
         JsonSaveRepository repository = new JsonSaveRepository(directory.resolve("save.json"));
         GameSession session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
         CropType turnip = session.state().catalog().get("nabo");
-        CropType potato = session.state().catalog().get("batata");
+        CropType potato = session.state().catalog().get("milho");
         assertFalse(session.state().unlocked(potato));
-        for (int i = 0; i < 3; i++) session.state().buySeed(turnip);
+        session.state().wallet().credit(1000);
+        for (int i = 0; i < 3; i++) assertTrue(session.state().buySeed(turnip).success());
         for (int row = 0; row < 3; row++) {
             session.state().selectTool(Tool.HOE);
             session.state().act(0, row);
             session.state().selectSeed(turnip);
             session.state().act(0, row);
-            session.state().selectTool(Tool.WATER);
-            session.state().act(0, row);
         }
-        clock.advanceSeconds(900);
+        for (int third = 0; third < 3; third++) {
+            session.state().selectTool(Tool.WATER);
+            for (int row = 0; row < 3; row++) assertTrue(session.state().act(0, row).success());
+            clock.advanceSeconds(12_000);
+        }
         session.state().refresh();
         session.state().selectTool(Tool.HAND);
         for (int row = 0; row < 3; row++) session.state().act(0, row);
@@ -219,11 +258,11 @@ class SaveRoundTripTest {
         Path file = directory.resolve("save.json");
         JsonSaveRepository repository = new JsonSaveRepository(file);
         GameSession session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
-        CropType strawberry = session.state().catalog().get("morango");
-        session.state().buySeed(strawberry);
+        CropType turnip = session.state().catalog().get("nabo");
+        session.state().buySeed(turnip);
         session.state().selectTool(Tool.HOE);
         session.state().act(0, 0);
-        session.state().selectSeed(strawberry);
+        session.state().selectSeed(turnip);
         session.state().act(0, 0);
         session.state().selectTool(Tool.WATER);
         session.state().act(0, 0);

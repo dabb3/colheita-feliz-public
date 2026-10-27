@@ -32,7 +32,7 @@ Comece colhendo os dois nabos prontos. Siga as tarefas de primeiros passos para 
 | `T` | Alternar tempo 1× / 60× para desenvolvimento |
 | `F3` | Overlay técnico |
 
-A primeira rega inicia o crescimento. Terra seca reduz a velocidade; ervas daninhas pausam o crescimento e insetos reduzem a colheita. Use herbicida e pesticida para removê-los. Retire a planta morta com a pá após colher. Venda a produção no depósito. O adubo, comprado na loja, adianta um quarto do ciclo de uma planta regada.
+A primeira rega inicia o crescimento. Terra seca reduz a velocidade; ervas daninhas e insetos pausam o crescimento até serem removidos (com os dois, só retoma após remover ambos) e não reduzem a colheita. Use herbicida e pesticida para removê-los. Cada temporada rende uma unidade; nas culturas com várias temporadas, a planta recomeça no estágio 1 após a coleta e precisa de nova rega. Retire a planta morta com a pá após a última colheita. Venda a produção no depósito. O adubo, comprado na loja, adianta um quarto do ciclo de uma planta regada.
 
 A aba **Animais** da loja vende galinha, pato, ovelha e vaca, liberados por nível, e a ração de cada um. Clique no animal no cercado para dar ração ou coletar o produto pronto; os produtos são vendidos na mesma aba ou no depósito.
 
@@ -40,7 +40,7 @@ Os preços, tempos e rendimentos ficam em [crops.json](assets/data/crops.json); 
 
 ## Save
 
-O save da nova economia é local: `save/game-rules-v1.json`, relativo ao diretório de execução, no formato v15. Defina `COLHEITA_SAVE_PATH` para usar outro caminho. Há autosave e progresso offline. Saves anteriores não são importados nem convertidos; o arquivo antigo permanece preservado. Um destino explícito com versão antiga, futura ou conteúdo inválido impede a carga e não é sobrescrito. Para iniciar uma fazenda nova após uma recusa, remova `COLHEITA_SAVE_PATH` da sessão ou aponte para um caminho inexistente; preserve o arquivo original. Faça backup antes de trocar de versão. Saves não são versionados.
+O save da nova economia é local: `save/game-rules-v2.json`, relativo ao diretório de execução, no formato v16. O `save/game-rules-v1.json` (v15) da primeira etapa fica preservado e não é lido; apontar `COLHEITA_SAVE_PATH` para ele é recusado. Defina `COLHEITA_SAVE_PATH` para usar outro caminho. Há autosave e progresso offline. Saves anteriores não são importados nem convertidos; o arquivo antigo permanece preservado. Um destino explícito com versão antiga, futura ou conteúdo inválido impede a carga e não é sobrescrito. Para iniciar uma fazenda nova após uma recusa, remova `COLHEITA_SAVE_PATH` da sessão ou aponte para um caminho inexistente; preserve o arquivo original. Faça backup antes de trocar de versão. Saves não são versionados.
 
 Uma fazenda nova começa com 500 moedas de ouro e 5 verdes. Saldos usam uma casa decimal; XP preserva frações. Produtos mantêm a moeda e o custo de aquisição da semente. A venda soma os lotes elegíveis por moeda, aplica lucro de 15% e arredonda o total para cima em uma casa decimal. Na aba **VIP**, 100 verdes compram 30 dias reais, acumuláveis; enquanto ativo, o lucro é 25%. Produtos exclusivos ficam bloqueados sem VIP e são ignorados em **Vender tudo**.
 

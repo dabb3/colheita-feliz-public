@@ -16,7 +16,8 @@ class ExactProgressTest {
                 br.com.colheitafeliz.game.CropCatalogLoader.load(), bound -> 99);
         game.progress().award(345);
         var turnip = game.catalog().get("nabo");
-        game.inventory().addSeeds(turnip, 1);
+        game.inventory().addSeedLot(new br.com.colheitafeliz.domain.inventory.ItemLot(turnip.id(),
+                turnip.seedPrice().getKey(), turnip.seedPrice().getValue(), 1, false));
         game.selectTool(br.com.colheitafeliz.game.Tool.HOE);
         assertTrue(game.act(0, 0).success());
         game.selectSeed(turnip);

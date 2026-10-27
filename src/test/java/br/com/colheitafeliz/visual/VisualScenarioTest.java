@@ -13,15 +13,19 @@ class VisualScenarioTest {
         var clock = new ManualClock();
         var state = new GameState(clock::instant, clock, catalog, bound -> 99);
         var turnip = catalog.get("nabo");
-        long interval = turnip.growthTime().toSeconds() / (turnip.stages() - 1);
+        state.wallet().credit(1500);
+        long interval = turnip.growthTime(1).toSeconds() / (turnip.stages() - 1);
         for (int row = 0; row < 5; row++) {
-            if (row > 0) clock.advanceSeconds(interval);
-            // Keep earlier rows moist so each row stays exactly one stage apart.
-            state.selectTool(Tool.WATER);
-            for (int earlier = 0; earlier < row; earlier++) {
-                var crop = state.farm().tile(0, earlier).crop();
-                if (crop.dryAt(state.now()) && !crop.matureAt(state.now()))
-                    assertTrue(state.act(0, earlier).success());
+            // Keep earlier rows moist so each row stays exactly one stage apart: the soil dries every third of
+            // the cycle and a stage takes a quarter, so ticks of a twelfth hit both boundaries.
+            for (int tick = 0; row > 0 && tick < 3; tick++) {
+                clock.advanceSeconds(interval / 3);
+                state.selectTool(Tool.WATER);
+                for (int earlier = 0; earlier < row; earlier++) {
+                    var crop = state.farm().tile(0, earlier).crop();
+                    if (crop.dryAt(state.now()) && !crop.matureAt(state.now()))
+                        assertTrue(state.act(0, earlier).success());
+                }
             }
             assertTrue(state.buySeed(turnip).success());
             state.selectTool(Tool.HOE);

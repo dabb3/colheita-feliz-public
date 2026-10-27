@@ -28,32 +28,34 @@ class ProgressAndPestTest {
         assertEquals(0, java.math.BigDecimal.valueOf(5).compareTo(progress.currentXp()));
     }
 
-    @Test void lockedCropCannotBeBoughtUntilLevelTwo() {
+    @Test void lockedCropCannotBeBoughtUntilItsLevel() {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);
-        CropType potato = game.catalog().get("batata");
+        CropType turnip = game.catalog().get("nabo");
+        CropType potato = game.catalog().get("milho");
         assertFalse(game.unlocked(potato));
         assertFalse(game.buySeed(potato).success());
         assertFalse(game.selectSeed(potato).success());
-        CropType turnip = game.catalog().get("nabo");
-        for (int i = 0; i < 3; i++) game.buySeed(turnip);
+        game.wallet().credit(1000);
+        for (int i = 0; i < 3; i++) assertTrue(game.buySeed(turnip).success());
         for (int row = 0; row < 3; row++) {
             game.selectTool(Tool.HOE);
             game.act(0, row);
             game.selectSeed(turnip);
             game.act(0, row);
-            game.selectTool(Tool.WATER);
-            game.act(0, row);
         }
-        clock.advanceSeconds(900);
+        // 10 h de crescimento: regar a cada terço mantém a terra úmida até a maturação.
+        for (int third = 0; third < 3; third++) {
+            game.selectTool(Tool.WATER);
+            for (int row = 0; row < 3; row++) assertTrue(game.act(0, row).success());
+            clock.advanceSeconds(12_000);
+        }
         game.refresh();
         game.selectTool(Tool.HAND);
         for (int row = 0; row < 3; row++) assertTrue(game.act(0, row).success());
         assertEquals(2, game.progress().level());
         assertTrue(game.unlocked(potato));
-        assertEquals(0, game.inventory().seeds(potato));
-        assertEquals(0, game.inventory().seeds(game.catalog().get("arroz")));
-        assertEquals(0, game.inventory().seeds(game.catalog().get("girassol")));
+        assertEquals(0, game.inventory().seeds(potato), "subir de nível não dá sementes");
         assertTrue(game.buySeed(potato).success());
     }
 
@@ -68,19 +70,21 @@ class ProgressAndPestTest {
         game.act(0, 0);
         game.selectTool(Tool.WATER);
         assertTrue(game.act(0, 0).success());
-        clock.advanceSeconds(120);
+        clock.advanceSeconds(7_200);
         assertFalse(game.act(0, 0).success());
         assertEquals("A terra ainda está úmida.", game.message());
-        clock.advanceSeconds(180);
+        clock.advanceSeconds(4_800);
         java.math.BigDecimal xp = game.progress().currentXp();
         assertTrue(game.act(0, 0).success());
         assertEquals(xp.add(java.math.BigDecimal.valueOf(3)), game.progress().currentXp());
-        clock.advanceSeconds(300);
+        clock.advanceSeconds(12_000);
+        assertTrue(game.act(0, 0).success());
+        clock.advanceSeconds(12_000);
         game.refresh();
         assertEquals(TileState.READY, game.farm().tile(0, 0).state());
     }
 
-    @Test void harvestDepositsTheCropYieldAndItsOwnXp() {
+    @Test void harvestDepositsOneUnitAndTheFormulaXp() {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);
         CropType carrot = game.catalog().get("cenoura");
@@ -89,15 +93,18 @@ class ProgressAndPestTest {
         game.act(0, 0);
         game.selectSeed(carrot);
         game.act(0, 0);
+        // Cenoura: 15 h, úmida por 5 h; regar a cada terço mantém a velocidade máxima.
         game.selectTool(Tool.WATER);
-        game.act(0, 0);
-        clock.advanceSeconds(2000);
+        for (int third = 0; third < 3; third++) {
+            assertTrue(game.act(0, 0).success());
+            clock.advanceSeconds(18_000);
+        }
         game.refresh();
         java.math.BigDecimal xp = game.progress().currentXp();
         game.selectTool(Tool.HAND);
         assertTrue(game.act(0, 0).success());
-        assertEquals(2, game.inventory().produce(carrot));
-        assertEquals(xp.add(java.math.BigDecimal.valueOf(15)), game.progress().currentXp());
+        assertEquals(1, game.inventory().produce(carrot));
+        assertEquals(0, xp.add(carrot.harvestXp(1)).compareTo(game.progress().currentXp()));
     }
 
     @Test void weedsPauseGrowthUntilRemovalWithInjectedRandom() {
@@ -109,83 +116,132 @@ class ProgressAndPestTest {
         game.act(0, 0);
         game.selectSeed(turnip);
         game.act(0, 0);
+        // Nabo: 10 h; ervas aparecem a partir do estágio 3 (metade do ciclo).
         game.selectTool(Tool.WATER);
         game.act(0, 0);
-        clock.advanceSeconds(300);
+        clock.advanceSeconds(12_000);
+        game.act(0, 0);
+        clock.advanceSeconds(6_000);
         assertTrue(game.refresh());
         assertEquals(PestState.WEEDS, game.farm().tile(0, 0).pest());
+        assertEquals(1, game.farm().tile(0, 0).insects());
         int pausedStage = game.farm().tile(0, 0).crop().stageAt(game.now());
-        clock.advanceSeconds(100);
+        clock.advanceSeconds(6_000);
         game.refresh();
         assertEquals(pausedStage, game.farm().tile(0, 0).crop().stageAt(game.now()));
         assertEquals(TileState.GROWING, game.farm().tile(0, 0).state());
         game.selectTool(Tool.WEEDER);
         assertTrue(game.act(0, 0).success());
         assertEquals(PestState.NONE, game.farm().tile(0, 0).pest());
+        assertTrue(game.farm().tile(0, 0).crop().paused(), "os insetos ainda pausam");
+        game.selectTool(Tool.PESTICIDE);
+        assertTrue(game.act(0, 0).success());
+        assertFalse(game.farm().tile(0, 0).crop().paused());
         game.selectTool(Tool.WATER);
         assertTrue(game.act(0, 0).success());
-        clock.advanceSeconds(300);
+        clock.advanceSeconds(12_000);
+        assertTrue(game.act(0, 0).success());
+        clock.advanceSeconds(6_000);
         game.refresh();
         assertEquals(TileState.READY, game.farm().tile(0, 0).state());
     }
 
-    @Test void insectsMultiplyAndCutTheHarvestUntilPesticide() {
+    @Test void insectsMultiplyAndPauseGrowthUntilPesticide() {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 0);
-        CropType strawberry = game.catalog().get("morango");
-        game.buySeed(strawberry);
+        CropType turnip = game.catalog().get("nabo");
+        game.buySeed(turnip);
         game.selectTool(Tool.HOE);
         game.act(0, 0);
-        game.selectSeed(strawberry);
+        game.selectSeed(turnip);
         game.act(0, 0);
         game.selectTool(Tool.WATER);
         game.act(0, 0);
         FarmTile tile = game.farm().tile(0, 0);
         game.selectTool(Tool.PESTICIDE);
         assertFalse(game.act(0, 0).success());
-        clock.advanceSeconds(600);
+        // Estágio 2 (insetos), ainda antes do 3 (ervas).
+        clock.advanceSeconds(10_800);
         assertTrue(game.refresh());
         assertTrue(game.lastOutbreak().insects());
         assertFalse(game.lastOutbreak().weeds());
         assertEquals(1, tile.insects());
-        assertEquals(3, tile.harvestYield());
-        clock.advanceSeconds(240);
+        assertTrue(tile.crop().paused());
+        long grown = tile.crop().grownMillisAt(clock.instant());
+        clock.advanceSeconds(3_600);
         game.refresh();
         assertEquals(2, tile.insects());
-        assertEquals(2, tile.harvestYield());
+        assertEquals(grown, tile.crop().grownMillisAt(clock.instant()));
         assertEquals(PestState.NONE, tile.pest());
         java.math.BigDecimal xp = game.progress().currentXp();
         assertTrue(game.act(0, 0).success());
         assertEquals(0, tile.insects());
-        assertEquals(4, tile.harvestYield());
+        assertFalse(tile.crop().paused());
         assertEquals(xp.add(java.math.BigDecimal.valueOf(5)), game.progress().currentXp());
     }
 
-    @Test void harvestWithInsectsDepositsLessButNeverZero() {
+    @Test void harvestAfterInsectsDepositsOneUnitWithoutLoss() {
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);
-        CropType strawberry = game.catalog().get("morango");
-        game.buySeed(strawberry);
+        CropType turnip = game.catalog().get("nabo");
+        game.buySeed(turnip);
         game.selectTool(Tool.HOE);
         game.act(0, 0);
-        game.selectSeed(strawberry);
+        game.selectSeed(turnip);
         game.act(0, 0);
         game.selectTool(Tool.WATER);
         game.act(0, 0);
         FarmTile tile = game.farm().tile(0, 0);
         tile.checkInsects(clock.instant(), true);
+        tile.worsenInsects(clock.instant());
+        game.selectTool(Tool.PESTICIDE);
+        assertTrue(game.act(0, 0).success());
+        game.selectTool(Tool.WATER);
         for (int i = 0; i < 2; i++) {
-            clock.advanceSeconds(800);
+            clock.advanceSeconds(12_000);
             assertTrue(game.act(0, 0).success());
         }
-        clock.advanceSeconds(800);
+        clock.advanceSeconds(12_000);
         game.refresh();
         assertEquals(TileState.READY, tile.state());
         game.selectTool(Tool.HAND);
+        java.math.BigDecimal xp = game.progress().currentXp();
         assertTrue(game.act(0, 0).success());
-        assertEquals(3, game.inventory().produce(strawberry));
-        assertEquals(3, game.lastHarvestAmount());
-        assertTrue(game.message().contains("insetos comeram 1"));
+        assertEquals(1, game.inventory().produce(turnip));
+        assertEquals(1, game.lastHarvestAmount());
+        assertFalse(game.message().contains("comeram"));
+        assertEquals(0, xp.add(turnip.harvestXp(1)).compareTo(game.progress().currentXp()));
+    }
+
+    @Test void removingOnePestOnlyAnnouncesGrowthWhenTheOtherIsGone() {
+        ManualClock clock = new ManualClock();
+        GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);
+        CropType turnip = game.catalog().get("nabo");
+        game.buySeed(turnip);
+        game.selectTool(Tool.HOE);
+        game.act(0, 0);
+        game.selectSeed(turnip);
+        game.act(0, 0);
+        game.selectTool(Tool.WATER);
+        game.act(0, 0);
+        FarmTile tile = game.farm().tile(0, 0);
+        tile.checkPest(clock.instant(), true);
+        tile.checkInsects(clock.instant(), true);
+        game.selectTool(Tool.WEEDER);
+        assertTrue(game.act(0, 0).success());
+        assertFalse(game.message().contains("voltou a crescer"), game.message());
+        assertTrue(game.message().contains("insetos"), game.message());
+        game.selectTool(Tool.PESTICIDE);
+        assertTrue(game.act(0, 0).success());
+        assertTrue(game.message().contains("voltou a crescer"), game.message());
+        assertFalse(game.message().contains("protegida"), "insetos não reduzem mais a colheita");
+
+        tile.checkInsects(clock.instant(), true);
+        tile.checkPest(clock.instant(), true);
+        game.selectTool(Tool.PESTICIDE);
+        assertTrue(game.act(0, 0).success());
+        assertFalse(game.message().contains("voltou a crescer"), game.message());
+        assertTrue(game.message().contains("ervas"), game.message());
     }
 
     @Test void herbicideOnlyRemovesWeedsAndPesticideOnlyInsects() {
