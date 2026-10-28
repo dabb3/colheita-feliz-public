@@ -45,12 +45,13 @@ public final class VisualReviewLauncher {
                 "09-avisos.png", "10-nivel-e-recompensas.png", "11-lote-a-venda.png",
                 "12-primeiros-passos.png", "13-tutorial-nas-missoes.png",
                 "14-loja-animais.png", "15-galinhas-no-cercado.png", "16-vip.png", "17-saldos-e-xp-decimais.png", "18-deposito-duas-moedas.png", "19-deposito-vip-bloqueado.png", "20-falha-autosave.png", "21-aviso-vip.png",
-                "22-cinco-estagios.png", "23-pragas-simultaneas.png", "24-temporada-reiniciada.png", "25-loja-ultima-pagina.png"
+                "22-cinco-estagios.png", "23-pragas-simultaneas.png", "24-temporada-reiniciada.png", "25-loja-ultima-pagina.png",
+                "26-loja-fertilizantes.png", "27-bandeja-fertilizantes.png", "28-pronta-pelo-fertilizante.png"
         };
-        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3};
+        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3};
         private final Path output = Path.of(System.getProperty("colheita.visualOutput", "build/visual-review"));
         private FarmRenderer renderer;
-        private GameState fresh, states, rich, newcomer, rancher, stages, seasons;
+        private GameState fresh, states, rich, newcomer, rancher, stages, seasons, fertilized;
         private int scene, frames;
 
         @Override public void create() {
@@ -59,6 +60,7 @@ public final class VisualReviewLauncher {
             states = buildStates(catalog);
             stages = buildStages(catalog);
             seasons = buildSeasons(catalog);
+            fertilized = buildFertilized(catalog);
             rich = new GameState(new ManualClock()::instant, catalog, bound -> 99);
             rich.wallet().credit(1150);
             rich.progress().award(60);
@@ -166,6 +168,25 @@ public final class VisualReviewLauncher {
             return game;
         }
 
+        /** Nabo com 6 h de crescimento que o superfertilizante (5 h 30 min) deixa pronto na mesma temporada. */
+        private static GameState buildFertilized(CropCatalog catalog) {
+            ManualClock clock = new ManualClock();
+            GameState game = new GameState(clock::instant, catalog, bound -> 99);
+            game.wallet().credit(300);
+            game.buySeed(catalog.get("nabo"));
+            plant(game, catalog.get("nabo"), 0);
+            water(game, 0);
+            clock.advanceSeconds(12_000);
+            water(game, 0);
+            clock.advanceSeconds(9_600);
+            game.inventory().addFertilizer("super", 1);
+            game.selectFertilizer("super");
+            game.selectTool(Tool.FERTILIZER);
+            game.act(0, 0);
+            game.selectTool(Tool.HAND);
+            return game;
+        }
+
         private static void plant(GameState game, CropType crop, int row) {
             game.selectTool(Tool.HOE);
             game.act(0, row);
@@ -187,7 +208,8 @@ public final class VisualReviewLauncher {
                 case 13, 14 -> rancher;
                 case 21 -> stages;
                 case 23 -> seasons;
-                case 24 -> fresh;
+                case 24, 25, 26 -> fresh;
+                case 27 -> fertilized;
                 default -> states;
             };
             IsoRenderer.GridPosition hovered = switch (scene) {
@@ -196,7 +218,7 @@ public final class VisualReviewLauncher {
                 case 10 -> new IsoRenderer.GridPosition(1, 0);
                 case 11 -> new IsoRenderer.GridPosition(0, 0);
                 case 22 -> new IsoRenderer.GridPosition(0, 3);
-                case 23 -> new IsoRenderer.GridPosition(0, 0);
+                case 23, 27 -> new IsoRenderer.GridPosition(0, 0);
                 default -> null;
             };
             if (hovered != null) {
@@ -219,9 +241,20 @@ public final class VisualReviewLauncher {
             fresh.selectTool(Tool.HAND);
             states.selectTool(scene == 4 ? Tool.SEED : Tool.HAND);
             rich.selectTool(Tool.HAND);
-            renderer.toolbar().closeSeeds();
+            renderer.toolbar().closeTray();
             switch (scene) {
                 case 4 -> renderer.toolbar().picked(Tool.SEED, Tool.HAND);
+                case 25 -> {
+                    fresh.wallet().credit(5_000);
+                    renderer.marketPanel().showFertilizers();
+                }
+                case 26 -> {
+                    fresh.inventory().addFertilizer("comum", 3);
+                    fresh.inventory().addFertilizer("rapido", 1);
+                    fresh.selectFertilizer("rapido");
+                    fresh.selectTool(Tool.FERTILIZER);
+                    renderer.toolbar().picked(Tool.FERTILIZER, Tool.HAND);
+                }
                 case 24 -> {
                     // Nível alto sem VIP: as sementes VIP liberadas pelo nível só saem com o cartão (última cena).
                     fresh.progress().award(new java.math.BigDecimal("20000"));

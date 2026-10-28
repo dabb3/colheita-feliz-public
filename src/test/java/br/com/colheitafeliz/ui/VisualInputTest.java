@@ -119,19 +119,58 @@ class VisualInputTest {
         }
     }
 
+    @Test void shopListsFertilizersAndBuysInEachAcceptedCurrency() {
+        CropCatalog catalog = CropCatalogLoader.load();
+        ManualClock clock = new ManualClock();
+        GameState game = new GameState(clock::instant, clock, catalog, bound -> 99);
+        game.progress().award(new java.math.BigDecimal("1000000"));
+        game.wallet().credit(10_000);
+        game.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GREEN, new java.math.BigDecimal("5"));
+        MarketPanel modal = new MarketPanel(catalog);
+        modal.showShop();
+        assertNull(modal.click(cx(MarketPanel.fertilizerButton()), cy(MarketPanel.fertilizerButton()), game));
+        assertTrue(modal.fertilizers());
+        int rapido = game.fertilizers().indexOf(game.fertilizer("rapido"));
+        Rectangle green = MarketPanel.buyFertilizerButton(rapido, 1);
+        java.math.BigDecimal before = game.greenCoins();
+        assertTrue(modal.click(cx(green), cy(green), game).success());
+        assertEquals(1, game.inventory().fertilizer("rapido"));
+        assertEquals(0, before.subtract(java.math.BigDecimal.ONE).compareTo(game.greenCoins()), "1 verde, sem converter para ouro");
+        int comum = game.fertilizers().indexOf(game.fertilizer("comum"));
+        Rectangle noGreen = MarketPanel.buyFertilizerButton(comum, 1);
+        assertNull(modal.click(cx(noGreen), cy(noGreen), game), "o comum não tem preço em verdes");
+        modal.click(cx(MarketPanel.tab(0)), cy(MarketPanel.tab(0)), game);
+        assertFalse(modal.fertilizers(), "a aba volta para a grade de sementes");
+    }
+
+    @Test void fertilizerTrayOpensWithTheToolAndPicksAType() {
+        CropCatalog catalog = CropCatalogLoader.load();
+        GameState game = new GameState(new ManualClock()::instant, catalog, bound -> 99);
+        Toolbar toolbar = new Toolbar();
+        toolbar.picked(Tool.FERTILIZER, Tool.HAND);
+        assertTrue(toolbar.trayOpen());
+        var types = game.fertilizers();
+        for (int i = 0; i < types.size(); i++) {
+            Rectangle r = Toolbar.seedRect(i, types.size());
+            assertEquals(types.get(i), toolbar.fertilizerHit(cx(r), cy(r), types));
+        }
+        toolbar.picked(Tool.FERTILIZER, Tool.FERTILIZER);
+        assertFalse(toolbar.trayOpen(), "a mesma ferramenta de novo fecha a bandeja");
+    }
+
     @Test void seedTrayOpensWithTheBagAndClosesAfterPickingASeed() {
         Toolbar toolbar = new Toolbar();
-        assertFalse(toolbar.seedsOpen());
+        assertFalse(toolbar.trayOpen());
         toolbar.picked(Tool.SEED, Tool.CURSOR);
-        assertTrue(toolbar.seedsOpen());
-        toolbar.closeSeeds();
-        assertFalse(toolbar.seedsOpen());
+        assertTrue(toolbar.trayOpen());
+        toolbar.closeTray();
+        assertFalse(toolbar.trayOpen());
         toolbar.picked(Tool.SEED, Tool.SEED);
-        assertTrue(toolbar.seedsOpen(), "o saco de novo reabre a faixa");
+        assertTrue(toolbar.trayOpen(), "o saco de novo reabre a faixa");
         toolbar.picked(Tool.SEED, Tool.SEED);
-        assertFalse(toolbar.seedsOpen(), "e com a faixa aberta, fecha");
+        assertFalse(toolbar.trayOpen(), "e com a faixa aberta, fecha");
         toolbar.picked(Tool.HOE, Tool.SEED);
-        assertFalse(toolbar.seedsOpen());
+        assertFalse(toolbar.trayOpen());
     }
 
     @Test void settingsPanelReturnsTheClickedRowAndClosesOnOutsideClick() {

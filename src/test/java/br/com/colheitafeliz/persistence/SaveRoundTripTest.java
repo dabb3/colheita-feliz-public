@@ -85,6 +85,51 @@ class SaveRoundTripTest {
         assertEquals(java.time.Duration.ofHours(4), restored.crop().moistDuration());
     }
 
+    @Test void fertilizerStockPerTypeTheSeasonMarkAndTheSelectionSurviveSave() throws IOException {
+        ManualClock clock = new ManualClock();
+        JsonSaveRepository repository = new JsonSaveRepository(directory.resolve("fertilizer.json"));
+        GameSession session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
+        GameState state = session.state();
+        state.inventory().addFertilizer("comum", 2);
+        state.inventory().addFertilizer("super", 1);
+        FarmTile tile = state.farm().tile(0, 0);
+        tile.plow();
+        tile.plant(state.catalog().get("nabo"), clock.instant());
+        tile.water(clock.instant());
+        assertTrue(state.selectFertilizer("comum").success());
+        state.selectTool(Tool.FERTILIZER);
+        assertTrue(state.act(0, 0).success());
+        assertTrue(state.selectFertilizer("super").success());
+        session.save();
+        assertFalse(Files.readString(directory.resolve("fertilizer.json")).contains("\"fertilizer\":"), "sem o contador único antigo");
+
+        GameState restored = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state();
+        assertEquals(1, restored.inventory().fertilizer("comum"));
+        assertEquals(1, restored.inventory().fertilizer("super"));
+        assertEquals("super", restored.selectedFertilizer().id());
+        assertTrue(restored.farm().tile(0, 0).fertilized());
+        restored.selectTool(Tool.FERTILIZER);
+        assertFalse(restored.act(0, 0).success(), "reabrir não libera segunda aplicação na mesma temporada");
+        assertEquals(1, restored.inventory().fertilizer("super"));
+    }
+
+    @Test void stageTwoSaveWithoutFertilizerFieldsOpensWithEmptyStock() throws IOException {
+        ManualClock clock = new ManualClock();
+        Path file = directory.resolve("stage-two.json");
+        GameSession.open(clock, CropCatalogLoader.load(), new JsonSaveRepository(file), bound -> 99).save();
+        // Um v16 da etapa 2: sem os fertilizantes por tipo e com o contador único do adubo antigo.
+        JsonObject save = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+        JsonObject snapshot = save.getAsJsonObject("snapshot");
+        snapshot.remove("fertilizers");
+        snapshot.remove("selectedFertilizerId");
+        snapshot.addProperty("fertilizer", 3);
+        Files.writeString(file, save.toString());
+
+        GameState restored = GameSession.open(clock, CropCatalogLoader.load(), new JsonSaveRepository(file), bound -> 99).state();
+        for (var type : restored.fertilizers()) assertEquals(0, restored.inventory().fertilizer(type.id()), type.id());
+        assertEquals("comum", restored.selectedFertilizer().id());
+    }
+
     @Test void offlineGrowthContinuesAndHarvestedProduceSurvivesAnotherRestart() throws IOException {
         ManualClock clock = new ManualClock();
         JsonSaveRepository repository = new JsonSaveRepository(directory.resolve("save.json"));
@@ -151,7 +196,7 @@ class SaveRoundTripTest {
         clock.advanceSeconds(hen.productionSeconds());
         GameState restored = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state();
         assertEquals(2, restored.barn().size());
-        assertEquals(0, restored.inventory().fertilizer());
+        assertEquals(0, restored.inventory().fertilizer("comum"));
         assertEquals(1, restored.inventory().feed("galinha"));
         assertEquals(2, restored.inventory().product("ovo"));
         assertEquals(br.com.colheitafeliz.domain.animal.Animal.Status.READY, restored.barn().get(0).statusAt(restored.now()));

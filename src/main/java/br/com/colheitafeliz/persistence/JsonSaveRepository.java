@@ -39,9 +39,15 @@ public final class JsonSaveRepository implements SaveRepository {
         if (!Files.exists(file)) return Optional.empty();
         try {
             JsonObject data = JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)).getAsJsonObject();
-            if (data.get("version").getAsInt() != GameSave.VERSION
+            int version = data.get("version").getAsInt();
+            if ((version != GameSave.VERSION && version != GameSave.STAGE_2_VERSION)
                     || !GameSave.RULESET.equals(data.get("ruleset").getAsString()))
                 throw new IOException("Incompatible save; select a new path for the new economy: " + file);
+            // O adubo agregado da etapa 2 não é convertido (seção 10); com estoque, recusa em vez de zerá-lo no próximo save.
+            if (version == GameSave.STAGE_2_VERSION && data.has("snapshot") && data.get("snapshot").isJsonObject()
+                    && data.getAsJsonObject("snapshot").has("fertilizer")
+                    && data.getAsJsonObject("snapshot").get("fertilizer").getAsInt() > 0)
+                throw new IOException("Incompatible save; it holds stage 2 fertilizer stock that would be lost, select a new path: " + file);
             GameSave save = gson.fromJson(data, GameSave.class);
             if (save.snapshot() == null) throw new IOException("Incomplete save file: " + file);
             return Optional.of(new LoadedGame(save.snapshot(), Instant.parse(save.savedAtReal()), Instant.parse(save.gameTime())));

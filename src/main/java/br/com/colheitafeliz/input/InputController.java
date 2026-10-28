@@ -89,12 +89,19 @@ public final class InputController extends InputAdapter {
             show(result, state.lastCollected() > 0 ? Cue.HARVEST : Cue.PLANT, before, p.x, p.y + 40, null, 0);
             return true;
         }
-        CropType seed = state.tool() == Tool.SEED && renderer.toolbar().seedsOpen()
+        CropType seed = state.tool() == Tool.SEED && renderer.toolbar().trayOpen()
                 ? renderer.toolbar().seedHit(p.x, p.y, state.catalog().all()) : null;
         if (seed != null) {
             ActionResult result = state.selectSeed(seed);
             if (!result.success()) renderer.failure(result.message());
-            else renderer.toolbar().closeSeeds();
+            else renderer.toolbar().closeTray();
+            return true;
+        }
+        var fertilizer = state.tool() == Tool.FERTILIZER && renderer.toolbar().trayOpen()
+                ? renderer.toolbar().fertilizerHit(p.x, p.y, state.fertilizers()) : null;
+        if (fertilizer != null) {
+            state.selectFertilizer(fertilizer.id());
+            renderer.toolbar().closeTray();
             return true;
         }
         IsoRenderer.GridPosition tile = renderer.iso().screenToGrid(p.x, p.y);

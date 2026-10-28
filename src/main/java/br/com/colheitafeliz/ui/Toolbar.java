@@ -1,6 +1,7 @@
 package br.com.colheitafeliz.ui;
 
 import br.com.colheitafeliz.domain.crop.CropType;
+import br.com.colheitafeliz.domain.crop.FertilizerType;
 import br.com.colheitafeliz.game.GameState;
 import br.com.colheitafeliz.game.Tool;
 import br.com.colheitafeliz.render.GameAssets;
@@ -14,8 +15,8 @@ import com.badlogic.gdx.utils.Align;
 import java.util.List;
 
 /**
- * Bandeja escura translúcida com as oito ferramentas (atalhos 1–8). Escolher o saco de sementes abre uma
- * segunda bandeja acima com as sementes do catálogo; ela fecha ao escolher uma semente.
+ * Bandeja escura translúcida com as oito ferramentas (atalhos 1–8). Escolher o saco de sementes ou o fertilizante
+ * abre uma segunda bandeja acima com as sementes ou os fertilizantes do catálogo; ela fecha ao escolher um.
  */
 public final class Toolbar {
     public static final float SLOT = 72, SLOT_H = 64, GAP = 6, PAD = 10;
@@ -23,12 +24,14 @@ public final class Toolbar {
     public static final float X = (1600 - WIDTH) / 2f, Y = 16, HEIGHT = SLOT_H + PAD * 2;
     private static final float SEED = 62, SEED_GAP = 4, SEED_Y = Y + HEIGHT + 12, SEED_MARGIN = 40;
 
-    private boolean seedsOpen;
+    private boolean trayOpen;
 
-    /** A faixa de sementes abre ao escolher o saco e fecha ao escolher uma semente; o saco de novo alterna. */
-    public void picked(Tool tool, Tool current) { seedsOpen = tool == Tool.SEED && !(current == Tool.SEED && seedsOpen); }
-    public void closeSeeds() { seedsOpen = false; }
-    public boolean seedsOpen() { return seedsOpen; }
+    /** A bandeja abre ao escolher o saco ou o fertilizante e fecha ao escolher um item; a mesma ferramenta de novo alterna. */
+    public void picked(Tool tool, Tool current) {
+        trayOpen = (tool == Tool.SEED || tool == Tool.FERTILIZER) && !(current == tool && trayOpen);
+    }
+    public void closeTray() { trayOpen = false; }
+    public boolean trayOpen() { return trayOpen; }
 
     public Tool hit(float x, float y) {
         if (y < Y + PAD || y > Y + PAD + SLOT_H) return null;
@@ -41,9 +44,12 @@ public final class Toolbar {
 
     public static float slotX(int index) { return X + PAD + index * (SLOT + GAP); }
 
-    public CropType seedHit(float x, float y, List<CropType> crops) {
-        for (int i = 0; i < crops.size(); i++)
-            if (seedRect(i, crops.size()).contains(x, y)) return crops.get(i);
+    public CropType seedHit(float x, float y, List<CropType> crops) { return trayHit(x, y, crops); }
+    public FertilizerType fertilizerHit(float x, float y, List<FertilizerType> types) { return trayHit(x, y, types); }
+
+    private static <T> T trayHit(float x, float y, List<T> items) {
+        for (int i = 0; i < items.size(); i++)
+            if (seedRect(i, items.size()).contains(x, y)) return items.get(i);
         return null;
     }
 
@@ -84,11 +90,10 @@ public final class Toolbar {
             else if (tool == hovered) skin.glow(batch, cx, cy, 96, .5f);
             float size = active ? 58 : 52;
             float lift = !active && tool == hovered ? 2 : 0;
-            if (tool == Tool.FERTILIZER) batch.setColor(Palette.FERTILIZER);
-            drawFitted(batch, assets.tool(tool), cx, cy + lift, size);
-            batch.setColor(Color.WHITE);
+            drawFitted(batch, tool == Tool.FERTILIZER ? assets.fertilizer(state.selectedFertilizer().id()) : assets.tool(tool),
+                    cx, cy + lift, size);
             if (tool == Tool.FERTILIZER) {
-                int bags = state.inventory().fertilizer();
+                int bags = state.inventory().fertilizer(state.selectedFertilizer().id());
                 skin.outlined(batch, skin.label, "x" + bags, x + SLOT - 4, y + 15,
                         bags == 0 ? Palette.BERRY_HI : Palette.ON_COLOR, new Color(0, 0, 0, .7f), 1f, Align.right);
             }
@@ -101,12 +106,13 @@ public final class Toolbar {
                         seeds == 0 ? Palette.BERRY_HI : Palette.ON_COLOR, new Color(0, 0, 0, .7f), 1f, Align.right);
             }
         }
-        boolean tray = seedsOpen && state.tool() == Tool.SEED;
+        boolean tray = trayOpen && (state.tool() == Tool.SEED || state.tool() == Tool.FERTILIZER);
         if (hovered != null && !tray) {
             int index = Tool.BAR.indexOf(hovered);
             skin.onScene(batch, skin.caption, hovered.label(), slotX(index) + SLOT / 2f, Y + HEIGHT + 18, Align.center);
         }
-        if (tray) drawSeeds(batch, skin, assets, state, pointerX, pointerY);
+        if (tray && state.tool() == Tool.SEED) drawSeeds(batch, skin, assets, state, pointerX, pointerY);
+        if (tray && state.tool() == Tool.FERTILIZER) drawFertilizers(batch, skin, assets, state, pointerX, pointerY);
     }
 
     private void drawSeeds(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state, float px, float py) {
@@ -133,6 +139,28 @@ public final class Toolbar {
         CropType shown = hovered != null ? hovered : state.seed();
         String caption = shown.name() + (state.unlocked(shown)
                 ? " · " + state.inventory().seeds(shown) + " sementes" : " · libera no nível " + shown.requiredLevel());
+        skin.onScene(batch, skin.label, caption, 800, SEED_Y + height + 22, Align.center);
+    }
+
+    private void drawFertilizers(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state, float px, float py) {
+        List<FertilizerType> types = state.fertilizers();
+        float width = seedTrayWidth(types.size()), height = seedTrayHeight(types.size()), x = seedTrayX(types.size());
+        skin.dropShadow(batch, x, SEED_Y, width, height, 2);
+        skin.draw(batch, skin.tray, x, SEED_Y, width, height);
+        FertilizerType hovered = fertilizerHit(px, py, types);
+        for (int i = 0; i < types.size(); i++) {
+            FertilizerType type = types.get(i);
+            Rectangle slot = seedRect(i, types.size());
+            boolean selected = type.equals(state.selectedFertilizer());
+            if (selected) skin.glow(batch, slot.x + SEED / 2f, slot.y + SEED / 2f, 92, 1f);
+            else if (type == hovered) skin.glow(batch, slot.x + SEED / 2f, slot.y + SEED / 2f, 84, .45f);
+            drawFitted(batch, assets.fertilizer(type.id()), slot.x + SEED / 2f, slot.y + SEED / 2f + 4, selected ? 48 : 42);
+            skin.outlined(batch, skin.micro, "x" + state.inventory().fertilizer(type.id()), slot.x + SEED - 3, slot.y + 12,
+                    Palette.ON_COLOR, new Color(0, 0, 0, .75f), 1f, Align.right);
+        }
+        FertilizerType shown = hovered != null ? hovered : state.selectedFertilizer();
+        String caption = shown.name() + " · reduz " + Hud.formatRemaining(shown.reduction())
+                + (shown.friendsOnly() ? " · plantação de amigos" : " · " + state.inventory().fertilizer(shown.id()) + " no estoque");
         skin.onScene(batch, skin.label, caption, 800, SEED_Y + height + 22, Align.center);
     }
 

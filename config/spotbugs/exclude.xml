@@ -38,6 +38,11 @@
 <Class name="br.com.colheitafeliz.persistence.JsonSaveRepository"/>
 <Bug pattern="DCN_NULLPOINTER_EXCEPTION,NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
 </Match>
+<!-- Baseline: cópia do leitor da etapa 2 usada no teste cruzado, com o mesmo código acima -->
+<Match>
+<Class name="br.com.colheitafeliz.persistence.stage2.Stage2JsonSaveRepository"/>
+<Bug pattern="DCN_NULLPOINTER_EXCEPTION,NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
+</Match>
 <!-- Baseline: test-only — dead stores e retornos ignorados em assertions -->
 <Match>
 <Class name="br.com.colheitafeliz.game.GameStateTest"/>

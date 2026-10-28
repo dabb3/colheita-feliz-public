@@ -122,7 +122,7 @@ class CropAndTileTest {
         tile.plant(strawberry, start, TestCrops.origin(strawberry));
         tile.water(start);
         assertEquals(Duration.ofHours(10).plusMinutes(20), tile.crop().moistDuration());
-        tile.fertilize(start, .25);
+        tile.fertilize(start, Duration.ofHours(1));
         tile.checkInsects(start.plusSeconds(60), true);
         tile.removeInsects(start.plusSeconds(60));
         Instant ready = TestCrops.growUntilReady(tile, start.plusSeconds(60));

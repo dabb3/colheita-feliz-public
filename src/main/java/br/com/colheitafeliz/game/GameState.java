@@ -26,6 +26,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.math.BigDecimal;
 import java.util.Map;
 import br.com.colheitafeliz.domain.inventory.ItemLot;
+import br.com.colheitafeliz.domain.crop.FertilizerType;
 import br.com.colheitafeliz.domain.economy.Currency;
 import br.com.colheitafeliz.domain.player.VipStatus;
 
@@ -35,9 +36,6 @@ public final class GameState {
     public static final int STARTING_COINS = 500;
     /** Chance, em %, de achar um baú do tesouro ao arar grama. */
     public static final int TREASURE_CHANCE = 5;
-    /** Adubo: preço, nível para comprar e fração do ciclo que ele adianta. */
-    public static final int FERTILIZER_PRICE = 15, FERTILIZER_LEVEL = 2;
-    public static final double FERTILIZER_BOOST = .25;
 
     private final Farm farm = new Farm(COLUMNS, ROWS);
     private final Inventory inventory = new Inventory();
@@ -54,6 +52,9 @@ public final class GameState {
     private final Tutorial tutorial = new Tutorial(true);
     private final List<AnimalType> animalTypes = AnimalCatalogLoader.load();
     private final Barn barn = new Barn();
+    private final List<FertilizerType> fertilizers = FertilizerCatalogLoader.load();
+    /** Tipo usado pela ferramenta de fertilizante. */
+    private FertilizerType fertilizer = fertilizers.getFirst();
     private Tool tool = Tool.CURSOR;
     private CropType seed;
     private String message = "Abra a loja para comprar sementes.";
@@ -202,15 +203,19 @@ public final class GameState {
                 }
             }
             case FERTILIZER -> {
-                if (tile.state() != TileState.GROWING) result = ActionResult.fail("O adubo é para plantas em crescimento.");
-                else if (inventory.fertilizer() == 0) result = ActionResult.fail("Sem adubo. Compre na Loja.");
-                else if (!tile.crop().watered()) result = ActionResult.fail("Regue antes de adubar.");
-                else if (tile.fertilized()) result = ActionResult.fail("Esta planta já recebeu adubo.");
+                FertilizerType type = fertilizer;
+                if (tile.state() != TileState.GROWING) result = ActionResult.fail("O fertilizante é para plantas em crescimento.");
+                else if (type.friendsOnly()) result = ActionResult.fail(type.name() + " só vale na plantação de amigos.");
+                else if (inventory.fertilizer(type.id()) == 0) result = ActionResult.fail("Sem " + type.name().toLowerCase() + ". Compre na Loja.");
+                else if (tile.fertilized()) result = ActionResult.fail("Esta planta já recebeu fertilizante nesta temporada.");
+                else if (tile.crop().dryAt(now)) result = ActionResult.fail("Regue antes de fertilizar.");
+                else if (tile.crop().paused()) result = ActionResult.fail("Remova as pragas e os insetos antes de fertilizar.");
                 else {
-                    inventory.useFertilizer();
-                    tile.fertilize(now, FERTILIZER_BOOST);
+                    inventory.useFertilizer(type.id());
+                    tile.fertilize(now, type.reduction());
                     tile.refresh(now);
-                    result = ActionResult.ok("Adubo aplicado: a planta adiantou um quarto do ciclo.");
+                    result = ActionResult.ok(type.name() + " aplicado"
+                            + (tile.state() == TileState.READY ? ": pronta para colher." : "."));
                 }
             }
             case PESTICIDE -> {
@@ -342,13 +347,31 @@ public final class GameState {
         return report(ActionResult.ok("Comprou: " + known.name() + "! Dê ração no cercado para produzir."));
     }
 
-    public ActionResult buyFertilizer() {
-        if (progress.level() < FERTILIZER_LEVEL)
-            return report(ActionResult.fail("O adubo libera no nível " + FERTILIZER_LEVEL + "."));
-        if (wallet.coins().compareTo(BigDecimal.valueOf(FERTILIZER_PRICE)) < 0) return report(ActionResult.fail("Moedas insuficientes."));
-        wallet.debit(FERTILIZER_PRICE);
-        inventory.addFertilizer(1);
-        return report(ActionResult.ok("+1 adubo | -" + FERTILIZER_PRICE + " moedas"));
+    public List<FertilizerType> fertilizers() { return fertilizers; }
+    public FertilizerType selectedFertilizer() { return fertilizer; }
+
+    public FertilizerType fertilizer(String id) {
+        for (FertilizerType type : fertilizers) if (type.id().equals(id)) return type;
+        throw new IllegalArgumentException("Unknown fertilizer: " + id);
+    }
+
+    public ActionResult selectFertilizer(String id) {
+        fertilizer = fertilizer(id);
+        return report(ActionResult.ok(fertilizer.name() + " selecionado."));
+    }
+
+    /** Compra um fertilizante numa das moedas da seção 5; não há revenda. */
+    public ActionResult buyFertilizer(String id, Currency currency) {
+        FertilizerType type = fertilizer(id);
+        if (progress.level() < type.requiredLevel())
+            return report(ActionResult.fail(type.name() + " libera no nível " + type.requiredLevel() + "."));
+        BigDecimal price = type.prices().get(Objects.requireNonNull(currency));
+        if (price == null) return report(ActionResult.fail(type.name() + " não é vendido por " + currencyName(currency) + "."));
+        if (wallet.balance(currency).compareTo(price) < 0) return report(ActionResult.fail("Moedas insuficientes."));
+        wallet.debit(currency, price);
+        inventory.addFertilizer(type.id(), 1);
+        return report(ActionResult.ok("+1 " + type.name().toLowerCase() + " | -" + GameText.money(price) + " " + currencyName(currency)
+                + (type.friendsOnly() ? " (use na plantação de amigos)" : "")));
     }
 
     public ActionResult buyFeed(AnimalType type) {
@@ -574,7 +597,7 @@ public final class GameState {
                 dailyMissions.progressSnapshot(), dailyMissions.completedSnapshot(), land.snapshot(),
                 tutorial.stepIndex(), barn.animals().stream().map(animal -> new GameSnapshot.AnimalSnapshot(
                         animal.type().id(), animal.fedAt() == null ? null : animal.fedAt().toString())).toList(),
-                inventory.feedSnapshot(), inventory.fertilizer(),
+                inventory.feedSnapshot(), inventory.fertilizerSnapshot(), fertilizer.id(),
                 greenCoins(), vip.expiresAt() == null ? null : vip.expiresAt().toString());
     }
 
@@ -608,7 +631,9 @@ public final class GameState {
         }
         game.inventory.restoreLots(snapshot.seeds(), snapshot.produce());
         game.inventory.restoreFeed(snapshot.feed());
-        game.inventory.restoreFertilizer(snapshot.fertilizer());
+        game.inventory.restoreFertilizers(snapshot.fertilizers());
+        for (String id : snapshot.fertilizers().keySet()) game.fertilizer(id);
+        if (snapshot.selectedFertilizerId() != null) game.fertilizer = game.fertilizer(snapshot.selectedFertilizerId());
         if (snapshot.animals() != null) {
             List<Animal> animals = new ArrayList<>();
             for (GameSnapshot.AnimalSnapshot saved : snapshot.animals())

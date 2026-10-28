@@ -12,12 +12,12 @@ public record GameSnapshot(BigDecimal coins, List<br.com.colheitafeliz.domain.in
                            String dailyMissionDay, Map<String, Integer> dailyMissionProgress,
                            List<String> completedDailyMissions, List<Integer> unlockedPlotIds,
                            Integer tutorialStep, List<AnimalSnapshot> animals,
-                           Map<String, Integer> feed, int fertilizer,
+                           Map<String, Integer> feed, Map<String, Integer> fertilizers, String selectedFertilizerId,
                            BigDecimal greenCoins, String vipExpiresAt) {
     public GameSnapshot {
         if (coins == null || greenCoins == null || coins.signum() < 0 || greenCoins.signum() < 0
                 || coins.stripTrailingZeros().scale() > 1 || greenCoins.stripTrailingZeros().scale() > 1
-                || currentXp == null || currentXp.signum() < 0 || level < 1 || fertilizer < 0
+                || currentXp == null || currentXp.signum() < 0 || level < 1
                 || selectedSeedId == null || selectedSeedId.isBlank() || tool == null
                 || tutorialStep == null || dailyMissionDay == null || unlockedPlotIds == null)
             throw new IllegalArgumentException("Invalid farm snapshot");
@@ -31,6 +31,8 @@ public record GameSnapshot(BigDecimal coins, List<br.com.colheitafeliz.domain.in
         unlockedPlotIds = List.copyOf(unlockedPlotIds);
         animals = List.copyOf(animals);
         feed = Map.copyOf(feed);
+        // Saves v16 da etapa 2 ainda não tinham os fertilizantes por tipo; o adubo antigo não é convertido (seção 10).
+        fertilizers = fertilizers == null ? Map.of() : Map.copyOf(fertilizers);
     }
     /** Um animal do cercado: o tipo e quando comeu pela última vez (nulo = com fome). */
     public record AnimalSnapshot(String typeId, String fedAt) {}
