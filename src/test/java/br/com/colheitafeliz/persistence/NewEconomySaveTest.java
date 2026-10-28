@@ -30,7 +30,7 @@ class NewEconomySaveTest {
         session.state().inventory().addProduceLot(lot);
         session.save();
         var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
-        assertEquals(16, json.get("version").getAsInt());
+        assertEquals(17, json.get("version").getAsInt());
         assertEquals("economy-2026-10", json.get("ruleset").getAsString());
         var restored = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state();
         assertEquals(0, new BigDecimal("500.1").compareTo(restored.wallet().coins()));
@@ -90,7 +90,7 @@ class NewEconomySaveTest {
         var clock = new ManualClock();
         var session = GameSession.open(clock, CropCatalogLoader.load(),
                 new JsonSaveRepository(directory.resolve("fresh.json")), bound -> 99);
-        for (int version : new int[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 99}) {
+        for (int version : new int[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 18, 99}) {
             Path file = directory.resolve("legacy-" + version + ".json");
             String bytes = "{\"version\":" + version + ",\"snapshot\":{\"coins\":99999}}";
             Files.writeString(file, bytes);
@@ -140,10 +140,65 @@ class NewEconomySaveTest {
 
     @Test void malformedNewSaveIsNotAFreshGame() throws IOException {
         Path file = directory.resolve("invalid.json");
-        Files.writeString(file, "{\"version\":16,\"ruleset\":\"economy-2026-10\",\"snapshot\":{}}");
+        Files.writeString(file, "{\"version\":17,\"ruleset\":\"economy-2026-10\",\"snapshot\":{}}");
         String before = Files.readString(file);
         var clock = new ManualClock();
         assertThrows(IOException.class, () -> GameSession.open(clock, CropCatalogLoader.load(), new JsonSaveRepository(file)));
+        assertEquals(before, Files.readString(file));
+    }
+
+    @Test void stage2ReaderRefusesAndPreservesTheV17SaveWithFertilizerStock() throws IOException {
+        var clock = new ManualClock();
+        Path file = directory.resolve("stock.json");
+        var repository = new JsonSaveRepository(file);
+        var session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
+        var state = session.state();
+        while (state.progress().level() < 10)
+            state.progress().award(state.progress().xpToNext().subtract(state.progress().currentXp()));
+        assertTrue(state.buyFertilizer("comum", Currency.GOLD).success());
+        session.save();
+        String bytes = Files.readString(file);
+        int stock = state.inventory().fertilizer("comum");
+        assertEquals(1, stock);
+        var stage2 = new br.com.colheitafeliz.persistence.stage2.Stage2JsonSaveRepository(file);
+        assertThrows(IOException.class, stage2::load);
+        IOException refused = assertThrows(IOException.class,
+                () -> stage2.save(state.snapshot(), clock.instant(), clock.instant()));
+        assertTrue(refused.getMessage().startsWith("Incompatible save"), refused.getMessage());
+        assertEquals(bytes, Files.readString(file));
+        var restored = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state();
+        assertEquals(stock, restored.inventory().fertilizer("comum"));
+    }
+
+    private Path stage2Save(String name, int fertilizer) throws IOException {
+        Path file = directory.resolve(name);
+        GameSession.open(new ManualClock(), CropCatalogLoader.load(), new JsonSaveRepository(file), bound -> 99).save();
+        var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+        json.addProperty("version", 16);
+        var snapshot = json.getAsJsonObject("snapshot");
+        snapshot.remove("fertilizers");
+        snapshot.remove("selectedFertilizerId");
+        snapshot.addProperty("fertilizer", fertilizer);
+        Files.writeString(file, json.toString());
+        return file;
+    }
+
+    @Test void stage2SaveV16WithoutFertilizerLoadsAndIsUpgradedOnTheNextSave() throws IOException {
+        Path file = stage2Save("stage2.json", 0);
+        assertTrue(new br.com.colheitafeliz.persistence.stage2.Stage2JsonSaveRepository(file).load().isPresent());
+        var session = GameSession.open(new ManualClock(), CropCatalogLoader.load(), new JsonSaveRepository(file), bound -> 99);
+        assertTrue(session.trySave());
+        assertEquals(17, JsonParser.parseString(Files.readString(file)).getAsJsonObject().get("version").getAsInt());
+    }
+
+    @Test void stage2SaveV16WithFertilizerStockIsRefusedAndPreserved() throws IOException {
+        Path file = stage2Save("stage2-stock.json", 3);
+        String before = Files.readString(file);
+        var clock = new ManualClock();
+        var repository = new JsonSaveRepository(file);
+        IOException refused = assertThrows(IOException.class, repository::load);
+        assertTrue(refused.getMessage().startsWith("Incompatible save"), refused.getMessage());
+        assertThrows(IOException.class, () -> GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99));
         assertEquals(before, Files.readString(file));
     }
 }
