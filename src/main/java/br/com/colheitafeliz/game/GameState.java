@@ -387,11 +387,20 @@ public final class GameState {
     public ActionResult buyFeed(String feedId) {
         int price = switch (feedId) { case "growth" -> 80; case "producer" -> 120;
             default -> throw new IllegalArgumentException("Unknown feed: " + feedId); };
+        if (!hasAnimalForFeed(feedId)) return report(ActionResult.fail("Você precisa ter um animal que use essa ração."));
         if (wallet.coins().compareTo(BigDecimal.valueOf(price)) < 0) return report(ActionResult.fail("Moedas insuficientes."));
         if (inventory.feed(feedId) == Integer.MAX_VALUE) return report(ActionResult.fail("Estoque de ração cheio."));
         wallet.debit(price);
         inventory.addFeed(feedId, 1);
         return report(ActionResult.ok("+1 ração " + (feedId.equals("growth") ? "de crescimento" : "de produtor") + " | -" + price + " ouro " + recordDailyMission("purchase", 1)));
+    }
+
+    public boolean hasAnimalForFeed(String feedId) {
+        for (Animal animal : barn.animals()) {
+            if (animal.expiredAt(realClock.instant())) continue;
+            if (animal.type().kind() == AnimalType.Kind.PROTECTOR || animal.type().feedId().equals(feedId)) return true;
+        }
+        return false;
     }
 
     public int activeProtectors() { return protectorSignature().size(); }

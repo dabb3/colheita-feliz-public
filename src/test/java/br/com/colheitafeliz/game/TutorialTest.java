@@ -86,8 +86,9 @@ class TutorialTest {
         game.progress().award(10000);
         game.wallet().credit(100000);
         game.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GREEN, new BigDecimal("1000"));
+        if (purchase.equals("feed")) assertTrue(game.buyAnimal(game.animalType("galinha")).success());
         ActionResult result = switch (purchase) {
-            case "feed" -> game.buyFeed("growth");
+            case "feed" -> game.buyFeed("producer");
             case "vip" -> game.buyVip();
             case "animal" -> game.buyAnimal(game.animalType("galinha"));
             case "fertilizer" -> game.buyFertilizer("comum", br.com.colheitafeliz.domain.economy.Currency.GOLD);

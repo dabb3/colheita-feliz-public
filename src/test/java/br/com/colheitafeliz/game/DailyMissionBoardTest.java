@@ -6,7 +6,7 @@ class DailyMissionBoardTest {
     @Test void gamePaymentsUseUtcEvenWhenTheInjectedClockHasAnotherZone() {
         var clock = java.time.Clock.fixed(java.time.Instant.parse("2026-10-28T23:30:00Z"), java.time.ZoneOffset.ofHours(14));
         var game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
-        assertTrue(game.buyFeed("growth").success());
+        assertTrue(game.buySeed(game.catalog().get("nabo")).success());
         assertEquals(LocalDate.of(2026, 10, 28), game.dailyMissions().day());
     }
     @Test void onlyTwoCategoriesPayOnceAndRollbackCannotReopenPaidDays() {

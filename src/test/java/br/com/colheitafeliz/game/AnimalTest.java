@@ -23,6 +23,20 @@ class AnimalTest {
         assertEquals(Animal.Status.READY, game.barn().get(0).statusAt(game.now()));
     }
 
+    @Test void feedRequiresAnAnimalThatCanUseIt() {
+        var game = rich(new ManualClock());
+        var coins = game.wallet().coins();
+        assertFalse(game.buyFeed("growth").success());
+        assertFalse(game.buyFeed("producer").success());
+        assertEquals(0, coins.compareTo(game.wallet().coins()));
+        assertTrue(game.inventory().feedSnapshot().isEmpty());
+
+        assertTrue(game.buyAnimal(game.animalType("galinha")).success());
+        assertFalse(game.buyFeed("growth").success());
+        assertTrue(game.buyFeed("producer").success());
+        assertEquals(1, game.inventory().feed("producer"));
+    }
+
     @Test void beeStopsAtInitialFoodAndOnlyNeedsFourMoreHours() {
         var clock = new ManualClock(); var game = rich(clock);
         var bee = game.animalType("abelha");
