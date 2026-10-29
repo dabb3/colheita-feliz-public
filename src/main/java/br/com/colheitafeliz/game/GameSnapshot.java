@@ -34,8 +34,9 @@ public record GameSnapshot(BigDecimal coins, List<br.com.colheitafeliz.domain.in
         // Saves v16 da etapa 2 ainda não tinham os fertilizantes por tipo; o adubo antigo não é convertido (seção 10).
         fertilizers = fertilizers == null ? Map.of() : Map.copyOf(fertilizers);
     }
-    /** Um animal do cercado: o tipo e quando comeu pela última vez (nulo = com fome). */
-    public record AnimalSnapshot(String typeId, String fedAt) {}
+    /** Estado de aquisição e progresso, sem recalcular origem nem reiniciar alimento na carga. */
+    public record AnimalSnapshot(String typeId, br.com.colheitafeliz.domain.inventory.ItemLot origin,
+                                 String acquiredAt, String growthAnchorAt, long grownAtAnchorMillis, String fedUntil) {}
     public record TileSnapshot(TileState state, String cropId, String plantedAt, String wateredAt,
                                String pest, String pausedAt, String nextPestCheckAt,
                                String growthAnchorAt, long grownAtAnchorMillis,

@@ -46,13 +46,15 @@ public final class VisualReviewLauncher {
                 "12-primeiros-passos.png", "13-tutorial-nas-missoes.png",
                 "14-loja-animais.png", "15-galinhas-no-cercado.png", "16-vip.png", "17-saldos-e-xp-decimais.png", "18-deposito-duas-moedas.png", "19-deposito-vip-bloqueado.png", "20-falha-autosave.png", "21-aviso-vip.png",
                 "22-cinco-estagios.png", "23-pragas-simultaneas.png", "24-temporada-reiniciada.png", "25-loja-ultima-pagina.png",
-                "26-loja-fertilizantes.png", "27-bandeja-fertilizantes.png", "28-pronta-pelo-fertilizante.png"
+                "26-loja-fertilizantes.png", "27-bandeja-fertilizantes.png", "28-pronta-pelo-fertilizante.png", "29-animais-bebes.png", "30-animais-jovens.png", "31-animais-adultos.png",
+                "32-animais-sono.png", "33-protetores-expirados.png", "34-animais-pagina2.png", "35-animais-pagina3.png", "36-animais-pagina4.png"
         };
-        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3};
+        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
         private final Path output = Path.of(System.getProperty("colheita.visualOutput", "build/visual-review"));
         private FarmRenderer renderer;
         private GameState fresh, states, rich, newcomer, rancher, stages, seasons, fertilized;
         private int scene, frames;
+        private GameState animalsBaby, animalsYoung, animalsAdult, animalsSleep, animalsExpired;
 
         @Override public void create() {
             CropCatalog catalog = CropCatalogLoader.load();
@@ -75,20 +77,12 @@ public final class VisualReviewLauncher {
             newcomer.startNewFarm();
             newcomer.selectTool(Tool.HAND);
             newcomer.act(0, 0);
-            ManualClock rancherClock = new ManualClock();
-            rancher = new GameState(rancherClock::instant, rancherClock, catalog, bound -> 99);
-            rancher.progress().award(50 + 75 + 100 + 125 + 150);
-            rancher.wallet().credit(10_000);
-            for (String id : new String[]{"galinha", "galinha", "pato", "ovelha", "ovelha", "vaca"}) {
-                var type = rancher.animalType(id);
-                rancher.buyAnimal(type);
-                rancher.buyFeed(type);
-            }
-            for (int i : new int[]{0, 2, 3, 5}) rancher.tendAnimal(i);
-            rancherClock.advanceSeconds(43_200);
-            rancher.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("ovo", br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(rancher.animalType("galinha").productPrice()), 3, false));
-            rancher.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("leite", br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(rancher.animalType("vaca").productPrice()), 2, false));
-            rancher.wallet().debit(br.com.colheitafeliz.domain.economy.Currency.GOLD, rancher.wallet().coins().subtract(java.math.BigDecimal.valueOf(1200)));
+            animalsBaby = animalScene(br.com.colheitafeliz.domain.animal.Animal.Stage.BABY, false, false);
+            animalsYoung = animalScene(br.com.colheitafeliz.domain.animal.Animal.Stage.YOUNG, false, false);
+            animalsAdult = animalScene(br.com.colheitafeliz.domain.animal.Animal.Stage.ADULT, false, false);
+            animalsSleep = animalScene(br.com.colheitafeliz.domain.animal.Animal.Stage.ADULT, true, false);
+            animalsExpired = animalScene(br.com.colheitafeliz.domain.animal.Animal.Stage.ADULT, false, true);
+            rancher = animalsAdult;
             renderer = new FarmRenderer(catalog);
             renderer.viewport().update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
             try { Files.createDirectories(output); }
@@ -194,6 +188,32 @@ public final class VisualReviewLauncher {
             game.act(0, row);
         }
 
+        private static GameState animalScene(br.com.colheitafeliz.domain.animal.Animal.Stage stage, boolean night, boolean expired) {
+            ManualClock real = new ManualClock(); ManualClock simulation = new ManualClock();
+            if (night) simulation.advanceSeconds(12 * 3600);
+            GameState game = new GameState(simulation::instant, real, CropCatalogLoader.load(), bound -> 99);
+            while (game.progress().level() < 60) game.progress().award(game.progress().xpToNext());
+            game.wallet().credit(10_000_000);
+            game.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GREEN, new java.math.BigDecimal("500"));
+            java.util.List<br.com.colheitafeliz.domain.animal.Animal> animals = new java.util.ArrayList<>();
+            for (var type : game.animalTypes()) {
+                long progress = type.kind() == br.com.colheitafeliz.domain.animal.AnimalType.Kind.PRODUCER ? type.requiredMillis()
+                        : type.kind() != br.com.colheitafeliz.domain.animal.AnimalType.Kind.GROWING ? 0 : switch (stage) {
+                    case BABY -> 0; case YOUNG -> type.babySeconds() * 1000; case ADULT -> type.requiredMillis();
+                };
+                var origin = new br.com.colheitafeliz.domain.inventory.ItemLot(type.id(), br.com.colheitafeliz.domain.economy.Currency.GOLD, type.prices().get(br.com.colheitafeliz.domain.economy.Currency.GOLD), 1, false);
+                boolean hungry = type.id().equals("abelha") || type.id().equals("cachorro-mastiff");
+                Instant anchor = hungry ? game.now().minus(type.foodDuration()) : game.now();
+                Instant acquisition = expired ? real.instant().minus(java.time.Duration.ofDays(30)) : real.instant();
+                animals.add(new br.com.colheitafeliz.domain.animal.Animal(type, origin, acquisition, anchor,
+                        hungry ? 0 : progress, anchor.plus(type.foodDuration())));
+            }
+            game.barn().restore(animals);
+            game.refresh();
+            game.message(expired ? "Protetores removidos aos 30 dias reais" : "Fases, fome e coleta única · protetores ativos: " + game.activeProtectors());
+            return game;
+        }
+
         private static void water(GameState game, int... rows) {
             game.selectTool(Tool.WATER);
             for (int row : rows) game.act(0, row);
@@ -210,6 +230,12 @@ public final class VisualReviewLauncher {
                 case 23 -> seasons;
                 case 24, 25, 26 -> fresh;
                 case 27 -> fertilized;
+                case 28 -> animalsBaby;
+                case 29 -> animalsYoung;
+                case 30 -> animalsAdult;
+                case 31 -> animalsSleep;
+                case 32 -> animalsExpired;
+                case 33, 34, 35 -> rancher;
                 default -> states;
             };
             IsoRenderer.GridPosition hovered = switch (scene) {
@@ -300,6 +326,16 @@ public final class VisualReviewLauncher {
                 case 6 -> renderer.marketPanel().showSell();
                 case 7, 12 -> renderer.missions().toggle();
                 case 13 -> renderer.marketPanel().showAnimals();
+                case 33, 34, 35 -> {
+                    renderer.marketPanel().showAnimals();
+                    for (int i = 0; i < scene - 32; i++) renderer.marketPanel().nextPage();
+                }
+                case 28, 29, 30, 31, 32 -> {
+                    GameState animalState = switch (scene) { case 28 -> animalsBaby; case 29 -> animalsYoung;
+                        case 30 -> animalsAdult; case 31 -> animalsSleep; default -> animalsExpired; };
+                    renderer.draw(animalState, null, 1);
+                    renderer.pointer(1262, 410);
+                }
                 case 14 -> {
                     renderer.draw(rancher, null, 1);
                     renderer.pointer(1446, 500);

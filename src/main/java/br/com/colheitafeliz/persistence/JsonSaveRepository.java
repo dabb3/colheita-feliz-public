@@ -40,7 +40,7 @@ public final class JsonSaveRepository implements SaveRepository {
         try {
             JsonObject data = JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)).getAsJsonObject();
             int version = data.get("version").getAsInt();
-            if ((version != GameSave.VERSION && version != GameSave.STAGE_2_VERSION)
+            if ((version != GameSave.VERSION && version != GameSave.STAGE_2_VERSION && version != GameSave.STAGE_3_VERSION)
                     || !GameSave.RULESET.equals(data.get("ruleset").getAsString()))
                 throw new IOException("Incompatible save; select a new path for the new economy: " + file);
             // O adubo agregado da etapa 2 não é convertido (seção 10); com estoque, recusa em vez de zerá-lo no próximo save.
@@ -48,6 +48,13 @@ public final class JsonSaveRepository implements SaveRepository {
                     && data.getAsJsonObject("snapshot").has("fertilizer")
                     && data.getAsJsonObject("snapshot").get("fertilizer").getAsInt() > 0)
                 throw new IOException("Incompatible save; it holds stage 2 fertilizer stock that would be lost, select a new path: " + file);
+            // Animais antigos não têm aquisição monetária; não inventar origem nem descartar ração por espécie.
+            if (version != GameSave.VERSION && data.has("snapshot") && data.get("snapshot").isJsonObject()) {
+                JsonObject snapshot = data.getAsJsonObject("snapshot");
+                if ((snapshot.has("animals") && snapshot.getAsJsonArray("animals").size() > 0)
+                        || (snapshot.has("feed") && !snapshot.getAsJsonObject("feed").entrySet().isEmpty()))
+                    throw new IOException("Incompatible save; legacy animals or feed have no acquisition origin, select a new path: " + file);
+            }
             GameSave save = gson.fromJson(data, GameSave.class);
             if (save.snapshot() == null) throw new IOException("Incomplete save file: " + file);
             return Optional.of(new LoadedGame(save.snapshot(), Instant.parse(save.savedAtReal()), Instant.parse(save.gameTime())));

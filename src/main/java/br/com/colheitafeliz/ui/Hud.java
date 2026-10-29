@@ -458,13 +458,17 @@ public final class Hud {
     /** Balão sobre o ninho: o que a galinha está fazendo e o que o clique faz. */
     public void animalTip(SpriteBatch batch, UiSkin skin, Animal animal, Instant now, float x, float y, GameState state) {
         AnimalType type = animal.type();
-        String line = switch (animal.statusAt(now)) {
-            case READY -> type.productYield() + "× " + type.productName() + " pronto · clique para coletar";
-            case PRODUCING -> type.productName() + " em " + MarketPanel.formatTime(animal.remainingAt(now).toSeconds());
-            case HUNGRY -> state.inventory().feed(type.id()) > 0
-                    ? "Com fome · clique para dar ração (" + state.inventory().feed(type.id()) + ")"
-                    : "Com fome · compre ração na Loja, aba Animais";
-        };
+        String line;
+        if (type.kind() == AnimalType.Kind.PROTECTOR) {
+            line = animal.activeAt(state.realNow(), now) ? "Proteção ativa" : "Proteção pausada · com fome";
+            line += " · até " + GameText.vipExpiry(animal.expiresAt(), java.time.ZoneId.systemDefault());
+            if (animal.hungryAt(now)) line += " · clique para alimentar";
+        } else if (animal.statusAt(now) == Animal.Status.READY) {
+            line = type.kind() == AnimalType.Kind.GROWING ? "Adulto · clique para vender" : "1 " + type.productName() + " · clique para coletar";
+        } else if (animal.hungryAt(now)) line = "Com fome · clique para dar ração · compre na Loja";
+        else line = (type.kind() == AnimalType.Kind.GROWING ? "Crescendo · " + switch (animal.stageAt(now)) {
+            case BABY -> "bebê"; case YOUNG -> "jovem"; case ADULT -> "adulto";
+        } : type.productName()) + " · " + MarketPanel.formatTime(animal.remainingAt(now).toSeconds()) + " restantes";
         simpleTip(batch, skin, x, y, type.name(), line);
     }
 

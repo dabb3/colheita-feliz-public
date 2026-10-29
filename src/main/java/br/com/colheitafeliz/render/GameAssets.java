@@ -20,6 +20,7 @@ public final class GameAssets implements AutoCloseable {
     private final List<Texture> textures = new ArrayList<>();
     private final Map<String, Texture[]> crops = new HashMap<>();
     private final Map<String, Texture> seeds = new HashMap<>();
+    private final Map<String, Texture[]> animalArt = new HashMap<>();
     private final Map<Texture, Float> footCenters = new HashMap<>();
     public final Texture background = load("classic/background/background.png");
     public final Texture house = load("classic/buildings/main-house.png");
@@ -59,6 +60,7 @@ public final class GameAssets implements AutoCloseable {
     public final Texture cursor = load("classic/icons/hud/cursor-ui.png");
     public final Texture hoe = load("classic/icons/hud/pa-ui.png");
     public final Texture bag = load("classic/icons/hud/saco-ui.png");
+    public final Texture feed = load("classic/icons/racao-generica.png");
     public final Texture hand = load("classic/icons/hud/mao-restaurada.png");
     public final Texture water = load("classic/icons/hud/regador-ui.png");
     /** Herbicida (frasco verde): remove ervas daninhas. */
@@ -111,14 +113,43 @@ public final class GameAssets implements AutoCloseable {
 
     public Texture crop(CropType type, int stage) { return crops.get(type.id())[stage - 1]; }
 
-    /** Ícone de um animal produtivo pelo id do catálogo de animais. */
-    public Texture animal(String id) {
-        return switch (id) { case "pato" -> duck; case "ovelha" -> sheep; case "vaca" -> cow; default -> chicken; };
+    public enum AnimalPose { IDLE, WALKING, SLEEPING }
+
+    /** Mapeamentos explícitos para os nomes reais do acervo, inclusive pomba e burrinho. */
+    static String animalPath(String id, br.com.colheitafeliz.domain.animal.Animal.Stage stage, AnimalPose pose) {
+        String folder = switch (id) {
+            case "pombo" -> "pomba"; case "burro" -> "burrinho";
+            case "cachorro-mastiff", "cachorro-robo", "galinha", "abelha", "coelho", "pato", "pavao", "porco", "ovelha", "vaca", "avestruz", "cabra", "cavalo" -> id;
+            default -> throw new IllegalArgumentException("Unknown animal art: " + id);
+        };
+        String stem = switch (id) {
+            case "pombo" -> "pomba-" + switch (stage) { case BABY -> "bebe"; case YOUNG -> "jovem"; case ADULT -> "adulta"; };
+            case "burro" -> "burrinho" + (stage == br.com.colheitafeliz.domain.animal.Animal.Stage.ADULT ? "" : stage == br.com.colheitafeliz.domain.animal.Animal.Stage.BABY ? "-bebe" : "-jovem");
+            case "porco" -> "porco-" + switch (stage) { case BABY -> "bebe"; case YOUNG -> "jovem"; case ADULT -> "adulto"; };
+            case "coelho" -> stage == br.com.colheitafeliz.domain.animal.Animal.Stage.ADULT ? (pose == AnimalPose.IDLE ? "coelho" : "coelho-adulto") : stage == br.com.colheitafeliz.domain.animal.Animal.Stage.BABY ? "coelho-bebe" : "coelho-jovem";
+            case "cachorro-mastiff" -> "mastiff";
+            case "cabra" -> pose == AnimalPose.IDLE ? "cabra" : "cabra-adulta";
+            default -> folder;
+        };
+        String suffix = pose == AnimalPose.IDLE || id.equals("pombo") || id.equals("abelha")
+                || (id.equals("pavao") && pose == AnimalPose.WALKING) ? "" : pose == AnimalPose.WALKING ? "-andando" : "-dormindo";
+        return "classic/animals/" + folder + "/" + stem + suffix + ".png";
     }
 
-    /** Ícone do produto de um animal: ovos no ninho, lã no cesto, leite no balde. */
+    public Texture animal(String id) { return animal(id, br.com.colheitafeliz.domain.animal.Animal.Stage.ADULT, AnimalPose.IDLE); }
+    public Texture animal(String id, br.com.colheitafeliz.domain.animal.Animal.Stage stage, AnimalPose pose) {
+        Texture[] frames = animalArt.computeIfAbsent(id + ":" + stage, key -> animalFrames(
+                animalPath(id, stage, AnimalPose.IDLE), animalPath(id, stage, AnimalPose.WALKING), animalPath(id, stage, AnimalPose.SLEEPING)));
+        return frames[pose.ordinal()];
+    }
+
+    /** O acervo não tem ícones de mel/pena; o símbolo do produtor identifica esses produtos na UI. */
     public Texture product(String id) {
-        return switch (id) { case "ovelha" -> woolBasket; case "vaca" -> bucket; default -> nestEggs; };
+        return switch (id) {
+            case "galinha", "pato" -> nestEggs; case "ovelha" -> woolBasket; case "vaca" -> bucket;
+            case "abelha", "pavao" -> animal(id);
+            default -> animal(id);
+        };
     }
     public Texture seed(CropType type) { return seeds.get(type.id()); }
 

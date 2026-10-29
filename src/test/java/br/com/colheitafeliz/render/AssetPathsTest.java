@@ -59,6 +59,16 @@ class AssetPathsTest {
         assertEquals(List.of(), missing);
     }
 
+    @Test void everyPlayableAnimalHasItsPhasesAndExistingMotionAndSleepArt() {
+        List<String> missing = new ArrayList<>();
+        for (var type : br.com.colheitafeliz.game.AnimalCatalogLoader.load())
+            for (var stage : type.kind() == br.com.colheitafeliz.domain.animal.AnimalType.Kind.GROWING
+                    ? br.com.colheitafeliz.domain.animal.Animal.Stage.values()
+                    : new br.com.colheitafeliz.domain.animal.Animal.Stage[]{br.com.colheitafeliz.domain.animal.Animal.Stage.ADULT})
+                for (var pose : GameAssets.AnimalPose.values()) expect(GameAssets.animalPath(type.id(), stage, pose), missing);
+        assertEquals(List.of(), missing);
+    }
+
     private static void expect(String path, List<String> missing) {
         if (!Files.exists(ASSETS.resolve(path))) missing.add(path);
     }

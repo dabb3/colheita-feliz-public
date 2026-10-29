@@ -1,10 +1,257 @@
 [
-  {"id":"galinha", "name":"Galinha", "price":300, "requiredLevel":3, "feedPrice":20, "productionSeconds":14400,
-   "productId":"ovo", "productName":"Ovo", "productYield":3, "productPrice":45, "collectXp":20, "max":3},
-  {"id":"pato", "name":"Pato", "price":500, "requiredLevel":4, "feedPrice":25, "productionSeconds":21600,
-   "productId":"ovo_de_pata", "productName":"Ovo de pata", "productYield":2, "productPrice":90, "collectXp":30, "max":2},
-  {"id":"ovelha", "name":"Ovelha", "price":900, "requiredLevel":5, "feedPrice":40, "productionSeconds":28800,
-   "productId":"la", "productName":"Lã", "productYield":1, "productPrice":320, "collectXp":50, "max":2},
-  {"id":"vaca", "name":"Vaca", "price":1500, "requiredLevel":6, "feedPrice":60, "productionSeconds":43200,
-   "productId":"leite", "productName":"Leite", "productYield":2, "productPrice":360, "collectXp":80, "max":1}
+  {
+    "id": "galinha",
+    "name": "Galinha",
+    "kind": "PRODUCER",
+    "prices": {
+      "GOLD": 8000,
+      "GREEN": 9
+    },
+    "requiredLevel": 10,
+    "max": 1,
+    "productionSeconds": 28800,
+    "babySeconds": 0,
+    "youngSeconds": 0,
+    "productId": "ovo",
+    "productName": "Ovo",
+    "collectXp": 100
+  },
+  {
+    "id": "abelha",
+    "name": "Abelha",
+    "kind": "PRODUCER",
+    "prices": {
+      "GOLD": 28000,
+      "GREEN": 28
+    },
+    "requiredLevel": 14,
+    "max": 1,
+    "productionSeconds": 43200,
+    "babySeconds": 0,
+    "youngSeconds": 0,
+    "productId": "mel",
+    "productName": "Mel",
+    "collectXp": 140
+  },
+  {
+    "id": "pombo",
+    "name": "Pombo",
+    "kind": "GROWING",
+    "prices": {
+      "GOLD": 36000,
+      "GREEN": 36
+    },
+    "requiredLevel": 18,
+    "max": 1,
+    "productionSeconds": 0,
+    "babySeconds": 43200,
+    "youngSeconds": 86400,
+    "productId": "",
+    "productName": "Adulto",
+    "collectXp": 180
+  },
+  {
+    "id": "coelho",
+    "name": "Coelho",
+    "kind": "GROWING",
+    "prices": {
+      "GOLD": 60000,
+      "GREEN": 59
+    },
+    "requiredLevel": 24,
+    "max": 1,
+    "productionSeconds": 0,
+    "babySeconds": 57600,
+    "youngSeconds": 115200,
+    "productId": "",
+    "productName": "Adulto",
+    "collectXp": 240
+  },
+  {
+    "id": "pato",
+    "name": "Pato",
+    "kind": "PRODUCER",
+    "prices": {
+      "GOLD": 70000,
+      "GREEN": 69
+    },
+    "requiredLevel": 28,
+    "max": 1,
+    "productionSeconds": 57600,
+    "babySeconds": 0,
+    "youngSeconds": 0,
+    "productId": "ovo_de_pata",
+    "productName": "Ovo de pato",
+    "collectXp": 280
+  },
+  {
+    "id": "pavao",
+    "name": "Pavão",
+    "kind": "PRODUCER",
+    "prices": {
+      "GOLD": 100000,
+      "GREEN": 99
+    },
+    "requiredLevel": 32,
+    "max": 1,
+    "productionSeconds": 100800,
+    "babySeconds": 0,
+    "youngSeconds": 0,
+    "productId": "pena",
+    "productName": "Pena",
+    "collectXp": 320
+  },
+  {
+    "id": "porco",
+    "name": "Porco",
+    "kind": "GROWING",
+    "prices": {
+      "GOLD": 150000,
+      "GREEN": 100
+    },
+    "requiredLevel": 36,
+    "max": 1,
+    "productionSeconds": 0,
+    "babySeconds": 72000,
+    "youngSeconds": 144000,
+    "productId": "",
+    "productName": "Adulto",
+    "collectXp": 360
+  },
+  {
+    "id": "burro",
+    "name": "Burro",
+    "kind": "GROWING",
+    "prices": {
+      "GOLD": 150000,
+      "GREEN": 100
+    },
+    "requiredLevel": 40,
+    "max": 1,
+    "productionSeconds": 0,
+    "babySeconds": 86400,
+    "youngSeconds": 172800,
+    "productId": "",
+    "productName": "Adulto",
+    "collectXp": 400
+  },
+  {
+    "id": "ovelha",
+    "name": "Ovelha",
+    "kind": "PRODUCER",
+    "prices": {
+      "GOLD": 180000,
+      "GREEN": 120
+    },
+    "requiredLevel": 44,
+    "max": 1,
+    "productionSeconds": 72000,
+    "babySeconds": 0,
+    "youngSeconds": 0,
+    "productId": "la",
+    "productName": "Lã",
+    "collectXp": 440
+  },
+  {
+    "id": "vaca",
+    "name": "Vaca leiteira",
+    "kind": "PRODUCER",
+    "prices": {
+      "GOLD": 220000,
+      "GREEN": 180
+    },
+    "requiredLevel": 48,
+    "max": 1,
+    "productionSeconds": 86400,
+    "babySeconds": 0,
+    "youngSeconds": 0,
+    "productId": "leite",
+    "productName": "Leite",
+    "collectXp": 480
+  },
+  {
+    "id": "cachorro-robo",
+    "name": "Cão Robô",
+    "kind": "PROTECTOR",
+    "prices": {
+      "GOLD": 20000,
+      "GREEN": 15
+    },
+    "requiredLevel": 10,
+    "max": 1,
+    "productionSeconds": 0,
+    "babySeconds": 0,
+    "youngSeconds": 0,
+    "productId": "",
+    "productName": "Proteção",
+    "collectXp": 0
+  },
+  {
+    "id": "cachorro-mastiff",
+    "name": "Cão Mastiff",
+    "kind": "PROTECTOR",
+    "prices": {
+      "GOLD": 50000,
+      "GREEN": 50
+    },
+    "requiredLevel": 20,
+    "max": 1,
+    "productionSeconds": 0,
+    "babySeconds": 0,
+    "youngSeconds": 0,
+    "productId": "",
+    "productName": "Proteção",
+    "collectXp": 0
+  },
+  {
+    "id": "avestruz",
+    "name": "Avestruz",
+    "kind": "PROTECTOR",
+    "prices": {
+      "GOLD": 80000,
+      "GREEN": 75
+    },
+    "requiredLevel": 30,
+    "max": 1,
+    "productionSeconds": 0,
+    "babySeconds": 0,
+    "youngSeconds": 0,
+    "productId": "",
+    "productName": "Proteção",
+    "collectXp": 0
+  },
+  {
+    "id": "cabra",
+    "name": "Cabra",
+    "kind": "PROTECTOR",
+    "prices": {
+      "GOLD": 120000,
+      "GREEN": 100
+    },
+    "requiredLevel": 40,
+    "max": 1,
+    "productionSeconds": 0,
+    "babySeconds": 0,
+    "youngSeconds": 0,
+    "productId": "",
+    "productName": "Proteção",
+    "collectXp": 0
+  },
+  {
+    "id": "cavalo",
+    "name": "Cavalo",
+    "kind": "PROTECTOR",
+    "prices": {
+      "GOLD": 150000,
+      "GREEN": 120
+    },
+    "requiredLevel": 50,
+    "max": 1,
+    "productionSeconds": 0,
+    "babySeconds": 0,
+    "youngSeconds": 0,
+    "productId": "",
+    "productName": "Proteção",
+    "collectXp": 0
+  }
 ]
