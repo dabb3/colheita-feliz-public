@@ -35,7 +35,7 @@ import java.util.Set;
 /** Desenha a fazenda (cena, canteiros e seus estados) e orquestra o HUD, a toolbar e as janelas. */
 public final class FarmRenderer implements AutoCloseable {
     /** Tamanho de desenho dos tiles clássicos: o losango cobre a grade com uma leve sobreposição. */
-    private static final float TILE_W = 188, TILE_H = 86, TILE_TOP = 42;
+    private static final float TILE_W = 188, TILE_H = 100, TILE_TOP = TILE_H / 2;
 
     private final GameAssets assets;
     private final UiSkin skin = new UiSkin();

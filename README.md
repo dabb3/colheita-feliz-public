@@ -84,6 +84,8 @@ Dentro do cercado ficam apenas porco, ovelha, vaca, galinha e pato. Pombo fica a
 
 Cada pose usa sua própria base visível para apoiar o animal no chão, inclusive dormindo e ao virar. Sombras, áreas de clique e dicas acompanham esse apoio, sem considerar as margens transparentes como corpo do animal. As escalas são definidas por tipo; filhotes continuam menores que adultos.
 
+Os terrenos usam uma grade isométrica uniforme de 170 × 72 unidades, elevada para deixar a última fileira acima da barra de ferramentas. O desenho compensa as margens transparentes dos sprites com sobreposição entre os tiles; plantas, destaque e cliques acompanham a mesma projeção.
+
 Pombo e colmeia não passeiam. O pavão permanece no lugar e alterna a cauda fechada e aberta a cada quatro segundos. Os outros animais viram conforme a orientação original da arte e alternam os passos pela distância percorrida; o cavalo faz percursos mais longos para não parecer andar parado.
 
 Os assets derivados do projeto de referência estão sujeitos à licença **Source Available — Non-Commercial**, reproduzida em [assets/REFERENCE_LICENSE](assets/REFERENCE_LICENSE). Preserve a atribuição. Uso comercial desses assets exige autorização do titular. A proveniência das imagens não foi verificada além da declaração do projeto original de que foram geradas com Google Gemini e ajustadas manualmente.
