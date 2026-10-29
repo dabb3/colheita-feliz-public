@@ -21,7 +21,7 @@ public final class GameAssets implements AutoCloseable {
     private final Map<String, Texture[]> crops = new HashMap<>();
     private final Map<String, Texture> seeds = new HashMap<>();
     private final Map<String, Texture[]> animalArt = new HashMap<>();
-    private final Map<Texture, Float> footCenters = new HashMap<>();
+    private final Map<Texture, SpriteFootprint> footprints = new HashMap<>();
     private final Texture[] hiveSprites = hiveSprites();
     public final Texture beehive = hiveSprites[0];
     public final Texture bee = hiveSprites[1];
@@ -227,16 +227,10 @@ public final class GameAssets implements AutoCloseable {
             }
             pixels = shrink(pixels);
             Texture texture = textures[i] = register(new Texture(pixels, true));
-            // Cabeça e cauda deslocam o centro da imagem; o apoio vem da faixa inferior.
-            int footLeft = pixels.getWidth(), footRight = -1;
-            int band = Math.max(1, Math.round(pixels.getHeight() * .12f));
-            for (int y = pixels.getHeight() - band; y < pixels.getHeight(); y++)
-                for (int x = 0; x < pixels.getWidth(); x++)
-                    if ((pixels.getPixel(x, y) & 0xff) > 12) {
-                        footLeft = Math.min(footLeft, x);
-                        footRight = Math.max(footRight, x);
-                    }
-            footCenters.put(texture, footRight >= footLeft ? (footLeft + footRight + 1f) / (2f * pixels.getWidth()) : .5f);
+            // O quadro dormindo pode ter margem inferior diferente do quadro acordado.
+            Pixmap pose = pixels;
+            footprints.put(texture, SpriteFootprint.measure(pose.getWidth(), pose.getHeight(),
+                    (x, y) -> pose.getPixel(x, y) & 0xff));
             pixels.dispose();
         }
         return textures;
@@ -269,7 +263,7 @@ public final class GameAssets implements AutoCloseable {
         return texture;
     }
 
-    float footCenter(Texture texture) { return footCenters.getOrDefault(texture, .5f); }
+    SpriteFootprint footprint(Texture texture) { return footprints.getOrDefault(texture, SpriteFootprint.FULL); }
 
     @Override public void close() {
         for (Texture texture : textures) texture.dispose();

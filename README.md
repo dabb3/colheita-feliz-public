@@ -72,6 +72,8 @@ O atlas `assets/classic/animals/abelha/colmeia-abelha-atlas.png` foi separado co
 
 Dentro do cercado ficam apenas porco, ovelha, vaca, galinha e pato. Pombo fica acima da colmeia; burro, cabra e cão robô ficam próximos das casas; pavão e avestruz acima da cerca; coelho, cavalo e Mastiff ficam nas bordas inferiores. As posições dependem do tipo, preservadas ao comprar ou remover outros animais. Não há cão comum decorativo.
 
+Cada pose usa sua própria base visível para apoiar o animal no chão, inclusive dormindo e ao virar. Sombras, áreas de clique e dicas acompanham esse apoio, sem considerar as margens transparentes como corpo do animal. As escalas são definidas por tipo; filhotes continuam menores que adultos.
+
 Os assets derivados do projeto de referência estão sujeitos à licença **Source Available — Non-Commercial**, reproduzida em [assets/REFERENCE_LICENSE](assets/REFERENCE_LICENSE). Preserve a atribuição. Uso comercial desses assets exige autorização do titular. A proveniência das imagens não foi verificada além da declaração do projeto original de que foram geradas com Google Gemini e ajustadas manualmente.
 
 As fontes **M PLUS Rounded 1c**, **Nunito** e **Lato** estão sob SIL Open Font License 1.1. Suas licenças estão em [OFL-MPLUSRounded1c.txt](assets/fonts/OFL-MPLUSRounded1c.txt), [OFL-Nunito.txt](assets/fonts/OFL-Nunito.txt) e [OFL-Lato.txt](assets/fonts/OFL-Lato.txt).

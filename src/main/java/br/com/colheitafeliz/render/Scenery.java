@@ -32,7 +32,6 @@ final class Scenery {
         boolean sleeping, hungry;
         float width;
         final float fullWidth, homeX, homeY, radius, speed;
-        float footCenter = .5f;
         final Layer layer;
         final boolean shadow;
         final boolean insidePen;
@@ -95,7 +94,6 @@ final class Scenery {
         add(a.house, null, 735, 540, 420, 0, 0, Layer.BACK, false, false, false);
         for (Thing t : things) {
             t.wait = random.nextFloat() * 3;
-            if (t.shadow) t.footCenter = a.footCenter(t.idle);
         }
     }
 
@@ -128,7 +126,6 @@ final class Scenery {
             p.animal().sleep = assets.animal(p.typeId(), stage, GameAssets.AnimalPose.SLEEPING);
             p.animal().sleeping = night;
             p.animal().hungry = animal.statusAt(now) == Animal.Status.HUNGRY;
-            p.animal().footCenter = assets.footCenter(p.animal().idle);
             p.animal().width = p.animal().fullWidth * (stage == Animal.Stage.BABY ? .65f : stage == Animal.Stage.YOUNG ? .85f : 1);
             p.product().hidden = animal.type().kind() != br.com.colheitafeliz.domain.animal.AnimalType.Kind.PRODUCER
                     || animal.statusAt(now) != Animal.Status.READY;
@@ -151,7 +148,6 @@ final class Scenery {
             boolean hive = id.equals("abelha");
             Thing animal = add(look.idle(), look.walk(), s[0], s[1], look.width(), look.radius(), look.speed(),
                     layer, true, insidePen, !hive && slot % 2 == 0);
-            animal.footCenter = assets.footCenter(animal.idle);
             animal.wait = random.nextFloat() * 3;
             placed.add(new Placed(id, animal, product));
         }
@@ -172,15 +168,23 @@ final class Scenery {
         return -1;
     }
 
-    private static boolean covers(Thing t, float x, float y) {
-        float h = t.width * t.idle.getHeight() / t.idle.getWidth();
-        return Math.abs(x - t.x) <= t.width / 2f && y >= t.y - 6 && y <= t.y + h;
+    private boolean covers(Thing t, float x, float y) {
+        Texture texture = pose(t);
+        SpriteFootprint foot = assets.footprint(texture);
+        float h = t.width * texture.getHeight() / texture.getWidth();
+        float anchor = t.facingRight ? 1 - foot.centerX() : foot.centerX();
+        float left = t.facingRight ? 1 - foot.left() - foot.width() : foot.left();
+        float minX = t.x + t.width * (left - anchor);
+        return x >= minX && x <= minX + t.width * foot.width()
+                && y >= t.y - 6 && y <= t.y + h * foot.height();
     }
 
     /** Ponto acima do animal, para o balão de dica. */
     float[] animalAnchor(int index) {
         Thing animal = placed.get(index).animal();
-        return new float[]{animal.x, animal.y + animal.width * animal.idle.getHeight() / animal.idle.getWidth() - 40};
+        Texture texture = pose(animal);
+        return new float[]{animal.x, animal.y + animal.width * texture.getHeight() / texture.getWidth()
+                * assets.footprint(texture).height() - 40};
     }
 
     /** Desenha a camada pedida, de trás para a frente (maior y primeiro). {@code pen} vem no meio da camada BACK. */
@@ -243,19 +247,20 @@ final class Scenery {
 
     private void drawThing(SpriteBatch batch, Thing t) {
         if (t.hidden) return;
-        Texture tex = t.sleeping && t.sleep != null ? t.sleep : t.walking && t.walk != null && ((int) (t.phase * 4) % 2 == 0) ? t.walk : t.idle;
-        // Pares normalizados compartilham o canvas, a altura visível e a base dos pés.
-        float w = t.width, h = w * t.idle.getHeight() / t.idle.getWidth();
+        Texture tex = pose(t);
+        SpriteFootprint foot = assets.footprint(tex);
+        float w = t.width, h = w * tex.getHeight() / tex.getWidth();
         if (t.shadow) {
             Color previous = batch.getColor().cpy();
             batch.setColor(0, 0, 0, .26f);
-            float shadowW = t.width * .7f, shadowH = t.width * .16f;
+            float shadowW = w * foot.width() * .65f, shadowH = shadowW * .16f;
             batch.draw(soft, t.x - shadowW / 2f, t.y - shadowH / 2f, shadowW, shadowH);
             batch.setColor(previous);
         }
         // Espelha em torno do apoio: a sombra permanece em (x, y) ao virar.
-        float anchor = t.facingRight ? 1 - t.footCenter : t.footCenter;
-        batch.draw(tex, t.x - w * anchor, t.y, w, h, 0, 0, tex.getWidth(), tex.getHeight(), t.facingRight, false);
+        float anchor = t.facingRight ? 1 - foot.centerX() : foot.centerX();
+        batch.draw(tex, t.x - w * anchor, t.y - h * foot.bottom(), w, h,
+                0, 0, tex.getWidth(), tex.getHeight(), t.facingRight, false);
         if (t.idle == assets.beehive) {
             for (int bee = 0; bee < 4; bee++) {
                 BeeOffset offset = beeOffset(bee, t.phase);
@@ -263,7 +268,12 @@ final class Scenery {
                 batch.draw(assets.bee, t.x + offset.x() - bw / 2, t.y + h - 8 + offset.y(), bw, bh);
             }
         }
-        if (t.hungry) batch.draw(assets.feed, t.x - 9, t.y + h + 2, 18, 20);
+        if (t.hungry) batch.draw(assets.feed, t.x - 9, t.y + h * foot.height() + 2, 18, 20);
+    }
+
+    private static Texture pose(Thing t) {
+        return t.sleeping && t.sleep != null ? t.sleep
+                : t.walking && t.walk != null && ((int) (t.phase * 4) % 2 == 0) ? t.walk : t.idle;
     }
 
     record BeeOffset(float x, float y) {}
