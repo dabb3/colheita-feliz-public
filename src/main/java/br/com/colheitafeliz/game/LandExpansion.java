@@ -1,12 +1,16 @@
 package br.com.colheitafeliz.game;
 
+import java.math.BigDecimal;
+import br.com.colheitafeliz.domain.economy.Currency;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
 /** Keep the left starting column, then purchase the remaining field left to right and top to bottom. */
 public final class LandExpansion {
-    public record Plot(int id, int column, int row, int requiredLevel, int price) {}
+    public record Plot(int id, int column, int row, int requiredLevel, BigDecimal price) {
+        public Currency currency() { return Currency.GREEN; }
+    }
 
     private static final List<int[]> COORDINATES = List.of(
             new int[]{0, 0}, new int[]{0, 1}, new int[]{0, 2}, new int[]{0, 3}, new int[]{0, 4},
@@ -69,7 +73,7 @@ public final class LandExpansion {
     private static Plot describe(int id) {
         int[] coordinate = COORDINATES.get(id);
         int level = id < 5 ? 1 : id < 10 ? 2 : id < 15 ? 3 : id < 20 ? 4 : 5;
-        int price = id < 5 ? 0 : id < 10 ? 75 : id < 15 ? 200 : id < 20 ? 500 : 1000;
+        BigDecimal price = BigDecimal.valueOf(id < 5 ? 0 : 50);
         return new Plot(id, coordinate[0], coordinate[1], level, price);
     }
 }

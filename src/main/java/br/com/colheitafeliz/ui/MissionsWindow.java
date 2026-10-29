@@ -14,7 +14,7 @@ import com.badlogic.gdx.utils.Align;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 
 /** Janela das missões diárias: uma linha por missão, com barra de progresso e recompensas. */
 public final class MissionsWindow {
@@ -50,11 +50,8 @@ public final class MissionsWindow {
         skin.text(batch, skin.title, "×", close.x + close.width / 2f, close.y + 27,
                 overClose ? Palette.ON_COLOR : Palette.INK_MUTED, Align.center);
 
-        if (tutorial) {
-            drawTutorial(batch, skin, assets, state.tutorial());
-            return;
-        }
-        int index = 0;
+        if (tutorial) drawTutorial(batch, skin, assets, state.tutorial());
+        int index = tutorial ? 1 : 0;
         for (DailyMissionBoard.Mission mission : state.dailyMissions().missions()) {
             float x = LEFT + 20, y = BOTTOM + HEIGHT - BAR - 20 - (index + 1) * ROW_H + 8, w = WIDTH - 40, h = ROW_H - 12;
             boolean done = state.dailyMissions().completed(mission);
@@ -62,22 +59,16 @@ public final class MissionsWindow {
             skin.draw(batch, done ? skin.missionDone : skin.mission, x, y, w, h);
             Toolbar.drawFitted(batch, icon(assets, mission), x + 44, y + h / 2f, 60);
             skin.text(batch, skin.label, mission.title(), x + 88, y + h - 22, Palette.INK, Align.left);
-            skin.bar(batch, done ? skin.barSun : skin.barLeaf, x + 88, y + 18, 360, 20,
+            skin.bar(batch, done ? skin.barSun : skin.barLeaf, x + 88, y + 18, 300, 20,
                     amount / (float) mission.target(), amount + " / " + mission.target());
             float rx = x + w - 20;
-            String xp = "+" + mission.xp();
-            String coins = "+" + mission.coins();
-            float xpW = skin.width(skin.label, xp);
-            skin.text(batch, skin.label, xp, rx, y + h - 22, Palette.SKY_INK, Align.right);
-            Toolbar.drawFitted(batch, assets.star, rx - xpW - 14, y + h - 28, 22);
-            float coinsRight = rx - xpW - 34;
-            skin.text(batch, skin.label, coins, coinsRight, y + h - 22, Palette.COIN_INK, Align.right);
-            Toolbar.drawFitted(batch, assets.coin, coinsRight - skin.width(skin.label, coins) - 14, y + h - 28, 22);
+            skin.text(batch, skin.label, "+1 verde", rx, y + h - 22, Palette.LEAF_INK, Align.right);
+            Toolbar.drawFitted(batch, assets.greenCoin, rx - 90, y + h - 28, 22);
             skin.text(batch, skin.caption, done ? "Concluída · recompensa recebida" : "Em andamento",
                     rx, y + 32, done ? Palette.LEAF_INK : Palette.INK_MUTED, Align.right);
             index++;
         }
-        skin.text(batch, skin.caption, "Novas missões em " + untilMidnight(state.dailyMissions().day())
+        skin.text(batch, skin.caption, "Novas missões em " + untilMidnight(state.dailyMissions().day(), state.realNow())
                 + " (meia-noite UTC)  ·  [Q] fecha", LEFT + WIDTH / 2f, BOTTOM + 26, Palette.INK_MUTED, Align.center);
     }
 
@@ -91,17 +82,7 @@ public final class MissionsWindow {
         skin.text(batch, skin.caption, step.hint(), x + 88, y + h - 46, Palette.INK_MUTED, Align.left);
         skin.bar(batch, skin.barLeaf, x + 88, y + 8, 360, 16,
                 tutorial.stepIndex() / (float) Tutorial.STEPS.size(), tutorial.stepIndex() + " / " + Tutorial.STEPS.size());
-        float rx = x + w - 20;
-        String xp = "+" + step.xp(), coins = "+" + step.coins();
-        float xpW = skin.width(skin.label, xp);
-        skin.text(batch, skin.label, xp, rx, y + h - 22, Palette.SKY_INK, Align.right);
-        Toolbar.drawFitted(batch, assets.star, rx - xpW - 14, y + h - 28, 22);
-        float coinsRight = rx - xpW - 34;
-        skin.text(batch, skin.label, coins, coinsRight, y + h - 22, Palette.COIN_INK, Align.right);
-        Toolbar.drawFitted(batch, assets.coin, coinsRight - skin.width(skin.label, coins) - 14, y + h - 28, 22);
-        skin.text(batch, skin.body, "As missões diárias começam depois dos primeiros passos.",
-                LEFT + WIDTH / 2f, BOTTOM + HEIGHT / 2f - 40, Palette.INK_MUTED, Align.center);
-        skin.text(batch, skin.caption, "[Q] fecha", LEFT + WIDTH / 2f, BOTTOM + 26, Palette.INK_MUTED, Align.center);
+
     }
 
     private static Texture icon(GameAssets assets, DailyMissionBoard.Mission mission) { return icon(assets, mission.action()); }
@@ -115,13 +96,13 @@ public final class MissionsWindow {
             case "plow" -> assets.hoe;
             case "buy" -> assets.shop;
             case "collect" -> assets.nestEggs;
-            default -> assets.gift;
+            case "care" -> assets.water;
+            default -> assets.shop;
         };
     }
 
-    private static String untilMidnight(LocalDate day) {
-        ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-        Duration left = Duration.between(now, day.plusDays(1).atStartOfDay(ZoneOffset.UTC));
+    private static String untilMidnight(LocalDate day, Instant now) {
+        Duration left = Duration.between(now, day.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant());
         if (left.isNegative()) left = Duration.ZERO;
         long minutes = left.toMinutes();
         return minutes >= 60 ? minutes / 60 + "h" + String.format("%02d", minutes % 60) : minutes + " min";

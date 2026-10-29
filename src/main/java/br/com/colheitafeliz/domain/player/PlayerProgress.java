@@ -39,7 +39,6 @@ public final class PlayerProgress {
     }
 
     private BigDecimal xpToNext(int level) {
-        return BigDecimal.valueOf(rules.levelBaseXp()).add(BigDecimal.valueOf(level - 1L)
-                .multiply(BigDecimal.valueOf(rules.levelStepXp())));
+        return rules.xpToNext(level);
     }
 }

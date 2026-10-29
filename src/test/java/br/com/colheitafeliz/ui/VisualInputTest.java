@@ -22,7 +22,7 @@ class VisualInputTest {
         game.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GREEN, new java.math.BigDecimal("95"));
         assertTrue(panel.click(cx(MarketPanel.vipButton()), cy(MarketPanel.vipButton()), game).success());
         assertTrue(game.vipActive());
-        assertEquals(0, java.math.BigDecimal.ZERO.compareTo(game.greenCoins()));
+        assertEquals(0, java.math.BigDecimal.ONE.compareTo(game.greenCoins()));
         assertEquals(0, new java.math.BigDecimal("500").compareTo(game.wallet().coins()));
         assertTrue(panel.handles(0, 0));
     }
@@ -154,7 +154,7 @@ class VisualInputTest {
         java.math.BigDecimal before = game.greenCoins();
         assertTrue(modal.click(cx(green), cy(green), game).success());
         assertEquals(1, game.inventory().fertilizer("rapido"));
-        assertEquals(0, before.subtract(java.math.BigDecimal.ONE).compareTo(game.greenCoins()), "1 verde, sem converter para ouro");
+        assertEquals(0, before.compareTo(game.greenCoins()), "1 verde, sem converter para ouro");
         int comum = game.fertilizers().indexOf(game.fertilizer("comum"));
         Rectangle noGreen = MarketPanel.buyFertilizerButton(comum, 1);
         assertNull(modal.click(cx(noGreen), cy(noGreen), game), "o comum não tem preço em verdes");

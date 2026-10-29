@@ -30,11 +30,11 @@ class NewEconomySaveTest {
         session.state().inventory().addProduceLot(lot);
         session.save();
         var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
-        assertEquals(18, json.get("version").getAsInt());
+        assertEquals(19, json.get("version").getAsInt());
         assertEquals("economy-2026-10", json.get("ruleset").getAsString());
         var restored = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state();
         assertEquals(0, new BigDecimal("500.1").compareTo(restored.wallet().coins()));
-        assertEquals(0, BigDecimal.ZERO.compareTo(restored.greenCoins()));
+        assertEquals(0, BigDecimal.ONE.compareTo(restored.greenCoins()));
         assertEquals(0, new BigDecimal("14.4375").compareTo(restored.progress().currentXp()));
         assertEquals(java.util.List.of(lot), restored.inventory().produceLots());
         assertEquals(session.state().vip(), restored.vip());
@@ -89,7 +89,7 @@ class NewEconomySaveTest {
         var clock = new ManualClock();
         var session = GameSession.open(clock, CropCatalogLoader.load(),
                 new JsonSaveRepository(directory.resolve("fresh.json")), bound -> 99);
-        for (int version : new int[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 19, 99}) {
+        for (int version : new int[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 99}) {
             Path file = directory.resolve("legacy-" + version + ".json");
             String bytes = "{\"version\":" + version + ",\"snapshot\":{\"coins\":99999}}";
             Files.writeString(file, bytes);
@@ -134,7 +134,7 @@ class NewEconomySaveTest {
     @Test void defaultPathChangesWithTheFormatSoTheFirstEconomySaveDoesNotBlockTheGame() {
         // A main da etapa 1 grava v15 em game-rules-v1.json; o v16 abre num arquivo novo e deixa aquele intacto.
         assertNotEquals("save/game-rules-v1.json", GameSave.DEFAULT_PATH);
-        assertEquals("save/game-rules-v3.json", GameSave.DEFAULT_PATH);
+        assertEquals("save/game-rules-v4.json", GameSave.DEFAULT_PATH);
     }
 
     @Test void malformedNewSaveIsNotAFreshGame() throws IOException {
@@ -182,12 +182,15 @@ class NewEconomySaveTest {
         return file;
     }
 
-    @Test void stage2SaveV16WithoutFertilizerLoadsAndIsUpgradedOnTheNextSave() throws IOException {
+    @Test void previousProgressionEvenWithoutStockIsRefusedAndPreserved() throws IOException {
         Path file = stage2Save("stage2.json", 0);
-        assertTrue(new br.com.colheitafeliz.persistence.stage2.Stage2JsonSaveRepository(file).load().isPresent());
-        var session = GameSession.open(new ManualClock(), CropCatalogLoader.load(), new JsonSaveRepository(file), bound -> 99);
-        assertTrue(session.trySave());
-        assertEquals(18, JsonParser.parseString(Files.readString(file)).getAsJsonObject().get("version").getAsInt());
+        String before = Files.readString(file);
+        var repository = new JsonSaveRepository(file);
+        assertThrows(IOException.class, repository::load);
+        var clock = new ManualClock();
+        var fresh = new br.com.colheitafeliz.game.GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
+        assertThrows(IOException.class, () -> repository.save(fresh.snapshot(), clock.instant(), clock.instant()));
+        assertEquals(before, Files.readString(file));
     }
 
     @Test void stage2SaveV16WithFertilizerStockIsRefusedAndPreserved() throws IOException {

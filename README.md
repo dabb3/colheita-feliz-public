@@ -19,7 +19,11 @@ Em Linux/macOS use `./gradlew`. No macOS o launcher configura `-XstartOnFirstThr
 
 ## Jogar
 
-Comece colhendo os dois nabos prontos. Siga as tarefas de primeiros passos para aprender a vender, comprar sementes, arar, plantar e regar. Depois, cumpra as missões diárias e amplie a fazenda.
+A fazenda começa vazia, no nível 1, com 500 ouro, 5 verdes e cinco terrenos em grama. Compre uma semente de nabo na loja e siga a orientação para arar, plantar, regar, esperar a maturação, colher e vender. O tutorial não concede bônus; cada ação mantém seu XP normal.
+
+Duas tarefas fixas já contam durante o tutorial: cuidar da fazenda e realizar uma compra ou venda válida. Cada uma paga 1 verde por dia UTC, sem ouro, itens ou XP extra. Reabrir o jogo ou retroceder o relógio não reabre pagamentos antigos. Terrenos extras custam 50 verdes, mantendo a ordem e os requisitos de nível.
+
+A curva exige `25 + 3 × (nível − 1)²` XP para o próximo nível e preserva todo excedente decimal. Níveis tabelados concedem apenas ouro e verdes. Um ensaio sem pragas, com nabo, animais e reinvestimento, chegou ao nível 30 em 31,333 dias com três visitas diárias; uma visita levou 64 dias e só plantas, 74,667 dias. São rotinas controladas sobre o domínio Java, sem VIP ou fertilizantes, não uma garantia de prazo para qualquer jogador.
 
 | Tecla | Ação |
 | --- | --- |
@@ -42,15 +46,15 @@ Os preços, tempos e rendimentos ficam em [crops.json](assets/data/crops.json); 
 
 ## Save
 
-O save da nova economia é local: `save/game-rules-v3.json`, relativo ao diretório de execução, no formato v18. Cada animal guarda origem monetária, aquisição real, progresso e alimentação. O arquivo padrão novo preserva `game-rules-v1.json` e `game-rules-v2.json` das versões anteriores. Defina `COLHEITA_SAVE_PATH` para usar outro caminho.
+O save local atual é `save/game-rules-v4.json`, relativo ao diretório de execução, no formato v19 (`economy-2026-10`). Ele guarda a curva nova, o passo do tutorial e o maior dia UTC processado com os pagamentos das duas tarefas, além dos lotes, culturas, animais e preferências.
 
-Um caminho explícito com save v16/v17 pode ser carregado somente se não contiver animais nem ração antiga; v16 também exige estoque vazio de adubo antigo. Os lotes de produtos já salvos mantêm literalmente moeda e custo, sem reprecificação. O próximo salvamento escreve v18, que os leitores v16/v17 recusam sem sobrescrever. Não se inventa origem para animais antigos. Arquivos incompatíveis, futuros ou inválidos impedem a carga e permanecem preservados. Para começar outra fazenda após uma recusa, remova `COLHEITA_SAVE_PATH` da sessão ou aponte para um arquivo inexistente, mantendo o original. Faça backup antes de trocar de versão. Há autosave e progresso offline; saves não são versionados.
+A curva, o tutorial e as tarefas mudaram de significado. Saves v16, v17 e v18, assim como formatos anteriores, futuros ou inválidos, são recusados sem conversão nem sobrescrita, mesmo quando selecionados por `COLHEITA_SAVE_PATH`. Os arquivos `game-rules-v1.json`, `game-rules-v2.json`, `game-rules-v3.json` e `game.json` permanecem em disco. Para começar outra fazenda após uma recusa, remova `COLHEITA_SAVE_PATH` da sessão ou aponte para um arquivo inexistente, mantendo o original. Faça backup antes de trocar de versão. Há autosave e progresso offline; saves não são versionados.
 
 Uma fazenda nova começa com 500 moedas de ouro e 5 verdes. Saldos usam uma casa decimal; XP preserva frações. Produtos mantêm a moeda e o custo de aquisição da semente. A venda soma os lotes elegíveis por moeda, aplica lucro de 15% e arredonda o total para cima em uma casa decimal. Na aba **VIP**, 100 verdes compram 30 dias reais, acumuláveis; enquanto ativo, o lucro é 25%. Produtos exclusivos ficam bloqueados sem VIP e são ignorados em **Vender tudo**.
 
 Produtos animais usam o custo e a moeda reais da aquisição do produtor. A ração comprada depois não muda essa base. A venda adulta usa a origem do próprio animal. Coleta e venda adulta concedem o XP da espécie uma única vez.
 
-A substituição do catálogo, dos ciclos e da progressão restante está dividida nas próximas etapas. Baús ao arar, presentes iniciais e recompensas do tutorial serão retirados na etapa de progressão (5/6). As regras finais estão em [game-rule.md](docs/game-rule.md); nem todas estão implementadas nesta etapa econômica.
+As etapas econômicas 1–5 estão implementadas neste checkout: catálogo, temporadas, fertilizantes, animais e progressão. Baús e presentes do fluxo antigo foram removidos. Contratos sociais e cobertura de proteção pertencem à etapa 6; contas e visitas online ainda não estão disponíveis. As regras completas estão em [game-rule.md](docs/game-rule.md).
 
 ## Desenvolvimento e distribuição
 

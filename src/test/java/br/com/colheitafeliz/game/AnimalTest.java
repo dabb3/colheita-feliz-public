@@ -68,7 +68,7 @@ class AnimalTest {
         assertEquals(0, new java.math.BigDecimal("9").compareTo(lot.unitCost()));
         var green = game.greenCoins();
         assertTrue(game.sellProduct(hen, false).success());
-        assertEquals(0, new java.math.BigDecimal("10.4").compareTo(game.greenCoins().subtract(green)));
+        assertEquals(0, new java.math.BigDecimal("11.4").compareTo(game.greenCoins().subtract(green)));
         assertFalse(game.sellProduct(hen, false).success());
         assertTrue(game.buyAnimal(hen).success());
     }

@@ -1,6 +1,6 @@
 {
-  "levelBaseXp": 50,
-  "levelStepXp": 25,
+  "levelBaseXp": 25,
+  "levelQuadraticXp": 3,
   "plantXp": 5,
   "waterXp": 3,
   "removePestXp": 5,

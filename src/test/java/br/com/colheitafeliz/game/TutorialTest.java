@@ -1,66 +1,107 @@
 package br.com.colheitafeliz.game;
-
-import br.com.colheitafeliz.domain.crop.CropType;
 import br.com.colheitafeliz.domain.farm.TileState;
 import br.com.colheitafeliz.testsupport.ManualClock;
+import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
-
 class TutorialTest {
-    @Test void newFarmStartsWithReadyTurnipsAndTheFirstStep() {
-        ManualClock clock = new ManualClock();
-        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
-        assertFalse(game.tutorial().active());
+    @Test void plowingAllStartingPlotsBeforeBuyingDoesNotStrandTheTutorial() {
+        var clock = new ManualClock();
+        var game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
         game.startNewFarm();
-        assertTrue(game.tutorial().active());
-        assertEquals("harvest", game.tutorial().current().action());
-        game.refresh();
-        assertEquals(TileState.READY, game.farm().tile(0, 0).state());
-        assertEquals(TileState.READY, game.farm().tile(0, 1).state());
-        assertEquals(TileState.GRASS, game.farm().tile(0, 2).state());
+        game.selectTool(Tool.HOE);
+        for (int row = 0; row < GameState.ROWS; row++) assertTrue(game.act(0, row).success());
+        assertEquals(0, game.tutorial().stepIndex());
+        assertTrue(game.buySeed(game.catalog().get("nabo")).success());
+        assertEquals("plant", game.tutorial().current().action());
+        exact("200", game.wallet().coins());
+        exact("6", game.greenCoins());
+        exact("0", game.progress().currentXp());
+        game.selectSeed(game.catalog().get("nabo"));
+        assertTrue(game.act(0, 0).success());
+        assertEquals("water", game.tutorial().current().action());
     }
 
-    @Test void stepsAdvanceInOrderPayRewardsAndHoldBackDailyMissions() {
-        ManualClock clock = new ManualClock();
-        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
+    @Test void emptyFarmTeachesRealActionsWithoutExtraRewards() {
+        var clock = new ManualClock();
+        var game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
         game.startNewFarm();
-        CropType turnip = game.catalog().get("nabo");
-
+        assertEquals("buy", game.tutorial().current().action());
+        assertEquals(5, game.land().snapshot().size());
+        for (int row = 0; row < GameState.ROWS; row++)
+            for (int col = 0; col < GameState.COLUMNS; col++)
+                assertEquals(TileState.GRASS, game.farm().tile(col, row).state());
+        assertTrue(game.inventory().seedLots().isEmpty());
+        assertTrue(game.inventory().produceLots().isEmpty());
+        assertEquals(0, game.barn().size());
+        assertTrue(game.inventory().feedSnapshot().isEmpty());
+        assertTrue(game.inventory().fertilizerSnapshot().isEmpty());
+        var turnip = game.catalog().get("nabo");
         assertTrue(game.buySeed(turnip).success());
-        assertEquals(0, game.tutorial().stepIndex(), "comprar fora de ordem não avança");
-
-        game.selectTool(Tool.HAND);
-        assertTrue(game.act(0, 0).success());
-        assertEquals(1, game.tutorial().stepIndex());
-        assertTrue(game.message().contains("Tarefa concluída: +10 moedas"));
-
-        assertTrue(game.sellEverything().success());
-        assertEquals(2, game.tutorial().stepIndex());
-        assertTrue(game.buySeed(turnip).success());
-        assertEquals(3, game.tutorial().stepIndex());
+        exact("200", game.wallet().coins());
+        exact("6", game.greenCoins());
         game.selectTool(Tool.HOE);
-        assertTrue(game.act(0, 0).success(), "a pá na planta morta conta como arar");
-        assertEquals(4, game.tutorial().stepIndex());
+        assertTrue(game.act(0, 0).success());
+        exact("200", game.wallet().coins());
+        exact("6", game.greenCoins());
         game.selectSeed(turnip);
         assertTrue(game.act(0, 0).success());
-        assertEquals(5, game.tutorial().stepIndex());
-        for (DailyMissionBoard.Mission mission : game.dailyMissions().missions())
-            assertEquals(0, game.dailyMissions().progress(mission), "missões não contam durante o tutorial");
-
+        exact("5", game.progress().currentXp());
+        exact("7", game.greenCoins());
         game.selectTool(Tool.WATER);
         assertTrue(game.act(0, 0).success());
+        exact("8", game.progress().currentXp());
+        assertEquals("harvest", game.tutorial().current().action());
+        assertTrue(game.tutorial().current().hint().contains("Aguarde"));
+        game.selectTool(Tool.HAND);
+        assertFalse(game.act(0, 0).success());
+        for (int i = 0; i < 3; i++) {
+            clock.advanceSeconds(12_000);
+            game.refresh();
+            if (game.farm().tile(0, 0).state() == TileState.GROWING) {
+                game.selectTool(Tool.WATER);
+                assertTrue(game.act(0, 0).success());
+            }
+        }
+        game.selectTool(Tool.HAND);
+        assertTrue(game.act(0, 0).success());
+        assertTrue(game.sellEverything().success());
         assertFalse(game.tutorial().active());
-        assertTrue(game.message().contains("Primeiros passos concluídos"));
-        int rewards = 0;
-        for (Tutorial.Step step : Tutorial.STEPS) rewards += step.coins();
-        // Cada colheita rende uma unidade, vendida pelo custo da semente com o acréscimo comum.
-        java.math.BigDecimal harvested = turnip.seedPrice().getValue()
-                .multiply(new java.math.BigDecimal("1.15")).setScale(1, java.math.RoundingMode.CEILING);
-        java.math.BigDecimal levelGold = java.math.BigDecimal.ZERO;
-        for (int level = 2; level <= game.progress().level(); level++)
-            levelGold = levelGold.add(ProgressionLoader.load().rewardFor(level).gold());
-        assertEquals(0, turnip.seedPrice().getValue().multiply(java.math.BigDecimal.valueOf(-2))
-                .add(java.math.BigDecimal.valueOf(500 + rewards)).add(harvested).add(levelGold)
-                .compareTo(game.wallet().coins()));
+        exact("545", game.wallet().coins());
+        exact("7", game.greenCoins());
+        assertEquals(2, game.progress().level());
+        exact("4", game.progress().currentXp());
+        var restored = GameState.restore(clock::instant, clock, game.catalog(), game.snapshot(), bound -> 99);
+        assertFalse(restored.tutorial().active());
+        exact("545", restored.wallet().coins());
+        exact("7", restored.greenCoins());
+        exact("4", restored.progress().currentXp());
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"feed", "vip", "animal", "fertilizer", "plot"})
+    void otherPurchasesPayTradeWithoutPretendingToBuyASeed(String purchase) {
+        var clock = new ManualClock();
+        var game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
+        game.startNewFarm();
+        game.progress().award(10000);
+        game.wallet().credit(100000);
+        game.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GREEN, new BigDecimal("1000"));
+        ActionResult result = switch (purchase) {
+            case "feed" -> game.buyFeed("growth");
+            case "vip" -> game.buyVip();
+            case "animal" -> game.buyAnimal(game.animalType("galinha"));
+            case "fertilizer" -> game.buyFertilizer("comum", br.com.colheitafeliz.domain.economy.Currency.GOLD);
+            case "plot" -> game.buyPlot(1, 0);
+            default -> throw new IllegalArgumentException(purchase);
+        };
+        assertTrue(result.success());
+        assertEquals(java.util.List.of("trade"), game.dailyMissions().completedSnapshot());
+        assertEquals(0, game.tutorial().stepIndex());
+        assertTrue(game.buySeed(game.catalog().get("nabo")).success());
+        assertEquals(1, game.tutorial().stepIndex());
+    }
+
+    private static void exact(String expected, BigDecimal actual) {
+        assertEquals(0, new BigDecimal(expected).compareTo(actual));
     }
 }

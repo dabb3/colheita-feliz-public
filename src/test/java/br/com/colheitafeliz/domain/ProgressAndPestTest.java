@@ -14,18 +14,26 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ProgressAndPestTest {
-    @Test void xpLevelsUpWithCarryAndUnlocksCrops() {
-        PlayerProgress progress = new PlayerProgress(ProgressionLoader.load());
-        assertEquals(0, java.math.BigDecimal.valueOf(50).compareTo(progress.xpToNext()));
-        assertEquals(0, progress.award(49));
-        assertEquals(0, java.math.BigDecimal.valueOf(49).compareTo(progress.currentXp()));
-        assertEquals(1, progress.award(1));
-        assertEquals(2, progress.level());
-        assertEquals(0, java.math.BigDecimal.valueOf(0).compareTo(progress.currentXp()));
-        assertEquals(0, java.math.BigDecimal.valueOf(75).compareTo(progress.xpToNext()));
-        assertEquals(1, progress.award(80));
-        assertEquals(3, progress.level());
-        assertEquals(0, java.math.BigDecimal.valueOf(5).compareTo(progress.currentXp()));
+    @Test void quadraticThresholdsKeepExactFractionalCarry() {
+        int[] levels = {2, 5, 10, 30};
+        int[] totals = {25, 142, 837, 23867};
+        for (int i = 0; i < levels.length; i++) {
+            PlayerProgress progress = new PlayerProgress(ProgressionLoader.load());
+            progress.award(new java.math.BigDecimal(totals[i]).subtract(new java.math.BigDecimal("0.125")));
+            assertEquals(levels[i] - 1, progress.level());
+            progress.award(new java.math.BigDecimal("0.250"));
+            assertEquals(levels[i], progress.level());
+            assertEquals(0, new java.math.BigDecimal("0.125").compareTo(progress.currentXp()));
+        }
+        PlayerProgress at29 = new PlayerProgress(ProgressionLoader.load(), 29, java.math.BigDecimal.ZERO);
+        assertEquals(0, new java.math.BigDecimal("2377").compareTo(at29.xpToNext()));
+        var progress = new PlayerProgress(ProgressionLoader.load());
+        java.math.BigDecimal previous = java.math.BigDecimal.ZERO;
+        for (int level = 1; level < 100; level++) {
+            assertTrue(progress.xpToNext().compareTo(previous) > 0);
+            previous = progress.xpToNext();
+            progress.award(previous);
+        }
     }
 
     @Test void lockedCropCannotBeBoughtUntilItsLevel() {
@@ -53,7 +61,7 @@ class ProgressAndPestTest {
         game.refresh();
         game.selectTool(Tool.HAND);
         for (int row = 0; row < 3; row++) assertTrue(game.act(0, row).success());
-        assertEquals(2, game.progress().level());
+        assertEquals(3, game.progress().level());
         assertTrue(game.unlocked(potato));
         assertEquals(0, game.inventory().seeds(potato), "subir de nível não dá sementes");
         assertTrue(game.buySeed(potato).success());
@@ -74,9 +82,8 @@ class ProgressAndPestTest {
         assertFalse(game.act(0, 0).success());
         assertEquals("A terra ainda está úmida.", game.message());
         clock.advanceSeconds(4_800);
-        java.math.BigDecimal xp = game.progress().currentXp();
         assertTrue(game.act(0, 0).success());
-        assertEquals(xp.add(java.math.BigDecimal.valueOf(3)), game.progress().currentXp());
+        assertEquals(new java.math.BigDecimal("11"), game.progress().currentXp());
         clock.advanceSeconds(12_000);
         assertTrue(game.act(0, 0).success());
         clock.advanceSeconds(12_000);
@@ -100,11 +107,10 @@ class ProgressAndPestTest {
             clock.advanceSeconds(18_000);
         }
         game.refresh();
-        java.math.BigDecimal xp = game.progress().currentXp();
         game.selectTool(Tool.HAND);
         assertTrue(game.act(0, 0).success());
         assertEquals(1, game.inventory().produce(carrot));
-        assertEquals(0, xp.add(carrot.harvestXp(1)).compareTo(game.progress().currentXp()));
+        assertEquals(0, new java.math.BigDecimal("11.5").compareTo(game.progress().currentXp()));
     }
 
     @Test void weedsPauseGrowthUntilRemovalWithInjectedRandom() {
@@ -173,11 +179,10 @@ class ProgressAndPestTest {
         assertEquals(2, tile.insects());
         assertEquals(grown, tile.crop().grownMillisAt(clock.instant()));
         assertEquals(PestState.NONE, tile.pest());
-        java.math.BigDecimal xp = game.progress().currentXp();
         assertTrue(game.act(0, 0).success());
         assertEquals(0, tile.insects());
         assertFalse(tile.crop().paused());
-        assertEquals(xp.add(java.math.BigDecimal.valueOf(5)), game.progress().currentXp());
+        assertEquals(new java.math.BigDecimal("13"), game.progress().currentXp());
     }
 
     @Test void harvestAfterInsectsDepositsOneUnitWithoutLoss() {
@@ -205,12 +210,11 @@ class ProgressAndPestTest {
         game.refresh();
         assertEquals(TileState.READY, tile.state());
         game.selectTool(Tool.HAND);
-        java.math.BigDecimal xp = game.progress().currentXp();
         assertTrue(game.act(0, 0).success());
         assertEquals(1, game.inventory().produce(turnip));
         assertEquals(1, game.lastHarvestAmount());
         assertFalse(game.message().contains("comeram"));
-        assertEquals(0, xp.add(turnip.harvestXp(1)).compareTo(game.progress().currentXp()));
+        assertEquals(0, new java.math.BigDecimal("9").compareTo(game.progress().currentXp()));
     }
 
     @Test void removingOnePestOnlyAnnouncesGrowthWhenTheOtherIsGone() {

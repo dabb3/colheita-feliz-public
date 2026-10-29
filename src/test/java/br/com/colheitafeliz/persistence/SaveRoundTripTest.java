@@ -22,6 +22,40 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SaveRoundTripTest {
+    @Test void paidUtcDaySurvivesRestartRollbackAndSkippedDays() throws IOException {
+        var clock = new ManualClock();
+        var repository = new JsonSaveRepository(directory.resolve("daily.json"));
+        var catalog = CropCatalogLoader.load();
+        var session = GameSession.open(clock, catalog, repository, bound -> 99);
+        var state = session.state();
+        state.startNewFarm();
+        assertTrue(state.buySeed(catalog.get("nabo")).success());
+        state.selectTool(Tool.HOE);
+        assertTrue(state.act(0, 0).success());
+        state.selectSeed(catalog.get("nabo"));
+        assertTrue(state.act(0, 0).success());
+        session.save();
+        session = GameSession.open(clock, catalog, repository, bound -> 99);
+        assertEquals(0, new java.math.BigDecimal("7").compareTo(session.state().greenCoins()));
+        clock.advanceSeconds(3 * 86400);
+        session.state().refresh();
+        assertEquals(0, new java.math.BigDecimal("7").compareTo(session.state().greenCoins()));
+        assertTrue(session.state().buyFeed("growth").success());
+        session.save();
+        var highDay = session.state().dailyMissions().day();
+        clock.advanceSeconds(-3 * 86400);
+        session = GameSession.open(clock, catalog, repository, bound -> 99);
+        assertEquals(highDay, session.state().dailyMissions().day());
+        session.state().wallet().credit(1000);
+        assertTrue(session.state().buyFeed("growth").success());
+        assertEquals(0, new java.math.BigDecimal("8").compareTo(session.state().greenCoins()));
+        session.save();
+        clock.advanceSeconds(4 * 86400);
+        session = GameSession.open(clock, catalog, repository, bound -> 99);
+        assertTrue(session.state().buyFeed("growth").success());
+        assertEquals(0, new java.math.BigDecimal("9").compareTo(session.state().greenCoins()));
+    }
+
     @TempDir Path directory;
 
     @Test void saveAndLoadKeepMoneyInventorySoilCropAndWater() throws IOException {
@@ -168,13 +202,12 @@ class SaveRoundTripTest {
         GameSession session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
         assertTrue(session.fresh());
         session.state().startNewFarm();
-        session.state().selectTool(Tool.HAND);
-        session.state().act(0, 0);
+        assertTrue(session.state().buySeed(session.state().catalog().get("nabo")).success());
         session.save();
         GameSession reopened = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
         assertFalse(reopened.fresh());
         assertEquals(1, reopened.state().tutorial().stepIndex());
-        assertEquals(TileState.READY, reopened.state().farm().tile(0, 1).state());
+        assertEquals(TileState.GRASS, reopened.state().farm().tile(0, 1).state());
 
     }
 
@@ -235,10 +268,11 @@ class SaveRoundTripTest {
         var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
         json.addProperty("version", 17);
         Files.writeString(file, json.toString());
-        var reopened = GameSession.open(clock, CropCatalogLoader.load(), repo, bound -> 99);
-        assertEquals(java.util.List.of(lot), reopened.state().inventory().produceLots());
-        reopened.save();
-        assertEquals(18, JsonParser.parseString(Files.readString(file)).getAsJsonObject().get("version").getAsInt());
+        String before = Files.readString(file);
+        assertThrows(IOException.class, repo::load);
+        assertThrows(IOException.class, () -> session.save());
+        assertEquals(before, Files.readString(file));
+
     }
 
     @Test void stageThreeReaderRefusesSave18AndNeverOverwritesIt() throws IOException {
@@ -342,7 +376,7 @@ class SaveRoundTripTest {
         session.save();
         GameState restored = GameSession.open(clock, CropCatalogLoader.load(), repository,
                 bound -> 99).state();
-        assertEquals(2, restored.progress().level());
+        assertEquals(3, restored.progress().level());
         assertTrue(restored.unlocked(potato));
         assertTrue(restored.buySeed(potato).success());
     }
