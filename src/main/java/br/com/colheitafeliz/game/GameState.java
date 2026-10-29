@@ -3,6 +3,7 @@ package br.com.colheitafeliz.game;
 import br.com.colheitafeliz.domain.animal.Animal;
 import br.com.colheitafeliz.domain.animal.AnimalType;
 import br.com.colheitafeliz.domain.animal.Barn;
+import br.com.colheitafeliz.domain.animal.ProtectionRules;
 import br.com.colheitafeliz.domain.crop.Crop;
 import br.com.colheitafeliz.domain.crop.CropCatalog;
 import br.com.colheitafeliz.domain.crop.CropType;
@@ -42,6 +43,8 @@ public final class GameState {
     private final Clock realClock;
     private final CropCatalog catalog;
     private final PestSystem pests;
+    private final RandomSource random;
+    private GameSnapshot.ProtectionSnapshot protection;
     private final PlayerProgress progress;
     private final DailyMissionBoard dailyMissions;
     private final LandExpansion land = new LandExpansion();
@@ -81,6 +84,7 @@ public final class GameState {
         wallet = new Wallet(coins, green);
         market = new Market(wallet, inventory);
         Objects.requireNonNull(random);
+        this.random = random;
         pests = new PestSystem(random);
         progress = new PlayerProgress(ProgressionLoader.load(), level, currentXp);
         dailyMissions = new DailyMissionBoard(LocalDate.ofInstant(realClock.instant(), java.time.ZoneOffset.UTC));
@@ -137,6 +141,12 @@ public final class GameState {
     }
 
     public ActionResult act(int col, int row) {
+        synchronized (GameState.class) {
+            return actLocally(col, row);
+        }
+    }
+
+    private ActionResult actLocally(int col, int row) {
         if (!farm.contains(col, row)) return report(ActionResult.fail("Clique em um terreno da fazenda."));
         if (!land.isUnlocked(col, row)) return report(ActionResult.fail("Este lote ainda está bloqueado."));
         FarmTile tile = farm.tile(col, row);
@@ -167,6 +177,8 @@ public final class GameState {
                     result = ActionResult.fail("Você não possui sementes de " + seed.name() + ".");
                 else if (seed.vipOnly() && !vipActive())
                     result = ActionResult.fail(seed.name() + " exige cartão VIP ativo para plantar.");
+                else if (tile.harvestRevision() == Long.MAX_VALUE)
+                    result = ActionResult.fail("Revisão do terreno esgotada.");
                 else {
                     tile.plant(seed, now, inventory.takeSeed(seed.id()));
                     result = ActionResult.ok(seed.name() + " plantado. Use o regador.");
@@ -220,6 +232,8 @@ public final class GameState {
             case HAND -> {
                 if (tile.state() != TileState.READY)
                     result = ActionResult.fail("A planta ainda não está madura.");
+                else if (!inventory.canAddProduceLot(tile.crop().origin()) || tile.harvestRevision() == Long.MAX_VALUE)
+                    result = ActionResult.fail("Depósito ou revisão sem capacidade.");
                 else {
                     // A temporada é lida antes da colheita, que já avança para a próxima.
                     harvested = tile.crop().type();
@@ -380,8 +394,26 @@ public final class GameState {
         return report(ActionResult.ok("+1 ração " + (feedId.equals("growth") ? "de crescimento" : "de produtor") + " | -" + price + " ouro " + recordDailyMission("purchase", 1)));
     }
 
-    public int activeProtectors() { return barn.activeProtectors(realClock.instant(), clock.now()); }
+    public int activeProtectors() { return protectorSignature().size(); }
     public Instant realNow() { return realClock.instant(); }
+
+    private List<String> protectorSignature() {
+        Instant realNow = realClock.instant();
+        Instant simulationNow = clock.now();
+        return barn.animals().stream().filter(animal -> animalTypes.contains(animal.type()) && animal.activeAt(realNow, simulationNow))
+                .map(animal -> animal.type().id() + ":" + animal.acquiredAt() + ":" + animal.growthAnchorAt() + ":" + animal.fedUntil())
+                .sorted().toList();
+    }
+
+    /** IDs da expansão; não são índices lineares de Farm. Sorteia apenas quando os conjuntos mudam. */
+    public java.util.Set<Integer> protectedPlots() {
+        var unlocked = land.snapshot();
+        var active = protectorSignature();
+        if (protection == null || !protection.unlockedIds().equals(unlocked) || !protection.activeProtectors().equals(active))
+            protection = new GameSnapshot.ProtectionSnapshot(unlocked, active,
+                    ProtectionRules.selectPlots(unlocked, active.size(), random).stream().sorted().toList());
+        return java.util.Set.copyOf(protection.protectedIds());
+    }
 
     /** Resolve o tipo capturado pelo renderer, sem reaproveitar um índice que mudou após remoção. */
     public ActionResult tendAnimal(String typeId) {
@@ -566,6 +598,7 @@ public final class GameState {
     public int lastHarvestAmount() { return lastHarvestAmount; }
 
     public GameSnapshot snapshot() {
+        protectedPlots();
         List<GameSnapshot.TileSnapshot> tiles = new ArrayList<>();
         for (int row = 0; row < ROWS; row++) for (int col = 0; col < COLUMNS; col++) {
             FarmTile tile = farm.tile(col, row);
@@ -579,7 +612,7 @@ public final class GameState {
                     crop == null || crop.growthAnchorAt() == null ? null : crop.growthAnchorAt().toString(),
                     crop == null ? 0 : crop.grownAtAnchorMillis(), tile.insects(),
                     tile.nextInsectCheckAt() == null ? null : tile.nextInsectCheckAt().toString(), tile.fertilized(), crop == null ? null : crop.origin(),
-                    crop == null ? 0 : crop.season()));
+                    crop == null ? 0 : crop.season(), tile.harvestRevision()));
         }
         return new GameSnapshot(wallet.coins(), inventory.seedLots(), inventory.produceLots(),
                 tiles, seed.id(), tool, progress.level(), progress.currentXp(),
@@ -589,7 +622,7 @@ public final class GameState {
                         animal.type().id(), animal.origin(), animal.acquiredAt().toString(), animal.growthAnchorAt().toString(),
                         animal.grownAtAnchorMillis(), animal.fedUntil().toString())).toList(),
                 inventory.feedSnapshot(), inventory.fertilizerSnapshot(), fertilizer.id(),
-                greenCoins(), vip.expiresAt() == null ? null : vip.expiresAt().toString());
+                greenCoins(), vip.expiresAt() == null ? null : vip.expiresAt().toString(), protection);
     }
 
     public static GameState restore(GameClock clock, CropCatalog catalog, GameSnapshot snapshot) {
@@ -650,12 +683,13 @@ public final class GameState {
                     : Instant.parse(tile.nextInsectCheckAt());
             game.farm.tile(i % COLUMNS, i / COLUMNS).restore(tile.state(), crop,
                     tile.pest() == null ? PestState.NONE : PestState.valueOf(tile.pest()), next,
-                    tile.insects(), nextInsects, dead ? catalog.get(tile.cropId()) : null, tile.fertilized());
+                    tile.insects(), nextInsects, dead ? catalog.get(tile.cropId()) : null, tile.fertilized(), tile.harvestRevision());
         }
         game.seed = catalog.get(snapshot.selectedSeedId());
         game.tool = Objects.requireNonNull(snapshot.tool());
         game.musicEnabled = snapshot.musicEnabled();
         game.effectsEnabled = snapshot.effectsEnabled();
+        game.protection = snapshot.protection();
         game.refresh();
         game.message = "Jogo carregado.";
         return game;

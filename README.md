@@ -40,13 +40,13 @@ A primeira rega inicia o crescimento. Terra seca reduz a velocidade; ervas danin
 
 A aba **Animais** tem quatro páginas com dez animais econômicos e cinco protetores. Cada tipo tem limite próprio de um animal e compra alternativa em ouro ou verdes, liberada por nível. Produtores chegam adultos e alimentados por 8 h; após uma coleta única, desaparecem e deixam uma unidade no depósito. Animais de crescimento chegam bebês, alimentados por 12 h; clique no adulto para vendê-lo. A loja também vende o adulto e os produtos na mesma aba.
 
-A ração é genérica: crescimento custa 80 ouro e dura 12 h; produtor custa 120 ouro e dura 8 h. Clique no animal com fome para alimentar; uma refeição antecipada é recusada e não acumula tempo. A fome pausa o progresso, inclusive offline, sem reiniciá-lo. Dormir só muda a aparência. Protetores aceitam ambas as rações por 6 h; o clique usa primeiro a de crescimento, se disponível. Eles duram 30 dias reais desde a compra, sem revenda ou XP, e a fome não estende esse prazo. O contador de protetores ativos está disponível; a cobertura das terras e o multiplayer pertencem a uma etapa posterior.
+A ração é genérica: crescimento custa 80 ouro e dura 12 h; produtor custa 120 ouro e dura 8 h. Clique no animal com fome para alimentar; uma refeição antecipada é recusada e não acumula tempo. A fome pausa o progresso, inclusive offline, sem reiniciá-lo. Dormir só muda a aparência. Protetores aceitam ambas as rações por 6 h; o clique usa primeiro a de crescimento, se disponível. Eles duram 30 dias reais desde a compra, sem revenda ou XP, e a fome não estende esse prazo. O núcleo local da etapa 6 calcula e persiste a cobertura das terras; multiplayer e interface de visitas permanecem planejados.
 
 Os preços, tempos e rendimentos ficam em [crops.json](assets/data/crops.json); a progressão fica em [progression.json](assets/data/progression.json) e os animais em [animals.json](assets/data/animals.json). O jogo funciona sem dispositivo de áudio.
 
 ## Save
 
-O save local atual é `save/game-rules-v4.json`, relativo ao diretório de execução, no formato v19 (`economy-2026-10`). Ele guarda a curva nova, o passo do tutorial e o maior dia UTC processado com os pagamentos das duas tarefas, além dos lotes, culturas, animais e preferências.
+O save local atual é `save/game-rules-v4.json`, relativo ao diretório de execução, no formato v20 (`economy-2026-10`). Ele guarda progressão, tarefas, lotes, culturas, animais, preferências, revisão monotônica dos terrenos e seleção de proteção. Um save v19 abre com metadados sociais novos, sem converter a economia; a próxima gravação o atualiza para v20. O executável v19 recusa esse arquivo atualizado. Faça backup antes de trocar de versão.
 
 A curva, o tutorial e as tarefas mudaram de significado. Saves v16, v17 e v18, assim como formatos anteriores, futuros ou inválidos, são recusados sem conversão nem sobrescrita, mesmo quando selecionados por `COLHEITA_SAVE_PATH`. Os arquivos `game-rules-v1.json`, `game-rules-v2.json`, `game-rules-v3.json` e `game.json` permanecem em disco. Para começar outra fazenda após uma recusa, remova `COLHEITA_SAVE_PATH` da sessão ou aponte para um arquivo inexistente, mantendo o original. Faça backup antes de trocar de versão. Há autosave e progresso offline; saves não são versionados.
 
@@ -54,7 +54,7 @@ Uma fazenda nova começa com 500 moedas de ouro e 5 verdes. Saldos usam uma casa
 
 Produtos animais usam o custo e a moeda reais da aquisição do produtor. A ração comprada depois não muda essa base. A venda adulta usa a origem do próprio animal. Coleta e venda adulta concedem o XP da espécie uma única vez.
 
-As etapas econômicas 1–5 estão implementadas neste checkout: catálogo, temporadas, fertilizantes, animais e progressão. Baús e presentes do fluxo antigo foram removidos. Contratos sociais e cobertura de proteção pertencem à etapa 6; contas e visitas online ainda não estão disponíveis. As regras completas estão em [game-rule.md](docs/game-rule.md).
+As etapas econômicas 1–5 e o núcleo social local da etapa 6 estão implementados neste checkout. A API interna de ensaio transfere uma temporada pronta e desprotegida, preservando origem e impedindo consumo duplicado por revisão. Protetores cobrem terrenos distintos com seleção persistida; amor usa o estoque do visitante e o limite compartilhado da temporada, sem recompensas. São operações sobre dois estados locais autorizados pelo chamador controlado. Contas, amigos, visitas na interface e rede dependem de desenho online próprio. As regras completas estão em [game-rule.md](docs/game-rule.md).
 
 ## Desenvolvimento e distribuição
 

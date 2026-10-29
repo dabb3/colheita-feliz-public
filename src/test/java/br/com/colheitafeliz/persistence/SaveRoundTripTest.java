@@ -22,6 +22,127 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SaveRoundTripTest {
+    @Test void stolenSeasonRevisionProtectionAndVisitorOriginSurviveRoundTrip() throws IOException {
+        var clock = new ManualClock();
+        var catalog = CropCatalogLoader.load();
+        var repository = new JsonSaveRepository(directory.resolve("social.json"));
+        var session = GameSession.open(clock, catalog, repository, bound -> bound - 1);
+        var owner = session.state();
+        var visitorRepository = new JsonSaveRepository(directory.resolve("visitor.json"));
+        var visitorSession = GameSession.open(clock, catalog, visitorRepository, bound -> bound - 1);
+        var tile = owner.farm().tile(0, 0);
+        tile.plow();
+        var origin = new br.com.colheitafeliz.domain.inventory.ItemLot("morango", br.com.colheitafeliz.domain.economy.Currency.GREEN,
+                new java.math.BigDecimal("7.3"), 1, true);
+        tile.plant(catalog.get("morango"), owner.now(), origin);
+        var ready = TestCrops.growUntilReady(tile, owner.now());
+        clock.advanceSeconds(java.time.Duration.between(clock.instant(), ready).toSeconds());
+        long revision = tile.harvestRevision();
+        assertTrue(new br.com.colheitafeliz.game.VisitService().steal(owner, visitorSession.state(), 0, 0, revision).success());
+        while (owner.progress().level() < 10) owner.progress().award(owner.progress().xpToNext());
+        owner.wallet().credit(100_000);
+        assertTrue(owner.buyAnimal(owner.animalType("cachorro-robo")).success());
+        var protectedIds = owner.protectedPlots();
+        session.save(); visitorSession.save();
+        var restored = GameSession.open(clock, catalog, repository, bound -> bound - 1).state();
+        assertEquals(protectedIds, restored.protectedPlots());
+        assertEquals(revision + 1, restored.farm().tile(0, 0).harvestRevision());
+        assertEquals(2, restored.farm().tile(0, 0).crop().season());
+        assertFalse(restored.farm().tile(0, 0).crop().watered());
+        var restoredVisitor = GameSession.open(clock, catalog, visitorRepository, bound -> bound - 1).state();
+        assertEquals(java.util.List.of(origin), restoredVisitor.inventory().produceLots());
+        assertFalse(new br.com.colheitafeliz.game.VisitService().steal(restored, restoredVisitor, 0, 0, revision).success());
+    }
+
+    @Test void stageFiveUpgradeAddsOnlySocialMetadataAndOldReaderRefusesDowngradeWithoutOverwriting() throws IOException {
+        var clock = new ManualClock();
+        var catalog = CropCatalogLoader.load();
+        Path file = directory.resolve("v19.json");
+        var session = GameSession.open(clock, catalog, new JsonSaveRepository(file), bound -> bound - 1);
+        session.state().wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GOLD, new java.math.BigDecimal("0.1"));
+        session.state().progress().award(new java.math.BigDecimal("14.4375"));
+        var tile = session.state().farm().tile(0, 0); tile.plow(); tile.plant(catalog.get("nabo"), session.state().now());
+        session.save();
+        var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+        json.addProperty("version", 19);
+        json.getAsJsonObject("snapshot").remove("protection");
+        for (var savedTile : json.getAsJsonObject("snapshot").getAsJsonArray("tiles")) savedTile.getAsJsonObject().remove("harvestRevision");
+        Files.writeString(file, json.toString());
+        String oldBytes = Files.readString(file);
+        var reopened = GameSession.open(clock, catalog, new JsonSaveRepository(file), bound -> bound - 1);
+        assertEquals(oldBytes, Files.readString(file), "carregar v19 não escreve");
+        assertEquals(0, reopened.state().farm().tile(0, 0).harvestRevision());
+        var upgraded = reopened.state().snapshot();
+        var original = session.state().snapshot();
+        assertEquals(original.coins(), upgraded.coins());
+        assertEquals(original.greenCoins(), upgraded.greenCoins());
+        assertEquals(original.currentXp(), upgraded.currentXp());
+        assertEquals(original.level(), upgraded.level());
+        assertEquals(original.seeds(), upgraded.seeds());
+        assertEquals(original.produce(), upgraded.produce());
+        assertEquals(original.animals(), upgraded.animals());
+        assertEquals(original.dailyMissionProgress(), upgraded.dailyMissionProgress());
+        assertEquals(original.completedDailyMissions(), upgraded.completedDailyMissions());
+        assertEquals(original.tutorialStep(), upgraded.tutorialStep());
+        assertEquals(original.tiles().getFirst().origin(), upgraded.tiles().getFirst().origin());
+        reopened.save();
+        assertEquals(20, JsonParser.parseString(Files.readString(file)).getAsJsonObject().get("version").getAsInt());
+        byte[] newBytes = Files.readAllBytes(file);
+        var oldReader = new br.com.colheitafeliz.persistence.stage5.Stage5JsonSaveRepository(file);
+        assertThrows(IOException.class, oldReader::load);
+        assertThrows(IOException.class, () -> oldReader.save(upgraded, clock.instant(), clock.instant()));
+        assertArrayEquals(newBytes, Files.readAllBytes(file));
+    }
+
+    @Test void currentSaveMissingSocialMetadataIsRefusedWithoutOverwriting() throws IOException {
+        var clock = new ManualClock();
+        var catalog = CropCatalogLoader.load();
+        for (String missing : java.util.List.of("protection", "harvestRevision")) {
+            Path file = directory.resolve("missing-" + missing + ".json");
+            var session = GameSession.open(clock, catalog, new JsonSaveRepository(file), bound -> bound - 1);
+            session.save();
+            var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+            if (missing.equals("protection")) json.getAsJsonObject("snapshot").remove(missing);
+            else json.getAsJsonObject("snapshot").getAsJsonArray("tiles").get(0).getAsJsonObject().remove(missing);
+            Files.writeString(file, json.toString());
+            String before = Files.readString(file);
+            assertThrows(IOException.class, () -> new JsonSaveRepository(file).load());
+            assertFalse(session.trySave());
+            assertEquals(before, Files.readString(file));
+        }
+    }
+    @Test void malformedProtectionIdsAreRefusedAndPreservedInsteadOfSilentlyReselected() throws IOException {
+        var clock = new ManualClock();
+        var catalog = CropCatalogLoader.load();
+        int caseIndex = 0;
+        for (String unlocked : java.util.List.of("[-1]", "[30]", "[0,1,2,3,4,5]")) {
+            Path file = directory.resolve("invalid-protection-" + caseIndex++ + ".json");
+            var session = GameSession.open(clock, catalog, new JsonSaveRepository(file), bound -> bound - 1);
+            session.save();
+            var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+            json.getAsJsonObject("snapshot").getAsJsonObject("protection").add("unlockedIds", JsonParser.parseString(unlocked));
+            Files.writeString(file, json.toString());
+            String before = Files.readString(file);
+            assertThrows(IOException.class, () -> new JsonSaveRepository(file).load());
+            assertThrows(IOException.class, () -> GameSession.open(clock, catalog, new JsonSaveRepository(file), bound -> bound - 1));
+            assertFalse(session.trySave());
+            assertEquals(before, Files.readString(file));
+        }
+    }
+    @Test void negativeRevisionIsRefusedBeforeRepositoryCanOverwriteTheFile() throws IOException {
+        var clock = new ManualClock();
+        var catalog = CropCatalogLoader.load();
+        Path file = directory.resolve("negative-revision.json");
+        var session = GameSession.open(clock, catalog, new JsonSaveRepository(file), bound -> bound - 1);
+        session.save();
+        var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+        json.getAsJsonObject("snapshot").getAsJsonArray("tiles").get(0).getAsJsonObject().addProperty("harvestRevision", -1);
+        Files.writeString(file, json.toString());
+        String before = Files.readString(file);
+        assertThrows(IOException.class, () -> new JsonSaveRepository(file).load());
+        assertThrows(IOException.class, () -> new JsonSaveRepository(file).save(session.state().snapshot(), clock.instant(), clock.instant()));
+        assertEquals(before, Files.readString(file));
+    }
     @Test void paidUtcDaySurvivesRestartRollbackAndSkippedDays() throws IOException {
         var clock = new ManualClock();
         var repository = new JsonSaveRepository(directory.resolve("daily.json"));
@@ -214,7 +335,7 @@ class SaveRoundTripTest {
     @Test void animalProgressOriginReadyProductAndHungryProtectorSurviveRestart() throws IOException {
         ManualClock clock = new ManualClock();
         var repository = new JsonSaveRepository(directory.resolve("animals.json"));
-        var session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
+        var session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> bound - 1);
         var state = session.state();
         while (state.progress().level() < 60) state.progress().award(state.progress().xpToNext());
         state.wallet().credit(1_000_000);
@@ -225,7 +346,7 @@ class SaveRoundTripTest {
         clock.advanceSeconds(5 * 3600);
         session.save();
         clock.advanceSeconds(43 * 3600);
-        var restored = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state();
+        var restored = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> bound - 1).state();
         assertEquals(12 * 3600_000L, restored.barn().get(0).grownMillisAt(restored.now()));
         assertEquals(br.com.colheitafeliz.domain.animal.Animal.Stage.YOUNG, restored.barn().get(0).stageAt(restored.now()));
         assertEquals(br.com.colheitafeliz.domain.economy.Currency.GREEN, restored.barn().get(0).origin().currency());
