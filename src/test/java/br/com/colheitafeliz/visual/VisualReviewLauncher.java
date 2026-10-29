@@ -61,7 +61,8 @@ public final class VisualReviewLauncher {
 
         @Override public void create() {
             CropCatalog catalog = CropCatalogLoader.load();
-            fresh = new GameState(new ManualClock()::instant, catalog, bound -> 99);
+            ManualClock freshClock = new ManualClock();
+            fresh = new GameState(freshClock::instant, freshClock, catalog, bound -> 99);
             states = buildStates(catalog);
             stages = buildStages(catalog);
             seasons = buildSeasons(catalog);
@@ -75,7 +76,8 @@ public final class VisualReviewLauncher {
             harvested.inventory().addProduceLot(harvestedTile.harvest(harvestedClock.instant()));
             harvested.selectTool(Tool.HAND);
             fertilized = buildFertilized(catalog);
-            rich = new GameState(new ManualClock()::instant, catalog, bound -> 99);
+            ManualClock richClock = new ManualClock();
+            rich = new GameState(richClock::instant, richClock, catalog, bound -> 99);
             rich.wallet().credit(1150);
             rich.progress().award(60);
             rich.progress().award(80);
@@ -122,7 +124,7 @@ public final class VisualReviewLauncher {
          */
         private static GameState buildStates(CropCatalog catalog) {
             ManualClock clock = new ManualClock();
-            GameState game = new GameState(clock::instant, catalog, bound -> 99);
+            GameState game = new GameState(clock::instant, clock, catalog, bound -> 99);
             CropType turnip = catalog.get("nabo");
             game.wallet().credit(1500);
             for (int row = 0; row < 5; row++) {
@@ -151,7 +153,7 @@ public final class VisualReviewLauncher {
         /** Cinco nabos, um estágio de diferença por linha: do pronto (linha 0) ao recém-regado (linha 4). */
         private static GameState buildStages(CropCatalog catalog) {
             ManualClock clock = new ManualClock();
-            GameState game = new GameState(clock::instant, catalog, bound -> 99);
+            GameState game = new GameState(clock::instant, clock, catalog, bound -> 99);
             CropType turnip = catalog.get("nabo");
             game.wallet().credit(1500);
             long quarter = turnip.growthTime(1).toSeconds() / (turnip.stages() - 1);
@@ -176,7 +178,7 @@ public final class VisualReviewLauncher {
         /** Tomate (duas temporadas) logo depois da primeira colheita: estágio 1 da temporada 2, sem rega. */
         private static GameState buildSeasons(CropCatalog catalog) {
             ManualClock clock = new ManualClock();
-            GameState game = new GameState(clock::instant, catalog, bound -> 99);
+            GameState game = new GameState(clock::instant, clock, catalog, bound -> 99);
             CropType tomato = catalog.get("tomate");
             FarmTile tile = game.farm().tile(0, 0);
             tile.plow();
@@ -192,7 +194,7 @@ public final class VisualReviewLauncher {
         /** Nabo com 6 h de crescimento que o superfertilizante (5 h 30 min) deixa pronto na mesma temporada. */
         private static GameState buildFertilized(CropCatalog catalog) {
             ManualClock clock = new ManualClock();
-            GameState game = new GameState(clock::instant, catalog, bound -> 99);
+            GameState game = new GameState(clock::instant, clock, catalog, bound -> 99);
             game.wallet().credit(300);
             game.buySeed(catalog.get("nabo"));
             plant(game, catalog.get("nabo"), 0);

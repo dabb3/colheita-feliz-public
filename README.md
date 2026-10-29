@@ -46,9 +46,15 @@ Os preços, tempos e rendimentos ficam em [crops.json](assets/data/crops.json); 
 
 ## Save
 
-O save local atual é `save/game-rules-v4.json`, relativo ao diretório de execução, no formato v20 (`economy-2026-10`). Ele guarda progressão, tarefas, lotes, culturas, animais, preferências, revisão monotônica dos terrenos e seleção de proteção. Um save v19 abre com metadados sociais novos, sem converter a economia; a próxima gravação o atualiza para v20. O executável v19 recusa esse arquivo atualizado. Faça backup antes de trocar de versão.
+O save local atual é `save/game-rules-v4.json`, relativo ao diretório de execução, no formato v20 (`economy-2026-10`). Ele guarda progressão, tarefas, lotes, culturas, animais, preferências, revisão monotônica dos terrenos e seleção de proteção. Um save v19 abre com metadados sociais novos, sem converter a economia; a próxima gravação o atualiza para v20. O executável v19 recusa esse arquivo atualizado. 
 
-A curva, o tutorial e as tarefas mudaram de significado. Saves v16, v17 e v18, assim como formatos anteriores, futuros ou inválidos, são recusados sem conversão nem sobrescrita, mesmo quando selecionados por `COLHEITA_SAVE_PATH`. Os arquivos `game-rules-v1.json`, `game-rules-v2.json`, `game-rules-v3.json` e `game.json` permanecem em disco. Para começar outra fazenda após uma recusa, remova `COLHEITA_SAVE_PATH` da sessão ou aponte para um arquivo inexistente, mantendo o original. Faça backup antes de trocar de versão. Há autosave e progresso offline; saves não são versionados.
+Faça backup antes de trocar de versão.
+
+A curva, o tutorial e as tarefas mudaram de significado. Saves v16, v17 e v18, assim como formatos anteriores, futuros ou inválidos, são recusados sem conversão nem sobrescrita, mesmo quando selecionados por `COLHEITA_SAVE_PATH`. Os arquivos `game-rules-v1.json`, `game-rules-v2.json`, `game-rules-v3.json` e `game.json` permanecem em disco. 
+
+Se houver erro de carga, o launcher mostra o caminho e permite cancelar ou escolher um arquivo inexistente para outra fazenda; um destino existente é recusado. O caminho escolhido vale para essa execução: para reabrir essa fazenda depois, informe o mesmo caminho em `COLHEITA_SAVE_PATH`. Nenhum save é restaurado ou convertido automaticamente. 
+
+Faça backup antes de trocar de versão. Há autosave e progresso offline; saves não são versionados. Cada instância desktop mantém um bloqueio cooperativo por destino; outra instância no mesmo arquivo é recusada. O arquivo `.lock` pode permanecer vazio após encerrar e não precisa ser apagado. A escrita usa temporários exclusivos; arquivos temporários antigos não são carregados como save.
 
 Uma fazenda nova começa com 500 moedas de ouro e 5 verdes. Saldos usam uma casa decimal; XP preserva frações. Produtos mantêm a moeda e o custo de aquisição da semente. A venda soma os lotes elegíveis por moeda, aplica lucro de 15% e arredonda o total para cima em uma casa decimal. Na aba **VIP**, 100 verdes compram 30 dias reais, acumuláveis; enquanto ativo, o lucro é 25%. Produtos exclusivos ficam bloqueados sem VIP e são ignorados em **Vender tudo**.
 

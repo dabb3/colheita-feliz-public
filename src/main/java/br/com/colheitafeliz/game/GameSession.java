@@ -33,10 +33,10 @@ public final class GameSession {
     public static GameSession open(Clock realClock, CropCatalog catalog, SaveRepository repository,
                                    RandomSource random) throws IOException {
         Optional<LoadedGame> loaded = repository.load();
-        Instant initial = loaded.map(save -> save.resumedGameTime(realClock.instant()))
-                .orElseGet(realClock::instant);
-        AdjustableGameClock gameClock = new AdjustableGameClock(realClock, initial);
         try {
+            Instant initial = loaded.map(save -> save.resumedGameTime(realClock.instant()))
+                    .orElseGet(realClock::instant);
+            AdjustableGameClock gameClock = new AdjustableGameClock(realClock, initial);
             GameState state = loaded.map(save -> GameState.restore(gameClock, realClock, catalog, save.snapshot(), random))
                     .orElseGet(() -> new GameState(gameClock, realClock, catalog, random));
             return new GameSession(realClock, repository, gameClock, state, loaded.isEmpty());

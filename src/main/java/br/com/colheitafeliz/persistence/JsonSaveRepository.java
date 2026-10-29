@@ -15,23 +15,34 @@ import java.util.Optional;
 
 public final class JsonSaveRepository implements SaveRepository {
     private final Path file;
+    private final Replacement replacement;
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
-    public JsonSaveRepository(Path file) { this.file = file; }
+    public JsonSaveRepository(Path file) { this(file, JsonSaveRepository::replace); }
+
+    @FunctionalInterface interface Replacement { void move(Path source, Path target) throws IOException; }
+    JsonSaveRepository(Path file, Replacement replacement) { this.file = file; this.replacement = replacement; }
 
     @Override public void save(GameSnapshot snapshot, Instant gameTime, Instant realTime) throws IOException {
         // A rota nova nunca substitui um save legado ou um arquivo que falhou na leitura.
         if (Files.exists(file)) load();
         Path absolute = file.toAbsolutePath();
         Files.createDirectories(absolute.getParent());
-        Path temporary = absolute.resolveSibling(absolute.getFileName() + ".tmp");
+        Path temporary = Files.createTempFile(absolute.getParent(), absolute.getFileName() + ".save-", ".tmp");
         GameSave save = new GameSave(GameSave.VERSION, GameSave.RULESET, realTime.toString(), gameTime.toString(), snapshot);
-        Files.writeString(temporary, gson.toJson(save), StandardCharsets.UTF_8);
         try {
-            Files.move(temporary, absolute, StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.ATOMIC_MOVE);
+            Files.writeString(temporary, gson.toJson(save), StandardCharsets.UTF_8);
+            replacement.move(temporary, absolute);
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
+    }
+
+    private static void replace(Path source, Path target) throws IOException {
+        try {
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (java.nio.file.AtomicMoveNotSupportedException e) {
-            Files.move(temporary, absolute, StandardCopyOption.REPLACE_EXISTING);
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
