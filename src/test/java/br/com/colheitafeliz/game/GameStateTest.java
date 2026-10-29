@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class GameStateTest {
     @Test void completeFarmCycleStoresProduceUntilSold() {
         ManualClock clock = new ManualClock();
-        GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
         CropType corn = game.catalog().get("nabo");
         assertEquals(0, java.math.BigDecimal.valueOf(500).compareTo(game.wallet().coins()));
         assertTrue(game.buySeed(corn).success());
@@ -177,7 +177,7 @@ class GameStateTest {
 
     @Test void plantingWithoutSeedIsRejectedAndLeavesSoilReady() {
         ManualClock clock = new ManualClock();
-        GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
         game.selectTool(Tool.HOE);
         game.act(0, 0);
         game.selectSeed(game.catalog().get("nabo"));

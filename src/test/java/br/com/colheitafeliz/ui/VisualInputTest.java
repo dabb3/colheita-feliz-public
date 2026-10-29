@@ -94,6 +94,25 @@ class VisualInputTest {
         assertEquals("1 / 2 · 1 unidade", Hud.seasonLine(vipTile.crop(), true));
     }
 
+    @Test void animalPagesReachEveryTypeIncludingLastProtector() {
+        var clock = new ManualClock();
+        var game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
+        while (game.progress().level() < 60) game.progress().award(game.progress().xpToNext());
+        game.wallet().credit(10_000_000);
+        var panel = new MarketPanel(game.catalog()); panel.showAnimals();
+        assertEquals(4, panel.pageCount());
+        for (int index = 0; index < 15; index++) {
+            int row = index % 4;
+            if (index > 0 && row == 0) panel.click(cx(MarketPanel.nextPageButton()), cy(MarketPanel.nextPageButton()), game);
+            assertEquals(index / 4, panel.page());
+            assertTrue(panel.click(cx(MarketPanel.buyAnimalButton(row)), cy(MarketPanel.buyAnimalButton(row)), game).success());
+            assertEquals(game.animalTypes().get(index).id(), game.barn().get(index).type().id());
+        }
+        panel.nextPage(); assertEquals(3, panel.page());
+        assertNull(panel.click(cx(MarketPanel.buyAnimalButton(3)), cy(MarketPanel.buyAnimalButton(3)), game));
+        panel.showShop(); assertEquals(0, panel.page());
+    }
+
     private static float cx(Rectangle r) { return r.x + r.width / 2f; }
     private static float cy(Rectangle r) { return r.y + r.height / 2f; }
 

@@ -178,29 +178,78 @@ class SaveRoundTripTest {
 
     }
 
-    @Test void hensFeedAndEggsSurviveRestartAndKeepProducingOffline() throws IOException {
+    @Test void animalProgressOriginReadyProductAndHungryProtectorSurviveRestart() throws IOException {
         ManualClock clock = new ManualClock();
-        JsonSaveRepository repository = new JsonSaveRepository(directory.resolve("save.json"));
-        GameSession session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
-        GameState state = session.state();
-        state.progress().award(50 + 75);
-        var hen = state.animalType("galinha");
-        state.wallet().credit(2 * hen.price() + 2 * hen.feedPrice());
-        state.buyAnimal(hen);
-        state.buyAnimal(hen);
-        state.buyFeed(hen);
-        state.buyFeed(hen);
-        assertTrue(state.tendAnimal(0).success());
-        state.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot("ovo", br.com.colheitafeliz.domain.economy.Currency.GOLD, java.math.BigDecimal.valueOf(state.animalType("galinha").price()), 2, false));
+        var repository = new JsonSaveRepository(directory.resolve("animals.json"));
+        var session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
+        var state = session.state();
+        while (state.progress().level() < 60) state.progress().award(state.progress().xpToNext());
+        state.wallet().credit(1_000_000);
+        state.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GREEN, new java.math.BigDecimal("100"));
+        assertTrue(state.buyAnimal(state.animalType("pombo"), br.com.colheitafeliz.domain.economy.Currency.GREEN).success());
+        assertTrue(state.buyAnimal(state.animalType("galinha")).success());
+        assertTrue(state.buyAnimal(state.animalType("cachorro-robo")).success());
+        clock.advanceSeconds(5 * 3600);
         session.save();
-        clock.advanceSeconds(hen.productionSeconds());
-        GameState restored = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state();
-        assertEquals(2, restored.barn().size());
-        assertEquals(0, restored.inventory().fertilizer("comum"));
-        assertEquals(1, restored.inventory().feed("galinha"));
-        assertEquals(2, restored.inventory().product("ovo"));
-        assertEquals(br.com.colheitafeliz.domain.animal.Animal.Status.READY, restored.barn().get(0).statusAt(restored.now()));
-        assertEquals(br.com.colheitafeliz.domain.animal.Animal.Status.HUNGRY, restored.barn().get(1).statusAt(restored.now()));
+        clock.advanceSeconds(43 * 3600);
+        var restored = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state();
+        assertEquals(12 * 3600_000L, restored.barn().get(0).grownMillisAt(restored.now()));
+        assertEquals(br.com.colheitafeliz.domain.animal.Animal.Stage.YOUNG, restored.barn().get(0).stageAt(restored.now()));
+        assertEquals(br.com.colheitafeliz.domain.economy.Currency.GREEN, restored.barn().get(0).origin().currency());
+        assertEquals(br.com.colheitafeliz.domain.animal.Animal.Status.READY, restored.barn().get(1).statusAt(restored.now()));
+        assertEquals(br.com.colheitafeliz.domain.animal.Animal.Status.HUNGRY, restored.barn().get(2).statusAt(restored.now()));
+        assertEquals(0, restored.activeProtectors());
+        assertTrue(restored.tendAnimal(1).success());
+        assertEquals(1, restored.inventory().product("ovo"));
+    }
+
+    @Test void legacyAnimalsAndFeedAreRefusedWithoutLosingExistingLots() throws IOException {
+        var clock = new ManualClock();
+        for (String legacyField : java.util.List.of("animals", "feed")) {
+            Path file = directory.resolve(legacyField + ".json");
+            var repo = new JsonSaveRepository(file);
+            var session = GameSession.open(clock, CropCatalogLoader.load(), repo, bound -> 99);
+            session.save();
+            var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+            json.addProperty("version", 17);
+            var snapshot = json.getAsJsonObject("snapshot");
+            snapshot.add(legacyField, JsonParser.parseString(legacyField.equals("animals")
+                    ? "[{\"typeId\":\"galinha\",\"fedAt\":null}]" : "{\"galinha\":1}"));
+            Files.writeString(file, json.toString());
+            String original = Files.readString(file);
+            assertThrows(IOException.class, repo::load);
+            assertThrows(IOException.class, () -> repo.save(session.state().snapshot(), clock.instant(), clock.instant()));
+            assertEquals(original, Files.readString(file));
+        }
+    }
+
+    @Test void legacyEmptyBarnPreservesSavedProductCostInsteadOfRepricingIt() throws IOException {
+        var clock = new ManualClock();
+        Path file = directory.resolve("lots.json");
+        var repo = new JsonSaveRepository(file);
+        var session = GameSession.open(clock, CropCatalogLoader.load(), repo, bound -> 99);
+        var lot = new br.com.colheitafeliz.domain.inventory.ItemLot("ovo", br.com.colheitafeliz.domain.economy.Currency.GOLD,
+                new java.math.BigDecimal("45"), 3, false);
+        session.state().inventory().addProduceLot(lot);
+        session.save();
+        var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+        json.addProperty("version", 17);
+        Files.writeString(file, json.toString());
+        var reopened = GameSession.open(clock, CropCatalogLoader.load(), repo, bound -> 99);
+        assertEquals(java.util.List.of(lot), reopened.state().inventory().produceLots());
+        reopened.save();
+        assertEquals(18, JsonParser.parseString(Files.readString(file)).getAsJsonObject().get("version").getAsInt());
+    }
+
+    @Test void stageThreeReaderRefusesSave18AndNeverOverwritesIt() throws IOException {
+        var clock = new ManualClock(); var file = directory.resolve("v18.json");
+        var repository = new JsonSaveRepository(file);
+        var session = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99);
+        session.save(); String original = Files.readString(file);
+        var oldReader = new br.com.colheitafeliz.persistence.stage3.Stage3JsonSaveRepository(file);
+        assertThrows(IOException.class, oldReader::load);
+        assertThrows(IOException.class, () -> oldReader.save(session.state().snapshot(), clock.instant(), clock.instant()));
+        assertEquals(original, Files.readString(file));
     }
 
     @Test void rejectsUnsupportedSaveVersion() throws IOException {

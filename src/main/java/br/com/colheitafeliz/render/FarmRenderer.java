@@ -77,6 +77,7 @@ public final class FarmRenderer implements AutoCloseable {
 
     /** Índice do animal do jogador sob o ponto (galinha ou ninho), ou -1. */
     public int animalAt(float x, float y) { return scenery.animalAt(x, y); }
+    public String animalTypeAt(float x, float y) { return scenery.animalTypeAt(x, y); }
 
     /** Centro do losango do canteiro, em coordenadas lógicas. */
     public Vector2 tileCenter(int col, int row) { return iso.gridToScreen(col, row); }
@@ -147,13 +148,7 @@ public final class FarmRenderer implements AutoCloseable {
         float backgroundHeight = assets.background.getHeight() * backgroundScale;
         batch.draw(assets.background, (viewport.getWorldWidth() - backgroundWidth) / 2f,
                 viewport.getWorldHeight() - backgroundHeight, backgroundWidth, backgroundHeight);
-        List<String> animalTypes = new ArrayList<>();
-        List<Animal.Status> statuses = new ArrayList<>();
-        for (Animal animal : state.barn().animals()) {
-            animalTypes.add(animal.type().id());
-            statuses.add(animal.statusAt(now));
-        }
-        scenery.syncAnimals(animalTypes, statuses);
+        scenery.syncAnimals(state.barn().animals(), now);
         scenery.draw(batch, Scenery.Layer.BACK);
         drawTiles(state, now, hoverFarm ? hovered : null);
         drawPlants(state, now);

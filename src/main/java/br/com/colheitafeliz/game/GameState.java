@@ -334,17 +334,22 @@ public final class GameState {
 
     // ---------- animais ----------
 
-    public ActionResult buyAnimal(AnimalType type) {
+    public ActionResult buyAnimal(AnimalType type) { return buyAnimal(type, Currency.GOLD); }
+
+    public ActionResult buyAnimal(AnimalType type, Currency currency) {
         AnimalType known = animalType(type.id());
+        barn.removeExpired(realClock.instant());
         if (progress.level() < known.requiredLevel())
             return report(ActionResult.fail(known.name() + " libera no nível " + known.requiredLevel() + "."));
-        if (barn.full(known))
-            return report(ActionResult.fail("O cercado está cheio: cabem " + known.max() + " de " + known.name().toLowerCase() + "."));
-        if (wallet.coins().compareTo(BigDecimal.valueOf(known.price())) < 0) return report(ActionResult.fail("Moedas insuficientes."));
-        wallet.debit(known.price());
-        barn.add(known);
+        if (barn.full(known)) return report(ActionResult.fail("Limite do cercado: " + known.max() + " por tipo."));
+        BigDecimal price = known.prices().get(Objects.requireNonNull(currency));
+        if (price == null || wallet.balance(currency).compareTo(price) < 0)
+            return report(ActionResult.fail("Moedas insuficientes."));
+        Animal animal = Animal.acquire(known, new ItemLot(known.id(), currency, price, 1, false), realClock.instant(), clock.now());
+        wallet.debit(currency, price);
+        barn.add(animal);
         dailyMissions.animalsAvailable(true);
-        return report(ActionResult.ok("Comprou: " + known.name() + "! Dê ração no cercado para produzir."));
+        return report(ActionResult.ok("Comprou " + known.name() + " com alimentação cheia."));
     }
 
     public List<FertilizerType> fertilizers() { return fertilizers; }
@@ -374,50 +379,68 @@ public final class GameState {
                 + (type.friendsOnly() ? " (use na plantação de amigos)" : "")));
     }
 
-    public ActionResult buyFeed(AnimalType type) {
-        AnimalType known = animalType(type.id());
-        if (progress.level() < known.requiredLevel())
-            return report(ActionResult.fail("Ração de " + known.name().toLowerCase() + " libera no nível " + known.requiredLevel() + "."));
-        if (wallet.coins().compareTo(BigDecimal.valueOf(known.feedPrice())) < 0) return report(ActionResult.fail("Moedas insuficientes."));
-        wallet.debit(known.feedPrice());
-        inventory.addFeed(known.id(), 1);
-        return report(ActionResult.ok("+1 ração de " + known.name().toLowerCase() + " | -" + known.feedPrice() + " moedas"));
+    public ActionResult buyFeed(AnimalType type) { return buyFeed(animalType(type.id()).feedId()); }
+
+    public ActionResult buyFeed(String feedId) {
+        int price = switch (feedId) { case "growth" -> 80; case "producer" -> 120;
+            default -> throw new IllegalArgumentException("Unknown feed: " + feedId); };
+        if (wallet.coins().compareTo(BigDecimal.valueOf(price)) < 0) return report(ActionResult.fail("Moedas insuficientes."));
+        if (inventory.feed(feedId) == Integer.MAX_VALUE) return report(ActionResult.fail("Estoque de ração cheio."));
+        wallet.debit(price);
+        inventory.addFeed(feedId, 1);
+        return report(ActionResult.ok("+1 ração " + (feedId.equals("growth") ? "de crescimento" : "de produtor") + " | -" + price + " ouro"));
     }
 
-    /** Clique num animal: coleta o produto pronto ou, com fome, dá uma ração. */
+    public int activeProtectors() { return barn.activeProtectors(realClock.instant(), clock.now()); }
+    public Instant realNow() { return realClock.instant(); }
+
+    /** Resolve o tipo capturado pelo renderer, sem reaproveitar um índice que mudou após remoção. */
+    public ActionResult tendAnimal(String typeId) {
+        lastCollected = 0;
+        for (int i = 0; i < barn.size(); i++)
+            if (barn.get(i).type().id().equals(typeId)) return tendAnimal(i);
+        return report(ActionResult.fail("Animal inválido."));
+    }
+
+    /** Clique coleta o produtor, vende o adulto ou alimenta um animal com fome. */
     public ActionResult tendAnimal(int index) {
+        lastCollected = 0;
         if (index < 0 || index >= barn.size()) return report(ActionResult.fail("Animal inválido."));
-        Instant now = clock.now();
         Animal animal = barn.get(index);
         AnimalType type = animal.type();
-        lastCollected = 0;
-        switch (animal.statusAt(now)) {
-            case READY -> {
-                // Base temporária do catálogo repetível; PR4 usa aquisição real e remove o produtor após uma coleta.
-                inventory.addProduceLot(new ItemLot(type.productId(), Currency.GOLD, BigDecimal.valueOf(type.productPrice()), type.productYield(), false));
-                barn.collect(index, now);
-                lastCollected = type.productYield();
-                ActionResult result = ActionResult.ok("Coletou " + type.productYield() + "× " + type.productName()
-                        + ". Dê ração de novo para produzir mais.");
-                String levelReward = awardXp(BigDecimal.valueOf(type.collectXp()));
-                if (!levelReward.isEmpty()) result = ActionResult.ok(result.message() + " " + levelReward);
-                String missionReward = recordDailyMission("collect", 1);
-                if (!missionReward.isEmpty()) result = ActionResult.ok(result.message() + " " + missionReward);
-                return report(result);
-            }
-            case HUNGRY -> {
-                if (inventory.feed(type.id()) == 0)
-                    return report(ActionResult.fail("Sem ração de " + type.name().toLowerCase() + ". Compre na Loja, aba Animais."));
-                inventory.useFeed(type.id());
-                barn.feed(index, now);
-                return report(ActionResult.ok(type.name() + " comeu a ração. " + type.productName() + " pronto em "
-                        + formatDuration(type.productionTime()) + "."));
-            }
-            default -> {
-                return report(ActionResult.fail(type.name() + " ainda está produzindo: "
-                        + formatDuration(animal.remainingAt(now)) + "."));
-            }
+        Instant now = clock.now();
+        if (animal.expiredAt(realClock.instant())) return report(ActionResult.fail("Protetor expirado."));
+        if (type.kind() == AnimalType.Kind.GROWING && animal.stageAt(now) == Animal.Stage.ADULT) return sellAnimal(index);
+        if (type.kind() == AnimalType.Kind.PRODUCER && animal.statusAt(now) == Animal.Status.READY) {
+            if (inventory.product(type.productId()) == Integer.MAX_VALUE) return report(ActionResult.fail("Depósito cheio para este produto."));
+            inventory.addProduceLot(barn.collect(index, now));
+            lastCollected = 1;
+            String reward = awardXp(BigDecimal.valueOf(type.collectXp()));
+            String mission = recordDailyMission("collect", 1);
+            return report(ActionResult.ok("Coletou 1× " + type.productName() + ". Animal removido. " + reward + " " + mission));
         }
+        if (!animal.hungryAt(now)) return report(ActionResult.fail(type.name() + " ainda está alimentado."));
+        String feedId = type.feedId();
+        if (type.kind() == AnimalType.Kind.PROTECTOR && inventory.feed("growth") == 0) feedId = "producer";
+        if (inventory.feed(feedId) == 0) return report(ActionResult.fail("Sem ração. Compre na Loja, aba Animais."));
+        Animal fed = animal.feed(now);
+        inventory.useFeed(feedId);
+        barn.feed(index, now);
+        return report(ActionResult.ok(type.name() + " alimentado por " + formatDuration(fed.type().foodDuration()) + "."));
+    }
+
+    public ActionResult sellAnimal(int index) {
+        if (index < 0 || index >= barn.size()) return report(ActionResult.fail("Animal inválido."));
+        Animal animal = barn.get(index);
+        if (animal.type().kind() != AnimalType.Kind.GROWING || animal.stageAt(clock.now()) != Animal.Stage.ADULT)
+            return report(ActionResult.fail("Só animais de crescimento adultos podem ser vendidos."));
+        BigDecimal total = animal.origin().unitCost().multiply(new BigDecimal(vipActive() ? "1.25" : "1.15"))
+                .setScale(1, java.math.RoundingMode.CEILING);
+        barn.remove(index);
+        wallet.credit(animal.origin().currency(), total);
+        String reward = awardXp(BigDecimal.valueOf(animal.type().collectXp()));
+        return report(ActionResult.ok("Vendeu " + animal.type().name() + " por " + GameText.money(total) + " "
+                + currencyName(animal.origin().currency()) + ". " + reward));
     }
 
     public ActionResult sellProduct(AnimalType type, boolean all) {
@@ -528,11 +551,12 @@ public final class GameState {
     public boolean refresh() {
         Instant now = clock.now();
         dailyMissions.resetIfNewDay(LocalDate.now(realClock));
+        boolean removed = barn.removeExpired(realClock.instant());
         farm.refresh(now);
         lastOutbreak = pests.update(farm, now);
         if (lastOutbreak.weeds()) message = "Ervas daninhas! Use o herbicida.";
         else if (lastOutbreak.insects()) message = "Insetos na plantação! Use o pesticida.";
-        return lastOutbreak.any();
+        return removed || lastOutbreak.any();
     }
 
     /** Pragas que surgiram no último {@link #refresh()}. */
@@ -596,7 +620,8 @@ public final class GameState {
                 musicEnabled, effectsEnabled, dailyMissions.day().toString(),
                 dailyMissions.progressSnapshot(), dailyMissions.completedSnapshot(), land.snapshot(),
                 tutorial.stepIndex(), barn.animals().stream().map(animal -> new GameSnapshot.AnimalSnapshot(
-                        animal.type().id(), animal.fedAt() == null ? null : animal.fedAt().toString())).toList(),
+                        animal.type().id(), animal.origin(), animal.acquiredAt().toString(), animal.growthAnchorAt().toString(),
+                        animal.grownAtAnchorMillis(), animal.fedUntil().toString())).toList(),
                 inventory.feedSnapshot(), inventory.fertilizerSnapshot(), fertilizer.id(),
                 greenCoins(), vip.expiresAt() == null ? null : vip.expiresAt().toString());
     }
@@ -626,10 +651,12 @@ public final class GameState {
                 snapshot.completedDailyMissions(), LocalDate.now(realClock));
         for (var lot : snapshot.seeds()) catalog.get(lot.itemId());
         for (var lot : snapshot.produce()) {
-            boolean animalProduct = game.animalTypes.stream().anyMatch(type -> type.productId().equals(lot.itemId()));
+            boolean animalProduct = game.animalTypes.stream().anyMatch(type -> type.kind() == AnimalType.Kind.PRODUCER && type.productId().equals(lot.itemId()));
             if (!animalProduct) catalog.get(lot.itemId());
         }
         game.inventory.restoreLots(snapshot.seeds(), snapshot.produce());
+        for (String id : snapshot.feed().keySet())
+            if (!id.equals("growth") && !id.equals("producer")) throw new IllegalArgumentException("Unknown feed: " + id);
         game.inventory.restoreFeed(snapshot.feed());
         game.inventory.restoreFertilizers(snapshot.fertilizers());
         for (String id : snapshot.fertilizers().keySet()) game.fertilizer(id);
@@ -638,7 +665,8 @@ public final class GameState {
             List<Animal> animals = new ArrayList<>();
             for (GameSnapshot.AnimalSnapshot saved : snapshot.animals())
                 animals.add(new Animal(game.animalType(saved.typeId()),
-                        saved.fedAt() == null ? null : Instant.parse(saved.fedAt())));
+                        saved.origin(), Instant.parse(saved.acquiredAt()), Instant.parse(saved.growthAnchorAt()),
+                        saved.grownAtAnchorMillis(), Instant.parse(saved.fedUntil())));
             game.barn.restore(animals);
         }
         for (int i = 0; i < snapshot.tiles().size(); i++) {

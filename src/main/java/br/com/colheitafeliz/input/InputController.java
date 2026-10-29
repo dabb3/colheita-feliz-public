@@ -82,8 +82,8 @@ public final class InputController extends InputAdapter {
             save.getAsBoolean();
             return true;
         }
-        int animal = renderer.animalAt(p.x, p.y);
-        if (animal >= 0) {
+        String animal = renderer.animalTypeAt(p.x, p.y);
+        if (animal != null) {
             Snapshot before = new Snapshot(state);
             ActionResult result = state.tendAnimal(animal);
             show(result, state.lastCollected() > 0 ? Cue.HARVEST : Cue.PLANT, before, p.x, p.y + 40, null, 0);

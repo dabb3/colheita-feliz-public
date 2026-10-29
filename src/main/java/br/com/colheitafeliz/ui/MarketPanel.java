@@ -30,6 +30,8 @@ public final class MarketPanel {
     private static final float SHEET_H = HEIGHT - BAR - 18 - TAB_H - 12;
     private static final float CELL_W = (SHEET_W - 24) / COLS, CELL_H = (SHEET_H - 24) / 2;
     private final List<CropType> crops;
+    private final int animalCount = br.com.colheitafeliz.game.AnimalCatalogLoader.load().size();
+    public static final int ANIMALS_PER_PAGE = 4;
     private boolean open;
     private boolean selling;
     private boolean animals;
@@ -48,7 +50,7 @@ public final class MarketPanel {
     public void showFertilizers() { showShop(); fertilizers = true; }
     public boolean fertilizers() { return fertilizers; }
     public int page() { return page; }
-    public int pageCount() { return (crops.size() + PAGE_SIZE - 1) / PAGE_SIZE; }
+    public int pageCount() { return animals ? (animalCount + ANIMALS_PER_PAGE - 1) / ANIMALS_PER_PAGE : (crops.size() + PAGE_SIZE - 1) / PAGE_SIZE; }
     public void nextPage() { page = Math.min(pageCount() - 1, page + 1); }
     public void previousPage() { page = Math.max(0, page - 1); }
     /** Entradas da página atual, a partir de {@code page * PAGE_SIZE}. */
@@ -107,7 +109,11 @@ public final class MarketPanel {
         if (tab(3).contains(x, y)) { showVip(); return null; }
         if (vip) return vipButton().contains(x, y) ? state.buyVip() : null;
         if (fertilizers) return clickFertilizers(x, y, state);
-        if (animals) return clickAnimals(x, y, state);
+        if (animals) {
+            if (previousPageButton().contains(x, y)) { previousPage(); return null; }
+            if (nextPageButton().contains(x, y)) { nextPage(); return null; }
+            return clickAnimals(x, y, state);
+        }
         if (selling && sellEverythingButton().contains(x, y)) return state.sellEverything();
         if (!selling && fertilizerButton().contains(x, y)) { showFertilizers(); return null; }
         if (previousPageButton().contains(x, y)) { previousPage(); return null; }
@@ -129,7 +135,15 @@ public final class MarketPanel {
         float h = (SHEET_H - 24) / 4f;
         return new Rectangle(SHEET_X + 12, SHEET_Y + SHEET_H - 12 - (index + 1) * h, SHEET_W - 24, h);
     }
-    public static Rectangle buyAnimalButton(int index) { return rowButton(index, 316, 170); }
+    public static Rectangle buyAnimalButton(int index) { return buyAnimalButton(index, Currency.GOLD); }
+    public static Rectangle buyAnimalButton(int index, Currency currency) {
+        Rectangle b = rowButton(index, 316, 170);
+        if (currency == Currency.GREEN) b.y += 36;
+        return b;
+    }
+    public static Rectangle alternateFeedButton(int index) {
+        Rectangle b = buyFeedButton(index); b.y += 36; return b;
+    }
     public static Rectangle buyFeedButton(int index) { return rowButton(index, 590, 120); }
     public static Rectangle sellProductOneButton(int index) { return rowButton(index, 790, 82); }
     public static Rectangle sellProductAllButton(int index) { return rowButton(index, 878, 58); }
@@ -147,14 +161,21 @@ public final class MarketPanel {
         return null;
     }
 
-    private static ActionResult clickAnimals(float x, float y, GameState state) {
+    private ActionResult clickAnimals(float x, float y, GameState state) {
         List<AnimalType> types = state.animalTypes();
-        for (int t = 0; t < types.size(); t++) {
-            AnimalType type = types.get(t);
-            if (buyAnimalButton(t).contains(x, y)) return state.buyAnimal(type);
-            if (buyFeedButton(t).contains(x, y)) return state.buyFeed(type);
-            if (sellProductOneButton(t).contains(x, y)) return state.sellProduct(type, false);
-            if (sellProductAllButton(t).contains(x, y)) return state.sellProduct(type, true);
+        for (int row = 0; row < ANIMALS_PER_PAGE && page * ANIMALS_PER_PAGE + row < types.size(); row++) {
+            AnimalType type = types.get(page * ANIMALS_PER_PAGE + row);
+            for (Currency currency : Currency.values())
+                if (buyAnimalButton(row, currency).contains(x, y)) return state.buyAnimal(type, currency);
+            if (buyFeedButton(row).contains(x, y)) return state.buyFeed(type.feedId());
+            if (type.kind() == AnimalType.Kind.PROTECTOR && alternateFeedButton(row).contains(x, y)) return state.buyFeed("producer");
+            if (type.kind() == AnimalType.Kind.PRODUCER) {
+                if (sellProductOneButton(row).contains(x, y)) return state.sellProduct(type, false);
+                if (sellProductAllButton(row).contains(x, y)) return state.sellProduct(type, true);
+            } else if (type.kind() == AnimalType.Kind.GROWING && sellProductOneButton(row).contains(x, y)) {
+                for (int i = 0; i < state.barn().size(); i++)
+                    if (state.barn().get(i).type().id().equals(type.id())) return state.sellAnimal(i);
+            }
         }
         return null;
     }
@@ -206,7 +227,9 @@ public final class MarketPanel {
         }
         if (animals) {
             List<AnimalType> types = state.animalTypes();
-            for (int t = 0; t < types.size(); t++) drawAnimalRow(batch, skin, assets, state, types.get(t), t, px, py);
+            for (int row = 0; row < ANIMALS_PER_PAGE && page * ANIMALS_PER_PAGE + row < types.size(); row++)
+                drawAnimalRow(batch, skin, assets, state, types.get(page * ANIMALS_PER_PAGE + row), row, px, py);
+            drawPager(batch, skin, px, py);
             return;
         }
         for (int i = 0; i < visibleCrops(); i++) drawItem(batch, skin, assets, state, i, px, py);
@@ -296,33 +319,44 @@ public final class MarketPanel {
         batch.setColor(Color.WHITE);
         skin.text(batch, skin.label, type.name() + "  " + state.barn().count(type) + "/" + type.max(), r.x + 108, mid + 24,
                 unlocked ? Palette.INK : Palette.INK_MUTED, Align.left);
-        skin.text(batch, skin.caption, type.productYield() + "× " + type.productName() + " a cada "
-                + formatTime(type.productionSeconds()), r.x + 108, mid + 2, Palette.INK_MUTED, Align.left);
-        skin.text(batch, skin.caption, "+" + type.collectXp() + " XP por coleta", r.x + 108, mid - 18, Palette.SKY_INK, Align.left);
-        Rectangle buy = buyAnimalButton(index);
+        String info = switch (type.kind()) {
+            case PRODUCER -> "1 " + type.productName().toLowerCase() + " · " + formatTime(type.productionSeconds());
+            case GROWING -> formatTime(type.babySeconds()) + " + " + formatTime(type.youngSeconds()) + " · venda adulta";
+            case PROTECTOR -> "Protetor · 30 dias reais";
+        };
+        skin.text(batch, skin.caption, info, r.x + 108, mid + 2, Palette.INK_MUTED, Align.left);
+        skin.text(batch, skin.caption, "Nível " + type.requiredLevel() + " · " + type.collectXp() + " XP", r.x + 108, mid - 18, Palette.SKY_INK, Align.left);
         boolean canBuy = unlocked && !full;
-        button(batch, skin, canBuy ? skin.glassSun : skin.glassDisabled, buy,
-                !unlocked ? "Nível " + type.requiredLevel() : full ? "Cercado cheio" : "Comprar · " + type.price(),
-                canBuy ? Palette.INK_WARM : Palette.INK_MUTED, null, canBuy && buy.contains(px, py));
-
-        int feed = state.inventory().feed(type.id());
-        Toolbar.drawFitted(batch, assets.bag, r.x + 540, mid + 2, 64);
-        skin.text(batch, skin.label, "Ração x" + feed, r.x + 590, mid + 24, Palette.INK, Align.left);
+        for (Currency currency : Currency.values()) {
+            Rectangle buy = buyAnimalButton(index, currency);
+            String label = GameText.money(type.prices().get(currency)) + (currency == Currency.GOLD ? " ouro" : " verdes");
+            button(batch, skin, canBuy ? skin.glassSun : skin.glassDisabled, buy, label,
+                    canBuy ? Palette.INK_WARM : Palette.INK_MUTED, null, canBuy && buy.contains(px, py));
+        }
+        int feed = state.inventory().feed(type.feedId());
+        Toolbar.drawFitted(batch, assets.feed, r.x + 540, mid + 2, 54);
+        skin.text(batch, skin.caption, "Ração x" + feed + " · " + type.foodDuration().toHours() + "h", r.x + 590, mid + 50, Palette.INK, Align.left);
         Rectangle feedButton = buyFeedButton(index);
-        button(batch, skin, unlocked ? skin.glassSun : skin.glassDisabled, feedButton,
-                unlocked ? "Comprar · " + type.feedPrice() : "Nível " + type.requiredLevel(),
-                unlocked ? Palette.INK_WARM : Palette.INK_MUTED, null, unlocked && feedButton.contains(px, py));
-
-        int owned = state.inventory().product(type.productId());
-        Toolbar.drawFitted(batch, assets.product(type.id()), r.x + 750, mid + 4, 50);
-        skin.text(batch, skin.label, type.productName() + " x" + owned + " · " + GameState.formatTotals(state.quoteItem(type.productId())), r.x + 790, mid + 24,
-                Palette.INK, Align.left);
-        boolean any = owned > 0;
-        Rectangle one = sellProductOneButton(index), all = sellProductAllButton(index);
-        button(batch, skin, any ? skin.glassNeutral : skin.glassDisabled, one, "Vender 1",
-                any ? Palette.INK : Palette.INK_MUTED, null, any && one.contains(px, py));
-        button(batch, skin, any ? skin.glassBerry : skin.glassDisabled, all, "Tudo",
-                any ? Palette.ON_COLOR : Palette.INK_MUTED, any ? Palette.BERRY_INK : null, any && all.contains(px, py));
+        button(batch, skin, skin.glassSun, feedButton, type.feedPrice() + " ouro",
+                Palette.INK_WARM, null, feedButton.contains(px, py));
+        if (type.kind() == AnimalType.Kind.PROTECTOR) {
+            Rectangle alternate = alternateFeedButton(index);
+            button(batch, skin, skin.glassSun, alternate, "120 ouro", Palette.INK_WARM, null, alternate.contains(px, py));
+            skin.text(batch, skin.caption, "Sem revenda", r.x + 790, mid + 4, Palette.INK_MUTED, Align.left);
+        } else if (type.kind() == AnimalType.Kind.GROWING) {
+            Rectangle sell = sellProductOneButton(index);
+            button(batch, skin, skin.glassNeutral, sell, "Adulto", Palette.INK, null, sell.contains(px, py));
+            skin.text(batch, skin.caption, "Venda única", r.x + 790, mid + 24, Palette.INK_MUTED, Align.left);
+        } else {
+            int owned = state.inventory().product(type.productId());
+            Toolbar.drawFitted(batch, assets.product(type.id()), r.x + 750, mid + 4, 40);
+            skin.text(batch, skin.caption, type.productName() + " x" + owned, r.x + 790, mid + 24, Palette.INK, Align.left);
+            skin.text(batch, skin.micro, GameState.formatTotals(state.quoteItem(type.productId())), r.x + 790, mid + 6, Palette.INK_MUTED, Align.left);
+            boolean any = owned > 0;
+            Rectangle one = sellProductOneButton(index), all = sellProductAllButton(index);
+            button(batch, skin, any ? skin.glassNeutral : skin.glassDisabled, one, "Vender 1", Palette.INK, null, any && one.contains(px, py));
+            button(batch, skin, any ? skin.glassBerry : skin.glassDisabled, all, "Tudo", any ? Palette.ON_COLOR : Palette.INK_MUTED, null, any && all.contains(px, py));
+        }
     }
 
     /** Linha de um fertilizante: ícone, efeito, nível, estoque e um botão de compra por moeda aceita. */

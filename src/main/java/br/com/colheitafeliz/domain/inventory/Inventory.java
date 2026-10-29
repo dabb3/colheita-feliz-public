@@ -10,7 +10,7 @@ import java.util.Objects;
 public final class Inventory {
     private final List<ItemLot> seedLots = new ArrayList<>();
     private final List<ItemLot> produceLots = new ArrayList<>();
-    /** Produtos de animais (ovo, leite...) e ração, ambos pelo id. A ração é do animal: "galinha". */
+    /** Rações genéricas por id: growth ou producer. */
     private final Map<String, Integer> feed = new HashMap<>();
     /** Fertilizantes por id do catálogo. */
     private final Map<String, Integer> fertilizers = new HashMap<>();

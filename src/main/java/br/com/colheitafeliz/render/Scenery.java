@@ -28,8 +28,10 @@ final class Scenery {
      */
     private static final class Thing {
         Texture idle;
-        final Texture walk;
-        final float width, homeX, homeY, radius, speed;
+        Texture walk, sleep;
+        boolean sleeping, hungry;
+        float width;
+        final float fullWidth, homeX, homeY, radius, speed;
         float footCenter = .5f;
         final Layer layer;
         final boolean shadow;
@@ -44,6 +46,7 @@ final class Scenery {
             this.idle = idle;
             this.walk = walk;
             this.width = width;
+            this.fullWidth = width;
             this.homeX = x;
             this.homeY = y;
             this.radius = radius;
@@ -80,14 +83,16 @@ final class Scenery {
         this.pen = pen;
         this.soft = softShadow;
         this.assets = a;
-        looks.put("galinha", new Look(a.chicken, a.chickenWalk, 58, 45, 32, a.nestEggs, a.nestEmpty, 76,
-                new float[][]{{1226, 378, 1296, 338}, {1426, 346, 1496, 306}, {1150, 420, 1186, 372}}));
-        looks.put("pato", new Look(a.duck, null, 50, 0, 0, a.nestEggs, a.nestEmpty, 66,
-                new float[][]{{1560, 370, 1556, 330}, {1500, 400, 1440, 390}}));
-        looks.put("ovelha", new Look(a.sheep, a.sheepWalk, 96, 32, 18, a.woolBasket, null, 46,
-                new float[][]{{1222, 460, 1168, 438}, {1330, 444, 1276, 418}}));
-        looks.put("vaca", new Look(a.cow, a.cowWalk, 158, 40, 16, a.bucket, null, 42,
-                new float[][]{{1446, 462, 1540, 440}}));
+        int position = 0;
+        for (var type : br.com.colheitafeliz.game.AnimalCatalogLoader.load()) {
+            int col = position % 5, row = position / 5;
+            float x = row == 2 ? 1250 + col * 73 : 1160 + col * 95;
+            float y = 458 - row * 54;
+            float width = type.id().equals("vaca") ? 88 : type.id().equals("galinha") || type.id().equals("abelha") || type.id().equals("pombo") ? 52 : 72;
+            looks.put(type.id(), new Look(a.animal(type.id()), null, width, 6, 8, a.product(type.id()), null, 28,
+                    new float[][]{{x, y, x + 30, y - 16}}));
+            position++;
+        }
         // Casas no alto, a casinha do cachorro à esquerda da casa.
         add(a.dogHouse, null, 410, 556, 214, 0, 0, Layer.BACK, false, false, false);
         add(a.house, null, 735, 540, 420, 0, 0, Layer.BACK, false, false, false);
@@ -113,16 +118,26 @@ final class Scenery {
     }
 
     /** Mantém um animal desenhado por animal do jogador, com o ponto de produto mostrando se está pronto. */
-    void syncAnimals(List<String> typeIds, List<Animal.Status> statuses) {
+    void syncAnimals(List<Animal> animals, java.time.Instant now) {
+        List<String> typeIds = animals.stream().map(a -> a.type().id()).toList();
         boolean same = placed.size() == typeIds.size();
         for (int i = 0; same && i < typeIds.size(); i++) same = placed.get(i).typeId().equals(typeIds.get(i));
         if (!same) rebuild(typeIds);
+        int hour = now.atOffset(java.time.ZoneOffset.UTC).getHour();
+        boolean night = hour < 6 || hour >= 22;
         for (int i = 0; i < placed.size(); i++) {
             Placed p = placed.get(i);
-            Look look = looks.get(p.typeId());
-            boolean ready = statuses.get(i) == Animal.Status.READY;
-            p.product().idle = ready || look.empty() == null ? look.ready() : look.empty();
-            p.product().hidden = !ready && look.empty() == null;
+            Animal animal = animals.get(i);
+            Animal.Stage stage = animal.stageAt(now);
+            p.animal().idle = assets.animal(p.typeId(), stage, GameAssets.AnimalPose.IDLE);
+            p.animal().walk = assets.animal(p.typeId(), stage, GameAssets.AnimalPose.WALKING);
+            p.animal().sleep = assets.animal(p.typeId(), stage, GameAssets.AnimalPose.SLEEPING);
+            p.animal().sleeping = night;
+            p.animal().hungry = animal.statusAt(now) == Animal.Status.HUNGRY;
+            p.animal().footCenter = assets.footCenter(p.animal().idle);
+            p.animal().width = p.animal().fullWidth * (stage == Animal.Stage.BABY ? .65f : stage == Animal.Stage.YOUNG ? .85f : 1);
+            p.product().hidden = animal.type().kind() != br.com.colheitafeliz.domain.animal.AnimalType.Kind.PRODUCER
+                    || animal.statusAt(now) != Animal.Status.READY;
         }
     }
 
@@ -143,6 +158,11 @@ final class Scenery {
             animal.wait = random.nextFloat() * 3;
             placed.add(new Placed(id, animal, product));
         }
+    }
+
+    String animalTypeAt(float x, float y) {
+        int index = animalAt(x, y);
+        return index < 0 ? null : placed.get(index).typeId();
     }
 
     /** Índice (na ordem do jogador) do animal ou do ponto de produto sob o ponto, ou -1. */
@@ -188,7 +208,7 @@ final class Scenery {
         lastNanos = now;
         for (Thing t : things) {
             t.phase += dt;
-            if (t.walk == null || t.speed <= 0) continue;
+            if (t.sleeping || t.walk == null || t.speed <= 0) continue;
             if (!t.walking) {
                 t.wait -= dt;
                 if (t.wait <= 0) pickTarget(t);
@@ -226,7 +246,7 @@ final class Scenery {
 
     private void drawThing(SpriteBatch batch, Thing t) {
         if (t.hidden) return;
-        Texture tex = t.walking && t.walk != null && ((int) (t.phase * 4) % 2 == 0) ? t.walk : t.idle;
+        Texture tex = t.sleeping && t.sleep != null ? t.sleep : t.walking && t.walk != null && ((int) (t.phase * 4) % 2 == 0) ? t.walk : t.idle;
         // Pares normalizados compartilham o canvas, a altura visível e a base dos pés.
         float w = t.width, h = w * t.idle.getHeight() / t.idle.getWidth();
         if (t.shadow) {
@@ -239,5 +259,6 @@ final class Scenery {
         // Espelha em torno do apoio: a sombra permanece em (x, y) ao virar.
         float anchor = t.facingRight ? 1 - t.footCenter : t.footCenter;
         batch.draw(tex, t.x - w * anchor, t.y, w, h, 0, 0, tex.getWidth(), tex.getHeight(), t.facingRight, false);
+        if (t.hungry) batch.draw(assets.feed, t.x - 9, t.y + h + 2, 18, 20);
     }
 }
