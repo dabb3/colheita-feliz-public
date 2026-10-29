@@ -132,7 +132,7 @@ class NewEconomySaveTest {
     }
 
     @Test void defaultPathChangesWithTheFormatSoTheFirstEconomySaveDoesNotBlockTheGame() {
-        // A main da etapa 1 grava v15 em game-rules-v1.json; o v16 abre num arquivo novo e deixa aquele intacto.
+        // Cada formato incompatível ganha um arquivo novo (v1, v2, v3 e agora v4); os anteriores ficam intactos em disco.
         assertNotEquals("save/game-rules-v1.json", GameSave.DEFAULT_PATH);
         assertEquals("save/game-rules-v4.json", GameSave.DEFAULT_PATH);
     }

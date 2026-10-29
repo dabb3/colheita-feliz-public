@@ -33,7 +33,7 @@ public record GameSnapshot(BigDecimal coins, List<br.com.colheitafeliz.domain.in
             throw new IllegalArgumentException("Protection does not match unlocked plots");
         animals = List.copyOf(animals);
         feed = Map.copyOf(feed);
-        // Saves v16 da etapa 2 ainda não tinham os fertilizantes por tipo; o adubo antigo não é convertido (seção 10).
+        // Null só chega de um save v20 sem o campo; o v16 já é recusado na carga e o adubo antigo não é convertido (seção 10).
         fertilizers = fertilizers == null ? Map.of() : Map.copyOf(fertilizers);
     }
     public record ProtectionSnapshot(List<Integer> unlockedIds, List<String> activeProtectors, List<Integer> protectedIds) {

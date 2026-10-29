@@ -96,7 +96,7 @@ tasks.register('dependencyInventory') {
 
 tasks.register('visualReview', JavaExec) {
     group = 'verification'
-    description = 'Captures the HUD visual review scenes into docs/visual-review/hud-retro without touching the player save.'
+    description = 'Captures the visual review scenes into build/visual-review (override with -PvisualOutput) without touching the player save.'
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'br.com.colheitafeliz.visual.VisualReviewLauncher'
