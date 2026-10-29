@@ -93,6 +93,8 @@ final class Scenery {
                     new float[][]{{x, y, x + 30, y - 16}}));
             position++;
         }
+        looks.put("abelha", new Look(a.beehive, null, 112, 0, 0, a.beehive, null, 28,
+                new float[][]{{1210, 70, 1210, 70}}));
         // Casas no alto, a casinha do cachorro à esquerda da casa.
         add(a.dogHouse, null, 410, 556, 214, 0, 0, Layer.BACK, false, false, false);
         add(a.house, null, 735, 540, 420, 0, 0, Layer.BACK, false, false, false);
@@ -120,6 +122,11 @@ final class Scenery {
         for (int i = 0; i < placed.size(); i++) {
             Placed p = placed.get(i);
             Animal animal = animals.get(i);
+            if (p.typeId().equals("abelha")) {
+                p.animal().hungry = animal.statusAt(now) == Animal.Status.HUNGRY;
+                p.product().hidden = true; // A própria colmeia recebe a coleta; não desenhar uma segunda colmeia como mel.
+                continue;
+            }
             Animal.Stage stage = animal.stageAt(now);
             p.animal().idle = assets.animal(p.typeId(), stage, GameAssets.AnimalPose.IDLE);
             p.animal().walk = assets.animal(p.typeId(), stage, GameAssets.AnimalPose.WALKING);
@@ -144,8 +151,9 @@ final class Scenery {
             float[] s = look.slots()[slot];
             Thing product = add(look.empty() != null ? look.empty() : look.ready(), null, s[2], s[3],
                     look.productWidth(), 0, 0, Layer.BACK, look.empty() == null, true, false);
+            boolean hive = id.equals("abelha");
             Thing animal = add(look.idle(), look.walk(), s[0], s[1], look.width(), look.radius(), look.speed(),
-                    Layer.BACK, true, true, slot % 2 == 0);
+                    hive ? Layer.FRONT : Layer.BACK, true, !hive, !hive && slot % 2 == 0);
             animal.footCenter = assets.footCenter(animal.idle);
             animal.wait = random.nextFloat() * 3;
             placed.add(new Placed(id, animal, product));
@@ -251,6 +259,21 @@ final class Scenery {
         // Espelha em torno do apoio: a sombra permanece em (x, y) ao virar.
         float anchor = t.facingRight ? 1 - t.footCenter : t.footCenter;
         batch.draw(tex, t.x - w * anchor, t.y, w, h, 0, 0, tex.getWidth(), tex.getHeight(), t.facingRight, false);
+        if (t.idle == assets.beehive) {
+            for (int bee = 0; bee < 4; bee++) {
+                BeeOffset offset = beeOffset(bee, t.phase);
+                float bw = 16, bh = bw * assets.bee.getHeight() / assets.bee.getWidth();
+                batch.draw(assets.bee, t.x + offset.x() - bw / 2, t.y + h - 8 + offset.y(), bw, bh);
+            }
+        }
         if (t.hungry) batch.draw(assets.feed, t.x - 9, t.y + h + 2, 18, 20);
+    }
+
+    record BeeOffset(float x, float y) {}
+
+    /** Voo curto, com fases diferentes; nunca desloca a estrutura da colmeia. */
+    static BeeOffset beeOffset(int bee, float seconds) {
+        float phase = seconds * 1.4f + bee * 1.7f;
+        return new BeeOffset((float) Math.sin(phase) * 28, (float) Math.cos(phase * 1.3f) * 12);
     }
 }

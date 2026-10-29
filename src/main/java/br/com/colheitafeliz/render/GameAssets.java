@@ -22,6 +22,9 @@ public final class GameAssets implements AutoCloseable {
     private final Map<String, Texture> seeds = new HashMap<>();
     private final Map<String, Texture[]> animalArt = new HashMap<>();
     private final Map<Texture, Float> footCenters = new HashMap<>();
+    private final Texture[] hiveSprites = hiveSprites();
+    public final Texture beehive = hiveSprites[0];
+    public final Texture bee = hiveSprites[1];
     public final Texture background = load("classic/background/background.png");
     public final Texture house = load("classic/buildings/main-house.png");
     public final Texture dogHouse = load("classic/buildings/dog-house.png");
@@ -174,15 +177,34 @@ public final class GameAssets implements AutoCloseable {
 
     private Texture animalSprite(String path) { return animalFrames(path)[0]; }
 
+    /** Atlas com colmeia à esquerda e abelha isolada à direita, ambas sem fundo. */
+    private Texture[] hiveSprites() {
+        Pixmap atlas = new Pixmap(Gdx.files.internal("classic/animals/abelha/colmeia-abelha-atlas.png"));
+        Texture[] sprites = new Texture[2];
+        for (int part = 0; part < sprites.length; part++) {
+            int width = atlas.getWidth() / 2;
+            Pixmap sprite = new Pixmap(width, atlas.getHeight(), Pixmap.Format.RGBA8888);
+            sprite.setBlending(Pixmap.Blending.None);
+            sprite.drawPixmap(atlas, 0, 0, part * width, 0, width, atlas.getHeight());
+            sprites[part] = animalFrames(sprite)[0];
+        }
+        atlas.dispose();
+        return sprites;
+    }
+
     /**
      * Arte de animal vem em telas grandes com margem. Recorta todas pela mesma caixa (a união da arte),
      * para o quadro parado e o andando manterem escala e apoio ao trocar, e reduz para caber em ANIMAL_SIDE.
      */
     private Texture[] animalFrames(String... paths) {
         Pixmap[] frames = new Pixmap[paths.length];
+        for (int i = 0; i < paths.length; i++) frames[i] = new Pixmap(Gdx.files.internal(paths[i]));
+        return animalFrames(frames);
+    }
+
+    private Texture[] animalFrames(Pixmap... frames) {
         int left = Integer.MAX_VALUE, top = Integer.MAX_VALUE, right = -1, bottom = -1;
-        for (int i = 0; i < paths.length; i++) {
-            Pixmap pixels = frames[i] = new Pixmap(Gdx.files.internal(paths[i]));
+        for (Pixmap pixels : frames) {
             // Ignora resíduos quase invisíveis ao localizar a base real da arte.
             for (int y = 0; y < pixels.getHeight(); y++)
                 for (int x = 0; x < pixels.getWidth(); x++)
@@ -193,8 +215,8 @@ public final class GameAssets implements AutoCloseable {
                         bottom = Math.max(bottom, y);
                     }
         }
-        Texture[] textures = new Texture[paths.length];
-        for (int i = 0; i < paths.length; i++) {
+        Texture[] textures = new Texture[frames.length];
+        for (int i = 0; i < frames.length; i++) {
             Pixmap pixels = frames[i];
             if (right >= left) {
                 Pixmap cropped = new Pixmap(right - left + 1, bottom - top + 1, Pixmap.Format.RGBA8888);

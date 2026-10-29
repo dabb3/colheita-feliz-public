@@ -68,6 +68,8 @@ Skills, configurações pessoais da IDE, ferramentas de arte e material interno 
 
 Os sprites `assets/classic/terrain/planta-morta.png` e `placa-terreno.png` foram fornecidos pelo responsável pelo projeto em 29/10/2026. São usados no terreno após a colheita e no próximo lote disponível. Os animais só aparecem após a compra; burro, coelho e cão não são acrescentados como decoração gratuita.
 
+O atlas `assets/classic/animals/abelha/colmeia-abelha-atlas.png` foi separado com Imagegen a partir da arte existente: colmeia na metade esquerda, abelha na direita, fundo transparente. A colmeia comprada fica fixa no canto inferior direito; somente as abelhas fazem voos curtos ao redor dela. Alimentação e coleta continuam pelo clique na colmeia.
+
 Os assets derivados do projeto de referência estão sujeitos à licença **Source Available — Non-Commercial**, reproduzida em [assets/REFERENCE_LICENSE](assets/REFERENCE_LICENSE). Preserve a atribuição. Uso comercial desses assets exige autorização do titular. A proveniência das imagens não foi verificada além da declaração do projeto original de que foram geradas com Google Gemini e ajustadas manualmente.
 
 As fontes **M PLUS Rounded 1c**, **Nunito** e **Lato** estão sob SIL Open Font License 1.1. Suas licenças estão em [OFL-MPLUSRounded1c.txt](assets/fonts/OFL-MPLUSRounded1c.txt), [OFL-Nunito.txt](assets/fonts/OFL-Nunito.txt) e [OFL-Lato.txt](assets/fonts/OFL-Lato.txt).
