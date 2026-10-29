@@ -27,6 +27,8 @@ public final class GameAssets implements AutoCloseable {
     public final Texture bee = hiveSprites[1];
     public final Texture peacockOpen = animalSprite("classic/animals/pavao/pavao-aberto.png");
     public final Texture background = load("classic/background/background.png");
+    private final Texture sunsetBackground = load("classic/background/background-sunset.png");
+    private final Texture nightBackground = load("classic/background/background-night.png");
     public final Texture house = load("classic/buildings/main-house.png");
     public final Texture dogHouse = load("classic/buildings/dog-house.png");
     /** Mourão e tábua da cerca do cercado (gerados por tools/art/fence.py). */
@@ -111,6 +113,14 @@ public final class GameAssets implements AutoCloseable {
     static String seedPath(String stem) { return "classic/crops/seeds/semente_" + stem + ".png"; }
 
     public Texture crop(CropType type, int stage) { return crops.get(type.id())[stage - 1]; }
+
+    Texture background(DayPeriod period) {
+        return switch (period) {
+            case DAY -> background;
+            case SUNSET -> sunsetBackground;
+            case NIGHT -> nightBackground;
+        };
+    }
 
     public enum AnimalPose { IDLE, WALKING, SLEEPING }
 

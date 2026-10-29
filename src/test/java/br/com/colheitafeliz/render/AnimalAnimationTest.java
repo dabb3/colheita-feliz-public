@@ -4,6 +4,12 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AnimalAnimationTest {
+    @Test void nightSleepOverridesEveryAnimalAnimationIncludingPeacockDisplay() {
+        for (var type : br.com.colheitafeliz.game.AnimalCatalogLoader.load())
+            assertEquals(GameAssets.AnimalPose.SLEEPING, Scenery.animationPose(type.id(), true, true, 8, 4), type.id());
+        assertEquals(GameAssets.AnimalPose.WALKING, Scenery.animationPose("pavao", false, false, 0, 4));
+    }
+
     @Test void pigeonHiveAndPeacockNeverRoam() {
         for (String id : new String[]{"pombo", "abelha", "pavao"}) assertFalse(Scenery.roams(id));
         assertTrue(Scenery.roams("cavalo"));

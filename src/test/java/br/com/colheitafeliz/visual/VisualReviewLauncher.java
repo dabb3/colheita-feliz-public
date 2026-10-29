@@ -47,12 +47,14 @@ public final class VisualReviewLauncher {
                 "14-loja-animais.png", "15-galinhas-no-cercado.png", "16-vip.png", "17-saldos-e-xp-decimais.png", "18-deposito-duas-moedas.png", "19-deposito-vip-bloqueado.png", "20-falha-autosave.png", "21-aviso-vip.png",
                 "22-cinco-estagios.png", "23-pragas-simultaneas.png", "24-temporada-reiniciada.png", "25-loja-ultima-pagina.png",
                 "26-loja-fertilizantes.png", "27-bandeja-fertilizantes.png", "28-pronta-pelo-fertilizante.png", "29-animais-bebes.png", "30-animais-jovens.png", "31-animais-adultos.png",
-                "32-animais-sono.png", "33-protetores-expirados.png", "34-animais-pagina2.png", "35-animais-pagina3.png", "36-animais-pagina4.png", "37-tarefas-no-tutorial.png", "38-terreno-verde-comprado.png", "39-saldos-milionarios.png", "40-planta-morta.png"
+                "32-animais-sono.png", "33-protetores-expirados.png", "34-animais-pagina2.png", "35-animais-pagina3.png", "36-animais-pagina4.png", "37-tarefas-no-tutorial.png", "38-terreno-verde-comprado.png", "39-saldos-milionarios.png", "40-planta-morta.png",
+                "41-background-dia.png", "42-background-por-do-sol.png", "43-background-noite.png"
         };
-        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
         static { FRAMES[30] = 150; } // Cinco segundos: inclui deslocamento e a cauda aberta do pavão.
         private final Path output = Path.of(System.getProperty("colheita.visualOutput", "build/visual-review"));
         private FarmRenderer renderer;
+        private final ManualClock backgroundClock = new ManualClock();
         private GameState fresh, states, rich, newcomer, rancher, stages, seasons, fertilized, tasks, expanded, millionaire;
         private int scene, frames;
         private GameState animalsBaby, animalsYoung, animalsAdult, animalsSleep, animalsExpired, harvested;
@@ -108,7 +110,7 @@ public final class VisualReviewLauncher {
             animalsSleep = animalScene(br.com.colheitafeliz.domain.animal.Animal.Stage.ADULT, true, false);
             animalsExpired = animalScene(br.com.colheitafeliz.domain.animal.Animal.Stage.ADULT, false, true);
             rancher = animalsAdult;
-            renderer = new FarmRenderer(catalog);
+            renderer = new FarmRenderer(catalog, backgroundClock);
             renderer.viewport().update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
             try { Files.createDirectories(output); }
             catch (IOException e) { throw new IllegalStateException("Cannot create visual review folder", e); }
@@ -265,6 +267,7 @@ public final class VisualReviewLauncher {
                 case 37 -> expanded;
                 case 38 -> millionaire;
                 case 39 -> harvested;
+                case 40, 41, 42 -> animalsAdult;
                 default -> states;
             };
             IsoRenderer.GridPosition hovered = switch (scene) {
@@ -299,6 +302,13 @@ public final class VisualReviewLauncher {
         }
 
         private void setUp(int scene) {
+            Instant target = Instant.parse("2026-01-01T" + switch (scene) {
+                case 40 -> "06:00:00Z";
+                case 41 -> "17:00:00Z";
+                case 31, 42 -> "18:31:00Z";
+                default -> "12:00:00Z";
+            });
+            backgroundClock.advanceSeconds(java.time.Duration.between(backgroundClock.instant(), target).toSeconds());
             renderer.hud().reset();
             renderer.marketPanel().close();
             renderer.missions().close();
