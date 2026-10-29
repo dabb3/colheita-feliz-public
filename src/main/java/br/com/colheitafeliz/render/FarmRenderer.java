@@ -48,6 +48,7 @@ public final class FarmRenderer implements AutoCloseable {
     private final MissionsWindow missions = new MissionsWindow();
     private final Hud hud = new Hud();
     private final Scenery scenery;
+    private final java.time.Clock localClock;
     private final FitViewport viewport = new FitViewport(1600, 900);
     private boolean debugVisible;
     private float pointerX = -1, pointerY = -1;
@@ -59,6 +60,11 @@ public final class FarmRenderer implements AutoCloseable {
     private boolean notificationStateInitialized;
 
     public FarmRenderer(CropCatalog catalog) {
+        this(catalog, java.time.Clock.systemDefaultZone());
+    }
+
+    public FarmRenderer(CropCatalog catalog, java.time.Clock localClock) {
+        this.localClock = java.util.Objects.requireNonNull(localClock);
         assets = new GameAssets(catalog);
         marketPanel = new MarketPanel(catalog);
         scenery = new Scenery(assets, new Pen(assets.fencePost, assets.fenceRail, skin.groundShadow), skin.groundShadow);
@@ -141,11 +147,12 @@ public final class FarmRenderer implements AutoCloseable {
                 && toolbar.hit(pointerX, pointerY) == null && hud.shortcutHit(pointerX, pointerY) == null;
 
         batch.begin();
-        float backgroundScale = Math.max(viewport.getWorldWidth() / assets.background.getWidth(),
-                viewport.getWorldHeight() / assets.background.getHeight());
-        float backgroundWidth = assets.background.getWidth() * backgroundScale;
-        float backgroundHeight = assets.background.getHeight() * backgroundScale;
-        batch.draw(assets.background, (viewport.getWorldWidth() - backgroundWidth) / 2f,
+        Texture background = assets.background(DayPeriod.at(localClock));
+        float backgroundScale = Math.max(viewport.getWorldWidth() / background.getWidth(),
+                viewport.getWorldHeight() / background.getHeight());
+        float backgroundWidth = background.getWidth() * backgroundScale;
+        float backgroundHeight = background.getHeight() * backgroundScale;
+        batch.draw(background, (viewport.getWorldWidth() - backgroundWidth) / 2f,
                 viewport.getWorldHeight() - backgroundHeight, backgroundWidth, backgroundHeight);
         scenery.syncAnimals(state.barn().animals(), now);
         scenery.draw(batch, Scenery.Layer.BACK);

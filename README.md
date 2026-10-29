@@ -56,6 +56,8 @@ Produtos animais usam o custo e a moeda reais da aquisição do produtor. A raç
 
 As etapas econômicas 1–5 e o núcleo social local da etapa 6 estão implementados neste checkout. A API interna de ensaio transfere uma temporada pronta e desprotegida, preservando origem e impedindo consumo duplicado por revisão. Protetores cobrem terrenos distintos com seleção persistida; amor usa o estoque do visitante e o limite compartilhado da temporada, sem recompensas. São operações sobre dois estados locais autorizados pelo chamador controlado. Contas, amigos, visitas na interface e rede dependem de desenho online próprio. As regras completas estão em [game-rule.md](docs/game-rule.md).
 
+O fundo acompanha o horário real local do computador: dia das 06:00 às 16:59; pôr do sol das 17:00 às 18:30; noite das 18:31 às 05:59. A troca é automática com o jogo aberto e não depende da aceleração por `T`, nem altera crescimento, recompensas ou o save.
+
 ## Desenvolvimento e distribuição
 
 Código em `src/main/java`, testes em `src/test/java` e recursos em `assets/`. Para capturas descartáveis, execute `./gradlew visualReview`; as imagens ficam em `build/visual-review/` e o save do jogador não é usado.
@@ -65,6 +67,8 @@ O GitHub Actions executa build, testes, SpotBugs e JaCoCo em pushes e PRs. O Spo
 Skills, configurações pessoais da IDE, ferramentas de arte e material interno ficam apenas no ambiente local, ignorados pelo Git.
 
 ## Referência, atribuição e licença
+
+Os fundos `background-sunset.png` e `background-night.png`, em `assets/classic/background/`, foram criados com Imagegen em 29/10/2026 como variações de iluminação de `background.png`, preservando a composição e as dimensões de 1478 × 1064.
 
 Os sprites `assets/classic/terrain/planta-morta.png` e `placa-terreno.png` foram fornecidos pelo responsável pelo projeto em 29/10/2026. São usados no terreno após a colheita e no próximo lote disponível. Os animais só aparecem após a compra; burro, coelho e cão não são acrescentados como decoração gratuita.
 
