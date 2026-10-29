@@ -56,7 +56,7 @@ Produtos animais usam o custo e a moeda reais da aquisição do produtor. A raç
 
 As etapas econômicas 1–5 e o núcleo social local da etapa 6 estão implementados neste checkout. A API interna de ensaio transfere uma temporada pronta e desprotegida, preservando origem e impedindo consumo duplicado por revisão. Protetores cobrem terrenos distintos com seleção persistida; amor usa o estoque do visitante e o limite compartilhado da temporada, sem recompensas. São operações sobre dois estados locais autorizados pelo chamador controlado. Contas, amigos, visitas na interface e rede dependem de desenho online próprio. As regras completas estão em [game-rule.md](docs/game-rule.md).
 
-O fundo acompanha o horário real local do computador: dia das 06:00 às 16:59; pôr do sol das 17:00 às 18:30; noite das 18:31 às 05:59. A troca é automática com o jogo aberto e não depende da aceleração por `T`, nem altera crescimento, recompensas ou o save.
+O fundo acompanha o horário real local do computador: dia das 06:00 às 16:59; pôr do sol das 17:00 às 18:30; noite das 18:31 às 05:59. Os animais dormem durante esse mesmo período noturno e acordam às 06:00. À noite, os passeios e a exibição da cauda do pavão param; as abelhas recolhem-se na colmeia. As poses de sono usam os sprites disponíveis no acervo. A troca é automática com o jogo aberto e não depende da aceleração por `T`, nem altera crescimento, recompensas ou o save.
 
 ## Desenvolvimento e distribuição
 

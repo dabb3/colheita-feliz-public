@@ -106,16 +106,15 @@ final class Scenery {
     }
 
     /** Mantém um animal desenhado por animal do jogador, com o ponto de produto mostrando se está pronto. */
-    void syncAnimals(List<Animal> animals, java.time.Instant now) {
+    void syncAnimals(List<Animal> animals, java.time.Instant now, DayPeriod period) {
         List<String> typeIds = animals.stream().map(a -> a.type().id()).toList();
         boolean same = placed.size() == typeIds.size();
         for (int i = 0; same && i < typeIds.size(); i++) same = placed.get(i).typeId().equals(typeIds.get(i));
         if (!same) rebuild(typeIds);
-        int hour = now.atOffset(java.time.ZoneOffset.UTC).getHour();
-        boolean night = hour < 6 || hour >= 22;
         for (int i = 0; i < placed.size(); i++) {
             Placed p = placed.get(i);
             Animal animal = animals.get(i);
+            p.animal().sleeping = period == DayPeriod.NIGHT;
             if (p.typeId().equals("abelha")) {
                 p.animal().hungry = animal.statusAt(now) == Animal.Status.HUNGRY;
                 p.product().hidden = true; // A própria colmeia recebe a coleta; não desenhar uma segunda colmeia como mel.
@@ -125,7 +124,6 @@ final class Scenery {
             p.animal().idle = assets.animal(p.typeId(), stage, GameAssets.AnimalPose.IDLE);
             p.animal().walk = assets.animal(p.typeId(), stage, GameAssets.AnimalPose.WALKING);
             p.animal().sleep = assets.animal(p.typeId(), stage, GameAssets.AnimalPose.SLEEPING);
-            p.animal().sleeping = night;
             p.animal().hungry = animal.statusAt(now) == Animal.Status.HUNGRY;
             p.animal().width = p.animal().fullWidth * (stage == Animal.Stage.BABY ? .65f : stage == Animal.Stage.YOUNG ? .85f : 1);
             p.product().hidden = animal.type().kind() != br.com.colheitafeliz.domain.animal.AnimalType.Kind.PRODUCER
@@ -268,7 +266,7 @@ final class Scenery {
         float anchor = flipped ? 1 - foot.centerX() : foot.centerX();
         batch.draw(tex, t.x - w * anchor, t.y - h * foot.bottom(), w, h,
                 0, 0, tex.getWidth(), tex.getHeight(), flipped, false);
-        if (t.idle == assets.beehive) {
+        if (t.idle == assets.beehive && !t.sleeping) {
             for (int bee = 0; bee < 4; bee++) {
                 BeeOffset offset = beeOffset(bee, t.phase);
                 float bw = 16, bh = bw * assets.bee.getHeight() / assets.bee.getWidth();
@@ -279,14 +277,21 @@ final class Scenery {
     }
 
     private static Texture pose(Thing t) {
-        if ("pavao".equals(t.typeId)) return alternatePose(t.typeId, false, 0, t.phase) ? t.walk : t.idle;
-        return t.sleeping && t.sleep != null ? t.sleep
-                : t.walk != null && alternatePose(t.typeId, t.walking, t.walkDistance, t.phase) ? t.walk : t.idle;
+        return switch (animationPose(t.typeId, t.sleeping, t.walking, t.walkDistance, t.phase)) {
+            case SLEEPING -> t.sleep != null ? t.sleep : t.idle;
+            case WALKING -> t.walk != null ? t.walk : t.idle;
+            case IDLE -> t.idle;
+        };
+    }
+
+    static GameAssets.AnimalPose animationPose(String id, boolean sleeping, boolean walking, float distance, float seconds) {
+        if (sleeping) return GameAssets.AnimalPose.SLEEPING;
+        return alternatePose(id, walking, distance, seconds) ? GameAssets.AnimalPose.WALKING : GameAssets.AnimalPose.IDLE;
     }
 
     /** A cauda aberta ocupa mais largura, preservando a altura visível e a base do pavão. */
     private float drawWidth(Thing t, Texture texture) {
-        if (!"pavao".equals(t.typeId) || texture == t.idle) return t.width;
+        if (!"pavao".equals(t.typeId) || texture != t.walk) return t.width;
         float height = t.width * t.idle.getHeight() / t.idle.getWidth() * assets.footprint(t.idle).height();
         return height * texture.getWidth() / texture.getHeight() / assets.footprint(texture).height();
     }

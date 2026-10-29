@@ -302,14 +302,13 @@ public final class VisualReviewLauncher {
         }
 
         private void setUp(int scene) {
-            if (scene >= 40) {
-                Instant target = Instant.parse("2026-01-01T" + switch (scene) {
-                    case 40 -> "06:00:00Z";
-                    case 41 -> "17:00:00Z";
-                    default -> "18:31:00Z";
-                });
-                backgroundClock.advanceSeconds(java.time.Duration.between(backgroundClock.instant(), target).toSeconds());
-            }
+            Instant target = Instant.parse("2026-01-01T" + switch (scene) {
+                case 40 -> "06:00:00Z";
+                case 41 -> "17:00:00Z";
+                case 31, 42 -> "18:31:00Z";
+                default -> "12:00:00Z";
+            });
+            backgroundClock.advanceSeconds(java.time.Duration.between(backgroundClock.instant(), target).toSeconds());
             renderer.hud().reset();
             renderer.marketPanel().close();
             renderer.missions().close();

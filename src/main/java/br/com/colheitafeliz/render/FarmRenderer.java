@@ -147,14 +147,15 @@ public final class FarmRenderer implements AutoCloseable {
                 && toolbar.hit(pointerX, pointerY) == null && hud.shortcutHit(pointerX, pointerY) == null;
 
         batch.begin();
-        Texture background = assets.background(DayPeriod.at(localClock));
+        DayPeriod period = DayPeriod.at(localClock);
+        Texture background = assets.background(period);
         float backgroundScale = Math.max(viewport.getWorldWidth() / background.getWidth(),
                 viewport.getWorldHeight() / background.getHeight());
         float backgroundWidth = background.getWidth() * backgroundScale;
         float backgroundHeight = background.getHeight() * backgroundScale;
         batch.draw(background, (viewport.getWorldWidth() - backgroundWidth) / 2f,
                 viewport.getWorldHeight() - backgroundHeight, backgroundWidth, backgroundHeight);
-        scenery.syncAnimals(state.barn().animals(), now);
+        scenery.syncAnimals(state.barn().animals(), now, period);
         scenery.draw(batch, Scenery.Layer.BACK);
         drawTiles(state, now, hoverFarm ? hovered : null);
         drawPlants(state, now);
