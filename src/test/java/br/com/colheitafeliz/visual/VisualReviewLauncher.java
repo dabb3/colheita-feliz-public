@@ -47,14 +47,15 @@ public final class VisualReviewLauncher {
                 "14-loja-animais.png", "15-galinhas-no-cercado.png", "16-vip.png", "17-saldos-e-xp-decimais.png", "18-deposito-duas-moedas.png", "19-deposito-vip-bloqueado.png", "20-falha-autosave.png", "21-aviso-vip.png",
                 "22-cinco-estagios.png", "23-pragas-simultaneas.png", "24-temporada-reiniciada.png", "25-loja-ultima-pagina.png",
                 "26-loja-fertilizantes.png", "27-bandeja-fertilizantes.png", "28-pronta-pelo-fertilizante.png", "29-animais-bebes.png", "30-animais-jovens.png", "31-animais-adultos.png",
-                "32-animais-sono.png", "33-protetores-expirados.png", "34-animais-pagina2.png", "35-animais-pagina3.png", "36-animais-pagina4.png", "37-tarefas-no-tutorial.png", "38-terreno-verde-comprado.png", "39-saldos-milionarios.png"
+                "32-animais-sono.png", "33-protetores-expirados.png", "34-animais-pagina2.png", "35-animais-pagina3.png", "36-animais-pagina4.png", "37-tarefas-no-tutorial.png", "38-terreno-verde-comprado.png", "39-saldos-milionarios.png", "40-planta-morta.png"
         };
-        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+        static { FRAMES[30] = 150; } // Cinco segundos: inclui deslocamento e a cauda aberta do pavão.
         private final Path output = Path.of(System.getProperty("colheita.visualOutput", "build/visual-review"));
         private FarmRenderer renderer;
         private GameState fresh, states, rich, newcomer, rancher, stages, seasons, fertilized, tasks, expanded, millionaire;
         private int scene, frames;
-        private GameState animalsBaby, animalsYoung, animalsAdult, animalsSleep, animalsExpired;
+        private GameState animalsBaby, animalsYoung, animalsAdult, animalsSleep, animalsExpired, harvested;
 
         @Override public void create() {
             CropCatalog catalog = CropCatalogLoader.load();
@@ -62,6 +63,15 @@ public final class VisualReviewLauncher {
             states = buildStates(catalog);
             stages = buildStages(catalog);
             seasons = buildSeasons(catalog);
+            ManualClock harvestedClock = new ManualClock();
+            harvested = new GameState(harvestedClock::instant, harvestedClock, catalog, bound -> 99);
+            FarmTile harvestedTile = harvested.farm().tile(0, 2);
+            harvestedTile.plow();
+            harvestedTile.plant(catalog.get("nabo"), harvestedClock.instant());
+            Instant harvestTime = br.com.colheitafeliz.testsupport.TestCrops.growUntilReady(harvestedTile, harvestedClock.instant());
+            harvestedClock.advanceSeconds(java.time.Duration.between(harvestedClock.instant(), harvestTime).toSeconds());
+            harvested.inventory().addProduceLot(harvestedTile.harvest(harvestedClock.instant()));
+            harvested.selectTool(Tool.HAND);
             fertilized = buildFertilized(catalog);
             rich = new GameState(new ManualClock()::instant, catalog, bound -> 99);
             rich.wallet().credit(1150);
@@ -254,6 +264,7 @@ public final class VisualReviewLauncher {
                 case 36 -> tasks;
                 case 37 -> expanded;
                 case 38 -> millionaire;
+                case 39 -> harvested;
                 default -> states;
             };
             IsoRenderer.GridPosition hovered = switch (scene) {
@@ -270,6 +281,16 @@ public final class VisualReviewLauncher {
                 renderer.pointer(p.x, p.y);
             }
             renderer.draw(state, hovered, 1);
+            if ((scene == 30 || scene == 31) && frames == 0) {
+                // Conferir os alvos renderizados de todos os animais sem alterar o estado ou salvar.
+                float[][] targets = {{1170, 433}, {1210, 68}, {1330, 238}, {195, 108}, {1350, 358},
+                        {1020, 628}, {1480, 333}, {300, 478}, {1375, 443}, {1515, 463},
+                        {785, 498}, {1430, 68}, {1220, 643}, {180, 578}, {345, 53}};
+                var types = state.animalTypes();
+                for (int i = 0; i < targets.length; i++)
+                    if (!types.get(i).id().equals(renderer.animalTypeAt(targets[i][0], targets[i][1])))
+                        throw new IllegalStateException("Unreachable animal: " + types.get(i).id());
+            }
             if (++frames < FRAMES[scene]) return;
             capture(FILES[scene]);
             scene++;

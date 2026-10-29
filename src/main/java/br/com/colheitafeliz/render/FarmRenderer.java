@@ -206,7 +206,7 @@ public final class FarmRenderer implements AutoCloseable {
                 FarmTile tile = state.farm().tile(col, row);
                 if (!state.land().isUnlocked(col, row)) continue;
                 if (tile.state() == TileState.DEAD) {
-                    drawDeadPlant(tile.withered(), iso.gridToScreen(col, row));
+                    drawDeadPlant(iso.gridToScreen(col, row));
                     continue;
                 }
                 if (tile.crop() == null) continue;
@@ -238,15 +238,11 @@ public final class FarmRenderer implements AutoCloseable {
         }
     }
 
-    /** Planta morta na terra rachada: o sprite maduro achatado, tombado e cor de palha. */
-    private void drawDeadPlant(CropType type, Vector2 p) {
-        Texture plant = assets.crop(type, type.stages());
-        float width = 86;
-        float height = width * plant.getHeight() / plant.getWidth() * .55f;
-        batch.setColor(Palette.DEAD_PLANT);
-        batch.draw(plant, p.x - width / 2f, p.y - 10, width / 2f, 0, width, height, 1, 1, -12,
-                0, 0, plant.getWidth(), plant.getHeight(), false, false);
-        batch.setColor(Color.WHITE);
+    /** Resíduo da planta colhida, removido com a enxada. */
+    private void drawDeadPlant(Vector2 p) {
+        Texture plant = assets.deadPlant;
+        float width = 86, height = width * plant.getHeight() / plant.getWidth();
+        batch.draw(plant, p.x - width / 2f, p.y - 10, width, height);
     }
 
     /** Plaquinha no próximo lote à venda; balança quando o jogador já pode comprar. */
@@ -259,18 +255,17 @@ public final class FarmRenderer implements AutoCloseable {
         String main = levelOk ? br.com.colheitafeliz.game.GameText.money(next.price()) : "Nível " + next.requiredLevel();
         String sub = levelOk ? "Comprar lote" : next.price() + " verdes";
         float mainW = skin.width(skin.button, main) + (levelOk ? 22 : 0);
-        float w = Math.max(mainW, skin.width(skin.micro, sub)) + 20, h = 40;
+        float w = Math.max(116, Math.max(mainW, skin.width(skin.micro, sub)) + 28);
+        float h = w * assets.plotSign.getHeight() / assets.plotSign.getWidth();
         float angle = ready ? MathUtils.sin(System.nanoTime() / 160_000_000f) * 3f
                 * Math.max(0, MathUtils.sin(System.nanoTime() / 900_000_000f)) : 0;
         float baseX = p.x, baseY = p.y - 6;
-        skin.rect(batch, Palette.WOOD_INK, baseX - 3, baseY, 6, 26);
-        float bx = baseX - w / 2f + angle * 1.2f, by = baseY + 24;
-        skin.dropShadow(batch, bx, by, w, h, 2);
-        skin.draw(batch, skin.signBoard, bx, by, w, h);
+        float bx = baseX - w / 2f + angle * 1.2f, by = baseY;
+        batch.draw(assets.plotSign, bx, by, w, h);
         float textX = bx + w / 2f + (levelOk ? 11 : 0);
-        if (levelOk) Toolbar.drawFitted(batch, assets.greenCoin, textX - mainW / 2f + 2, by + 26, 18);
-        skin.shadowed(batch, skin.button, main, textX, by + h - 9, Palette.ON_COLOR, Palette.WOOD_INK, Align.center);
-        skin.text(batch, skin.micro, sub, bx + w / 2f, by + 12, Color.valueOf("fff3d6"), Align.center);
+        if (levelOk) Toolbar.drawFitted(batch, assets.greenCoin, textX - mainW / 2f + 2, by + h * .76f - 6, 18);
+        skin.shadowed(batch, skin.button, main, textX, by + h * .79f, Palette.ON_COLOR, Palette.WOOD_INK, Align.center);
+        skin.shadowed(batch, skin.micro, sub, bx + w / 2f, by + h * .63f, Palette.ON_COLOR, Palette.WOOD_INK, Align.center);
     }
 
     private void updateNotifications(GameState state) {

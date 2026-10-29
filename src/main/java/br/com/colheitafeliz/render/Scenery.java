@@ -13,8 +13,8 @@ import java.util.Map;
 import java.util.Random;
 
 /**
- * Cenário vivo, como na fazenda do Orkut: casa e casinha do cachorro no alto, cachorro com o potinho, burrinho
- * cochilando, coelho com a cenoura e, dentro do cercado, os animais do jogador. Cada animal tem um lugar e
+ * Cenário da fazenda: somente animais comprados, distribuídos pela referência visual. No cercado ficam
+ * porco, ovelha, vaca, galinha e pato; os demais ficam fora. Cada animal tem um lugar e
  * um ponto de produto, visível só com o produto pronto: ovos no ninho da galinha e da pata, balde da vaca e cesto
  * da ovelha; mel e pena usam o próprio animal, pois o acervo não tem ícone específico.
  */
@@ -24,7 +24,7 @@ final class Scenery {
 
     /**
      * Um objeto do cenário. Se {@code walk} não for nulo, ele passeia: fica parado alguns segundos, escolhe
-     * um ponto perto de casa e anda até lá, alternando os quadros de passo. Os sprites olham para a esquerda.
+     * um ponto perto de casa e anda até lá, alternando os quadros conforme a distância percorrida.
      */
     private static final class Thing {
         Texture idle;
@@ -32,14 +32,14 @@ final class Scenery {
         boolean sleeping, hungry;
         float width;
         final float fullWidth, homeX, homeY, radius, speed;
-        float footCenter = .5f;
         final Layer layer;
         final boolean shadow;
         final boolean insidePen;
         float x, y, targetX, targetY, wait;
         boolean hidden;
         boolean walking, facingRight;
-        float phase;
+        float phase, walkDistance;
+        String typeId;
 
         Thing(Texture idle, Texture walk, float x, float y, float width, float radius, float speed,
               Layer layer, boolean shadow, boolean insidePen, boolean facingRight) {
@@ -83,30 +83,18 @@ final class Scenery {
         this.pen = pen;
         this.soft = softShadow;
         this.assets = a;
-        int position = 0;
         for (var type : br.com.colheitafeliz.game.AnimalCatalogLoader.load()) {
-            int col = position % 5, row = position / 5;
-            float x = row == 2 ? 1250 + col * 73 : 1160 + col * 95;
-            float y = 458 - row * 54;
-            float width = type.id().equals("vaca") ? 88 : type.id().equals("galinha") || type.id().equals("abelha") || type.id().equals("pombo") ? 52 : 72;
-            looks.put(type.id(), new Look(a.animal(type.id()), null, width, 6, 8, a.product(type.id()), null, 28,
-                    new float[][]{{x, y, x + 30, y - 16}}));
-            position++;
+            AnimalLayout layout = AnimalLayout.forType(type.id());
+            boolean hive = type.id().equals("abelha"), mobile = roams(type.id());
+            looks.put(type.id(), new Look(hive ? a.beehive : a.animal(type.id()), null, layout.width(),
+                    !mobile ? 0 : type.id().equals("cavalo") ? 36 : 20, mobile ? 18 : 0, a.product(type.id()), null, 28,
+                    new float[][]{{layout.x(), layout.y(), layout.x() + 38, layout.y() - 12}}));
         }
         // Casas no alto, a casinha do cachorro à esquerda da casa.
         add(a.dogHouse, null, 410, 556, 214, 0, 0, Layer.BACK, false, false, false);
         add(a.house, null, 735, 540, 420, 0, 0, Layer.BACK, false, false, false);
-        // Cachorro, potinho e burrinho na frente das casas.
-        add(a.bowl, null, 318, 544, 46, 0, 0, Layer.BACK, true, false, false);
-        add(a.dog, a.dogWalk, 384, 530, 92, 40, 34, Layer.BACK, true, false, true);
-        add(a.donkeySleeping, null, 222, 540, 96, 0, 0, Layer.BACK, true, false, false);
-        // Dentro do cercado.
-        // Coelho com a cenoura no canto de baixo.
-        add(a.carrot, null, 168, 140, 54, 0, 0, Layer.FRONT, true, false, false);
-        add(a.rabbit, null, 104, 150, 58, 0, 0, Layer.FRONT, true, false, false);
         for (Thing t : things) {
             t.wait = random.nextFloat() * 3;
-            if (t.shadow) t.footCenter = a.footCenter(t.idle);
         }
     }
 
@@ -128,15 +116,20 @@ final class Scenery {
         for (int i = 0; i < placed.size(); i++) {
             Placed p = placed.get(i);
             Animal animal = animals.get(i);
+            if (p.typeId().equals("abelha")) {
+                p.animal().hungry = animal.statusAt(now) == Animal.Status.HUNGRY;
+                p.product().hidden = true; // A própria colmeia recebe a coleta; não desenhar uma segunda colmeia como mel.
+                continue;
+            }
             Animal.Stage stage = animal.stageAt(now);
             p.animal().idle = assets.animal(p.typeId(), stage, GameAssets.AnimalPose.IDLE);
             p.animal().walk = assets.animal(p.typeId(), stage, GameAssets.AnimalPose.WALKING);
             p.animal().sleep = assets.animal(p.typeId(), stage, GameAssets.AnimalPose.SLEEPING);
             p.animal().sleeping = night;
             p.animal().hungry = animal.statusAt(now) == Animal.Status.HUNGRY;
-            p.animal().footCenter = assets.footCenter(p.animal().idle);
             p.animal().width = p.animal().fullWidth * (stage == Animal.Stage.BABY ? .65f : stage == Animal.Stage.YOUNG ? .85f : 1);
             p.product().hidden = animal.type().kind() != br.com.colheitafeliz.domain.animal.AnimalType.Kind.PRODUCER
+                    || p.typeId().equals("pavao")
                     || animal.statusAt(now) != Animal.Status.READY;
         }
     }
@@ -150,11 +143,13 @@ final class Scenery {
             int slot = used.merge(id, 1, Integer::sum) - 1;
             if (look == null || slot >= look.slots().length) throw new IllegalStateException("No pen slot for " + id);
             float[] s = look.slots()[slot];
+            boolean insidePen = AnimalLayout.forType(id).insidePen();
+            Layer layer = insidePen || s[1] > 450 ? Layer.BACK : Layer.FRONT;
             Thing product = add(look.empty() != null ? look.empty() : look.ready(), null, s[2], s[3],
-                    look.productWidth(), 0, 0, Layer.BACK, look.empty() == null, true, false);
+                    look.productWidth(), 0, 0, layer, look.empty() == null, insidePen, false);
             Thing animal = add(look.idle(), look.walk(), s[0], s[1], look.width(), look.radius(), look.speed(),
-                    Layer.BACK, true, true, slot % 2 == 0);
-            animal.footCenter = assets.footCenter(animal.idle);
+                    layer, true, insidePen, false);
+            animal.typeId = id;
             animal.wait = random.nextFloat() * 3;
             placed.add(new Placed(id, animal, product));
         }
@@ -175,15 +170,24 @@ final class Scenery {
         return -1;
     }
 
-    private static boolean covers(Thing t, float x, float y) {
-        float h = t.width * t.idle.getHeight() / t.idle.getWidth();
-        return Math.abs(x - t.x) <= t.width / 2f && y >= t.y - 6 && y <= t.y + h;
+    private boolean covers(Thing t, float x, float y) {
+        Texture texture = pose(t);
+        SpriteFootprint foot = assets.footprint(texture);
+        float w = drawWidth(t, texture), h = w * texture.getHeight() / texture.getWidth();
+        boolean flipped = flipSprite(t.typeId, t.facingRight);
+        float anchor = flipped ? 1 - foot.centerX() : foot.centerX();
+        float left = flipped ? 1 - foot.left() - foot.width() : foot.left();
+        float minX = t.x + w * (left - anchor);
+        return x >= minX && x <= minX + w * foot.width()
+                && y >= t.y - 6 && y <= t.y + h * foot.height();
     }
 
     /** Ponto acima do animal, para o balão de dica. */
     float[] animalAnchor(int index) {
         Thing animal = placed.get(index).animal();
-        return new float[]{animal.x, animal.y + animal.width * animal.idle.getHeight() / animal.idle.getWidth() - 40};
+        Texture texture = pose(animal);
+        return new float[]{animal.x, animal.y + drawWidth(animal, texture) * texture.getHeight() / texture.getWidth()
+                * assets.footprint(texture).height() - 40};
     }
 
     /** Desenha a camada pedida, de trás para a frente (maior y primeiro). {@code pen} vem no meio da camada BACK. */
@@ -218,11 +222,13 @@ final class Scenery {
             float dist = (float) Math.hypot(dx, dy);
             float step = t.speed * dt;
             if (dist <= step) {
+                t.walkDistance += dist;
                 t.x = t.targetX;
                 t.y = t.targetY;
                 t.walking = false;
                 t.wait = 2 + random.nextFloat() * 4;
             } else {
+                t.walkDistance += step;
                 t.x += dx / dist * step;
                 t.y += dy / dist * step;
             }
@@ -234,6 +240,7 @@ final class Scenery {
             float angle = random.nextFloat() * MathUtils.PI2;
             float r = t.radius * (.3f + .7f * random.nextFloat());
             float x = t.homeX + MathUtils.cos(angle) * r, y = t.homeY + MathUtils.sin(angle) * r * .55f;
+            if (Math.hypot(x - t.x, y - t.y) < t.radius * .6f) continue;
             if (t.insidePen && !pen.inside(x, y, t.width * .45f)) continue;
             t.targetX = x;
             t.targetY = y;
@@ -246,19 +253,66 @@ final class Scenery {
 
     private void drawThing(SpriteBatch batch, Thing t) {
         if (t.hidden) return;
-        Texture tex = t.sleeping && t.sleep != null ? t.sleep : t.walking && t.walk != null && ((int) (t.phase * 4) % 2 == 0) ? t.walk : t.idle;
-        // Pares normalizados compartilham o canvas, a altura visível e a base dos pés.
-        float w = t.width, h = w * t.idle.getHeight() / t.idle.getWidth();
+        Texture tex = pose(t);
+        SpriteFootprint foot = assets.footprint(tex);
+        float w = drawWidth(t, tex), h = w * tex.getHeight() / tex.getWidth();
         if (t.shadow) {
             Color previous = batch.getColor().cpy();
             batch.setColor(0, 0, 0, .26f);
-            float shadowW = t.width * .7f, shadowH = t.width * .16f;
+            float shadowW = w * foot.width() * .65f, shadowH = shadowW * .16f;
             batch.draw(soft, t.x - shadowW / 2f, t.y - shadowH / 2f, shadowW, shadowH);
             batch.setColor(previous);
         }
         // Espelha em torno do apoio: a sombra permanece em (x, y) ao virar.
-        float anchor = t.facingRight ? 1 - t.footCenter : t.footCenter;
-        batch.draw(tex, t.x - w * anchor, t.y, w, h, 0, 0, tex.getWidth(), tex.getHeight(), t.facingRight, false);
-        if (t.hungry) batch.draw(assets.feed, t.x - 9, t.y + h + 2, 18, 20);
+        boolean flipped = flipSprite(t.typeId, t.facingRight);
+        float anchor = flipped ? 1 - foot.centerX() : foot.centerX();
+        batch.draw(tex, t.x - w * anchor, t.y - h * foot.bottom(), w, h,
+                0, 0, tex.getWidth(), tex.getHeight(), flipped, false);
+        if (t.idle == assets.beehive) {
+            for (int bee = 0; bee < 4; bee++) {
+                BeeOffset offset = beeOffset(bee, t.phase);
+                float bw = 16, bh = bw * assets.bee.getHeight() / assets.bee.getWidth();
+                batch.draw(assets.bee, t.x + offset.x() - bw / 2, t.y + h - 8 + offset.y(), bw, bh);
+            }
+        }
+        if (t.hungry) batch.draw(assets.feed, t.x - 9, t.y + h * foot.height() + 2, 18, 20);
+    }
+
+    private static Texture pose(Thing t) {
+        if ("pavao".equals(t.typeId)) return alternatePose(t.typeId, false, 0, t.phase) ? t.walk : t.idle;
+        return t.sleeping && t.sleep != null ? t.sleep
+                : t.walk != null && alternatePose(t.typeId, t.walking, t.walkDistance, t.phase) ? t.walk : t.idle;
+    }
+
+    /** A cauda aberta ocupa mais largura, preservando a altura visível e a base do pavão. */
+    private float drawWidth(Thing t, Texture texture) {
+        if (!"pavao".equals(t.typeId) || texture == t.idle) return t.width;
+        float height = t.width * t.idle.getHeight() / t.idle.getWidth() * assets.footprint(t.idle).height();
+        return height * texture.getWidth() / texture.getHeight() / assets.footprint(texture).height();
+    }
+
+    static boolean roams(String id) {
+        return !"pombo".equals(id) && !"pavao".equals(id) && !"abelha".equals(id);
+    }
+
+    static boolean flipSprite(String id, boolean facingRight) {
+        boolean originalRight = id != null && switch (id) {
+            case "cavalo", "cachorro-robo", "cachorro-mastiff", "cabra", "burro", "avestruz", "coelho" -> true;
+            default -> false;
+        };
+        return facingRight != originalRight;
+    }
+
+    static boolean alternatePose(String id, boolean walking, float distance, float seconds) {
+        if ("pavao".equals(id)) return (int) (seconds / 4) % 2 != 0;
+        return roams(id) && walking && (int) (distance / 6) % 2 != 0;
+    }
+
+    record BeeOffset(float x, float y) {}
+
+    /** Voo curto, com fases diferentes; nunca desloca a estrutura da colmeia. */
+    static BeeOffset beeOffset(int bee, float seconds) {
+        float phase = seconds * 1.4f + bee * 1.7f;
+        return new BeeOffset((float) Math.sin(phase) * 28, (float) Math.cos(phase * 1.3f) * 12);
     }
 }

@@ -21,7 +21,11 @@ public final class GameAssets implements AutoCloseable {
     private final Map<String, Texture[]> crops = new HashMap<>();
     private final Map<String, Texture> seeds = new HashMap<>();
     private final Map<String, Texture[]> animalArt = new HashMap<>();
-    private final Map<Texture, Float> footCenters = new HashMap<>();
+    private final Map<Texture, SpriteFootprint> footprints = new HashMap<>();
+    private final Texture[] hiveSprites = hiveSprites();
+    public final Texture beehive = hiveSprites[0];
+    public final Texture bee = hiveSprites[1];
+    public final Texture peacockOpen = animalSprite("classic/animals/pavao/pavao-aberto.png");
     public final Texture background = load("classic/background/background.png");
     public final Texture house = load("classic/buildings/main-house.png");
     public final Texture dogHouse = load("classic/buildings/dog-house.png");
@@ -38,17 +42,13 @@ public final class GameAssets implements AutoCloseable {
     public final Texture chicken = chickenFrames[0];
     public final Texture chickenWalk = chickenFrames[1];
     public final Texture duck = animalSprite("classic/animals/pato/pato.png");
-    private final Texture[] dogFrames = animalFrames("classic/animals/cachorro/cachorro.png", "classic/animals/cachorro/cachorro-andando.png");
-    public final Texture dog = dogFrames[0];
-    public final Texture dogWalk = dogFrames[1];
-    public final Texture donkeySleeping = animalSprite("classic/animals/burrinho/burrinho-dormindo.png");
-    public final Texture rabbit = animalSprite("classic/animals/coelho/coelho.png");
-    public final Texture carrot = animalSprite("classic/animals/coelho/cenoura-coelho.png");
+    // Reutiliza o recorte de margens transparentes e o limite de textura dos sprites.
+    public final Texture deadPlant = animalSprite("classic/terrain/planta-morta.png");
+    public final Texture plotSign = animalSprite("classic/terrain/placa-terreno.png");
     public final Texture nestEggs = animalSprite("classic/animals/ninho-geral/ninho-com-ovos.png");
     public final Texture nestEmpty = animalSprite("classic/animals/ninho-geral/ninho-vazio.png");
     public final Texture bucket = animalSprite("classic/animals/vaca/balde-vaca.png");
     public final Texture woolBasket = animalSprite("classic/animals/ovelha/la-ovelha.png");
-    public final Texture bowl = animalSprite("classic/animals/cachorro/potinho-cachorro-com-comida.png");
     public final Texture[] weeds = new Texture[WEED_STAGES];
     /** Minhocas por quantidade: insects[0] = 1 minhoca ... insects[2] = 3. */
     public final Texture[] insects = new Texture[INSECT_STAGES];
@@ -116,6 +116,7 @@ public final class GameAssets implements AutoCloseable {
 
     /** Mapeamentos explícitos para os nomes reais do acervo, inclusive pomba e burrinho. */
     static String animalPath(String id, br.com.colheitafeliz.domain.animal.Animal.Stage stage, AnimalPose pose) {
+        if (id.equals("pavao") && pose == AnimalPose.WALKING) return "classic/animals/pavao/pavao-aberto.png";
         String folder = switch (id) {
             case "pombo" -> "pomba"; case "burro" -> "burrinho";
             case "cachorro-mastiff", "cachorro-robo", "galinha", "abelha", "coelho", "pato", "pavao", "porco", "ovelha", "vaca", "avestruz", "cabra", "cavalo" -> id;
@@ -138,8 +139,9 @@ public final class GameAssets implements AutoCloseable {
     public Texture animal(String id) { return animal(id, br.com.colheitafeliz.domain.animal.Animal.Stage.ADULT, AnimalPose.IDLE); }
     public Texture animal(String id, br.com.colheitafeliz.domain.animal.Animal.Stage stage, AnimalPose pose) {
         Texture[] frames = animalArt.computeIfAbsent(id + ":" + stage, key -> animalFrames(
-                animalPath(id, stage, AnimalPose.IDLE), animalPath(id, stage, AnimalPose.WALKING), animalPath(id, stage, AnimalPose.SLEEPING)));
-        return frames[pose.ordinal()];
+                animalPath(id, stage, AnimalPose.IDLE), animalPath(id, stage, id.equals("pavao") ? AnimalPose.IDLE : AnimalPose.WALKING),
+                animalPath(id, stage, AnimalPose.SLEEPING)));
+        return id.equals("pavao") && pose == AnimalPose.WALKING ? peacockOpen : frames[pose.ordinal()];
     }
 
     /** O acervo não tem ícones de mel/pena; o símbolo do produtor identifica esses produtos na UI. */
@@ -178,15 +180,34 @@ public final class GameAssets implements AutoCloseable {
 
     private Texture animalSprite(String path) { return animalFrames(path)[0]; }
 
+    /** Atlas com colmeia à esquerda e abelha isolada à direita, ambas sem fundo. */
+    private Texture[] hiveSprites() {
+        Pixmap atlas = new Pixmap(Gdx.files.internal("classic/animals/abelha/colmeia-abelha-atlas.png"));
+        Texture[] sprites = new Texture[2];
+        for (int part = 0; part < sprites.length; part++) {
+            int width = atlas.getWidth() / 2;
+            Pixmap sprite = new Pixmap(width, atlas.getHeight(), Pixmap.Format.RGBA8888);
+            sprite.setBlending(Pixmap.Blending.None);
+            sprite.drawPixmap(atlas, 0, 0, part * width, 0, width, atlas.getHeight());
+            sprites[part] = animalFrames(sprite)[0];
+        }
+        atlas.dispose();
+        return sprites;
+    }
+
     /**
      * Arte de animal vem em telas grandes com margem. Recorta todas pela mesma caixa (a união da arte),
      * para o quadro parado e o andando manterem escala e apoio ao trocar, e reduz para caber em ANIMAL_SIDE.
      */
     private Texture[] animalFrames(String... paths) {
         Pixmap[] frames = new Pixmap[paths.length];
+        for (int i = 0; i < paths.length; i++) frames[i] = new Pixmap(Gdx.files.internal(paths[i]));
+        return animalFrames(frames);
+    }
+
+    private Texture[] animalFrames(Pixmap... frames) {
         int left = Integer.MAX_VALUE, top = Integer.MAX_VALUE, right = -1, bottom = -1;
-        for (int i = 0; i < paths.length; i++) {
-            Pixmap pixels = frames[i] = new Pixmap(Gdx.files.internal(paths[i]));
+        for (Pixmap pixels : frames) {
             // Ignora resíduos quase invisíveis ao localizar a base real da arte.
             for (int y = 0; y < pixels.getHeight(); y++)
                 for (int x = 0; x < pixels.getWidth(); x++)
@@ -197,8 +218,8 @@ public final class GameAssets implements AutoCloseable {
                         bottom = Math.max(bottom, y);
                     }
         }
-        Texture[] textures = new Texture[paths.length];
-        for (int i = 0; i < paths.length; i++) {
+        Texture[] textures = new Texture[frames.length];
+        for (int i = 0; i < frames.length; i++) {
             Pixmap pixels = frames[i];
             if (right >= left) {
                 Pixmap cropped = new Pixmap(right - left + 1, bottom - top + 1, Pixmap.Format.RGBA8888);
@@ -209,16 +230,10 @@ public final class GameAssets implements AutoCloseable {
             }
             pixels = shrink(pixels);
             Texture texture = textures[i] = register(new Texture(pixels, true));
-            // Cabeça e cauda deslocam o centro da imagem; o apoio vem da faixa inferior.
-            int footLeft = pixels.getWidth(), footRight = -1;
-            int band = Math.max(1, Math.round(pixels.getHeight() * .12f));
-            for (int y = pixels.getHeight() - band; y < pixels.getHeight(); y++)
-                for (int x = 0; x < pixels.getWidth(); x++)
-                    if ((pixels.getPixel(x, y) & 0xff) > 12) {
-                        footLeft = Math.min(footLeft, x);
-                        footRight = Math.max(footRight, x);
-                    }
-            footCenters.put(texture, footRight >= footLeft ? (footLeft + footRight + 1f) / (2f * pixels.getWidth()) : .5f);
+            // O quadro dormindo pode ter margem inferior diferente do quadro acordado.
+            Pixmap pose = pixels;
+            footprints.put(texture, SpriteFootprint.measure(pose.getWidth(), pose.getHeight(),
+                    (x, y) -> pose.getPixel(x, y) & 0xff));
             pixels.dispose();
         }
         return textures;
@@ -251,7 +266,7 @@ public final class GameAssets implements AutoCloseable {
         return texture;
     }
 
-    float footCenter(Texture texture) { return footCenters.getOrDefault(texture, .5f); }
+    SpriteFootprint footprint(Texture texture) { return footprints.getOrDefault(texture, SpriteFootprint.FULL); }
 
     @Override public void close() {
         for (Texture texture : textures) texture.dispose();
