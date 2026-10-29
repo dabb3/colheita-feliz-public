@@ -18,6 +18,7 @@ public final class FarmTile {
     private CropType withered;
     /** Fertilizante já usado nesta temporada; vale uma vez por temporada. */
     private boolean fertilized;
+    private long harvestRevision;
     public static final int MAX_INSECTS = 3;
 
     public TileState state() { return state; }
@@ -28,6 +29,7 @@ public final class FarmTile {
     public Instant nextPestCheckAt() { return nextPestCheckAt; }
     public CropType withered() { return withered; }
     public boolean fertilized() { return fertilized; }
+    public long harvestRevision() { return harvestRevision; }
 
     public void plow() {
         require(TileState.GRASS);
@@ -48,7 +50,9 @@ public final class FarmTile {
 
     public void plant(CropType type, Instant now, ItemLot origin) {
         require(TileState.PLOWED);
+        long nextRevision = Math.incrementExact(harvestRevision);
         startSeason(new Crop(type, now, origin));
+        harvestRevision = nextRevision;
     }
 
     /** Planta nova ou próxima temporada: estágio 1, sem rega, pragas, insetos nem fertilizante. */
@@ -138,9 +142,11 @@ public final class FarmTile {
     public ItemLot harvest(Instant now) {
         refresh(now);
         require(TileState.READY);
+        long nextRevision = Math.incrementExact(harvestRevision);
         Crop done = crop;
         if (done.season() < done.type().seasons()) {
             startSeason(new Crop(done.type(), now, done.origin(), done.season() + 1));
+            harvestRevision = nextRevision;
             return done.origin();
         }
         crop = null;
@@ -151,6 +157,7 @@ public final class FarmTile {
         withered = done.type();
         fertilized = false;
         state = TileState.DEAD;
+        harvestRevision = nextRevision;
         return done.origin();
     }
 
@@ -169,10 +176,15 @@ public final class FarmTile {
 
     public void restore(TileState state, Crop crop, PestState pest, Instant nextPestCheckAt,
                         int insects, Instant nextInsectCheckAt, CropType withered, boolean fertilized) {
+        restore(state, crop, pest, nextPestCheckAt, insects, nextInsectCheckAt, withered, fertilized, 0);
+    }
+
+    public void restore(TileState state, Crop crop, PestState pest, Instant nextPestCheckAt,
+                        int insects, Instant nextInsectCheckAt, CropType withered, boolean fertilized, long revision) {
         Objects.requireNonNull(state);
         Objects.requireNonNull(pest);
         boolean needsCrop = state == TileState.GROWING || state == TileState.READY;
-        if (needsCrop != (crop != null) || (state == TileState.READY && !crop.watered())
+        if (revision < 0 || needsCrop != (crop != null) || (state == TileState.READY && !crop.watered())
                 || (pest == PestState.WEEDS || insects > 0) != (crop != null && crop.paused())
                 || insects < 0 || insects > MAX_INSECTS || (insects > 0 && (crop == null || !crop.watered()))
                 || (state == TileState.DEAD) != (withered != null))
@@ -185,6 +197,7 @@ public final class FarmTile {
         this.nextInsectCheckAt = nextInsectCheckAt;
         this.withered = withered;
         this.fertilized = fertilized && state == TileState.GROWING;
+        this.harvestRevision = revision;
     }
 
     private void require(TileState expected) {

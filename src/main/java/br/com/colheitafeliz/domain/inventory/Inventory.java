@@ -17,6 +17,10 @@ public final class Inventory {
 
     public void addSeedLot(ItemLot lot) { addLot(seedLots, lot); }
     public void addProduceLot(ItemLot lot) { addLot(produceLots, lot); }
+    public boolean canAddProduceLot(ItemLot lot) {
+        Objects.requireNonNull(lot);
+        return lot.quantity() <= Integer.MAX_VALUE - product(lot.itemId());
+    }
     public List<ItemLot> seedLots() { return List.copyOf(seedLots); }
     public List<ItemLot> produceLots() { return List.copyOf(produceLots); }
     public ItemLot takeSeed(String id) {
