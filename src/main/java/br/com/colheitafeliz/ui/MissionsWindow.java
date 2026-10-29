@@ -16,7 +16,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.Instant;
 
-/** Janela das missões diárias: uma linha por missão, com barra de progresso e recompensas. */
+/** Janela das missões diárias: as duas tarefas fixas, com barra de progresso e a recompensa de 1 verde cada. */
 public final class MissionsWindow {
     public static final float LEFT = 430, BOTTOM = 190, WIDTH = 740, HEIGHT = 520;
     private static final float BAR = 46, ROW_H = 104;
@@ -72,7 +72,7 @@ public final class MissionsWindow {
                 + " (meia-noite UTC)  ·  [Q] fecha", LEFT + WIDTH / 2f, BOTTOM + 26, Palette.INK_MUTED, Align.center);
     }
 
-    /** Durante os primeiros passos, a janela mostra só a tarefa atual e o progresso do tutorial. */
+    /** Durante os primeiros passos, a primeira linha mostra a tarefa atual e o progresso do tutorial; as tarefas diárias, que já contam, ficam abaixo. */
     private static void drawTutorial(SpriteBatch batch, UiSkin skin, GameAssets assets, Tutorial tutorial) {
         Tutorial.Step step = tutorial.current();
         float x = LEFT + 20, y = BOTTOM + HEIGHT - BAR - 20 - ROW_H + 8, w = WIDTH - 40, h = ROW_H - 12;

@@ -272,7 +272,7 @@ class SaveRoundTripTest {
         ManualClock clock = new ManualClock();
         Path file = directory.resolve("stage-two.json");
         GameSession.open(clock, CropCatalogLoader.load(), new JsonSaveRepository(file), bound -> 99).save();
-        // Um v16 da etapa 2: sem os fertilizantes por tipo e com o contador único do adubo antigo.
+        // Remove fertilizers e selectedFertilizerId e põe o contador único antigo fertilizer (a versão segue v20): ele é ignorado, sem conversão.
         JsonObject save = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
         JsonObject snapshot = save.getAsJsonObject("snapshot");
         snapshot.remove("fertilizers");
@@ -311,9 +311,7 @@ class SaveRoundTripTest {
         assertEquals(TileState.DEAD, again.state().farm().tile(0, 0).state());
         assertEquals(corn, again.state().farm().tile(0, 0).withered());
         assertTrue(again.state().sellProduce(corn).success());
-        // 345 de venda completa a missão "Venda produtos por 100 moedas" quando ela está na rotação do dia.
-        int mission = again.state().message().contains("Missão diária concluída") ? 35 : 0;
-        assertEquals(0, java.math.BigDecimal.valueOf(545 + mission).compareTo(again.state().wallet().coins()));
+        assertEquals(0, java.math.BigDecimal.valueOf(545).compareTo(again.state().wallet().coins()));
     }
 
     @Test void tutorialProgressSurvivesRestart() throws IOException {

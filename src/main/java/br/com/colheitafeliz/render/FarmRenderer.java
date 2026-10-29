@@ -75,7 +75,7 @@ public final class FarmRenderer implements AutoCloseable {
     public boolean debugVisible() { return debugVisible; }
     public void pointer(float x, float y) { pointerX = x; pointerY = y; }
 
-    /** Índice do animal do jogador sob o ponto (galinha ou ninho), ou -1. */
+    /** Índice do animal do jogador sob o ponto (o animal ou o ponto de produto), ou -1. */
     public int animalAt(float x, float y) { return scenery.animalAt(x, y); }
     public String animalTypeAt(float x, float y) { return scenery.animalTypeAt(x, y); }
 

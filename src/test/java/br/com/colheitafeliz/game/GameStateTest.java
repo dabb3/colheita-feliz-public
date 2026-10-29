@@ -77,7 +77,7 @@ class GameStateTest {
         assertTrue(game.act(0, 0).success());
     }
 
-    @Test void plowingNeverPaysTreasureEvenWithTheLuckiestSource() {
+    @Test void plowingNeverPaysBonusEvenWithTheLuckiestSource() {
         var clock = new ManualClock();
         var game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 0);
         game.selectTool(Tool.HOE);

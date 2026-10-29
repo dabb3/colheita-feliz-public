@@ -182,7 +182,7 @@ public final class Hud {
         }
     }
 
-    /** Card dos primeiros passos, logo abaixo do perfil: tarefa atual, dica e recompensa. */
+    /** Card dos primeiros passos, logo abaixo do perfil: tarefa atual e dica; o tutorial só orienta e não paga recompensa. */
     private void drawTutorial(SpriteBatch batch, UiSkin skin, GameAssets assets, Tutorial tutorial) {
         Tutorial.Step step = tutorial.current();
         float w = 420, h = 96, x = CARD_X, y = CARD_Y - 8 - h;
@@ -454,7 +454,7 @@ public final class Hud {
         return chips.size() > 2 ? chips.subList(0, 2) : chips;
     }
 
-    /** Balão sobre o ninho: o que a galinha está fazendo e o que o clique faz. */
+    /** Balão sobre o animal: o estado dele (fome, crescimento, produção, proteção) e o que o clique faz. */
     public void animalTip(SpriteBatch batch, UiSkin skin, Animal animal, Instant now, float x, float y, GameState state) {
         AnimalType type = animal.type();
         String line;

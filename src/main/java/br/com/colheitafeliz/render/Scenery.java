@@ -15,8 +15,8 @@ import java.util.Random;
 /**
  * Cenário vivo, como na fazenda do Orkut: casa e casinha do cachorro no alto, cachorro com o potinho, burrinho
  * cochilando, coelho com a cenoura e, dentro do cercado, os animais do jogador. Cada animal tem um lugar e
- * um ponto de produto: o ninho da galinha e da pata mostra ovos quando estão prontos; o balde da vaca e o
- * cesto da ovelha só aparecem com o produto pronto.
+ * um ponto de produto, visível só com o produto pronto: ovos no ninho da galinha e da pata, balde da vaca e cesto
+ * da ovelha; mel e pena usam o próprio animal, pois o acervo não tem ícone específico.
  */
 final class Scenery {
     /** Camada de desenho: atrás dos canteiros (o padrão) ou na frente deles. */
