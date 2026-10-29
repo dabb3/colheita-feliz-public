@@ -13,8 +13,8 @@ import java.util.Map;
 import java.util.Random;
 
 /**
- * Cenário vivo, como na fazenda do Orkut: casa e casinha do cachorro no alto, cachorro com o potinho, burrinho
- * cochilando, coelho com a cenoura e, dentro do cercado, os animais do jogador. Cada animal tem um lugar e
+ * Cenário da fazenda: casa e casinha do cachorro no alto e, dentro do cercado, somente os animais comprados
+ * pelo jogador. Cada animal tem um lugar e
  * um ponto de produto, visível só com o produto pronto: ovos no ninho da galinha e da pata, balde da vaca e cesto
  * da ovelha; mel e pena usam o próprio animal, pois o acervo não tem ícone específico.
  */
@@ -96,14 +96,6 @@ final class Scenery {
         // Casas no alto, a casinha do cachorro à esquerda da casa.
         add(a.dogHouse, null, 410, 556, 214, 0, 0, Layer.BACK, false, false, false);
         add(a.house, null, 735, 540, 420, 0, 0, Layer.BACK, false, false, false);
-        // Cachorro, potinho e burrinho na frente das casas.
-        add(a.bowl, null, 318, 544, 46, 0, 0, Layer.BACK, true, false, false);
-        add(a.dog, a.dogWalk, 384, 530, 92, 40, 34, Layer.BACK, true, false, true);
-        add(a.donkeySleeping, null, 222, 540, 96, 0, 0, Layer.BACK, true, false, false);
-        // Dentro do cercado.
-        // Coelho com a cenoura no canto de baixo.
-        add(a.carrot, null, 168, 140, 54, 0, 0, Layer.FRONT, true, false, false);
-        add(a.rabbit, null, 104, 150, 58, 0, 0, Layer.FRONT, true, false, false);
         for (Thing t : things) {
             t.wait = random.nextFloat() * 3;
             if (t.shadow) t.footCenter = a.footCenter(t.idle);

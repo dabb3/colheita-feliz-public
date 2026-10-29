@@ -38,17 +38,13 @@ public final class GameAssets implements AutoCloseable {
     public final Texture chicken = chickenFrames[0];
     public final Texture chickenWalk = chickenFrames[1];
     public final Texture duck = animalSprite("classic/animals/pato/pato.png");
-    private final Texture[] dogFrames = animalFrames("classic/animals/cachorro/cachorro.png", "classic/animals/cachorro/cachorro-andando.png");
-    public final Texture dog = dogFrames[0];
-    public final Texture dogWalk = dogFrames[1];
-    public final Texture donkeySleeping = animalSprite("classic/animals/burrinho/burrinho-dormindo.png");
-    public final Texture rabbit = animalSprite("classic/animals/coelho/coelho.png");
-    public final Texture carrot = animalSprite("classic/animals/coelho/cenoura-coelho.png");
+    // Reutiliza o recorte de margens transparentes e o limite de textura dos sprites.
+    public final Texture deadPlant = animalSprite("classic/terrain/planta-morta.png");
+    public final Texture plotSign = animalSprite("classic/terrain/placa-terreno.png");
     public final Texture nestEggs = animalSprite("classic/animals/ninho-geral/ninho-com-ovos.png");
     public final Texture nestEmpty = animalSprite("classic/animals/ninho-geral/ninho-vazio.png");
     public final Texture bucket = animalSprite("classic/animals/vaca/balde-vaca.png");
     public final Texture woolBasket = animalSprite("classic/animals/ovelha/la-ovelha.png");
-    public final Texture bowl = animalSprite("classic/animals/cachorro/potinho-cachorro-com-comida.png");
     public final Texture[] weeds = new Texture[WEED_STAGES];
     /** Minhocas por quantidade: insects[0] = 1 minhoca ... insects[2] = 3. */
     public final Texture[] insects = new Texture[INSECT_STAGES];

@@ -30,7 +30,7 @@ public final class UiSkin implements AutoCloseable {
     public final NinePatch window, windowBar, tab, tabActive, sheet;
     public final NinePatch tray, hudCard, tooltip, toast, toastReward, toastAlert, banner;
     public final NinePatch barTrack, barSky, barSun, barLeaf, barGray;
-    public final NinePatch badge, chip, signBoard, itemHover, missionDone, mission;
+    public final NinePatch badge, chip, itemHover, missionDone, mission;
     public final NinePatch shadow;
     public final Texture glow, white, groundShadow;
 
@@ -69,7 +69,6 @@ public final class UiSkin implements AutoCloseable {
                 new Stop(0, Color.valueOf("ff7468")), new Stop(.48f, Color.valueOf("ff7468")),
                 new Stop(.52f, Palette.BERRY), new Stop(1, Palette.BERRY_LO));
         chip = box(16, 16, 4, 0, Palette.WINDOW, false, new Stop(0, Color.WHITE), new Stop(1, Color.WHITE));
-        signBoard = box(32, 40, 3, 1, Palette.WOOD_INK, true, new Stop(0, Palette.WOOD_HI), new Stop(1, Palette.WOOD));
         itemHover = box(32, 32, 6, 1, Palette.REWARD_LINE, false, new Stop(0, Palette.REWARD_HI), new Stop(1, Palette.REWARD));
         mission = box(32, 32, 6, 1, Palette.CHROME_LO, false, new Stop(0, Palette.WINDOW), new Stop(1, Palette.WINDOW));
         missionDone = box(32, 32, 6, 1, Palette.REWARD_LINE, false, new Stop(0, Palette.REWARD_HI), new Stop(1, Palette.REWARD));

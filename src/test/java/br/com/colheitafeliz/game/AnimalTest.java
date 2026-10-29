@@ -38,6 +38,30 @@ class AnimalTest {
         assertEquals(Animal.Status.READY, game.barn().get(0).statusAt(game.now()));
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"galinha", "abelha", "pato", "pavao", "ovelha", "vaca"})
+    void everyProducerCanBeFedCollectedAndItsProductSold(String id) {
+        var clock = new ManualClock(); var game = rich(clock);
+        var type = game.animalType(id);
+        assertTrue(game.buyAnimal(type).success());
+        while (game.barn().get(0).statusAt(game.now()) != Animal.Status.READY) {
+            if (game.barn().get(0).statusAt(game.now()) == Animal.Status.HUNGRY) {
+                assertTrue(game.buyFeed("producer").success());
+                assertTrue(game.tendAnimal(id).success());
+            }
+            clock.advanceSeconds(8 * 3600);
+        }
+        assertTrue(game.tendAnimal(id).success());
+        assertEquals(0, game.barn().size());
+        assertEquals(1, game.inventory().product(type.productId()));
+        assertFalse(game.tendAnimal(id).success());
+        var before = game.wallet().coins();
+        assertTrue(game.sellProduct(type, false).success());
+        assertTrue(game.wallet().coins().compareTo(before) > 0);
+        assertEquals(0, game.inventory().product(type.productId()));
+        assertFalse(game.sellProduct(type, false).success());
+    }
+
     @Test void fifteenTypesRespectTheirOwnLimitAndLevel() {
         var clock = new ManualClock(); var game = rich(clock);
         assertEquals(15, game.animalTypes().size());
