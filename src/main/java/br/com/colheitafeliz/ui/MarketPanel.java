@@ -100,7 +100,8 @@ public final class MarketPanel {
     public boolean beginScrollDrag(float x, float y, GameState state) {
         if (!open || vip) return false;
         Scrollbar bar = scrollbar(state);
-        if (bar == null || !bar.track().contains(x, y)) return false;
+        if (bar == null || !new Rectangle(bar.track().x - 8, bar.track().y,
+                bar.track().width + 16, bar.track().height).contains(x, y)) return false;
         scrollDragOffset = bar.thumb().contains(x, y) ? y - bar.thumb().y : bar.thumb().height / 2f;
         updateScrollFromThumb(y - scrollDragOffset, state);
         return true;

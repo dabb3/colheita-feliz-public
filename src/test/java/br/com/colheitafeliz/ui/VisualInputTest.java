@@ -118,6 +118,23 @@ class VisualInputTest {
         panel.endScrollDrag();
     }
 
+    @Test void scrollbarHasAnAccessibleHitAreaWiderThanItsVisibleTrack() {
+        var game = new GameState(new ManualClock()::instant, CropCatalogLoader.load(), bound -> 99);
+        var panel = new MarketPanel(game.catalog());
+        panel.showShop();
+        float trackX = MarketPanel.LEFT + MarketPanel.WIDTH - 24.5f;
+        float bottom = MarketPanel.BOTTOM + 26;
+        float height = MarketPanel.HEIGHT - 46 - 18 - 36 - 12 - 76;
+        float thumbHeight = height * 2 / 6;
+
+        assertTrue(panel.beginScrollDrag(trackX - 6, bottom + height - 1, game),
+                "a área de arraste deve ser fácil de acertar, mesmo fora dos 5 px visuais");
+        assertEquals(0, panel.scrollRows());
+        assertTrue(panel.dragScroll(bottom + thumbHeight / 2 - 1, game));
+        assertEquals(4, panel.scrollRows());
+        panel.endScrollDrag();
+    }
+
     private static float cx(Rectangle r) { return r.x + r.width / 2f; }
     private static float cy(Rectangle r) { return r.y + r.height / 2f; }
 
