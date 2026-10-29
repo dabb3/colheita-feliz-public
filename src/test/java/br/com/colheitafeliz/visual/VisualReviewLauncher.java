@@ -47,12 +47,12 @@ public final class VisualReviewLauncher {
                 "14-loja-animais.png", "15-galinhas-no-cercado.png", "16-vip.png", "17-saldos-e-xp-decimais.png", "18-deposito-duas-moedas.png", "19-deposito-vip-bloqueado.png", "20-falha-autosave.png", "21-aviso-vip.png",
                 "22-cinco-estagios.png", "23-pragas-simultaneas.png", "24-temporada-reiniciada.png", "25-loja-ultima-pagina.png",
                 "26-loja-fertilizantes.png", "27-bandeja-fertilizantes.png", "28-pronta-pelo-fertilizante.png", "29-animais-bebes.png", "30-animais-jovens.png", "31-animais-adultos.png",
-                "32-animais-sono.png", "33-protetores-expirados.png", "34-animais-pagina2.png", "35-animais-pagina3.png", "36-animais-pagina4.png"
+                "32-animais-sono.png", "33-protetores-expirados.png", "34-animais-pagina2.png", "35-animais-pagina3.png", "36-animais-pagina4.png", "37-tarefas-no-tutorial.png", "38-terreno-verde-comprado.png", "39-saldos-milionarios.png"
         };
-        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
         private final Path output = Path.of(System.getProperty("colheita.visualOutput", "build/visual-review"));
         private FarmRenderer renderer;
-        private GameState fresh, states, rich, newcomer, rancher, stages, seasons, fertilized;
+        private GameState fresh, states, rich, newcomer, rancher, stages, seasons, fertilized, tasks, expanded, millionaire;
         private int scene, frames;
         private GameState animalsBaby, animalsYoung, animalsAdult, animalsSleep, animalsExpired;
 
@@ -77,6 +77,21 @@ public final class VisualReviewLauncher {
             newcomer.startNewFarm();
             newcomer.selectTool(Tool.HAND);
             newcomer.act(0, 0);
+            tasks = new GameState(newcomerClock::instant, newcomerClock, catalog, bound -> 99);
+            tasks.startNewFarm();
+            tasks.buySeed(catalog.get("nabo"));
+            tasks.selectTool(Tool.HOE);
+            tasks.act(0, 0);
+            tasks.selectSeed(catalog.get("nabo"));
+            tasks.act(0, 0);
+            expanded = new GameState(newcomerClock::instant, newcomerClock, catalog, bound -> 99);
+            expanded.progress().award(25);
+            expanded.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GREEN, new java.math.BigDecimal("95"));
+            expanded.buyPlot(1, 0);
+            millionaire = new GameState(newcomerClock::instant, newcomerClock, catalog, bound -> 99);
+            millionaire.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GOLD, new java.math.BigDecimal("987654321.1"));
+            millionaire.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GREEN, new java.math.BigDecimal("1234567.8"));
+            millionaire.progress().award(new java.math.BigDecimal("23867.125"));
             animalsBaby = animalScene(br.com.colheitafeliz.domain.animal.Animal.Stage.BABY, false, false);
             animalsYoung = animalScene(br.com.colheitafeliz.domain.animal.Animal.Stage.YOUNG, false, false);
             animalsAdult = animalScene(br.com.colheitafeliz.domain.animal.Animal.Stage.ADULT, false, false);
@@ -236,12 +251,15 @@ public final class VisualReviewLauncher {
                 case 31 -> animalsSleep;
                 case 32 -> animalsExpired;
                 case 33, 34, 35 -> rancher;
+                case 36 -> tasks;
+                case 37 -> expanded;
+                case 38 -> millionaire;
                 default -> states;
             };
             IsoRenderer.GridPosition hovered = switch (scene) {
                 case 2 -> new IsoRenderer.GridPosition(0, 2);
                 case 3 -> new IsoRenderer.GridPosition(0, 1);
-                case 10 -> new IsoRenderer.GridPosition(1, 0);
+                case 10, 37 -> new IsoRenderer.GridPosition(2, 0);
                 case 11 -> new IsoRenderer.GridPosition(0, 0);
                 case 22 -> new IsoRenderer.GridPosition(0, 3);
                 case 23, 27 -> new IsoRenderer.GridPosition(0, 0);
@@ -283,7 +301,7 @@ public final class VisualReviewLauncher {
                 }
                 case 24 -> {
                     // Nível alto sem VIP: as sementes VIP liberadas pelo nível só saem com o cartão (última cena).
-                    fresh.progress().award(new java.math.BigDecimal("20000"));
+                    fresh.progress().award(new java.math.BigDecimal("1000000"));
                     renderer.marketPanel().showShop();
                     for (int i = 0; i < 3; i++) renderer.marketPanel().nextPage();
                 }
@@ -324,7 +342,7 @@ public final class VisualReviewLauncher {
                     renderer.pointer(cell.x + cell.width / 2f, cell.y + cell.height / 2f);
                 }
                 case 6 -> renderer.marketPanel().showSell();
-                case 7, 12 -> renderer.missions().toggle();
+                case 7, 12, 36 -> renderer.missions().toggle();
                 case 13 -> renderer.marketPanel().showAnimals();
                 case 33, 34, 35 -> {
                     renderer.marketPanel().showAnimals();

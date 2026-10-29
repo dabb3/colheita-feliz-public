@@ -146,7 +146,6 @@ public final class InputController extends InputAdapter {
         boolean levelUp = state.progress().level() > before.level();
         java.math.BigDecimal xpGained = levelUp ? java.math.BigDecimal.ZERO : state.progress().currentXp().subtract(before.xp());
         renderer.reward(x, y, harvested, produced, xpGained, state.wallet().coins().subtract(before.coins()));
-        if (cue == Cue.PLOW && state.lastTreasureCoins() > 0) renderer.treasure(state.lastTreasureCoins());
         if (levelUp) renderer.levelUp(state);
         audio.play(levelUp ? Cue.LEVEL_UP : cue);
         save.getAsBoolean();

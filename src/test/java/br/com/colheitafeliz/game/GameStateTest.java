@@ -77,22 +77,14 @@ class GameStateTest {
         assertTrue(game.act(0, 0).success());
     }
 
-    @Test void plowingGrassSometimesFindsATreasureChestThatGrowsWithLevel() {
-        ManualClock clock = new ManualClock();
-        GameState lucky = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 0);
-        lucky.selectTool(Tool.HOE);
-        assertTrue(lucky.act(0, 0).success());
-        assertEquals(30, lucky.lastTreasureCoins());
-        assertEquals(0, java.math.BigDecimal.valueOf(530).compareTo(lucky.wallet().coins()));
-        assertTrue(lucky.message().contains("baú do tesouro"));
-        lucky.progress().award(50);
-        assertEquals(40, lucky.treasureCoins());
-
-        GameState unlucky = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> GameState.TREASURE_CHANCE);
-        unlucky.selectTool(Tool.HOE);
-        assertTrue(unlucky.act(0, 0).success());
-        assertEquals(0, unlucky.lastTreasureCoins());
-        assertEquals(0, java.math.BigDecimal.valueOf(500).compareTo(unlucky.wallet().coins()));
+    @Test void plowingNeverPaysTreasureEvenWithTheLuckiestSource() {
+        var clock = new ManualClock();
+        var game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 0);
+        game.selectTool(Tool.HOE);
+        assertTrue(game.act(0, 0).success());
+        assertEquals(0, new BigDecimal("500").compareTo(game.wallet().coins()));
+        assertEquals(0, new BigDecimal("5").compareTo(game.greenCoins()));
+        assertEquals(0, game.progress().currentXp().signum());
     }
 
     @Test void sellEverythingEmptiesTheDepositAtOnce() {
@@ -141,7 +133,7 @@ class GameStateTest {
         game.selectTool(Tool.PESTICIDE);
         game.act(0, 0);
         assertTrue(game.alerts().isEmpty());
-        assertEquals(0, java.math.BigDecimal.valueOf(5).compareTo(game.greenCoins()));
+        assertEquals(0, java.math.BigDecimal.valueOf(7).compareTo(game.greenCoins()));
     }
 
     @Test void insectsPauseTheCropWithAnAlertUntilPesticide() {
@@ -197,7 +189,7 @@ class GameStateTest {
         assertFalse(game.buySeed(sweetPotato, Currency.GOLD).success(), "semente VIP não sai por ouro");
         assertFalse(game.buySeed(game.catalog().get("nabo"), Currency.GREEN).success(), "nabo não sai por verdes");
         assertTrue(game.buySeed(sweetPotato, Currency.GREEN).success());
-        assertEquals(0, new BigDecimal("101").compareTo(game.greenCoins()));
+        assertEquals(0, new BigDecimal("102").compareTo(game.greenCoins()));
         ItemLot seed = game.inventory().seedLots().getFirst();
         assertEquals(new ItemLot("batata-doce", Currency.GREEN, new BigDecimal("4"), 1, true), seed);
 
@@ -245,7 +237,7 @@ class GameStateTest {
         BigDecimal green = game.greenCoins();
         assertTrue(game.buyVip().success());
         assertTrue(game.sellAllProduce(sweetPotato).success());
-        assertEquals(0, green.subtract(new BigDecimal("100")).add(new BigDecimal("5")).compareTo(game.greenCoins()),
+        assertEquals(0, green.subtract(new BigDecimal("100")).add(new BigDecimal("6")).compareTo(game.greenCoins()),
                 "a venda devolve verdes, nunca ouro");
     }
 }

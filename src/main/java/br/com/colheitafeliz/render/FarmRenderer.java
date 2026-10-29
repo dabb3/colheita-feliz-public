@@ -91,7 +91,8 @@ public final class FarmRenderer implements AutoCloseable {
         if (outbreak.weeds()) hud.toast(assets.weeds[3], "Ervas daninhas", "pausaram uma planta. Use o herbicida (5).", Hud.ToastKind.ALERT);
     }
 
-    /** Números que sobem do ponto da ação: itens colhidos, XP e moedas. */
+
+
     public void reward(float x, float y, CropType harvested, int produced, int xp, int coins) {
         reward(x, y, harvested, produced, java.math.BigDecimal.valueOf(xp), java.math.BigDecimal.valueOf(coins));
     }
@@ -114,9 +115,7 @@ public final class FarmRenderer implements AutoCloseable {
         }
     }
 
-    public void treasure(int coins) {
-        hud.toast(assets.coin, "Baú do tesouro!", "+" + coins + " moedas achadas na terra", Hud.ToastKind.REWARD);
-    }
+
 
     public void levelUp(GameState state) {
         List<CropType> unlocked = new ArrayList<>();
@@ -256,9 +255,9 @@ public final class FarmRenderer implements AutoCloseable {
         if (next == null) return;
         Vector2 p = iso.gridToScreen(next.column(), next.row());
         boolean levelOk = state.progress().level() >= next.requiredLevel();
-        boolean ready = levelOk && state.wallet().coins().compareTo(java.math.BigDecimal.valueOf(next.price())) >= 0;
-        String main = levelOk ? Hud.formatInt(next.price()) : "Nível " + next.requiredLevel();
-        String sub = levelOk ? "Comprar lote" : next.price() + " moedas";
+        boolean ready = levelOk && state.wallet().balance(next.currency()).compareTo(next.price()) >= 0;
+        String main = levelOk ? br.com.colheitafeliz.game.GameText.money(next.price()) : "Nível " + next.requiredLevel();
+        String sub = levelOk ? "Comprar lote" : next.price() + " verdes";
         float mainW = skin.width(skin.button, main) + (levelOk ? 22 : 0);
         float w = Math.max(mainW, skin.width(skin.micro, sub)) + 20, h = 40;
         float angle = ready ? MathUtils.sin(System.nanoTime() / 160_000_000f) * 3f
@@ -269,7 +268,7 @@ public final class FarmRenderer implements AutoCloseable {
         skin.dropShadow(batch, bx, by, w, h, 2);
         skin.draw(batch, skin.signBoard, bx, by, w, h);
         float textX = bx + w / 2f + (levelOk ? 11 : 0);
-        if (levelOk) Toolbar.drawFitted(batch, assets.coin, textX - mainW / 2f + 2, by + 26, 18);
+        if (levelOk) Toolbar.drawFitted(batch, assets.greenCoin, textX - mainW / 2f + 2, by + 26, 18);
         skin.shadowed(batch, skin.button, main, textX, by + h - 9, Palette.ON_COLOR, Palette.WOOD_INK, Align.center);
         skin.text(batch, skin.micro, sub, bx + w / 2f, by + 12, Color.valueOf("fff3d6"), Align.center);
     }
@@ -305,8 +304,8 @@ public final class FarmRenderer implements AutoCloseable {
         if (notificationStateInitialized && missionDay.equals(observedMissionDay)) {
             for (DailyMissionBoard.Mission mission : state.dailyMissions().missions()) {
                 if (completedMissions.contains(mission.id()) && !observedCompletedMissions.contains(mission.id()))
-                    hud.toast(assets.gift, "Missão concluída:", mission.title() + " (+" + mission.coins()
-                            + " moedas, +" + mission.xp() + " XP)", Hud.ToastKind.REWARD);
+                    hud.toast(assets.greenCoin, "Missão concluída:", mission.title() + " (+" + mission.green()
+                            + " verde)", Hud.ToastKind.REWARD);
             }
         }
         observedMissionDay = missionDay;
@@ -315,7 +314,7 @@ public final class FarmRenderer implements AutoCloseable {
         LandExpansion.Plot nextPlot = state.land().next();
         boolean plotAvailable = nextPlot != null
                 && state.progress().level() >= nextPlot.requiredLevel()
-                && state.wallet().coins().compareTo(java.math.BigDecimal.valueOf(nextPlot.price())) >= 0;
+                && state.wallet().balance(nextPlot.currency()).compareTo(nextPlot.price()) >= 0;
         if (notificationStateInitialized && plotAvailable
                 && (!observedPlotAvailable || nextPlot.id() != observedNextPlotId))
             hud.toast(assets.coin, "Lote disponível.", "Clique na plaquinha para comprar.", Hud.ToastKind.NORMAL);

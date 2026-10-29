@@ -45,7 +45,7 @@ public final class Hud {
     private record Toast(Texture icon, String bold, String rest, ToastKind kind) {}
     private record Floater(float x, float y, Texture icon, String text, FloaterStyle style, long start) {}
 
-    private static final float CARD_X = 16, CARD_W = 330, CARD_H = 92, CARD_Y = 900 - 14 - CARD_H;
+    private static final float CARD_X = 16, CARD_W = 430, CARD_H = 112, CARD_Y = 900 - 14 - CARD_H;
     private static final float ICON_W = 78, ICON_TOP = 890;
     private static final long TOAST_NANOS = 3_200_000_000L, TOAST_FADE = 250_000_000L;
     private static final long FLOATER_NANOS = 1_100_000_000L, BANNER_NANOS = 2_600_000_000L, BUMP_NANOS = 360_000_000L;
@@ -127,14 +127,12 @@ public final class Hud {
     public void drawTop(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state, float px, float py,
                         double speed, boolean debug) {
         drawProfile(batch, skin, assets, state);
-        Toolbar.drawFitted(batch, assets.gift, CARD_X + 32, GIFT_Y + GIFT / 2f, GIFT);
         if (state.tutorial().active()) drawTutorial(batch, skin, assets, state.tutorial());
         drawShortcuts(batch, skin, assets, state, px, py);
         if (panel == Panel.ALERTS) drawAlerts(batch, skin, state.alerts());
         if (panel == Panel.SETTINGS) drawSettings(batch, skin, state, speed, debug, px, py);
     }
 
-    private static final float GIFT = 50, GIFT_Y = CARD_Y - 8 - GIFT;
 
     private void drawAlerts(SpriteBatch batch, UiSkin skin, List<GameState.Alert> alerts) {
         Rectangle anchor = shortcutBounds(Shortcut.ALERTS);
@@ -187,21 +185,14 @@ public final class Hud {
     /** Card dos primeiros passos, logo abaixo do perfil: tarefa atual, dica e recompensa. */
     private void drawTutorial(SpriteBatch batch, UiSkin skin, GameAssets assets, Tutorial tutorial) {
         Tutorial.Step step = tutorial.current();
-        float w = 420, h = 96, x = CARD_X, y = GIFT_Y - 8 - h;
+        float w = 420, h = 96, x = CARD_X, y = CARD_Y - 8 - h;
         skin.dropShadow(batch, x, y, w, h, 2);
         skin.draw(batch, skin.hudCard, x, y, w, h);
         skin.text(batch, skin.caption, "Primeiros passos · " + (tutorial.stepIndex() + 1) + "/" + Tutorial.STEPS.size(),
                 x + 16, y + h - 14, Palette.INK_MUTED, Align.left);
         skin.text(batch, skin.label, step.title(), x + 16, y + h - 40, Palette.INK, Align.left);
         skin.text(batch, skin.caption, step.hint(), x + 16, y + 22, Palette.INK_MUTED, Align.left);
-        float rx = x + w - 16;
-        String xp = "+" + step.xp(), coins = "+" + step.coins();
-        float xpW = skin.width(skin.label, xp);
-        skin.text(batch, skin.label, xp, rx, y + h - 40, Palette.SKY_INK, Align.right);
-        Toolbar.drawFitted(batch, assets.star, rx - xpW - 14, y + h - 46, 22);
-        float coinsRight = rx - xpW - 34;
-        skin.text(batch, skin.label, coins, coinsRight, y + h - 40, Palette.COIN_INK, Align.right);
-        Toolbar.drawFitted(batch, assets.coin, coinsRight - skin.width(skin.label, coins) - 14, y + h - 46, 22);
+
     }
 
     private void drawProfile(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state) {
@@ -223,19 +214,27 @@ public final class Hud {
                 Palette.ON_COLOR, Palette.SKY_INK, 1f, Align.center);
         skin.label.getData().setScale(1);
         skin.micro.getData().setScale(.85f);
-        skin.bar(batch, skin.barSky, tx, CARD_Y + 42, 220, 14,
+        skin.bar(batch, skin.barSky, tx, CARD_Y + 62, 320, 14,
                 state.progress().currentXp().floatValue() / state.progress().xpToNext().floatValue(),
                 GameText.xp(state.progress().currentXp()) + " / " + GameText.xp(state.progress().xpToNext()) + " XP");
         skin.micro.getData().setScale(1);
         float bump = 1;
         float t = (now - bumpStarted) / (float) BUMP_NANOS;
         if (t < 1) bump = 1 + .35f * (float) Math.sin(t * Math.PI);
-        Toolbar.drawFitted(batch, assets.coin, tx + 11, CARD_Y + 22, 24 * bump);
+        Toolbar.drawFitted(batch, assets.coin, tx + 10, CARD_Y + 43, 24 * bump);
         String gold = GameText.money(state.wallet().coins());
-        skin.text(batch, skin.number, gold, tx + 28, CARD_Y + 30, Palette.INK, Align.left);
-        float greenX = tx + 28 + skin.width(skin.number, gold) + 24;
-        Toolbar.drawFitted(batch, assets.greenCoin, greenX, CARD_Y + 22, 24);
-        skin.text(batch, skin.number, GameText.money(state.greenCoins()), greenX + 17, CARD_Y + 30, Palette.LEAF_INK, Align.left);
+        drawBalance(batch, skin, gold, tx + 30, CARD_Y + 51, CARD_X + CARD_W - 12, Palette.INK);
+        Toolbar.drawFitted(batch, assets.greenCoin, tx + 10, CARD_Y + 18, 24);
+        drawBalance(batch, skin, GameText.money(state.greenCoins()), tx + 30, CARD_Y + 26,
+                CARD_X + CARD_W - 12, Palette.LEAF_INK);
+
+    }
+
+    private static void drawBalance(SpriteBatch batch, UiSkin skin, String text, float x, float y, float right, Color color) {
+        float scale = Math.min(1, (right - x) / skin.width(skin.number, text));
+        skin.number.getData().setScale(scale);
+        skin.text(batch, skin.number, text, x, y, color, Align.left);
+        skin.number.getData().setScale(1);
     }
 
     private void drawShortcuts(SpriteBatch batch, UiSkin skin, GameAssets assets, GameState state, float px, float py) {
@@ -387,9 +386,9 @@ public final class Hud {
             if (next != null && next.id() == plot.id()) {
                 boolean levelOk = state.progress().level() >= plot.requiredLevel();
                 simpleTip(batch, skin, tileX, tileY, "Lote à venda",
-                        !levelOk ? "Libera no nível " + plot.requiredLevel() + " · " + plot.price() + " moedas"
-                                : state.wallet().coins().compareTo(java.math.BigDecimal.valueOf(plot.price())) >= 0 ? "Clique para comprar por " + plot.price() + " moedas"
-                                : "Custa " + plot.price() + " moedas");
+                        !levelOk ? "Libera no nível " + plot.requiredLevel() + " · " + br.com.colheitafeliz.game.GameText.money(plot.price()) + " verdes"
+                                : state.wallet().balance(plot.currency()).compareTo(plot.price()) >= 0 ? "Clique para comprar por " + br.com.colheitafeliz.game.GameText.money(plot.price()) + " verdes"
+                                : "Custa " + br.com.colheitafeliz.game.GameText.money(plot.price()) + " verdes");
             } else simpleTip(batch, skin, tileX, tileY, "Lote bloqueado", "Os lotes são comprados em ordem");
             return;
         }
