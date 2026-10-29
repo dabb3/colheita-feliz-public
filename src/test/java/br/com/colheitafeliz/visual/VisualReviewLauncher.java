@@ -280,6 +280,16 @@ public final class VisualReviewLauncher {
                 renderer.pointer(p.x, p.y);
             }
             renderer.draw(state, hovered, 1);
+            if (scene == 30 && frames == 0) {
+                // Conferir os alvos renderizados de todos os animais sem alterar o estado ou salvar.
+                float[][] targets = {{1170, 433}, {1210, 68}, {1330, 238}, {195, 108}, {1350, 358},
+                        {1020, 628}, {1445, 353}, {275, 488}, {1375, 443}, {1515, 463},
+                        {745, 488}, {1430, 68}, {1220, 643}, {220, 563}, {395, 53}};
+                var types = state.animalTypes();
+                for (int i = 0; i < targets.length; i++)
+                    if (!types.get(i).id().equals(renderer.animalTypeAt(targets[i][0], targets[i][1])))
+                        throw new IllegalStateException("Unreachable animal: " + types.get(i).id());
+            }
             if (++frames < FRAMES[scene]) return;
             capture(FILES[scene]);
             scene++;

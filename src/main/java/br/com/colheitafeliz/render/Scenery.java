@@ -13,8 +13,8 @@ import java.util.Map;
 import java.util.Random;
 
 /**
- * Cenário da fazenda: casa e casinha do cachorro no alto e, dentro do cercado, somente os animais comprados
- * pelo jogador. Cada animal tem um lugar e
+ * Cenário da fazenda: somente animais comprados, distribuídos pela referência visual. No cercado ficam
+ * porco, ovelha, vaca, galinha e pato; os demais ficam fora. Cada animal tem um lugar e
  * um ponto de produto, visível só com o produto pronto: ovos no ninho da galinha e da pata, balde da vaca e cesto
  * da ovelha; mel e pena usam o próprio animal, pois o acervo não tem ícone específico.
  */
@@ -83,18 +83,13 @@ final class Scenery {
         this.pen = pen;
         this.soft = softShadow;
         this.assets = a;
-        int position = 0;
         for (var type : br.com.colheitafeliz.game.AnimalCatalogLoader.load()) {
-            int col = position % 5, row = position / 5;
-            float x = row == 2 ? 1250 + col * 73 : 1160 + col * 95;
-            float y = 458 - row * 54;
-            float width = type.id().equals("vaca") ? 88 : type.id().equals("galinha") || type.id().equals("abelha") || type.id().equals("pombo") ? 52 : 72;
-            looks.put(type.id(), new Look(a.animal(type.id()), null, width, 6, 8, a.product(type.id()), null, 28,
-                    new float[][]{{x, y, x + 30, y - 16}}));
-            position++;
+            AnimalLayout layout = AnimalLayout.forType(type.id());
+            boolean hive = type.id().equals("abelha");
+            looks.put(type.id(), new Look(hive ? a.beehive : a.animal(type.id()), null, layout.width(),
+                    hive ? 0 : 12, hive ? 0 : 8, a.product(type.id()), null, 28,
+                    new float[][]{{layout.x(), layout.y(), layout.x() + 38, layout.y() - 12}}));
         }
-        looks.put("abelha", new Look(a.beehive, null, 112, 0, 0, a.beehive, null, 28,
-                new float[][]{{1210, 70, 1210, 70}}));
         // Casas no alto, a casinha do cachorro à esquerda da casa.
         add(a.dogHouse, null, 410, 556, 214, 0, 0, Layer.BACK, false, false, false);
         add(a.house, null, 735, 540, 420, 0, 0, Layer.BACK, false, false, false);
@@ -149,11 +144,13 @@ final class Scenery {
             int slot = used.merge(id, 1, Integer::sum) - 1;
             if (look == null || slot >= look.slots().length) throw new IllegalStateException("No pen slot for " + id);
             float[] s = look.slots()[slot];
+            boolean insidePen = AnimalLayout.forType(id).insidePen();
+            Layer layer = insidePen || s[1] > 450 ? Layer.BACK : Layer.FRONT;
             Thing product = add(look.empty() != null ? look.empty() : look.ready(), null, s[2], s[3],
-                    look.productWidth(), 0, 0, Layer.BACK, look.empty() == null, true, false);
+                    look.productWidth(), 0, 0, layer, look.empty() == null, insidePen, false);
             boolean hive = id.equals("abelha");
             Thing animal = add(look.idle(), look.walk(), s[0], s[1], look.width(), look.radius(), look.speed(),
-                    hive ? Layer.FRONT : Layer.BACK, true, !hive, !hive && slot % 2 == 0);
+                    layer, true, insidePen, !hive && slot % 2 == 0);
             animal.footCenter = assets.footCenter(animal.idle);
             animal.wait = random.nextFloat() * 3;
             placed.add(new Placed(id, animal, product));
