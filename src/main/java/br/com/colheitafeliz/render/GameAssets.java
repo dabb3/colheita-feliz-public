@@ -25,6 +25,7 @@ public final class GameAssets implements AutoCloseable {
     private final Texture[] hiveSprites = hiveSprites();
     public final Texture beehive = hiveSprites[0];
     public final Texture bee = hiveSprites[1];
+    public final Texture peacockOpen = animalSprite("classic/animals/pavao/pavao-aberto.png");
     public final Texture background = load("classic/background/background.png");
     public final Texture house = load("classic/buildings/main-house.png");
     public final Texture dogHouse = load("classic/buildings/dog-house.png");
@@ -115,6 +116,7 @@ public final class GameAssets implements AutoCloseable {
 
     /** Mapeamentos explícitos para os nomes reais do acervo, inclusive pomba e burrinho. */
     static String animalPath(String id, br.com.colheitafeliz.domain.animal.Animal.Stage stage, AnimalPose pose) {
+        if (id.equals("pavao") && pose == AnimalPose.WALKING) return "classic/animals/pavao/pavao-aberto.png";
         String folder = switch (id) {
             case "pombo" -> "pomba"; case "burro" -> "burrinho";
             case "cachorro-mastiff", "cachorro-robo", "galinha", "abelha", "coelho", "pato", "pavao", "porco", "ovelha", "vaca", "avestruz", "cabra", "cavalo" -> id;
@@ -137,8 +139,9 @@ public final class GameAssets implements AutoCloseable {
     public Texture animal(String id) { return animal(id, br.com.colheitafeliz.domain.animal.Animal.Stage.ADULT, AnimalPose.IDLE); }
     public Texture animal(String id, br.com.colheitafeliz.domain.animal.Animal.Stage stage, AnimalPose pose) {
         Texture[] frames = animalArt.computeIfAbsent(id + ":" + stage, key -> animalFrames(
-                animalPath(id, stage, AnimalPose.IDLE), animalPath(id, stage, AnimalPose.WALKING), animalPath(id, stage, AnimalPose.SLEEPING)));
-        return frames[pose.ordinal()];
+                animalPath(id, stage, AnimalPose.IDLE), animalPath(id, stage, id.equals("pavao") ? AnimalPose.IDLE : AnimalPose.WALKING),
+                animalPath(id, stage, AnimalPose.SLEEPING)));
+        return id.equals("pavao") && pose == AnimalPose.WALKING ? peacockOpen : frames[pose.ordinal()];
     }
 
     /** O acervo não tem ícones de mel/pena; o símbolo do produtor identifica esses produtos na UI. */

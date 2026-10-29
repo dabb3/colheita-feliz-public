@@ -50,6 +50,7 @@ public final class VisualReviewLauncher {
                 "32-animais-sono.png", "33-protetores-expirados.png", "34-animais-pagina2.png", "35-animais-pagina3.png", "36-animais-pagina4.png", "37-tarefas-no-tutorial.png", "38-terreno-verde-comprado.png", "39-saldos-milionarios.png", "40-planta-morta.png"
         };
         private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+        static { FRAMES[30] = 150; } // Cinco segundos: inclui deslocamento e a cauda aberta do pavão.
         private final Path output = Path.of(System.getProperty("colheita.visualOutput", "build/visual-review"));
         private FarmRenderer renderer;
         private GameState fresh, states, rich, newcomer, rancher, stages, seasons, fertilized, tasks, expanded, millionaire;
@@ -284,7 +285,7 @@ public final class VisualReviewLauncher {
                 // Conferir os alvos renderizados de todos os animais sem alterar o estado ou salvar.
                 float[][] targets = {{1170, 433}, {1210, 68}, {1330, 238}, {195, 108}, {1350, 358},
                         {1020, 628}, {1480, 333}, {300, 478}, {1375, 443}, {1515, 463},
-                        {785, 498}, {1430, 68}, {1220, 643}, {180, 578}, {395, 53}};
+                        {785, 498}, {1430, 68}, {1220, 643}, {180, 578}, {345, 53}};
                 var types = state.animalTypes();
                 for (int i = 0; i < targets.length; i++)
                     if (!types.get(i).id().equals(renderer.animalTypeAt(targets[i][0], targets[i][1])))

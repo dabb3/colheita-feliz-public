@@ -16,7 +16,7 @@ record AnimalLayout(float x, float y, float width, boolean insidePen) {
             case "pavao" -> new AnimalLayout(1020, 620, 80, false);
             case "avestruz" -> new AnimalLayout(1220, 635, 90, false);
             case "cabra" -> new AnimalLayout(180, 570, 110, false);
-            case "cavalo" -> new AnimalLayout(395, 45, 150, false);
+            case "cavalo" -> new AnimalLayout(345, 45, 150, false);
             case "cachorro-robo" -> new AnimalLayout(785, 490, 110, false);
             case "cachorro-mastiff" -> new AnimalLayout(1430, 60, 135, false);
             default -> throw new IllegalArgumentException("No scenery placement for " + id);
