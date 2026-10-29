@@ -4,9 +4,9 @@ import com.badlogic.gdx.math.Vector2;
 
 public final class IsoRenderer {
     public static final int TILE_WIDTH = 170;
-    public static final int TILE_HEIGHT = 78;
+    public static final int TILE_HEIGHT = 72;
     private static final float ORIGIN_X = 585;
-    private static final float ORIGIN_Y = 450;
+    private static final float ORIGIN_Y = 500;
 
     public Vector2 gridToScreen(int column, int row) {
         return new Vector2(ORIGIN_X + (column - row) * TILE_WIDTH / 2f,
