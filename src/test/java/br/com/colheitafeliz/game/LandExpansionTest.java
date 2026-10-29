@@ -15,7 +15,7 @@ class LandExpansionTest {
         assertFalse(game.buyPlot(2, 0).success());
         assertEquals(5, game.land().snapshot().size());
         game.wallet().credit(Currency.GREEN, new BigDecimal("0.1"));
-        assertTrue(game.buyFeed("growth").success());
+        assertTrue(game.buySeed(game.catalog().get("nabo")).success());
         game.wallet().debit(Currency.GREEN, BigDecimal.ONE);
         var gold = game.wallet().coins();
         assertTrue(game.buyPlot(1, 0).success());

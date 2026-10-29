@@ -161,19 +161,20 @@ class SaveRoundTripTest {
         clock.advanceSeconds(3 * 86400);
         session.state().refresh();
         assertEquals(0, new java.math.BigDecimal("7").compareTo(session.state().greenCoins()));
-        assertTrue(session.state().buyFeed("growth").success());
+        session.state().wallet().credit(1000);
+        assertTrue(session.state().buySeed(catalog.get("nabo")).success());
         session.save();
         var highDay = session.state().dailyMissions().day();
         clock.advanceSeconds(-3 * 86400);
         session = GameSession.open(clock, catalog, repository, bound -> 99);
         assertEquals(highDay, session.state().dailyMissions().day());
         session.state().wallet().credit(1000);
-        assertTrue(session.state().buyFeed("growth").success());
+        assertTrue(session.state().buySeed(catalog.get("nabo")).success());
         assertEquals(0, new java.math.BigDecimal("8").compareTo(session.state().greenCoins()));
         session.save();
         clock.advanceSeconds(4 * 86400);
         session = GameSession.open(clock, catalog, repository, bound -> 99);
-        assertTrue(session.state().buyFeed("growth").success());
+        assertTrue(session.state().buySeed(catalog.get("nabo")).success());
         assertEquals(0, new java.math.BigDecimal("9").compareTo(session.state().greenCoins()));
     }
 

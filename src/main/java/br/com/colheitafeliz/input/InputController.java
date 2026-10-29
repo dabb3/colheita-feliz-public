@@ -11,6 +11,7 @@ import br.com.colheitafeliz.game.Tool;
 import br.com.colheitafeliz.render.FarmRenderer;
 import br.com.colheitafeliz.render.IsoRenderer;
 import br.com.colheitafeliz.ui.Hud;
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.math.Vector2;
@@ -23,6 +24,7 @@ public final class InputController extends InputAdapter {
     private final AudioManager audio;
     private final BooleanSupplier save;
     private IsoRenderer.GridPosition hovered;
+    private boolean draggingMarketScroll;
 
     public InputController(FarmRenderer renderer, GameSession session, AudioManager audio, BooleanSupplier save) {
         this.renderer = renderer;
@@ -42,7 +44,25 @@ public final class InputController extends InputAdapter {
     }
 
     @Override public boolean touchDragged(int screenX, int screenY, int pointer) {
+        if (draggingMarketScroll) {
+            Vector3 p = world(screenX, screenY);
+            renderer.pointer(p.x, p.y);
+            renderer.marketPanel().dragScroll(p.y, session.state());
+            return true;
+        }
         return mouseMoved(screenX, screenY);
+    }
+
+    @Override public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+        if (!draggingMarketScroll) return false;
+        draggingMarketScroll = false;
+        renderer.marketPanel().endScrollDrag();
+        return true;
+    }
+
+    @Override public boolean scrolled(float amountX, float amountY) {
+        Vector3 p = world(Gdx.input.getX(), Gdx.input.getY());
+        return renderer.marketPanel().scroll(p.x, p.y, amountY, session.state());
     }
 
     @Override public boolean touchDown(int screenX, int screenY, int pointer, int button) {
@@ -52,6 +72,10 @@ public final class InputController extends InputAdapter {
         if (renderer.hud().bannerVisible()) { renderer.hud().dismissBanner(); return true; }
         if (renderer.missions().isOpen()) { renderer.missions().click(p.x, p.y); return true; }
         if (renderer.marketPanel().handles(p.x, p.y)) {
+            if (renderer.marketPanel().beginScrollDrag(p.x, p.y, state)) {
+                draggingMarketScroll = true;
+                return true;
+            }
             Snapshot before = new Snapshot(state);
             ActionResult result = renderer.marketPanel().click(p.x, p.y, state);
             if (result != null) show(result, renderer.marketPanel().selling() ? Cue.SELL : Cue.BUY, before,

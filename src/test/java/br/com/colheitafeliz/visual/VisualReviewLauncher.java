@@ -324,7 +324,8 @@ public final class VisualReviewLauncher {
                     // Nível alto sem VIP: as sementes VIP liberadas pelo nível só saem com o cartão (última cena).
                     fresh.progress().award(new java.math.BigDecimal("1000000"));
                     renderer.marketPanel().showShop();
-                    for (int i = 0; i < 3; i++) renderer.marketPanel().nextPage();
+                    var vipSeeds = MarketPanel.seedGroupButton(true);
+                    renderer.marketPanel().click(vipSeeds.x + vipSeeds.width / 2, vipSeeds.y + vipSeeds.height / 2, fresh);
                 }
                 case 20 -> renderer.hud().toast(null, "", rich.message(), Hud.ToastKind.NORMAL);
                 case 19 -> {
@@ -367,7 +368,7 @@ public final class VisualReviewLauncher {
                 case 13 -> renderer.marketPanel().showAnimals();
                 case 33, 34, 35 -> {
                     renderer.marketPanel().showAnimals();
-                    for (int i = 0; i < scene - 32; i++) renderer.marketPanel().nextPage();
+                    renderer.marketPanel().scroll(800, 400, (scene - 32) * 4, fresh);
                 }
                 case 28, 29, 30, 31, 32 -> {
                     GameState animalState = switch (scene) { case 28 -> animalsBaby; case 29 -> animalsYoung;

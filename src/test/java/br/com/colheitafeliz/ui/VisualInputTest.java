@@ -27,7 +27,7 @@ class VisualInputTest {
         assertTrue(panel.handles(0, 0));
     }
 
-    @Test void marketPagesThroughTheWholeCatalogInsideTheWindow() {
+    @Test void marketScrollsTheCatalogAndKeepsVipSeedsInTheirOwnFilter() {
         CropCatalog catalog = CropCatalogLoader.load();
         ManualClock clock = new ManualClock();
         GameState game = new GameState(clock::instant, clock, catalog, bound -> 99);
@@ -37,34 +37,26 @@ class VisualInputTest {
         assertTrue(game.buyVip().success());
         MarketPanel modal = new MarketPanel(catalog);
         modal.showShop();
-        assertEquals(0, modal.page());
-        assertEquals(4, modal.pageCount(), "33 culturas, 10 por página");
-        for (Rectangle button : new Rectangle[]{MarketPanel.previousPageButton(), MarketPanel.nextPageButton()})
-            assertTrue(button.x >= MarketPanel.LEFT && button.x + button.width <= MarketPanel.LEFT + MarketPanel.WIDTH
-                    && button.y >= MarketPanel.BOTTOM && button.y + button.height <= MarketPanel.BOTTOM + MarketPanel.HEIGHT,
-                    "a navegação fica dentro da janela");
-        assertNull(modal.click(cx(MarketPanel.previousPageButton()), cy(MarketPanel.previousPageButton()), game));
-        assertEquals(0, modal.page());
-        for (int i = 0; i < 4; i++) modal.click(cx(MarketPanel.nextPageButton()), cy(MarketPanel.nextPageButton()), game);
-        assertEquals(3, modal.page(), "não passa da última página");
+        assertTrue(modal.scroll(cx(MarketPanel.cell(0)), cy(MarketPanel.cell(0)), 20, game));
+        assertEquals(4, modal.scrollRows(), "a rolagem para na última linha comum");
         assertTrue(modal.isOpen());
 
-        assertTrue(modal.click(cx(MarketPanel.cell(2)), cy(MarketPanel.cell(2)), game).success());
-        assertEquals(1, game.inventory().seeds(catalog.get("coco")), "última entrada do catálogo");
-        assertNull(modal.click(cx(MarketPanel.cell(3)), cy(MarketPanel.cell(3)), game), "posição vazia depois da última");
-        modal.click(cx(MarketPanel.previousPageButton()), cy(MarketPanel.previousPageButton()), game);
-        assertEquals(2, modal.page());
-        assertTrue(modal.click(cx(MarketPanel.cell(0)), cy(MarketPanel.cell(0)), game).success());
-        assertEquals(1, game.inventory().seeds(catalog.all().get(20)));
+        assertTrue(modal.click(cx(MarketPanel.cell(7)), cy(MarketPanel.cell(7)), game).success());
+        assertEquals(1, game.inventory().seeds(catalog.get("caviar")), "última semente comum");
+        assertNull(modal.click(cx(MarketPanel.cell(8)), cy(MarketPanel.cell(8)), game), "posição vazia após a última semente comum");
+        Rectangle vip = MarketPanel.seedGroupButton(true);
+        modal.click(cx(vip), cy(vip), game);
+        assertEquals(0, modal.scrollRows(), "trocar filtro volta ao início");
+        assertTrue(modal.click(cx(MarketPanel.cell(4)), cy(MarketPanel.cell(4)), game).success());
+        assertEquals(1, game.inventory().seeds(catalog.get("coco")), "última semente VIP");
 
         assertNull(modal.click(MarketPanel.LEFT + MarketPanel.WIDTH / 2f, MarketPanel.BOTTOM + MarketPanel.HEIGHT - 20, game));
         assertTrue(modal.isOpen(), "clique fora da grade não fecha nem vaza");
         assertTrue(modal.handles(10, 10));
         modal.click(cx(MarketPanel.tab(1)), cy(MarketPanel.tab(1)), game);
-        assertEquals(0, modal.page(), "trocar de aba volta à primeira página");
-        modal.click(cx(MarketPanel.nextPageButton()), cy(MarketPanel.nextPageButton()), game);
+        assertEquals(0, modal.scrollRows(), "trocar de aba volta ao início da lista");
         modal.click(cx(MarketPanel.tab(0)), cy(MarketPanel.tab(0)), game);
-        assertEquals(0, modal.page());
+        assertEquals(0, modal.scrollRows());
     }
 
     @Test void cropTooltipShowsSeasonDryHalfSpeedBothPestsAndVipBlock() {
@@ -94,23 +86,53 @@ class VisualInputTest {
         assertEquals("1 / 2 · 1 unidade", Hud.seasonLine(vipTile.crop(), true));
     }
 
-    @Test void animalPagesReachEveryTypeIncludingLastProtector() {
+    @Test void animalScrollReachesEveryTypeIncludingLastProtector() {
         var clock = new ManualClock();
         var game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
         while (game.progress().level() < 60) game.progress().award(game.progress().xpToNext());
         game.wallet().credit(10_000_000);
         var panel = new MarketPanel(game.catalog()); panel.showAnimals();
-        assertEquals(4, panel.pageCount());
         for (int index = 0; index < 15; index++) {
-            int row = index % 4;
-            if (index > 0 && row == 0) panel.click(cx(MarketPanel.nextPageButton()), cy(MarketPanel.nextPageButton()), game);
-            assertEquals(index / 4, panel.page());
+            if (index >= 4) panel.scroll(cx(MarketPanel.animalRow(0)), cy(MarketPanel.animalRow(0)), 1, game);
+            int row = index - panel.scrollRows();
             assertTrue(panel.click(cx(MarketPanel.buyAnimalButton(row)), cy(MarketPanel.buyAnimalButton(row)), game).success());
             assertEquals(game.animalTypes().get(index).id(), game.barn().get(index).type().id());
         }
-        panel.nextPage(); assertEquals(3, panel.page());
-        assertNull(panel.click(cx(MarketPanel.buyAnimalButton(3)), cy(MarketPanel.buyAnimalButton(3)), game));
-        panel.showShop(); assertEquals(0, panel.page());
+        assertEquals(11, panel.scrollRows(), "a rolagem para no último grupo de quatro animais");
+        panel.showShop(); assertEquals(0, panel.scrollRows());
+    }
+
+    @Test void scrollbarStartsAtTopAndCanBeDraggedToTheBottom() {
+        var game = new GameState(new ManualClock()::instant, CropCatalogLoader.load(), bound -> 99);
+        var panel = new MarketPanel(game.catalog());
+        panel.showShop();
+        float trackX = MarketPanel.LEFT + MarketPanel.WIDTH - 24.5f;
+        float bottom = MarketPanel.BOTTOM + 26;
+        float height = MarketPanel.HEIGHT - 46 - 18 - 36 - 12 - 76;
+        float thumbHeight = height * 2 / 6;
+
+        assertTrue(panel.beginScrollDrag(trackX, bottom + height - 1, game));
+        assertEquals(0, panel.scrollRows(), "o indicador começa no topo da lista");
+        assertTrue(panel.dragScroll(bottom + thumbHeight - 1, game));
+        assertEquals(4, panel.scrollRows(), "arrastar o indicador até embaixo mostra o fim da lista");
+        panel.endScrollDrag();
+    }
+
+    @Test void scrollbarHasAnAccessibleHitAreaWiderThanItsVisibleTrack() {
+        var game = new GameState(new ManualClock()::instant, CropCatalogLoader.load(), bound -> 99);
+        var panel = new MarketPanel(game.catalog());
+        panel.showShop();
+        float trackX = MarketPanel.LEFT + MarketPanel.WIDTH - 24.5f;
+        float bottom = MarketPanel.BOTTOM + 26;
+        float height = MarketPanel.HEIGHT - 46 - 18 - 36 - 12 - 76;
+        float thumbHeight = height * 2 / 6;
+
+        assertTrue(panel.beginScrollDrag(trackX - 6, bottom + height - 1, game),
+                "a área de arraste deve ser fácil de acertar, mesmo fora dos 5 px visuais");
+        assertEquals(0, panel.scrollRows());
+        assertTrue(panel.dragScroll(bottom + thumbHeight / 2 - 1, game));
+        assertEquals(4, panel.scrollRows());
+        panel.endScrollDrag();
     }
 
     private static float cx(Rectangle r) { return r.x + r.width / 2f; }
