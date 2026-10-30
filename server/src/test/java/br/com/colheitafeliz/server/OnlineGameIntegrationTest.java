@@ -17,6 +17,7 @@ class OnlineGameIntegrationTest {
     private final UUID bob = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private final TestClock clock = new TestClock();
     private JdbcOnlineStore store;
+    private String testSchema;
     private OnlineGameService service;
 
     @Test void httpRejectsForgedFieldsMalformedBodiesAndUnapprovedOrigins() throws Exception {
@@ -63,7 +64,8 @@ class OnlineGameIntegrationTest {
         assertNotNull(url, "integrationTest requires TEST_DATABASE_URL pointing to disposable PostgreSQL");
         assertTrue(url.startsWith("jdbc:postgresql://127.0.0.1:") || url.startsWith("jdbc:postgresql://localhost:"));
         assertTrue(url.contains("/colheita_test"));
-        store = new JdbcOnlineStore(url, "postgres", "", "test_" + UUID.randomUUID().toString().replace("-", ""));
+        testSchema = "test_" + UUID.randomUUID().toString().replace("-", "");
+        store = new JdbcOnlineStore(url, "postgres", "", testSchema);
         store.initialize(alice);
         service = new OnlineGameService(store, clock, bound -> bound - 1, 5);
     }
@@ -71,7 +73,7 @@ class OnlineGameIntegrationTest {
     @Test void newFarmAndRetryPreserveEconomyAndSurviveServiceRestart() {
         JsonObject farm = service.farm(alice);
         assertEquals("500", farm.get("coins").getAsString());
-        Command command = new Command(UUID.randomUUID(), farm.get("revision").getAsString(), "BUY_SEED", "nabo", "GOLD", null, null, null);
+        Command command = new Command(requestId(), farm.get("revision").getAsString(), "BUY_SEED", "nabo", "GOLD", null, null, null);
         JsonObject bought = service.command(alice, command);
         assertTrue(bought.getAsJsonObject("result").get("success").getAsBoolean());
         assertEquals(bought, service.command(alice, command));
@@ -85,15 +87,15 @@ class OnlineGameIntegrationTest {
 
     @Test void friendshipAuthorizesVisitsButNeverExposesOwnerInventoryAndRevocationWinsOverReplay() {
         assertEquals(403, assertThrows(ApiFailure.class, () -> service.farm(bob)).status());
-        JsonObject invite = service.createInvitation(alice, UUID.randomUUID());
-        service.acceptInvitation(bob, "Bob", invite.get("code").getAsString(), UUID.randomUUID());
+        JsonObject invite = service.createInvitation(alice, requestId());
+        service.acceptInvitation(bob, "Bob", invite.get("code").getAsString(), requestId());
         JsonObject visit = service.visit(bob, alice);
         assertFalse(visit.has("coins"));
         assertFalse(visit.has("produceLots"));
         assertFalse(visit.has("seedCounts"));
         assertEquals(1, service.friends(bob).size());
         JsonObject farm = service.farm(bob);
-        Command command = new Command(UUID.randomUUID(), farm.get("revision").getAsString(), "BUY_SEED", "nabo", "GOLD", null, null, null);
+        Command command = new Command(requestId(), farm.get("revision").getAsString(), "BUY_SEED", "nabo", "GOLD", null, null, null);
         service.command(bob, command);
         store.transaction(alice, tx -> { tx.setActive(bob, false); return null; });
         assertEquals(403, assertThrows(ApiFailure.class, () -> service.command(bob, command)).status());
@@ -102,7 +104,7 @@ class OnlineGameIntegrationTest {
 
     @Test void concurrentDuplicatePaysOnceAndFailedTransactionRollsBack() throws Exception {
         JsonObject farm = service.farm(alice);
-        Command command = new Command(UUID.randomUUID(), farm.get("revision").getAsString(), "BUY_SEED", "nabo", "GOLD", null, null, null);
+        Command command = new Command(requestId(), farm.get("revision").getAsString(), "BUY_SEED", "nabo", "GOLD", null, null, null);
         try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
             var one = executor.submit(() -> service.command(alice, command));
             var two = executor.submit(() -> service.command(alice, command));
@@ -122,8 +124,8 @@ class OnlineGameIntegrationTest {
         JsonObject before = service.visit(bob, alice);
         String revision = before.get("revision").getAsString();
         String season = before.getAsJsonArray("tiles").get(0).getAsJsonObject().get("harvestRevision").getAsString();
-        var harvest = new Command(UUID.randomUUID(), revision, "HARVEST", null, null, 0, 0, null);
-        var steal = new Command(UUID.randomUUID(), revision, "STEAL", null, null, 0, 0, season);
+        var harvest = new Command(requestId(), revision, "HARVEST", null, null, 0, 0, null);
+        var steal = new Command(requestId(), revision, "STEAL", null, null, 0, 0, season);
         try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
             var one = executor.submit(() -> confirmed(() -> service.command(alice, harvest)));
             var two = executor.submit(() -> confirmed(() -> service.visitAction(bob, alice, steal)));
@@ -141,7 +143,7 @@ class OnlineGameIntegrationTest {
         var visit = service.visit(bob, alice);
         var tile = visit.getAsJsonArray("tiles").get(0).getAsJsonObject();
         assertTrue(tile.get("protected").getAsBoolean());
-        var command = new Command(UUID.randomUUID(), visit.get("revision").getAsString(), "STEAL", null, null,
+        var command = new Command(requestId(), visit.get("revision").getAsString(), "STEAL", null, null,
                 0, 0, tile.get("harvestRevision").getAsString());
         assertFalse(service.visitAction(bob, alice, command).getAsJsonObject("result").get("success").getAsBoolean());
         assertEquals(0, quantity(service.farm(bob)));
@@ -157,7 +159,7 @@ class OnlineGameIntegrationTest {
         for (boolean love : new boolean[] {loveFirst, !loveFirst}) {
             JsonObject owner = service.farm(alice);
             var tile = owner.getAsJsonArray("tiles").get(0).getAsJsonObject();
-            var command = new Command(UUID.randomUUID(), owner.get("revision").getAsString(), love ? "LOVE" : "FERTILIZE",
+            var command = new Command(requestId(), owner.get("revision").getAsString(), love ? "LOVE" : "FERTILIZE",
                     love ? "amor" : "comum", null, 0, 0, love ? tile.get("harvestRevision").getAsString() : null);
             JsonObject response = love ? service.visitAction(bob, alice, command) : service.command(alice, command);
             assertEquals(love == loveFirst, response.getAsJsonObject("result").get("success").getAsBoolean());
@@ -165,10 +167,52 @@ class OnlineGameIntegrationTest {
         assertEquals(loveFirst ? 2 : 3, service.farm(bob).getAsJsonObject("fertilizers").get("amor").getAsInt());
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void failedVisitDoesNotInvalidateOwnerCommands(boolean protectedCrop) {
+        connectFriends();
+        prepare(alice, "morango", protectedCrop, protectedCrop);
+        var ownerBefore = service.farm(alice);
+        var visitorBefore = service.farm(bob);
+        var tile = ownerBefore.getAsJsonArray("tiles").get(0).getAsJsonObject();
+        var rejected = service.visitAction(bob, alice, new Command(requestId(), ownerBefore.get("revision").getAsString(),
+                "STEAL", null, null, 0, 0, tile.get("harvestRevision").getAsString()));
+        assertFalse(rejected.getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(ownerBefore.get("revision"), service.farm(alice).get("revision"));
+        assertEquals(visitorBefore.get("revision"), service.farm(bob).get("revision"));
+        var plowed = service.command(alice, new Command(requestId(), ownerBefore.get("revision").getAsString(), "PLOW", null, null, 0, 1, null));
+        assertTrue(plowed.getAsJsonObject("result").get("success").getAsBoolean());
+    }
+
+    @Test void receiptQuotaAllowsReplayAndExpiredKeysNeverExecuteAgain() {
+        var farm = service.farm(alice);
+        var command = new Command(requestId(), farm.get("revision").getAsString(), "BUY_SEED", "nabo", "GOLD", null, null, null);
+        var original = service.command(alice, command);
+        store.transaction(alice, tx -> {
+            tx.execute("INSERT INTO " + testSchema + ".receipts (actor,request_id,hash,response,expires_at) "
+                    + "SELECT ?, md5(i::text)::uuid, 'fixture', '{}'::jsonb, ? FROM generate_series(1,999) i",
+                    alice, java.sql.Timestamp.from(clock.instant().plusSeconds(86400)));
+            return null;
+        });
+        assertEquals(original, service.command(alice, command));
+        var refused = new Command(requestId(), original.getAsJsonObject("farm").get("revision").getAsString(), "PLOW", null, null, 0, 0, null);
+        assertEquals(429, assertThrows(ApiFailure.class, () -> service.command(alice, refused)).status());
+        assertEquals("200", service.farm(alice).get("coins").getAsString());
+        clock.advanceSeconds(86401);
+        assertEquals(410, assertThrows(ApiFailure.class, () -> service.command(alice, command)).status());
+        farm = service.farm(alice);
+        var fresh = new Command(requestId(), farm.get("revision").getAsString(), "PLOW", null, null, 0, 0, null);
+        assertTrue(service.command(alice, fresh).getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(1, store.transaction(alice, tx -> tx.query("SELECT count(*) FROM " + testSchema + ".receipts", r -> r.getInt(1)).get(0)).intValue());
+        assertEquals("200", service.farm(alice).get("coins").getAsString());
+    }
+
+    private UUID requestId() { return UUID.fromString(service.requestId().get("requestId").getAsString()); }
+
     private void connectFriends() {
         service.farm(alice);
-        var invite = service.createInvitation(alice, UUID.randomUUID());
-        service.acceptInvitation(bob, "Bob", invite.get("code").getAsString(), UUID.randomUUID());
+        var invite = service.createInvitation(alice, requestId());
+        service.acceptInvitation(bob, "Bob", invite.get("code").getAsString(), requestId());
         service.farm(bob);
     }
     private void prepare(UUID actor, String cropId, boolean mature, boolean protectors) {

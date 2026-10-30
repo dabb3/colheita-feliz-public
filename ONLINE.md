@@ -1,91 +1,201 @@
 # Online com amigos
 
-O desktop continua disponÌvel. O servidor online cria fazendas novas e n„o importa saves locais. O piloto admite cinco participantes ativos, por convite aceito. O cliente TypeScript/Canvas usa a mesma economia Java no servidor.
+
+
+O desktop continua dispon√≠vel. O servidor online cria fazendas novas e n√£o importa saves locais. O piloto admite cinco participantes ativos, por convite aceito. O cliente TypeScript/Canvas usa a mesma economia Java no servidor.
+
+
 
 ## Testar o servidor
 
-Requer JDK 21, Gradle Wrapper e PostgreSQL 17 descart·vel. Nunca aponte os testes para dados pessoais. A integraÁ„o exige banco `colheita_test` em localhost e cria schemas exclusivos por caso.
+
+
+Requer JDK 21, Gradle Wrapper e PostgreSQL 17 descart√°vel. Nunca aponte os testes para dados pessoais. A integra√ß√£o exige banco `colheita_test` em localhost e cria schemas exclusivos por caso.
+
+
 
 ```powershell
+
 docker run --detach --rm --name colheita-online-qa --publish 127.0.0.1:55439:5432 --env POSTGRES_HOST_AUTH_METHOD=trust --env POSTGRES_DB=colheita_test postgres:17-alpine
+
 $env:TEST_DATABASE_URL='jdbc:postgresql://127.0.0.1:55439/colheita_test'
+
 .\gradlew.bat build :server:integrationTest
+
 ```
 
-O modo sem senha acima È exclusivo do banco descart·vel, exposto apenas em localhost.
+
+
+O modo sem senha acima √© exclusivo do banco descart√°vel, exposto apenas em localhost.
+
+
 
 ```powershell
+
 $env:AUTH_MODE='development'
+
 $env:HOST='127.0.0.1'
+
 $env:DATABASE_URL='jdbc:postgresql://127.0.0.1:55439/colheita_test'
+
 $env:DATABASE_USER='postgres'
+
 $env:ALLOWED_ORIGINS='http://127.0.0.1:5173'
+
 .\gradlew.bat :server:run
+
 ```
 
-No desenvolvimento, `Bearer dev-alice` e `Bearer dev-bob` representam duas contas fixas. Apenas Alice comeÁa autorizada; Bob precisa aceitar seu convite. O servidor recusa bind p˙blico nesse modo. Nenhuma rota concede saldo, XP ou altera o relÛgio.
 
-## ConfiguraÁ„o de produÁ„o
 
-Construir com `docker build -t colheita-server .`. O runtime inclui somente Java, core, cat·logo e servidor. Configurar no provedor, nunca no repositÛrio:
+No desenvolvimento, `Bearer dev-alice` e `Bearer dev-bob` representam duas contas fixas. Apenas Alice come√ßa autorizada; Bob precisa aceitar seu convite. O servidor recusa bind p√∫blico nesse modo. Nenhuma rota concede saldo, XP ou altera o rel√≥gio.
 
-- `AUTH_MODE`: `production` (padr„o).
+
+
+## Configura√ß√£o de produ√ß√£o
+
+
+
+Construir com `docker build -t colheita-server .`. O runtime inclui somente Java, core, cat√°logo e servidor. Configurar no provedor, nunca no reposit√≥rio:
+
+
+
+- `AUTH_MODE`: `production` (padr√£o).
+
 - `OWNER_USER_ID`: UUID da conta Google previamente criada no Supabase Auth.
-- `DATABASE_URL`: conex„o JDBC PostgreSQL com `sslmode=require` ou `verify-full`.
+
+- `DATABASE_URL`: conex√£o JDBC PostgreSQL com `sslmode=verify-full` e CA confi√°vel.
+
 - `DATABASE_USER` e `DATABASE_PASSWORD`: credenciais exclusivas do servidor.
-- `SUPABASE_URL` e `SUPABASE_PUBLISHABLE_KEY`: projeto Auth e chave p˙blica.
-- `ALLOWED_ORIGINS`: origens HTTPS exatas, separadas por vÌrgula.
-- `PORT`: porta fornecida pelo host; `HOST` usa `0.0.0.0` em produÁ„o.
 
-O servidor valida cada sess„o em `/auth/v1/user`, antes de consultar recibos ou dados. Schema `colheita` tem RLS sem polÌticas para clientes e privilÈgios p˙blicos revogados. N„o exponha credenciais SQL ou chave de serviÁo ao navegador. Use uma conta SQL exclusiva capaz de criar o schema privado, sem acesso aos demais schemas.
+- `SUPABASE_URL` e `SUPABASE_PUBLISHABLE_KEY`: projeto Auth e chave p√∫blica.
 
-Convites s„o de uso ˙nico e expiram em sete dias. Amizade exige aceite. A revogaÁ„o administrativa desativa o participante em `colheita.players` e tambÈm bloqueia reenvio de pedidos anteriores. N„o h· painel p˙blico de administraÁ„o.
+- `ALLOWED_ORIGINS`: origens HTTPS exatas, separadas por v√≠rgula.
 
-## ConsistÍncia e operaÁ„o
+- `PORT`: porta fornecida pelo host; `HOST` usa `0.0.0.0` em produ√ß√£o.
 
-Comandos carregam UUID ˙nico e revis„o decimal em string. A API registra recibo e mudanÁas na mesma transaÁ„o. Repetir o mesmo pedido retorna o resultado gravado; trocar conte˙do com a mesma chave retorna 409. Visitas alteram as duas fazendas atomicamente, com locks ordenados. N„o apague recibos enquanto clientes puderem repetir pedidos antigos.
 
-Tempo, saldos, XP, proteÁ„o e sorteios pertencem ao servidor. Visitantes recebem apenas a projeÁ„o p˙blica. O relÛgio local controla somente a aparÍncia dia/noite.
 
-Antes de publicar: validar duas contas, configurar Google OAuth e redirects, testar restauraÁ„o de backup PostgreSQL e conferir limites gratuitos vigentes. Proposta: Cloudflare Pages para arquivos, Render para API e Supabase para PostgreSQL/Auth. Nenhum deploy realizado. ServiÁos gratuitos podem suspender por inatividade ou atingir quotas.
+O servidor valida cada sess√£o em `/auth/v1/user`, antes de consultar recibos ou dados. Schema `colheita` tem RLS sem pol√≠ticas para clientes e privil√©gios p√∫blicos revogados. N√£o exponha credenciais SQL ou chave de servi√ßo ao navegador. Use uma conta SQL exclusiva capaz de criar o schema privado, sem acesso aos demais schemas.
 
-Backup usa `pg_dump` do schema `colheita`, guardado fora de artefatos p˙blicos. Restaurar primeiro em banco isolado e conferir participantes, fazendas e recibos. Para rollback de cÛdigo, guardar a imagem anterior e preservar compatibilidade do schema. MudanÁas futuras de schema exigem migraÁ„o explÌcita e backup.
+
+
+Convites s√£o de uso √∫nico e expiram em sete dias. Amizade exige aceite. A revoga√ß√£o administrativa desativa o participante em `colheita.players` e tamb√©m bloqueia reenvio de pedidos anteriores. N√£o h√° painel p√∫blico de administra√ß√£o.
+
+
+
+## Consist√™ncia e opera√ß√£o
+
+
+
+Comandos carregam UUID √∫nico e revis√£o decimal em string. A API registra recibo e mudan√ßas na mesma transa√ß√£o. Repetir o mesmo pedido retorna o resultado gravado; trocar conte√∫do com a mesma chave retorna 409. Visitas alteram as duas fazendas atomicamente, com locks ordenados. IDs de a√ß√£o v√™m de `GET /v1/request-id` autenticado e cont√™m o hor√°rio do servidor (UUIDv7). Repeti√ß√µes s√£o aceitas por 24 horas; IDs antigos, futuros ou expirados retornam 410 sem executar, inclusive ap√≥s a remo√ß√£o do recibo. O cliente deve atualizar a fazenda para conferir o resultado antes de iniciar outra a√ß√£o. N√£o gere um novo ID automaticamente para uma inten√ß√£o cujo resultado continua desconhecido.
+
+
+
+Os recibos recebem `expires_at` e s√£o limpos em lotes de at√© 1.000, com locks ignorados por outros limpadores. Cada participante pode manter at√© 1.000 recibos v√°lidos na janela de 24 horas; o limite recusa novas a√ß√µes antes de alterar o jogo, mas permite repetir recibos existentes. A implanta√ß√£o atualiza somente a estrutura da tabela de recibos; n√£o muda snapshots nem saves locais. IDs UUIDv4 usados no prot√≥tipo anterior deixam de ser aceitos; consulte a fazenda para confirmar seus efeitos e n√£o os converta em IDs novos.
+
+
+
+Tempo, saldos, XP, prote√ß√£o e sorteios pertencem ao servidor. Visitantes recebem apenas a proje√ß√£o p√∫blica. O rel√≥gio local controla somente a apar√™ncia dia/noite.
+
+
+
+Antes de publicar: validar duas contas, configurar Google OAuth e redirects, testar restaura√ß√£o de backup PostgreSQL e conferir limites gratuitos vigentes. Proposta: Cloudflare Pages para arquivos, Render para API e Supabase para PostgreSQL/Auth. Nenhum deploy realizado. Servi√ßos gratuitos podem suspender por inatividade ou atingir quotas.
+
+
+
+Backup usa `pg_dump` do schema `colheita`, guardado fora de artefatos p√∫blicos. Restaurar primeiro em banco isolado e conferir participantes, fazendas e recibos. Para rollback de c√≥digo, guardar a imagem anterior e preservar compatibilidade do schema. Mudan√ßas futuras de schema exigem migra√ß√£o expl√≠cita e backup.
+
+
+
 
 ## Cliente web
 
-Requer Node 24. As dependÍncias s„o locais e fixadas no lockfile.
+
+
+Requer Node 24. As depend√™ncias s√£o locais e fixadas no lockfile.
+
+
 
 ```powershell
+
 npm.cmd ci --ignore-scripts --prefix web
+
 npm.cmd test --prefix web
+
 npm.cmd run build:local --prefix web
+
 npm.cmd run serve --prefix web
+
 ```
 
-Abra `http://127.0.0.1:5173`. Entre como Alice, crie um convite em Amigos e abra o link em outra aba como Bob. Bob sÛ recebe fazenda depois de aceitar. Loja, ferramentas, depÛsito, animais, alimentaÁ„o, fertilizantes, VIP, tarefas, expans„o e visitas usam a API. H· lista de terras acessÌvel pelo teclado. Atalhos B/V abrem loja/depÛsito e 2ñ8 selecionam as ferramentas do tutorial. T/F3 n„o existem no online.
 
-Uma compra cujo resultado ficou desconhecido bloqueia novas aÁıes atÈ confirmar a mesma requisiÁ„o. O navegador guarda somente essa intenÁ„o por conta e aba, alÈm da sess„o Auth; n„o guarda um save econÙmico. N„o limpe o armazenamento da aba enquanto houver aÁ„o pendente. FaÁa login novamente com a mesma conta se a sess„o expirar. Sem conex„o, novas aÁıes ficam indisponÌveis.
 
-As imagens carregam conforme o cen·rio ou a loja precisa. A pasta completa de arte vai ao host est·tico; n„o È baixada inteira no primeiro acesso. Dia/noite segue o relÛgio local; crescimento e tarefas usam tempo UTC do servidor. A previs„o sem nova rega pode exceder a duraÁ„o nominal porque solo seco cresce mais devagar.
+Abra `http://127.0.0.1:5173`. Entre como Alice, crie um convite em Amigos e abra o link em outra aba como Bob. Bob s√≥ recebe fazenda depois de aceitar. Loja, ferramentas, dep√≥sito, animais, alimenta√ß√£o, fertilizantes, VIP, tarefas, expans√£o e visitas usam a API. H√° lista de terras acess√≠vel pelo teclado. Atalhos B/V abrem loja/dep√≥sito e 2‚Äì8 selecionam as ferramentas do tutorial. T/F3 n√£o existem no online.
 
-O piloto foi desenhado para Chrome/Edge em desktop, a partir de 1280◊720. N„o h· promessa de suporte mÛvel ou reproduÁ„o visual idÍntica ao desktop. Sons de ferramentas existentes s„o opcionais; novos sons de animais n„o foram gerados.
 
-## PublicaÁ„o gratuita proposta
 
-Os artefatos est„o preparados, mas contas, OAuth e deploy externo ainda precisam ser configurados pelo respons·vel. N„o ative planos pagos, cart„o obrigatÛrio ou pings para manter inst‚ncias acordadas. Confira as quotas dos provedores no dia da publicaÁ„o.
+Uma compra cujo resultado ficou desconhecido bloqueia novas a√ß√µes at√© confirmar a mesma requisi√ß√£o. O navegador guarda somente essa inten√ß√£o por conta e aba, al√©m da sess√£o Auth; n√£o guarda um save econ√¥mico. N√£o limpe o armazenamento da aba enquanto houver a√ß√£o pendente. Fa√ßa login novamente com a mesma conta se a sess√£o expirar. Sem conex√£o, novas a√ß√µes ficam indispon√≠veis.
 
-1. Criar projeto Supabase Free. Ativar Google em Auth e configurar cliente OAuth no Google Cloud, com callback do projeto Supabase. Configurar a origem final do site na lista de redirects do Supabase. N„o colocar client secret do Google no cÛdigo.
-2. Preparar serviÁo Render **Free**, usando o Dockerfile da raiz. Anotar sua origem HTTPS. O primeiro deploy sÛ estar· pronto depois das vari·veis de produÁ„o e do UUID do dono.
-3. Preparar Cloudflare Pages Free com este repositÛrio: comando `cd web && npm ci --ignore-scripts && npm run build`, saÌda `web/dist`, Node 24. Informar `PUBLIC_API_URL` (origem Render), `PUBLIC_SUPABASE_URL` e `PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Essas trÍs configuraÁıes s„o p˙blicas; nenhuma senha SQL/chave de serviÁo pertence ao build.
-4. Publicar o cliente e entrar com Google. O bot„o de login permanece disponÌvel mesmo antes de a API estar pronta. Conferir no Supabase Auth o UUID criado; esse ser· `OWNER_USER_ID` no Render. N„o usar UUID fictÌcio para bootstrap.
-5. Configurar o servidor com a conex„o PostgreSQL do pooler Supabase adequado ao host (IPv4 quando necess·rio), SSL, usu·rio/senha, projeto Auth e `ALLOWED_ORIGINS` exata do Pages. Publicar o servidor. Nenhum volume local guarda progresso online.
-6. Validar login, compra, convite, aceite, visita e retomada apÛs suspens„o com duas contas reais. Salvar backup e testar restauraÁ„o em banco isolado antes de compartilhar com amigos.
 
-N„o execute build:local no site publicado: ele sÛ usa contas de teste e localhost. O build de produÁ„o recusa endpoints sem HTTPS e exige as trÍs vari·veis p˙blicas. Render pode dormir e atrasar o primeiro acesso; Supabase Free tambÈm tem limites e regras de inatividade. O piloto usa requisiÁıes HTTP normais, sem websocket permanente.
+
+As imagens carregam conforme o cen√°rio ou a loja precisa. A pasta completa de arte vai ao host est√°tico; n√£o √© baixada inteira no primeiro acesso. Dia/noite segue o rel√≥gio local; crescimento e tarefas usam tempo UTC do servidor. A previs√£o sem nova rega pode exceder a dura√ß√£o nominal porque solo seco cresce mais devagar.
+
+
+
+O piloto foi desenhado para Chrome/Edge em desktop, a partir de 1280√ó720. N√£o h√° promessa de suporte m√≥vel ou reprodu√ß√£o visual id√™ntica ao desktop. Sons de ferramentas existentes s√£o opcionais; novos sons de animais n√£o foram gerados.
+
+
+
+## Publica√ß√£o gratuita proposta
+
+
+
+Os artefatos est√£o preparados, mas contas, OAuth e deploy externo ainda precisam ser configurados pelo respons√°vel. N√£o ative planos pagos, cart√£o obrigat√≥rio ou pings para manter inst√¢ncias acordadas. Confira as quotas dos provedores no dia da publica√ß√£o.
+
+
+
+1. Criar projeto Supabase Free. Ativar Google em Auth e configurar cliente OAuth no Google Cloud, com callback do projeto Supabase. Configurar a origem final do site na lista de redirects do Supabase. N√£o colocar client secret do Google no c√≥digo.
+
+2. Preparar servi√ßo Render **Free**, usando o Dockerfile da raiz. Anotar sua origem HTTPS. O primeiro deploy s√≥ estar√° pronto depois das vari√°veis de produ√ß√£o e do UUID do dono.
+
+3. Preparar Cloudflare Pages Free com este reposit√≥rio: comando `cd web && npm ci --ignore-scripts && npm run build`, sa√≠da `web/dist`, Node 24. Informar `PUBLIC_API_URL` (origem Render), `PUBLIC_SUPABASE_URL` e `PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Essas tr√™s configura√ß√µes s√£o p√∫blicas; nenhuma senha SQL/chave de servi√ßo pertence ao build.
+
+4. Publicar o cliente e entrar com Google. O bot√£o de login permanece dispon√≠vel mesmo antes de a API estar pronta. Conferir no Supabase Auth o UUID criado; esse ser√° `OWNER_USER_ID` no Render. N√£o usar UUID fict√≠cio para bootstrap.
+
+5. Configurar o servidor com a conex√£o PostgreSQL do pooler Supabase adequado ao host (IPv4 quando necess√°rio), SSL, usu√°rio/senha, projeto Auth e `ALLOWED_ORIGINS` exata do Pages. Publicar o servidor. Nenhum volume local guarda progresso online.
+
+6. Validar login, compra, convite, aceite, visita e retomada ap√≥s suspens√£o com duas contas reais. Salvar backup e testar restaura√ß√£o em banco isolado antes de compartilhar com amigos.
+
+
+
+N√£o execute build:local no site publicado: ele s√≥ usa contas de teste e localhost. O build de produ√ß√£o recusa endpoints sem HTTPS e exige as tr√™s vari√°veis p√∫blicas. Render pode dormir e atrasar o primeiro acesso; Supabase Free tamb√©m tem limites e regras de inatividade. O piloto usa requisi√ß√µes HTTP normais, sem websocket permanente.
+
+
 
 ### Arte e tamanho inicial
 
-As variantes pequenas de Ìcones e casas em `web/public` s„o derivadas dos assets existentes. Para regenerar, com JDK 21 na raiz: `java web/scripts/WebAssets.java`. O build usa esses arquivos prontos e n„o exige Java no Cloudflare. O teste de payload confere todos os perÌodos do dia e reserva espaÁo para scripts/API; n„o mede latÍncia em uma conex„o real de 10 Mbps. A licenÁa e atribuiÁ„o do acervo original permanecem aplic·veis.
 
 
-Fontes de hospedagem conferidas em 29/10/2026: [limites do Cloudflare Pages](https://developers.cloudflare.com/pages/platform/limits/), [inst‚ncias gratuitas Render](https://render.com/docs/free) e [Supabase Free](https://supabase.com/pricing). Render suspende a API apÛs 15 minutos sem tr·fego e pode levar cerca de um minuto para acordar. Supabase Free oferece 500 MB de banco e pausa projetos apÛs uma semana de inatividade. Esses planos servem ao piloto e n„o garantem disponibilidade contÌnua.
+As variantes pequenas de √≠cones e casas em `web/public` s√£o derivadas dos assets existentes. Para regenerar, com JDK 21 na raiz: `java web/scripts/WebAssets.java`. O build usa esses arquivos prontos e n√£o exige Java no Cloudflare. O teste de payload confere todos os per√≠odos do dia e reserva espa√ßo para scripts/API; n√£o mede lat√™ncia em uma conex√£o real de 10 Mbps. A licen√ßa e atribui√ß√£o do acervo original permanecem aplic√°veis.
+
+
+
+
+
+Fontes de hospedagem conferidas em 29/10/2026: [limites do Cloudflare Pages](https://developers.cloudflare.com/pages/platform/limits/), [inst√¢ncias gratuitas Render](https://render.com/docs/free) e [Supabase Free](https://supabase.com/pricing). Render suspende a API ap√≥s 15 minutos sem tr√°fego e pode levar cerca de um minuto para acordar. Supabase Free oferece 500 MB de banco e pausa projetos ap√≥s uma semana de inatividade. Esses planos servem ao piloto e n√£o garantem disponibilidade cont√≠nua.
+
+
+
+
+### Valida√ß√£o do banco em produ√ß√£o
+
+
+
+A URL JDBC deve ter `sslmode=verify-full`; `require` n√£o autentica o servidor e √© recusado. Forne√ßa a CA do banco em um arquivo leg√≠vel pelo processo, por exemplo `sslrootcert=/etc/secrets/root.crt`, usando o certificado do projeto no painel Supabase. A URL aceita somente `sslmode` e `sslrootcert`, sem par√¢metros duplicados ou factories SSL customizadas. Usu√°rio e senha ficam em vari√°veis pr√≥prias. N√£o desative a valida√ß√£o para contornar erros de certificado ou hostname.
+
+
+
+Ap√≥s aceitar uma visita sem mudan√ßa, as revis√µes das fazendas permanecem est√°veis; rel√≥gio e atualiza√ß√£o real de estado ainda podem mudar a revis√£o. Cada a√ß√£o bem-sucedida continua sendo at√¥mica.
+
+

@@ -48,6 +48,12 @@ final class OnlineGameService {
                 "feedPrices", feedPrices, "vip", object("greenPrice", GameState.VIP_PRICE));
     }
 
+    JsonObject requestId() {
+        Instant now = clock.instant();
+        UUID id = RequestIds.issue(now);
+        return object("requestId", id.toString(), "expiresAt", RequestIds.validate(id, now).toString());
+    }
+
     JsonObject farm(UUID actor) {
         return store.transaction(actor, tx -> {
             active(tx, actor);
@@ -131,8 +137,8 @@ final class OnlineGameService {
                 var result = command.action().equals("STEAL")
                         ? visits.steal(destination.game(), visitor.game(), command.column(), command.row(), season)
                         : visits.fertilizeVisit(destination.game(), visitor.game(), command.column(), command.row(), "amor", season);
-                return object("result", result, "farm", persist(tx, visitor, true, true),
-                        "visitedFarm", persist(tx, destination, true, false));
+                return object("result", result, "farm", persist(tx, visitor, false, true),
+                        "visitedFarm", persist(tx, destination, false, false));
             });
         });
     }
@@ -169,14 +175,16 @@ final class OnlineGameService {
     private static void checkRevision(Loaded farm, Command command) {
         if (farm.revision() != Command.revision(command.expectedRevision())) throw new ApiFailure(409, "A fazenda mudou. Atualize antes de agir.");
     }
-    private static JsonObject receipt(JdbcOnlineStore.Tx tx, UUID actor, UUID id, String hash, Supplier<JsonObject> operation) {
-        if (id == null) throw new ApiFailure(400, "Falta o identificador da ação.");
+    private JsonObject receipt(JdbcOnlineStore.Tx tx, UUID actor, UUID id, String hash, Supplier<JsonObject> operation) {
+        Instant now = clock.instant();
+        Instant expires = RequestIds.validate(id, now);
         var previous = tx.receipt(actor, id);
         if (previous != null) {
             if (!hash.equals(previous.hash())) throw new ApiFailure(409, "Identificador reutilizado com outra ação.");
             return previous.response();
         }
-        var response = operation.get(); tx.remember(actor, id, hash, response); return response;
+        tx.prepareReceipt(actor, now);
+        var response = operation.get(); tx.remember(actor, id, hash, response, expires); return response;
     }
     private static String hash(String value) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
