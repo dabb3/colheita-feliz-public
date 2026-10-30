@@ -3,6 +3,14 @@ export function periodAt(date:Date):'day'|'sunset'|'night' {
  return minute>=360 && minute<1020 ? 'day' : minute>=1020 && minute<=1110 ? 'sunset' : 'night';
 }
 export function tileCenter(column:number,row:number) {return {x:585+(column-row)*85,y:400+(column+row)*36};}
+export const terrainSize={width:188,height:100};
+export function cropSize(stage:number,aspect:number) {const height=32+stage*16;return{width:height*aspect,height};}
+export function animalWidth(id:string,stage:string) {return (animalLayout[id]?.[2]??0)*(stage==='BABY'?.65:stage==='YOUNG'?.85:1);}
+export function productPath(id:string,status:string):string|undefined {
+ if(status!=='READY')return;
+ return ({galinha:'classic/animals/ninho-geral/ninho-com-ovos.png',pato:'classic/animals/ninho-geral/ninho-com-ovos.png',
+  vaca:'classic/animals/vaca/balde-vaca.png',ovelha:'classic/animals/ovelha/la-ovelha.png'} as Record<string,string>)[id];
+}
 export function pickTile(x:number,y:number):{column:number;row:number}|null {
  for(let row=0;row<5;row++) for(let column=0;column<6;column++) {
   const p=tileCenter(column,row);
@@ -28,3 +36,6 @@ export const animalLayout:Record<string,[number,number,number]>={
  abelha:[1210,60,156],pombo:[1330,230,110],coelho:[195,100,72],burro:[300,470,140],pavao:[1020,620,80],
  avestruz:[1220,635,90],cabra:[180,570,110],cavalo:[345,45,150],'cachorro-robo':[785,490,110],'cachorro-mastiff':[1430,60,135]
 };
+
+// Both peacock poses use the same visible height; their silhouettes have different widths.
+export function peacockWidth(height:number,aspect:number){return height*aspect;}
