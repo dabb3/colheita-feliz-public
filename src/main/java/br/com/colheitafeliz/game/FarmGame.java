@@ -3,33 +3,24 @@ package br.com.colheitafeliz.game;
 import br.com.colheitafeliz.domain.crop.CropCatalog;
 import br.com.colheitafeliz.audio.AudioManager;
 import br.com.colheitafeliz.input.InputController;
-import br.com.colheitafeliz.persistence.JsonSaveRepository;
 import br.com.colheitafeliz.render.FarmRenderer;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Cursor;
 import com.badlogic.gdx.graphics.Pixmap;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.time.Clock;
 
 public final class FarmGame extends ApplicationAdapter {
-    private GameSession session;
+    private final GameSession session;
     private FarmRenderer renderer;
     private InputController input;
     private AudioManager audio;
     private long lastPeriodicSave;
     private Cursor cursor;
 
+    public FarmGame(GameSession session) { this.session = java.util.Objects.requireNonNull(session); }
+
     @Override public void create() {
         CropCatalog catalog = CropCatalogLoader.load();
-        try {
-            session = GameSession.open(Clock.systemUTC(), catalog,
-                    new JsonSaveRepository(Path.of(System.getenv().getOrDefault(
-                            "COLHEITA_SAVE_PATH", br.com.colheitafeliz.persistence.GameSave.DEFAULT_PATH))));
-        } catch (IOException e) {
-            throw new IllegalStateException("Could not load saved game", e);
-        }
         if (session.fresh()) session.state().startNewFarm();
         renderer = new FarmRenderer(catalog);
         audio = new AudioManager(session.state());
