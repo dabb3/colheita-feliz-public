@@ -2,8 +2,9 @@ import {createClient} from '@supabase/supabase-js';
 import type {Farm,Catalog,Tile,Reply,CommandFields} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
-import {animalPath} from './presentation.ts';
+import {animalPath,tileCenter} from './presentation.ts';
 import {renderWallet,renderMarket,focusMarketPage} from './ui.ts';
+import {renderDeposit,renderPlantHealth,renderAnimal,renderMissions,renderFriends} from './ui-panels.ts';
 
 const config=window.COLHEITA_CONFIG;
 const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
@@ -12,6 +13,7 @@ const select=element<HTMLSelectElement>('item');
 let api:ApiClient|undefined,catalog:Catalog,own:Farm|undefined,visited:Farm|undefined,scene:Scene|undefined;
 let tool='PLOW',selectedSeed='nabo',selectedFertilizer='comum',sound=false,busy=false;
 let toastTimer:number,sessionGeneration=0,navigationGeneration=0;
+let modalGeneration=0,refreshPanel:(()=>void)|undefined;
 const login=element('login');
 const inviteFromUrl=new URL(location.href).searchParams.get('invite');
 if(inviteFromUrl)sessionStorage.setItem('colheita:invitation',inviteFromUrl);
@@ -20,7 +22,14 @@ const toolDefinitions=[['PLOW','Arar / limpar','pa-ui'],['PLANT','Plantar','saco
 function button(label:string,action:()=>void|Promise<void>,parent:HTMLElement=content){const b=document.createElement('button');b.textContent=label;b.onclick=()=>void action();parent.append(b);return b;}
 function paragraph(text:string,parent:HTMLElement=content){const p=document.createElement('p');p.textContent=text;parent.append(p);return p;}
 function notify(message:string){element('notice').textContent=message;clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>element('notice').textContent='',7000);}
-function dialog(title:string){element('modal-title').textContent=title;content.replaceChildren();if(!modal.open)modal.showModal();}
+function dialog(title:string){modalGeneration++;refreshPanel=undefined;element('plant-health').hidden=true;element('modal-title').textContent=title;content.replaceChildren();if(!modal.open)modal.showModal();}
+modal.addEventListener('close',()=>{modalGeneration++;refreshPanel=undefined;});
+function updatePanel(){
+ if(!modal.open||!refreshPanel)return;
+ const focused=document.activeElement,key=focused&&content.contains(focused)?focused.getAttribute('data-focus-key'):null;
+ refreshPanel();
+ if(key){const replacement=[...content.querySelectorAll<HTMLButtonElement>('[data-focus-key]')].find(node=>node.getAttribute('data-focus-key')===key&&!node.disabled);(replacement??element('close-modal')).focus();}
+}
 function showConnection(message?:string){element('connection').hidden=!message;element('connection').textContent=message??'';}
 function syncPending(){element('pending').hidden=!api?.pending;element<HTMLButtonElement>('retry').disabled=!!api?.busy;}
 function display(){return visited??own;}
@@ -57,7 +66,7 @@ async function refresh(){
  try{
   const farm=await client.get<Farm>('/v1/me/farm');if(generation!==sessionGeneration)return;own=acceptFarm(own,farm);
   if(visited&&navigation===navigationGeneration){const target=visited.owner;const incoming=await client.get<Farm>(`/v1/farms/${target}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||visited?.owner!==target)return;visited=acceptFarm(visited,incoming);}
-  showConnection();render();
+  showConnection();render();updatePanel();
  }catch(error){if(generation===sessionGeneration)handleError(error);}
 }
 function handleError(error:unknown){
@@ -71,6 +80,7 @@ function receive(reply:Reply){
  if(reply.visitedFarm&&visited?.owner===reply.visitedFarm.owner)visited=acceptFarm(visited,reply.visitedFarm);
  if(reply.result)notify(reply.result.message);
  render();
+ updatePanel();
 }
 async function action(fields:CommandFields,path='/v1/me/actions'){
  if(!api||!own||busy)return;
@@ -89,10 +99,12 @@ async function tileAction(tile:Tile){
  await action(fields);
 }
 function health(tile:Tile|null){
- const panel=element('plant-health');panel.hidden=!tile?.cropId;if(!tile?.cropId)return;
- const crop=catalog.crops.find(c=>c.id===tile.cropId);
- const hours=Math.ceil(tile.remainingSeconds/3600);
- panel.textContent=`${crop?.name??tile.cropId} · temporada ${tile.season}/${tile.seasons} · ${tile.state==='DEAD'?'Morta':tile.state==='READY'?'Pronta para colher':`${Math.ceil(tile.nominalRemainingSeconds/3600)} h com rega contínua${tile.dry?'':`; ${hours} h sem nova rega`}`}${tile.dry?' · precisa de água':''}${tile.paused?' · crescimento pausado':''}${tile.protected?' · protegida':''}`;
+ const panel=element('plant-health');renderPlantHealth(panel,catalog,modal.open?null:tile);
+ if(tile){const p=tileCenter(tile.column,tile.row);panel.style.setProperty('--health-x',`${Math.max(12,Math.min(88,p.x/16))}%`);panel.style.setProperty('--health-y',`${(p.y-45)/9}%`);}
+}
+function animalPanel(id:string,ownAnimal=false){
+ dialog(catalog.animals.find(a=>a.id===id)?.name??'Animal');
+ refreshPanel=()=>{const farm=ownAnimal?own:display();if(farm)renderAnimal(content,catalog,farm,id,ownAnimal||!visited,fields=>void action(fields));};refreshPanel();
 }
 function tileList(){dialog('Terras da fazenda');const states:Record<string,string>={GRASS:'grama',PLOWED:'arada',DEAD:'planta morta',READY:'pronta',GROWING:'crescendo'};const grid=document.createElement('div');grid.className='tile-list';content.append(grid);for(const tile of display()?.tiles??[]){const crop=catalog.crops.find(c=>c.id===tile.cropId);const b=button(`Terra ${tile.column+1}, ${tile.row+1}: ${!tile.unlocked?'bloqueada':crop?.name??states[tile.state]}`,async()=>{modal.close();await tileAction(tile);},grid);b.title='Aplicar a ferramenta selecionada';}}
 function card(name:string,image?:string){const c=document.createElement('article');c.className='card';if(image){const img=document.createElement('img');img.loading='lazy';img.src='/assets/'+image;img.alt='';c.append(img);}const title=document.createElement('strong');title.textContent=name;c.append(title);return c;}
@@ -104,42 +116,36 @@ function shop(category='crops',page=0){
  if(category==='vip'){paragraph('VIP por 30 dias. Libera as culturas VIP conforme seu nível.',grid);button(`Ativar VIP · ${catalog.vip.greenPrice} verdes`,()=>action({action:'BUY_VIP'}),grid);}
  if(category==='owned'){
   if(!own?.animals.length)paragraph('Nenhum animal comprado.',grid);
-  for(const animal of own?.animals??[]){const type=catalog.animals.find(a=>a.id===animal.id)!;const c=card(type.name,animalPath(animal.id,animal.stage,false,false));grid.append(c);const stage:Record<string,string>={BABY:'Filhote',YOUNG:'Jovem',ADULT:'Adulto'},status:Record<string,string>={HUNGRY:'Com fome',PRODUCING:type.kind==='PROTECTOR'?'Protegendo':'Em desenvolvimento',READY:'Pronto'};paragraph(`${stage[animal.stage]} · ${status[animal.status]} · ${Math.ceil(animal.remainingSeconds/3600)} h`,c);
-   button('Cuidar / recolher',()=>action({action:'TEND_ANIMAL',itemId:animal.id}),c);
-   const feedId=type.kind==='PRODUCER'?'producer':'growth';button(`Ração · ${catalog.feedPrices[feedId]} ouro`,()=>action({action:'BUY_FEED',itemId:feedId}),c);
-   if(type.kind==='GROWING')button('Vender adulto',()=>action({action:'SELL_ANIMAL',itemId:animal.id}),c);
-  }
+  for(const animal of own?.animals??[]){const type=catalog.animals.find(a=>a.id===animal.id);const c=card(type?.name??animal.id,animalPath(animal.id,animal.stage,false,false));grid.append(c);button('Ver animal',()=>animalPanel(animal.id,true),c);}
  }
 }
-function deposit(){
- dialog('Depósito');button('Vender tudo',()=>action({action:'SELL_ALL'}));paragraph('Produtos VIP bloqueados são ignorados. Cada item é vendido na moeda de aquisição.');
- const groups=new Map<string,number>();for(const lot of own?.produceLots??[])groups.set(lot.itemId,(groups.get(lot.itemId)??0)+lot.quantity);
- for(const [id,count]of groups){const name=catalog.crops.find(c=>c.id===id)?.name??catalog.animals.find(a=>a.productId===id)?.productName??id;const row=document.createElement('div');row.className='row';paragraph(`${name}: ${count}`,row);button('Vender',()=>action({action:'SELL_ITEM',itemId:id}),row);content.append(row);}
- if(!groups.size)paragraph('Nenhum produto armazenado.');
- paragraph(`Ração: ${Object.entries(own?.feed??{}).map(([id,n])=>`${id==='producer'?'produção':'crescimento'}: ${n}`).join(', ')||'nenhuma'}`);
+function deposit(category='products'){
+ if(!own)return;dialog('Depósito');
+ refreshPanel=()=>{if(own)renderDeposit(content,catalog,own,category,id=>deposit(id),fields=>void action(fields));};refreshPanel();
 }
-function missions(){dialog('Tarefas diárias');for(const mission of own?.missions??[])paragraph(`${mission.done?'✓':'○'} ${mission.title} · ${mission.green} moeda verde`);paragraph('As recompensas são creditadas pelo servidor ao concluir as tarefas.');paragraph(own?.vipActive?`VIP ativo até ${own.vipExpiresAt}`:'VIP inativo.');}
+function missions(){dialog('Tarefas diárias');refreshPanel=()=>{if(own)renderMissions(content,own);};refreshPanel();}
 function invitationForm(parent:HTMLElement){
  const input=document.createElement('input');input.placeholder='Cole o código de convite';input.setAttribute('aria-label','Código de convite');input.value=sessionStorage.getItem('colheita:invitation')??'';parent.append(input);
  button('Aceitar convite',async()=>{
   if(!api){notify('Entre antes de aceitar o convite.');return;}
-  const client=api,generation=sessionGeneration;
-  try{await client.mutate('/v1/friend-invitations/accept',{code:input.value.trim()});if(generation!==sessionGeneration)return;await refresh();if(own)modal.close();}
+  const client=api,generation=sessionGeneration,panelGeneration=modalGeneration;
+  try{await client.mutate('/v1/friend-invitations/accept',{code:input.value.trim()});if(generation!==sessionGeneration)return;await refresh();if(own&&panelGeneration===modalGeneration)modal.close();}
   catch(error){handleError(error);}finally{syncPending();}
  },parent);
 }
 async function friends(){
- if(!api)return;const client=api,generation=sessionGeneration;dialog('Amigos');button('Criar convite',async()=>{
-  try{const reply=await client.mutate('/v1/friend-invitations',{});if(generation!==sessionGeneration)return;const code=paragraph(reply.code??'');code.id='invite-code';const url=new URL(location.origin);url.searchParams.set('invite',reply.code??'');const link=document.createElement('a');link.href=url.href;link.textContent='Link de convite';content.append(link);paragraph('Válido por sete dias, para um aceite.');}
+ if(!api)return;const client=api,generation=sessionGeneration;dialog('Amigos');const panelGeneration=modalGeneration;
+ const controls=document.createElement('div');controls.className='friend-controls';content.append(controls);button('Criar convite',async()=>{
+  try{const reply=await client.mutate('/v1/friend-invitations',{});if(generation!==sessionGeneration||panelGeneration!==modalGeneration||!modal.open)return;const code=paragraph(reply.code??'',controls);code.id='invite-code';const url=new URL(location.origin);url.searchParams.set('invite',reply.code??'');const link=document.createElement('a');link.href=url.href;link.textContent='Link de convite';controls.append(link);paragraph('Válido por sete dias, para um aceite.',controls);}
   catch(error){handleError(error);}finally{syncPending();}
- });invitationForm(content);
- try{const list=await client.get<{id:string;name:string}[]>('/v1/friends');if(generation!==sessionGeneration)return;for(const friend of list)button(`Visitar ${friend.name}`,async()=>{const navigation=++navigationGeneration;try{const farm=await client.get<Farm>(`/v1/farms/${friend.id}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration)return;visited=farm;tool='STEAL';render();modal.close();}catch(error){handleError(error);}});if(!list.length)paragraph('Nenhum amigo ainda. Crie um convite e compartilhe o link.');}
+ },controls);invitationForm(controls);const listRoot=document.createElement('div');content.append(listRoot);paragraph('Carregando amigos…',listRoot);
+ try{const list=await client.get<{id:string;name:string}[]>('/v1/friends');if(generation!==sessionGeneration||panelGeneration!==modalGeneration||!modal.open)return;renderFriends(listRoot,list,id=>{void(async()=>{const navigation=++navigationGeneration;try{const farm=await client.get<Farm>(`/v1/farms/${id}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||panelGeneration!==modalGeneration||!modal.open)return;visited=farm;tool='STEAL';render();modal.close();}catch(error){handleError(error);}})();});}
  catch(error){handleError(error);}
 }
 async function connect(user:string,token:()=>Promise<string>){
  sessionGeneration++;navigationGeneration++;busy=false;own=undefined;visited=undefined;scene?.close();const generation=sessionGeneration;
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
- scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>void tileAction(tile),()=>shop('owned'),health);
+ scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>void tileAction(tile),animalPanel,health);
  try{await refresh();if(generation===sessionGeneration&&!own){paragraph('Esta conta precisa de um convite para começar.',login);invitationForm(login);}}
  catch(error){handleError(error);}
 }
@@ -158,7 +164,7 @@ async function start(){
   }
  }catch(error){showConnection();notify(error instanceof Error?error.message:'Servidor indisponível.');button('Tentar conectar novamente',start,login);}
 }
-element('shop').onclick=()=>shop();element('deposit').onclick=deposit;element('missions').onclick=missions;element('friends').onclick=()=>void friends();
+element('shop').onclick=()=>shop();element('deposit').onclick=()=>deposit();element('missions').onclick=missions;element('friends').onclick=()=>void friends();
 element('home').onclick=()=>{navigationGeneration++;visited=undefined;tool='PLOW';render();};element('close-modal').onclick=()=>modal.close();
 element('accessible-tiles').onclick=tileList;
 element('credits').onclick=()=>{dialog('Créditos');paragraph('Reimplementação independente e não oficial de Colheita Feliz. Acervo visual derivado da referência indicada no repositório, com uso não comercial.');const link=document.createElement('a');link.href='/assets/REFERENCE_LICENSE';link.textContent='Licença e atribuição dos assets';content.append(link);};

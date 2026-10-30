@@ -16,3 +16,15 @@ export function purchaseLock(level:number,required:number,vipRequired:boolean,vi
  if(level<required)return `Nível ${required}`;
  if(vipRequired&&!vipActive)return 'Exige VIP';
 }
+
+export function durationLabel(seconds:number) {
+ if(seconds<=0)return 'Pronto';
+ const minutes=Math.ceil(seconds/60),days=Math.floor(minutes/1440),hours=Math.floor(minutes%1440/60),rest=minutes%60;
+ return [days?`${days} d`:'',hours?`${hours} h`:'',rest?`${rest} min`:''].filter(Boolean).join(' ');
+}
+
+export function animalCare(animal:{stage:string;status:string},type:{kind:string}) {
+ if(type.kind==='GROWING'&&animal.stage==='ADULT')return{label:'Vender adulto',action:'SELL_ANIMAL'};
+ if(type.kind==='PRODUCER'&&animal.status==='READY')return{label:'Recolher produto',action:'TEND_ANIMAL'};
+ if(animal.status==='HUNGRY')return{label:'Alimentar',action:'TEND_ANIMAL'};
+}

@@ -10,7 +10,7 @@ export interface Farm {
  tiles:Tile[]; animals:Animal[];
  coins?:string; greenCoins?:string; level?:number; currentXp?:string; xpToNext?:string;
  vipActive?:boolean; vipExpiresAt?:string; seedCounts?:Record<string,number>;
- produceLots?:{itemId:string; quantity:number; currency:string}[];
+ produceLots?:{itemId:string; quantity:number; currency:string;vipOnly?:boolean}[];
  feed?:Record<string,number>; fertilizers?:Record<string,number>;
  tutorial?:{title?:string; hint?:string}; missions?:{id:string; title:string;green:number;done:boolean}[];
  nextPlot?:{column:number;row:number};

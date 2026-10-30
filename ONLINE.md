@@ -123,6 +123,30 @@ carteira com avatar genérico, progresso de XP, saldos preservados como texto e
 loja com dez itens por página. Bloqueios por nível, VIP e animal já comprado
 ficam explícitos. O seletor de semente/adubo mantém teclado e ganha preview.
 Na revisão isolada, os botões de compra exibem apenas mensagem de demonstração.
-Paginação mantém foco e Escape fecha o dialog. Depósito, tarefas, amigos e
-popups contextuais continuam na próxima parte da etapa de interface, após
-aprovação visual da amostra. Não confundir essa fixture com teste multiplayer.
+Paginação mantém foco e Escape fecha o dialog. Não confundir essa fixture com
+teste multiplayer.
+
+### Depósito e painéis contextuais
+
+O depósito tem abas de produtos, sementes e insumos. Produtos indicam quantidades
+por moeda de aquisição; vender um produto usa a operação existente para o estoque
+daquele item. Não há venda unitária nem preço estimado no cliente. Lotes VIP
+bloqueados permanecem no estoque e não impedem a operação Vender tudo.
+
+O popup da planta informa temporada, estágio, condições e dois tempos com rótulos
+distintos: com rega contínua e sem nova rega. A posição acompanha a terra; em
+painéis estreitos, a informação aparece fora do canvas. A atualização recebida da
+API renova o popup mesmo com o cursor parado.
+
+Clique em animal abre o alvo escolhido. Ações de alimentação, coleta ou venda
+seguem espécie, estágio e estado projetados pelo servidor. Animais da fazenda
+visitada são somente leitura; Loja → Meus animais continua mostrando os próprios,
+inclusive durante visitas. O painel aberto acompanha as atualizações periódicas,
+preservando o foco quando a ação ainda existe. Percentual de fome não é exibido,
+pois esse dado não integra a projeção atual.
+
+Tarefas usam cartões de estado e amigos usam nomes e botões de visita. Listagem,
+criação e aceite de convite não preenchem nem fecham uma janela diferente após
+resposta tardia. A revisão isolada apresenta esses painéis com dados sintéticos e
+callbacks de demonstração. Validar economia e duas pessoas simultâneas continua
+sendo parte dos ensaios de integração, com PostgreSQL descartável.
