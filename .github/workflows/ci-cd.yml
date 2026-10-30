@@ -14,6 +14,18 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+        env:
+          POSTGRES_DB: colheita_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['55439:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d colheita_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: jdbc:postgresql://127.0.0.1:55439/colheita_test
     steps:
       - name: Check out source
         uses: actions/checkout@v7
@@ -34,9 +46,9 @@ jobs:
               echo "Release tags must use vMAJOR.MINOR.PATCH, for example v0.2.0."
               exit 1
             fi
-            bash ./gradlew --no-daemon "-PreleaseVersion=$release_version" build distZip
+            bash ./gradlew --no-daemon "-PreleaseVersion=$release_version" build :server:integrationTest distZip
           else
-            bash ./gradlew --no-daemon build distZip
+            bash ./gradlew --no-daemon build :server:integrationTest distZip
           fi
 
       - name: Upload SpotBugs report
@@ -50,6 +62,7 @@ jobs:
             build/reports/spotbugs/test.xml
             build/reports/spotbugs/test.html
             core/build/reports/spotbugs/
+            server/build/reports/spotbugs/
           retention-days: 7
 
       - name: Convert SpotBugs XML to SARIF
@@ -95,6 +108,23 @@ jobs:
           convert_to_sarif core/build/reports/spotbugs/main.xml core/build/reports/spotbugs/main.sarif "src/main/java/"
           convert_to_sarif core/build/reports/spotbugs/test.xml core/build/reports/spotbugs/test.sarif "core/src/test/java/"
 
+          convert_to_sarif server/build/reports/spotbugs/main.xml server/build/reports/spotbugs/main.sarif "server/src/main/java/"
+          convert_to_sarif server/build/reports/spotbugs/test.xml server/build/reports/spotbugs/test.sarif "server/src/test/java/"
+
+      - name: Upload Server SpotBugs SARIF to PR
+        if: github.event_name == 'pull_request' && always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: server/build/reports/spotbugs/main.sarif
+          category: spotbugs-server-main
+
+      - name: Upload Server Test SpotBugs SARIF to PR
+        if: github.event_name == 'pull_request' && always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: server/build/reports/spotbugs/test.sarif
+          category: spotbugs-server-test
+
       - name: Upload Core SpotBugs SARIF to PR
         if: github.event_name == 'pull_request' && always()
         uses: github/codeql-action/upload-sarif@v4
@@ -128,7 +158,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: jacoco-report
-          path: build/reports/jacoco/test/
+          path: |
+            build/reports/jacoco/test/
+            server/build/reports/jacoco/
+            server/build/reports/tests/
           retention-days: 7
 
       - name: Save desktop distribution

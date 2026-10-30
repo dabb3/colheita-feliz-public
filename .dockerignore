@@ -1,0 +1,11 @@
+**
+!gradlew
+!settings.gradle
+!build.gradle
+!gradle/**
+!config/spotbugs/**
+!core/build.gradle
+!server/build.gradle
+!server/src/main/**
+!src/main/java/**
+!assets/data/**

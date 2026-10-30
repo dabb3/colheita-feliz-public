@@ -71,6 +71,7 @@ sourceSets.main.resources.srcDir 'assets'
 sourceSets.main.java.exclude 'br/com/colheitafeliz/domain/**', 'br/com/colheitafeliz/game/**', 'br/com/colheitafeliz/persistence/**'
 sourceSets.main.resources.exclude 'data/**'
 tasks.named('build') { dependsOn ':core:build' }
+tasks.named('build') { dependsOn ':server:build' }
 tasks.named('test') { useJUnitPlatform() }
 
 tasks.withType(JavaCompile).configureEach {
