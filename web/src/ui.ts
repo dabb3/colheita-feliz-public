@@ -2,14 +2,14 @@ import type {Farm,Catalog,CommandFields} from './types.ts';
 import {animalPath} from './presentation.ts';
 import {xpPercent,pageItems,purchaseLock} from './ui-presentation.ts';
 
-function text(tag:string,value:string,className='') {
+export function text(tag:string,value:string,className='') {
  const node=document.createElement(tag);node.textContent=value;node.className=className;return node;
 }
-function image(path:string,className='') {
+export function image(path:string,className='') {
  const node=document.createElement('img');node.src='/assets/'+path;node.alt='';node.className=className;return node;
 }
-function control(label:string,action:()=>void) {
- const node=text('button',label) as HTMLButtonElement;node.type='button';node.onclick=action;return node;
+export function control(label:string,action:()=>void) {
+ const node=text('button',label) as HTMLButtonElement;node.type='button';node.setAttribute('data-focus-key',label);node.onclick=action;return node;
 }
 
 export function focusMarketPage(root:HTMLElement,forward:boolean) {

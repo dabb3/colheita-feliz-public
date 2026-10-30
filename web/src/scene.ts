@@ -37,7 +37,11 @@ export class Scene {
   this.animation=window.setInterval(()=>this.draw(),200);
  }
  close(){clearInterval(this.animation);this.events.abort();}
- update(farm:Farm){this.farm=farm;this.draw();}
+ update(farm:Farm){
+  this.farm=farm;
+  if(this.hover){const previous=this.hover;this.hover=farm.tiles.find(tile=>tile.column===previous.column&&tile.row===previous.row)??null;this.onHover(this.hover);}
+  this.draw();
+ }
  private point(e:PointerEvent|MouseEvent){const rect=this.canvas.getBoundingClientRect();return{x:(e.clientX-rect.left)*1600/rect.width,y:(e.clientY-rect.top)*900/rect.height};}
  private sprite(path:string,trim=false,part?:number):Sprite|undefined {
   const key=`${path}:${trim}:${part??'all'}`;const cached=this.sprites.get(key);if(cached)return cached;if(cached===null)return;

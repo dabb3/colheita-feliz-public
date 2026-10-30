@@ -59,3 +59,31 @@
  #game header nav { gap: .25rem; }
 }
 .review-controls { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; padding: 1rem; background: #fff8df; color: #253b35; }
+
+/* Contextual panels reuse the market's spacing, cards and native dialog. */
+.inventory-cards { margin-top: 1rem; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); }
+.inventory-card { background: #fffdf4; border-color: #d9d7bb; padding: .8rem; max-width: 340px; width: 100%; }
+#modal-content .inventory-card h3, #modal-content .mission-card h3 { font-size: 16px; margin: .25rem; }
+.inventory-card img { height: 90px; width: 100px; object-fit: contain; }
+.inventory-card button { margin-top: .5rem; }
+.status-badge { display: inline-block; background: #edf4d6; color: #38532b; border: 1px solid #c6d5ad; border-radius: 6px; padding: .25rem .45rem; font-size: 12px; }
+.empty-state { padding: 1.5rem; text-align: center; color: #61705b; background: #f1f3e5; border-radius: 8px; }
+.mission-card { align-items: flex-start; text-align: left; background: #fffdf4; }
+.friend-controls { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; padding: .7rem; border: 1px solid #d6dabf; background: #f7f8e9; border-radius: 8px; }
+.friend-controls p { margin: .4rem 0; }
+.friend-list { display: grid; gap: .6rem; margin-top: 1rem; }
+.friend-card { display: flex; align-items: center; gap: .8rem; padding: .7rem; background: #fffdf4; border: 1px solid #d6dabf; border-radius: 8px; }
+.friend-card strong { overflow-wrap: anywhere; flex: 1; }
+.friend-card .friend-avatar { width: 42px; height: 48px; object-fit: contain; }
+.friend-card button { max-width: 55%; }
+#plant-health { left: var(--health-x, 30%); top: var(--health-y, 19%); transform: translate(-50%, -100%); width: 280px; max-width: 80%; z-index: 2; background: #fffbdfee; border: 2px solid #c9ac5b; }
+#plant-health p { margin: .35rem 0; font-size: 12px; }
+#plant-health strong { display: block; font-size: 14px; }
+#plant-health .health-state { font-weight: 750; color: #496d23; }
+@media(max-width:1000px) {
+ #plant-health { position: static; transform: none; width: auto; max-width: none; }
+}
+@media(max-width:560px) {
+ .friend-card { flex-wrap: wrap; }
+ .friend-card button { max-width: 100%; }
+}
