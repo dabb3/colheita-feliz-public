@@ -41,7 +41,11 @@ final class OnlineGameService {
     JsonObject catalog() {
         var fixed = Clock.fixed(clock.instant(), ZoneOffset.UTC);
         var game = new GameState(fixed::instant, fixed, catalog, bound -> 99);
-        return object("crops", catalog.all(), "animals", game.animalTypes(), "fertilizers", game.fertilizers());
+        var feedPrices = new JsonObject();
+        for (var type : game.animalTypes()) if (type.kind() != br.com.colheitafeliz.domain.animal.AnimalType.Kind.PROTECTOR)
+            feedPrices.addProperty(type.feedId(), type.feedPrice());
+        return object("crops", catalog.all(), "animals", game.animalTypes(), "fertilizers", game.fertilizers(),
+                "feedPrices", feedPrices, "vip", object("greenPrice", GameState.VIP_PRICE));
     }
 
     JsonObject requestId() {

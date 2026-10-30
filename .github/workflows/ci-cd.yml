@@ -37,6 +37,27 @@ jobs:
           java-version: '21'
           cache: gradle
 
+      - name: Set up Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Verify web client
+        working-directory: web
+        run: |
+          npm ci --ignore-scripts
+          npm test
+          npm run build:local
+
+      - name: Save web preview
+        uses: actions/upload-artifact@v7
+        with:
+          name: colheita-web-local-preview
+          path: web/dist/
+          retention-days: 7
+
       - name: Build and run checks
         shell: bash
         run: |

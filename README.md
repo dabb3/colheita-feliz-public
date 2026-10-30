@@ -2,6 +2,11 @@
 
 Jogo desktop de fazenda single-player (por enquanto) em Java 21 e libGDX, inspirado no jogo [Colheita Feliz] original do Orkut. Reimplementação independente e não oficial.
 
+
+## Jogo no navegador
+
+O cliente web e a API online estão em desenvolvimento. Veja [ONLINE.md](ONLINE.md) para executar o piloto local com duas contas e configurar os serviços. Fazendas online são novas; saves do desktop permanecem separados.
+
 ## Executar e compilar
 
 Instale JDK 21 e configure `JAVA_HOME`. O Gradle Wrapper está incluído; a primeira execução baixa o Gradle e as dependências Maven.
@@ -93,3 +98,6 @@ Os assets derivados do projeto de referência estão sujeitos à licença **Sour
 As fontes **M PLUS Rounded 1c**, **Nunito** e **Lato** estão sob SIL Open Font License 1.1. Suas licenças estão em [OFL-MPLUSRounded1c.txt](assets/fonts/OFL-MPLUSRounded1c.txt), [OFL-Nunito.txt](assets/fonts/OFL-Nunito.txt) e [OFL-Lato.txt](assets/fonts/OFL-Lato.txt).
 
 Os avisos acima documentam os materiais de terceiros; não concedem uma licença geral ao código Java deste repositório.
+# Jogo no navegador
+
+O cliente web e a API online estão em desenvolvimento. Veja [ONLINE.md](ONLINE.md) para executar o piloto local com duas contas e configurar os serviços. Fazendas online são novas; saves do desktop permanecem separados.

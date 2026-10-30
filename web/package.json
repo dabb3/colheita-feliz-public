@@ -1,0 +1,14 @@
+{
+  "name": "colheita-feliz-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-isolation=none test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && node scripts/build.mjs",
+    "build:local": "npm run typecheck && node scripts/build.mjs --local",
+    "serve": "node scripts/serve.mjs"
+  },
+  "dependencies": {"@supabase/supabase-js": "2.118.0"},
+  "devDependencies": {"typescript": "7.0.2", "esbuild": "0.28.2"}
+}
