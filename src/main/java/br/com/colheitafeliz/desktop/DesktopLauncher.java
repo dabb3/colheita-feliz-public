@@ -1,6 +1,5 @@
 package br.com.colheitafeliz.desktop;
 
-import br.com.colheitafeliz.game.FarmGame;
 import br.com.colheitafeliz.game.CropCatalogLoader;
 import br.com.colheitafeliz.persistence.GameSave;
 import java.io.IOException;

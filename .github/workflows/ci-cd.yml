@@ -49,6 +49,7 @@ jobs:
             build/reports/spotbugs/main.html
             build/reports/spotbugs/test.xml
             build/reports/spotbugs/test.html
+            core/build/reports/spotbugs/
           retention-days: 7
 
       - name: Convert SpotBugs XML to SARIF
@@ -91,6 +92,22 @@ jobs:
           }
           convert_to_sarif build/reports/spotbugs/main.xml build/reports/spotbugs/main.sarif "src/main/java/"
           convert_to_sarif build/reports/spotbugs/test.xml build/reports/spotbugs/test.sarif "src/test/java/"
+          convert_to_sarif core/build/reports/spotbugs/main.xml core/build/reports/spotbugs/main.sarif "src/main/java/"
+          convert_to_sarif core/build/reports/spotbugs/test.xml core/build/reports/spotbugs/test.sarif "core/src/test/java/"
+
+      - name: Upload Core SpotBugs SARIF to PR
+        if: github.event_name == 'pull_request' && always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: core/build/reports/spotbugs/main.sarif
+          category: spotbugs-core-main
+
+      - name: Upload Core Test SpotBugs SARIF to PR
+        if: github.event_name == 'pull_request' && always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: core/build/reports/spotbugs/test.sarif
+          category: spotbugs-core-test
 
       - name: Upload SpotBugs SARIF to PR
         if: github.event_name == 'pull_request' && always()

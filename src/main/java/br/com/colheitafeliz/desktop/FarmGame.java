@@ -1,4 +1,7 @@
-package br.com.colheitafeliz.game;
+package br.com.colheitafeliz.desktop;
+
+import br.com.colheitafeliz.game.CropCatalogLoader;
+import br.com.colheitafeliz.game.GameSession;
 
 import br.com.colheitafeliz.domain.crop.CropCatalog;
 import br.com.colheitafeliz.audio.AudioManager;

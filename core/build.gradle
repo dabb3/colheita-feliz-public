@@ -1,0 +1,35 @@
+plugins {
+    id 'java-library'
+    id 'com.github.spotbugs'
+}
+
+repositories { mavenCentral() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+dependencies {
+    implementation 'com.google.code.gson:gson:2.14.0'
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+sourceSets.main {
+    java {
+        srcDir '../src/main/java'
+        include 'br/com/colheitafeliz/domain/**', 'br/com/colheitafeliz/game/**', 'br/com/colheitafeliz/persistence/**'
+    }
+    resources { srcDir '../assets'; include 'data/**' }
+}
+tasks.test { useJUnitPlatform() }
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs.addAll(['-Xlint:all', '-Werror'])
+}
+spotbugs {
+    toolVersion = '4.8.6'
+    effort = 'max'
+    reportLevel = 'medium'
+    excludeFilter = rootProject.file('config/spotbugs/exclude.xml')
+}
+tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {
+    reports.create('xml') { required = true }
+    reports.create('html') { required = true }
+}

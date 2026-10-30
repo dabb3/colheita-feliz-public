@@ -66,7 +66,7 @@ O fundo acompanha o horário real local do computador: dia das 06:00 às 16:59; 
 
 ## Desenvolvimento e distribuição
 
-Código em `src/main/java`, testes em `src/test/java` e recursos em `assets/`. Para capturas descartáveis, execute `./gradlew visualReview`; as imagens ficam em `build/visual-review/` e o save do jogador não é usado.
+Código em `src/main/java`, testes em `src/test/java` e recursos em `assets/`. O módulo Gradle `core` compila domínio, regras, persistência e catálogos sem libGDX; o aplicativo desktop depende desse módulo. A classe `FarmGame` pertence ao pacote `desktop`. `./gradlew build` verifica ambos; `./gradlew :core:test` verifica o motor sem o framework gráfico no classpath. Para capturas descartáveis, execute `./gradlew visualReview`; as imagens ficam em `build/visual-review/` e o save do jogador não é usado.
 
 O GitHub Actions executa build, testes, SpotBugs e JaCoCo em pushes e PRs. O SpotBugs roda como parte do `build` com `ignoreFailures = false`; achados novos quebram o build local e no CI. Warnings pré-existentes estão listados em `config/spotbugs/exclude.xml`, escopados por classe e método para não mascarar código novo. Os resultados são publicados como annotations no PR via SARIF. O JaCoCo gera relatório de cobertura em `build/reports/jacoco/test/`. Tags `vMAJOR.MINOR.PATCH` geram um Release com o ZIP e checksum SHA-256. Mudanças na `main` exigem PR e pelo menos uma aprovação de outra pessoa, inclusive para administradores; consulte [CONTRIBUTING.md](CONTRIBUTING.md).
 
