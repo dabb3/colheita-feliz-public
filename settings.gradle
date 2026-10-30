@@ -1,2 +1,3 @@
 rootProject.name = 'colheita-feliz-java'
 include 'core'
+include 'server'
