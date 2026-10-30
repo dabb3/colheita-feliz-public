@@ -41,6 +41,8 @@ O servidor valida cada sessão em `/auth/v1/user`, antes de consultar recibos ou
 
 Convites são de uso único e expiram em sete dias. Amizade exige aceite. A revogação administrativa desativa o participante em `colheita.players` e também bloqueia reenvio de pedidos anteriores. Não há painel público de administração.
 
+Ao abrir a própria fazenda, o servidor atualiza o nome público pelo perfil autenticado no Supabase. Isso substitui o nome inicial do dono e acompanha mudanças de perfil. O nome é limitado a 40 caracteres, sem controles; participantes desativados continuam bloqueados.
+
 ## Consistência e operação
 
 Comandos carregam UUID único e revisão decimal em string. A API registra recibo e mudanças na mesma transação. Repetir o mesmo pedido retorna o resultado gravado; trocar conteúdo com a mesma chave retorna 409. Visitas alteram as duas fazendas atomicamente, com locks ordenados. IDs de ação vêm de `GET /v1/request-id` autenticado e contêm o horário do servidor (UUIDv7). Repetições são aceitas por 24 horas; IDs antigos, futuros ou expirados retornam 410 sem executar, inclusive após a remoção do recibo. O cliente deve atualizar a fazenda para conferir o resultado antes de iniciar outra ação. Não gere um novo ID automaticamente para uma intenção cujo resultado continua desconhecido.

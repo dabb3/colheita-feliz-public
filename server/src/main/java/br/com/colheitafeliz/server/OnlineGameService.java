@@ -55,8 +55,13 @@ final class OnlineGameService {
     }
 
     JsonObject farm(UUID actor) {
+        return farm(actor, null);
+    }
+
+    JsonObject farm(UUID actor, String authenticatedName) {
         return store.transaction(actor, tx -> {
             active(tx, actor);
+            if (authenticatedName != null) tx.updateName(actor, cleanName(authenticatedName));
             tx.lockFarms(actor);
             var farm = load(tx, actor);
             return persist(tx, farm, false, true);
@@ -100,9 +105,7 @@ final class OnlineGameService {
                     throw new ApiFailure(404, "Convite indisponível.");
                 active(tx, invite.owner());
                 if (invite.usedBy() != null && !invite.usedBy().equals(actor)) throw new ApiFailure(409, "Convite já utilizado.");
-                String clean = name == null ? "Fazendeiro" : name.replaceAll("\\p{Cntrl}", "").strip();
-                if (clean.isEmpty()) clean = "Fazendeiro";
-                tx.addPlayer(actor, clean.substring(0, Math.min(40, clean.length())), limit);
+                tx.addPlayer(actor, cleanName(name), limit);
                 tx.befriend(actor, invite.owner());
                 tx.accept(hash(code), actor);
                 return object("success", true, "message", "Convite aceito. Vocês são amigos.");
@@ -112,6 +115,12 @@ final class OnlineGameService {
 
     JsonArray friends(UUID actor) {
         return store.transaction(actor, tx -> { active(tx, actor); return JSON.toJsonTree(tx.friends(actor)).getAsJsonArray(); });
+    }
+
+    private static String cleanName(String name) {
+        String clean = name == null ? "Fazendeiro" : name.replaceAll("\\p{Cntrl}", "").strip();
+        if (clean.isEmpty()) clean = "Fazendeiro";
+        return clean.substring(0, Math.min(40, clean.length()));
     }
 
     JsonObject visit(UUID actor, UUID owner) {

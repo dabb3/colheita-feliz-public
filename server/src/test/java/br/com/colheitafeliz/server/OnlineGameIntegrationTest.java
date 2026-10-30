@@ -32,6 +32,15 @@ class OnlineGameIntegrationTest {
             String base = "http://127.0.0.1:" + http.port();
             var missing = client.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base + "/v1/me/farm")).build(), java.net.http.HttpResponse.BodyHandlers.ofString());
             assertEquals(401, missing.statusCode());
+            var own = client.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base + "/v1/me/farm"))
+                    .header("Authorization", "Bearer test").build(), java.net.http.HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, own.statusCode());
+            assertEquals("Alice", com.google.gson.JsonParser.parseString(own.body()).getAsJsonObject().get("name").getAsString());
+            var invitation = service.createInvitation(alice, requestId());
+            service.acceptInvitation(bob, "Bob", invitation.get("code").getAsString(), requestId());
+            assertEquals("Alice", service.friends(bob).get(0).getAsJsonObject().get("name").getAsString());
+            store.initialize(alice);
+            assertEquals("Alice", service.visit(bob, alice).get("name").getAsString());
             for (String body : java.util.List.of("{", "{\"coins\":999999}", "{\"requestId\":\"bad\",\"action\":\"BUY_SEED\"}")) {
                 var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create(base + "/v1/me/actions"))
                         .header("Authorization", "Bearer test").header("Content-Type", "application/json")
@@ -68,6 +77,24 @@ class OnlineGameIntegrationTest {
         store = new JdbcOnlineStore(url, "postgres", "", testSchema);
         store.initialize(alice);
         service = new OnlineGameService(store, clock, bound -> bound - 1, 5);
+    }
+
+    @Test void profileRefreshPreservesFarmAndNeverReactivatesParticipants() {
+        var original = service.farm(alice);
+        var updated = service.farm(alice, "  Alice\n Silva  ");
+        assertEquals("Alice Silva", updated.get("name").getAsString());
+        for (String field : java.util.List.of("revision", "coins", "greenCoins", "tiles"))
+            assertEquals(original.get(field), updated.get(field));
+        assertEquals("A".repeat(40), service.farm(alice, "A".repeat(100)).get("name").getAsString());
+        assertEquals("Fazendeiro", service.farm(alice, "\n\t ").get("name").getAsString());
+        store.transaction(alice, tx -> { tx.setActive(alice, false); return null; });
+        assertEquals(403, assertThrows(ApiFailure.class, () -> service.farm(alice, "Novo nome")).status());
+        store.transaction(alice, tx -> {
+            assertEquals("Fazendeiro", tx.player(alice).name());
+            assertFalse(tx.player(alice).active());
+            return null;
+        });
+        assertEquals(403, assertThrows(ApiFailure.class, () -> service.farm(bob, "Bob")).status());
     }
 
     @Test void newFarmAndRetryPreserveEconomyAndSurviveServiceRestart() {

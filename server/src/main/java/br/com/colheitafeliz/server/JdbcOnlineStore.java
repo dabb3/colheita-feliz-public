@@ -97,6 +97,9 @@ final class JdbcOnlineStore {
                     r -> new Player(r.getObject(1, UUID.class), r.getString(2), r.getBoolean(3)), id));
         }
         void setActive(UUID id, boolean active) { execute("UPDATE " + schema + ".players SET active=? WHERE id=?", active, id); }
+        void updateName(UUID id, String name) {
+            execute("UPDATE " + schema + ".players SET name=? WHERE id=? AND active AND name<>?", name, id, name);
+        }
         void addPlayer(UUID id, String name, int limit) {
             lock("membership");
             if (player(id) != null) return;
