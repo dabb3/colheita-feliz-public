@@ -31,7 +31,8 @@ final class OnlineViews {
                     "paused", crop != null && crop.paused(), "weeds", tile.pest().name().equals("WEEDS"),
                     "insects", tile.insects(), "fertilized", tile.fertilized(), "protected", protectedPlots.contains(game.land().at(col, row).id()),
                     "harvestRevision", Long.toString(tile.harvestRevision()),
-                    "remainingSeconds", crop == null ? 0 : crop.remainingAt(now).toSeconds()));
+                    "remainingSeconds", crop == null ? 0 : crop.remainingAt(now).toSeconds(),
+                    "nominalRemainingSeconds", crop == null ? 0 : Math.max(0, crop.currentDuration().toMillis() - crop.grownMillisAt(now)) / 1000));
         }
         JsonArray animals = new JsonArray();
         for (var animal : game.barn().animals()) animals.add(object("id", animal.type().id(), "stage", animal.stageAt(now),

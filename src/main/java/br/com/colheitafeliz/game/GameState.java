@@ -35,6 +35,7 @@ public final class GameState {
     public static final int COLUMNS = 6;
     public static final int ROWS = 5;
     public static final int STARTING_COINS = 500;
+    public static final BigDecimal VIP_PRICE = new BigDecimal("100");
     private final Farm farm = new Farm(COLUMNS, ROWS);
     private final Inventory inventory = new Inventory();
     private final Wallet wallet;
@@ -105,7 +106,7 @@ public final class GameState {
     public boolean vipActive() { return vip.activeAt(realClock.instant()); }
 
     public ActionResult buyVip() {
-        BigDecimal price = new BigDecimal("100");
+        BigDecimal price = VIP_PRICE;
         if (wallet.balance(Currency.GREEN).compareTo(price) < 0)
             return report(ActionResult.fail("O cartão VIP custa 100 moedas verdes."));
         VipStatus renewed = vip.purchase(realClock.instant());

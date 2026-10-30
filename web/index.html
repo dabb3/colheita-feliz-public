@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#376b36"><title>Colheita Feliz</title><link rel="stylesheet" href="/style.css"><script src="/config.js" defer></script><script src="/app.js" defer></script></head>
+<body>
+ <main id="app">
+  <div id="welcome"><h1>Colheita Feliz</h1><p>Sua fazenda, seus amigos, uma colheita por vez.</p><div id="login"></div></div>
+  <section id="game" hidden aria-label="Fazenda">
+   <canvas id="farm" aria-label="Fazenda. Use a lista de terras para jogar pelo teclado."></canvas>
+   <header><div id="wallet" class="panel"></div><nav aria-label="Menu da fazenda"><button id="shop">Loja</button><button id="deposit">Depósito</button><button id="missions">Tarefas</button><button id="friends">Amigos</button><button id="home" hidden>Minha fazenda</button><button id="credits">Créditos</button><button id="logout">Sair</button></nav></header>
+   <aside id="tutorial" class="panel"></aside>
+   <div id="plant-health" class="panel" hidden></div>
+   <footer><div id="tools" role="toolbar" aria-label="Ferramentas"></div><label id="item-label">Semente <select id="item"></select></label><button id="accessible-tiles">Lista de terras</button><button id="sound" aria-pressed="false">Som: desligado</button></footer>
+  </section>
+  <div id="connection" class="panel" role="status" hidden></div>
+  <div id="pending" class="panel" hidden><span>Uma ação aguarda confirmação.</span><button id="retry">Confirmar ação pendente</button></div>
+  <div id="notice" role="status" aria-live="polite"></div>
+  <dialog id="modal" aria-labelledby="modal-title"><div class="dialog-header"><h2 id="modal-title"></h2><button id="close-modal" aria-label="Fechar">×</button></div><div id="modal-content"></div></dialog>
+ </main>
+</body></html>

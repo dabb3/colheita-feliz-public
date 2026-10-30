@@ -1,0 +1,56 @@
+import type {Farm, Reply, CommandFields} from './types.ts';
+
+interface StorageLike {getItem(key:string):string|null;setItem(key:string,value:string):void;removeItem(key:string):void;}
+interface Pending {path:string;body:string;}
+export class ApiError extends Error {
+ readonly status:number;
+ constructor(status:number,message:string) {super(message);this.status=status;}
+}
+export function acceptFarm<T extends {owner:string;revision:string}>(current:T|undefined,incoming:T):T {
+ return current?.owner===incoming.owner && BigInt(current.revision)>BigInt(incoming.revision) ? current : incoming;
+}
+export class ApiClient {
+ private readonly key:string;
+ private readonly base:string;
+ private readonly token:()=>Promise<string>;
+ private readonly storage:StorageLike;
+ private readonly send:typeof fetch;
+ pending:Pending|null;
+ busy=false;
+ constructor(base:string,user:string,token:()=>Promise<string>,storage:StorageLike,send:typeof fetch=fetch) {
+  this.base=base;this.token=token;this.storage=storage;this.send=send;
+  this.key=`colheita:pending:${base}:${user}`;
+  const saved=storage.getItem(this.key);
+  this.pending=saved ? JSON.parse(saved) : null;
+ }
+ async get<T>(path:string):Promise<T> {return this.request(path);}
+ async mutate(path:string,fields:CommandFields):Promise<Reply> {
+  if(this.pending || this.busy) throw new Error('Resolva a ação pendente antes de continuar.');
+  const pending={path,body:JSON.stringify({...fields,requestId:crypto.randomUUID()})};
+  // Persist before sending: a reload after an unknown result must reuse this UUID.
+  this.storage.setItem(this.key,JSON.stringify(pending)); this.pending=pending;
+  return this.retry();
+ }
+ async retry():Promise<Reply> {
+  if(!this.pending || this.busy) throw new Error('Não há ação pendente disponível.');
+  this.busy=true;
+  try {
+   const response=await this.request<Reply>(this.pending.path,this.pending.body);
+   this.clear();return response;
+  } catch(error) {
+   if(error instanceof ApiError && [400,403,404,409,413,415,429].includes(error.status)) this.clear();
+   throw error;
+  } finally {this.busy=false;}
+ }
+ private clear() {this.storage.removeItem(this.key);this.pending=null;}
+ private async request<T>(path:string,body?:string):Promise<T> {
+  const token=await this.token();
+  const send=this.send;
+  const response=await send(this.base+path,{method:body?'POST':'GET',
+   headers:{Authorization:`Bearer ${token}`,...(body?{'Content-Type':'application/json'}:{})},body,
+   signal:AbortSignal.timeout(65_000),cache:'no-store'});
+  const json=await response.json();
+  if(!response.ok) throw new ApiError(response.status,json.error??'Não foi possível concluir.');
+  return json as T;
+ }
+}

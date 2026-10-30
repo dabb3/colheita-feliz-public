@@ -44,6 +44,20 @@ class OnlineGameIntegrationTest {
         }
     }
 
+    @Test void firstPlantFlowSurvivesEveryRequestReload() {
+        service = new OnlineGameService(store, Clock.systemUTC(), bound -> bound - 1, 5);
+        var farm = service.farm(alice);
+        farm = service.command(alice, new Command(UUID.randomUUID(), farm.get("revision").getAsString(), "BUY_SEED", "nabo", "GOLD", null, null, null)).getAsJsonObject("farm");
+        farm = service.command(alice, new Command(UUID.randomUUID(), farm.get("revision").getAsString(), "PLOW", null, null, 0, 0, null)).getAsJsonObject("farm");
+        farm = service.farm(alice);
+        var planted = service.command(alice, new Command(UUID.randomUUID(), farm.get("revision").getAsString(), "PLANT", "nabo", null, 0, 0, null));
+        assertTrue(planted.getAsJsonObject("result").get("success").getAsBoolean());
+        farm = service.farm(alice);
+        var watered = service.command(alice, new Command(UUID.randomUUID(), farm.get("revision").getAsString(), "WATER", null, null, 0, 0, null));
+        assertTrue(watered.getAsJsonObject("result").get("success").getAsBoolean());
+        assertTrue(service.farm(alice).getAsJsonArray("tiles").get(0).getAsJsonObject().get("remainingSeconds").getAsInt() > 59000);
+    }
+
     @BeforeEach void setUp() {
         String url = System.getenv("TEST_DATABASE_URL");
         assertNotNull(url, "integrationTest requires TEST_DATABASE_URL pointing to disposable PostgreSQL");

@@ -1,6 +1,6 @@
 # Online com amigos
 
-O desktop continua disponível. O servidor online cria fazendas novas e não importa saves locais. O piloto admite cinco participantes ativos, por convite aceito. O cliente web está em implementação.
+O desktop continua disponível. O servidor online cria fazendas novas e não importa saves locais. O piloto admite cinco participantes ativos, por convite aceito. O cliente TypeScript/Canvas usa a mesma economia Java no servidor.
 
 ## Testar o servidor
 
@@ -50,3 +50,42 @@ Tempo, saldos, XP, proteção e sorteios pertencem ao servidor. Visitantes recebem
 Antes de publicar: validar duas contas, configurar Google OAuth e redirects, testar restauração de backup PostgreSQL e conferir limites gratuitos vigentes. Proposta: Cloudflare Pages para arquivos, Render para API e Supabase para PostgreSQL/Auth. Nenhum deploy realizado. Serviços gratuitos podem suspender por inatividade ou atingir quotas.
 
 Backup usa `pg_dump` do schema `colheita`, guardado fora de artefatos públicos. Restaurar primeiro em banco isolado e conferir participantes, fazendas e recibos. Para rollback de código, guardar a imagem anterior e preservar compatibilidade do schema. Mudanças futuras de schema exigem migração explícita e backup.
+
+## Cliente web
+
+Requer Node 24. As dependências são locais e fixadas no lockfile.
+
+```powershell
+npm.cmd ci --ignore-scripts --prefix web
+npm.cmd test --prefix web
+npm.cmd run build:local --prefix web
+npm.cmd run serve --prefix web
+```
+
+Abra `http://127.0.0.1:5173`. Entre como Alice, crie um convite em Amigos e abra o link em outra aba como Bob. Bob só recebe fazenda depois de aceitar. Loja, ferramentas, depósito, animais, alimentação, fertilizantes, VIP, tarefas, expansão e visitas usam a API. Há lista de terras acessível pelo teclado. Atalhos B/V abrem loja/depósito e 2–8 selecionam as ferramentas do tutorial. T/F3 não existem no online.
+
+Uma compra cujo resultado ficou desconhecido bloqueia novas ações até confirmar a mesma requisição. O navegador guarda somente essa intenção por conta e aba, além da sessão Auth; não guarda um save econômico. Não limpe o armazenamento da aba enquanto houver ação pendente. Faça login novamente com a mesma conta se a sessão expirar. Sem conexão, novas ações ficam indisponíveis.
+
+As imagens carregam conforme o cenário ou a loja precisa. A pasta completa de arte vai ao host estático; não é baixada inteira no primeiro acesso. Dia/noite segue o relógio local; crescimento e tarefas usam tempo UTC do servidor. A previsão sem nova rega pode exceder a duração nominal porque solo seco cresce mais devagar.
+
+O piloto foi desenhado para Chrome/Edge em desktop, a partir de 1280×720. Não há promessa de suporte móvel ou reprodução visual idêntica ao desktop. Sons de ferramentas existentes são opcionais; novos sons de animais não foram gerados.
+
+## Publicação gratuita proposta
+
+Os artefatos estão preparados, mas contas, OAuth e deploy externo ainda precisam ser configurados pelo responsável. Não ative planos pagos, cartão obrigatório ou pings para manter instâncias acordadas. Confira as quotas dos provedores no dia da publicação.
+
+1. Criar projeto Supabase Free. Ativar Google em Auth e configurar cliente OAuth no Google Cloud, com callback do projeto Supabase. Configurar a origem final do site na lista de redirects do Supabase. Não colocar client secret do Google no código.
+2. Preparar serviço Render **Free**, usando o Dockerfile da raiz. Anotar sua origem HTTPS. O primeiro deploy só estará pronto depois das variáveis de produção e do UUID do dono.
+3. Preparar Cloudflare Pages Free com este repositório: comando `cd web && npm ci --ignore-scripts && npm run build`, saída `web/dist`, Node 24. Informar `PUBLIC_API_URL` (origem Render), `PUBLIC_SUPABASE_URL` e `PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Essas três configurações são públicas; nenhuma senha SQL/chave de serviço pertence ao build.
+4. Publicar o cliente e entrar com Google. O botão de login permanece disponível mesmo antes de a API estar pronta. Conferir no Supabase Auth o UUID criado; esse será `OWNER_USER_ID` no Render. Não usar UUID fictício para bootstrap.
+5. Configurar o servidor com a conexão PostgreSQL do pooler Supabase adequado ao host (IPv4 quando necessário), SSL, usuário/senha, projeto Auth e `ALLOWED_ORIGINS` exata do Pages. Publicar o servidor. Nenhum volume local guarda progresso online.
+6. Validar login, compra, convite, aceite, visita e retomada após suspensão com duas contas reais. Salvar backup e testar restauração em banco isolado antes de compartilhar com amigos.
+
+Não execute build:local no site publicado: ele só usa contas de teste e localhost. O build de produção recusa endpoints sem HTTPS e exige as três variáveis públicas. Render pode dormir e atrasar o primeiro acesso; Supabase Free também tem limites e regras de inatividade. O piloto usa requisições HTTP normais, sem websocket permanente.
+
+### Arte e tamanho inicial
+
+As variantes pequenas de ícones e casas em `web/public` são derivadas dos assets existentes. Para regenerar, com JDK 21 na raiz: `java web/scripts/WebAssets.java`. O build usa esses arquivos prontos e não exige Java no Cloudflare. O teste de payload confere todos os períodos do dia e reserva espaço para scripts/API; não mede latência em uma conexão real de 10 Mbps. A licença e atribuição do acervo original permanecem aplicáveis.
+
+
+Fontes de hospedagem conferidas em 29/10/2026: [limites do Cloudflare Pages](https://developers.cloudflare.com/pages/platform/limits/), [instâncias gratuitas Render](https://render.com/docs/free) e [Supabase Free](https://supabase.com/pricing). Render suspende a API após 15 minutos sem tráfego e pode levar cerca de um minuto para acordar. Supabase Free oferece 500 MB de banco e pausa projetos após uma semana de inatividade. Esses planos servem ao piloto e não garantem disponibilidade contínua.
