@@ -85,3 +85,16 @@ export function renderFriends(root:HTMLElement,friends:{id:string;name:string}[]
  for(const friend of friends){const row=document.createElement('article');row.className='friend-card';row.append(image('classic/icons/avatar_masculino.png','friend-avatar'),text('strong',friend.name),control(`Visitar ${friend.name}`,()=>onVisit(friend.id)));root.append(row);}
  if(!friends.length)root.append(text('p','Nenhum amigo ainda. Crie um convite e compartilhe o link.','empty-state'));
 }
+
+export function renderAudioSettings(root:HTMLElement,settings:{music:boolean;effects:boolean;musicVolume:number;effectsVolume:number},onChange:(channel:'music'|'effects',enabled:boolean,volume:number)=>void){
+ root.replaceChildren();
+ for(const [channel,name]of [['music','Música'],['effects','Efeitos']] as const){
+  const row=document.createElement('section');row.className='audio-setting';
+  const label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.checked=settings[channel];check.setAttribute('aria-label',name);
+  label.append(check,text('span',name));
+  const volume=document.createElement('input');volume.type='range';volume.min='0';volume.max='100';volume.value=String(settings[channel==='music'?'musicVolume':'effectsVolume']*100);volume.setAttribute('aria-label',`Volume de ${name}`);
+  const value=text('output',`${volume.value}%`);const update=()=>{value.textContent=`${volume.value}%`;onChange(channel,check.checked,Number(volume.value)/100);};
+  check.onchange=update;volume.oninput=update;row.append(label,volume,value);root.append(row);
+ }
+ root.append(text('p','Preferências salvas neste navegador. Áudio inicia após sua interação.','muted'));
+}

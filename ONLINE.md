@@ -150,3 +150,31 @@ criação e aceite de convite não preenchem nem fecham uma janela diferente ap�
 resposta tardia. A revisão isolada apresenta esses painéis com dados sintéticos e
 callbacks de demonstração. Validar economia e duas pessoas simultâneas continua
 sendo parte dos ensaios de integração, com PostgreSQL descartável.
+
+### Animações e áudio
+
+Animais móveis percorrem trajetos locais curtos, com repouso, orientação e quadros
+de caminhada vinculados ao deslocamento. Pombo e colmeia permanecem fixos; pavão
+alterna penas a cada quatro segundos. Pés, sombras e seleção usam a mesma posição
+visual; produtos prontos continuam nas âncoras de produção. A cerca frontal separa
+os cinco animais internos dos animais externos.
+
+O relógio visual usa tempo decorrido, com atualização a30fps enquanto a aba está
+visível e delta máximo de100ms. Não substitui o relógio autoritativo da API.
+Noite local interrompe deslocamento e abelhas; retomar a aba não compensa tempo
+visual oculto. Indicadores de rega, plantio, colheita e cuidados nas terras só
+aparecem após sucesso confirmado, sem animar outra fazenda após sair da visita.
+
+Ajustes oferece controles separados de música, efeitos e volumes, guardados na
+chave local `colheita:audio`. Ambos começam desligados sem preferência anterior;
+reprodução depende de interação do usuário. O toggle da toolbar controla efeitos.
+Logout e aba oculta pausam áudio. O player reutiliza `farm_loop.mp3` e os oito cues
+do desktop, com até três efeitos simultâneos e intervalo mínimo de150ms por cue.
+Falha de storage, decoder ou autoplay não interrompe o jogo.
+
+Na revisão isolada, Ajustes usa o player real e os botões Regar/Plantar/Colher
+apresentam efeitos demonstrativos sem comandar a API. Para ouvir, habilite Efeitos
+nos Ajustes antes de usar os botões. Sons novos de animais permanecem pendentes:
+nesta entrega não há novos arquivos sonoros nem geração paga. Audição subjetiva,
+autoplay em Firefox/Safari e medição de fluidez em diferentes máquinas ainda
+precisam de ensaio; testes automatizados não comprovam esses resultados.

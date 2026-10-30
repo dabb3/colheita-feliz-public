@@ -1,7 +1,8 @@
 import {Scene} from '../src/scene.ts';
+import {GameAudio} from '../src/audio.ts';
 import {animalLayout,tileCenter} from '../src/presentation.ts';
 import {renderWallet,renderMarket,focusMarketPage} from '../src/ui.ts';
-import {renderDeposit,renderPlantHealth,renderAnimal,renderMissions,renderFriends} from '../src/ui-panels.ts';
+import {renderDeposit,renderPlantHealth,renderAnimal,renderMissions,renderFriends,renderAudioSettings} from '../src/ui-panels.ts';
 import type {Farm,Catalog,Tile} from '../src/types.ts';
 import crops from '../../assets/data/crops.json';
 import animals from '../../assets/data/animals.json';
@@ -14,6 +15,7 @@ const params=new URLSearchParams(location.search),period=params.get('period')??'
 const stage=params.get('stage')??'ADULT';
 const clock=()=>new Date(2026,9,30,period==='night'?22:period==='sunset'?18:12);
 const canvas=document.getElementById('farm') as HTMLCanvasElement;
+const audio=new GameAudio();audio.setActive(true);
 const scene=new Scene(canvas,catalog,tile=>{document.getElementById('notice')!.textContent=`Terra ${tile.column+1}, ${tile.row+1}`;},animalPanel,health,clock);
 const tiles=Array.from({length:30},(_,i)=>{
  const row=Math.floor(i/6),column=i%6,stage=row+1,crop=crops[column];
@@ -55,6 +57,10 @@ document.getElementById('shop')!.onclick=()=>market();
 document.getElementById('deposit')!.onclick=()=>deposit();
 document.getElementById('missions')!.onclick=()=>openPanel('Tarefas diárias',root=>renderMissions(root,farm));
 document.getElementById('friends')!.onclick=()=>openPanel('Amigos — demonstração',root=>renderFriends(root,[{id:'review-bob',name:'Fazenda do amigo'},{id:'review-ana',name:'Fazenda da amiga'}],demonstration));
+document.getElementById('settings')!.onclick=()=>openPanel('Ajustes de áudio',root=>renderAudioSettings(root,audio.settings,(channel,enabled,volume)=>{audio.unlock();if(channel==='music')audio.setMusic(enabled);else audio.setEffects(enabled);audio.setVolume(channel,volume);}));
+document.addEventListener('pointerdown',()=>audio.unlock(),{once:true});document.addEventListener('keydown',()=>audio.unlock(),{once:true});
+document.addEventListener('visibilitychange',()=>audio.setActive(!document.hidden));
+document.querySelectorAll<HTMLButtonElement>('[data-effect]').forEach(button=>button.onclick=()=>{const action=button.dataset.effect!;audio.unlock();audio.play(action);scene.effect(action,2,0);demonstration();});
 document.getElementById('close-modal')!.onclick=()=>modal.close();
 document.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach(button=>button.onclick=()=>button.setAttribute('aria-pressed',String(button.getAttribute('aria-pressed')!=='true')));
-window.addEventListener('pagehide',()=>scene.close(),{once:true});
+window.addEventListener('pagehide',()=>{scene.close();audio.close();},{once:true});

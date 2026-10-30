@@ -18,17 +18,18 @@ export function pickTile(x:number,y:number):{column:number;row:number}|null {
  }
  return null;
 }
-export function animalPath(id:string,stage:string,sleep:boolean,open:boolean) {
+export function animalPath(id:string,stage:string,sleep:boolean,open:boolean,walking=false) {
  if(id==='pavao'&&open&&!sleep) return 'classic/animals/pavao/pavao-aberto.png';
  const folder=id==='pombo'?'pomba':id==='burro'?'burrinho':id;
  let stem=folder;
  if(id==='pombo') stem=`pomba-${stage==='BABY'?'bebe':stage==='YOUNG'?'jovem':'adulta'}`;
  if(id==='burro') stem=`burrinho${stage==='ADULT'?'':stage==='BABY'?'-bebe':'-jovem'}`;
  if(id==='porco') stem=`porco-${stage==='BABY'?'bebe':stage==='YOUNG'?'jovem':'adulto'}`;
- if(id==='coelho') stem=stage==='ADULT'?(sleep?'coelho-adulto':'coelho'):stage==='BABY'?'coelho-bebe':'coelho-jovem';
+ if(id==='coelho') stem=stage==='ADULT'?(sleep||walking?'coelho-adulto':'coelho'):stage==='BABY'?'coelho-bebe':'coelho-jovem';
  if(id==='cachorro-mastiff') stem='mastiff';
- if(id==='cabra') stem=sleep?'cabra-adulta':'cabra';
- return `classic/animals/${folder}/${stem}${sleep&&id!=='pombo'&&id!=='abelha'?'-dormindo':''}.png`;
+ if(id==='cabra') stem=sleep||walking?'cabra-adulta':'cabra';
+ const mobile=!['pombo','pavao','abelha'].includes(id);
+ return `classic/animals/${folder}/${stem}${sleep&&id!=='pombo'&&id!=='abelha'?'-dormindo':walking&&mobile?'-andando':''}.png`;
 }
 // Presentation coordinates only; ownership, stages and eligibility come from the API.
 export const animalLayout:Record<string,[number,number,number]>={
@@ -39,3 +40,15 @@ export const animalLayout:Record<string,[number,number,number]>={
 
 // Both peacock poses use the same visible height; their silhouettes have different widths.
 export function peacockWidth(height:number,aspect:number){return height*aspect;}
+
+export function poseWidth(width:number,idleAspect:number,poseAspect:number){return width/idleAspect*poseAspect;}
+export function animalFlip(id:string,facingRight:boolean){return facingRight!==['cavalo','cachorro-robo','cachorro-mastiff','cabra','burro','avestruz','coelho'].includes(id);}
+export function animalMotion(id:string,seconds:number,sleeping:boolean){
+ const [homeX,homeY]=animalLayout[id]??[0,0];
+ if(['pombo','pavao','abelha'].includes(id))return{x:homeX,y:homeY,walking:false,facingRight:false,alternate:!sleeping&&id==='pavao'&&Math.floor(seconds/4)%2!==0};
+ const radius=id==='cavalo'?36:20,distance=2*radius*Math.hypot(1,.35),travel=distance/18,half=2+travel;
+ const offset=[...id].reduce((sum,char)=>sum+char.charCodeAt(0),0)/37;
+ const phase=(seconds+offset)%(half*2),leg=Math.floor(phase/half),local=phase%half,progress=Math.max(0,Math.min(1,(local-2)/travel));
+ const dx=(leg===0?-radius:radius)+(leg===0?2*radius:-2*radius)*progress,walking=!sleeping&&local>=2;
+ return{x:homeX+dx,y:homeY+dx*.35,walking,facingRight:leg===0,alternate:walking&&Math.floor((leg+progress)*distance/6)%2!==0};
+}

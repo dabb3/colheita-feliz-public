@@ -12,9 +12,13 @@ test('scene props and pest frames use existing desktop art',()=>{
 test('all animal poses map to files shipped with the desktop',()=>{
  for(const id of Object.keys(animalLayout)){
   if(id==='abelha')continue;
-  for(const stage of ['BABY','YOUNG','ADULT'])for(const sleep of [false,true]){
-   const path=animalPath(id,stage,sleep,false);
+  for(const stage of ['BABY','YOUNG','ADULT'])for(const sleep of [false,true])for(const walking of [false,true]){
+   const path=animalPath(id,stage,sleep,false,walking);
    assert.ok(existsSync(new URL('../../assets/'+path,import.meta.url)),path);
   }
  }
+});
+
+test('all desktop audio cues and music are available locally',()=>{
+ for(const name of ['farm_loop.mp3',...['click_button','plant','water','harvest','buy','sell','weed','levelup'].map(id=>id+'.wav')])assert.ok(existsSync(new URL('../../assets/sounds/'+name,import.meta.url)),name);
 });

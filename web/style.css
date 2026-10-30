@@ -87,3 +87,4 @@
  .friend-card { flex-wrap: wrap; }
  .friend-card button { max-width: 100%; }
 }
+.audio-setting { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; padding: 1rem; background: #f1f4e5; margin: .7rem 0; border-radius: 8px; } .audio-setting label { display: flex; align-items: center; gap: .5rem; min-width: 110px; } .audio-setting input[type=checkbox] { min-width: 0; width: 20px; height: 20px; } .audio-setting input[type=range] { min-width: 100px; width: 220px; max-width: 100%; }
