@@ -9,6 +9,8 @@ class WebAssets {
     public static void main(String[] args) throws Exception {
         resize("buildings/main-house.png", 600);
         resize("buildings/dog-house.png", 320);
+        for (String id : new String[]{"avatar_masculino", "moeda-comum", "moeda-verde", "icon-shop", "deposit-icon"})
+            resize("icons/" + id + ".png", 128);
         for (String id : new String[]{"comum", "rapido", "super", "amor"}) resize("icons/adubo-" + id + ".png", 96);
         for (String id : new String[]{"pa-ui", "saco-ui", "regador-ui", "mao-restaurada", "herbicida-ui", "pesticida-ui"})
             resize("icons/hud/" + id + ".png", 96);

@@ -8,13 +8,19 @@ import {ApiError,acceptFarm} from '../src/api.ts';
 const farm=owner=>({owner,name:owner,revision:'1',tiles:[],animals:[],seedCounts:{}});
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve};}
 function app(){
+ const wallets=[];
  const elements=new Map();const make=()=>({value:'',selectedIndex:0,hidden:false,children:[],replaceChildren(){this.children=[];},append(...nodes){this.children.push(...nodes);},setAttribute(){},addEventListener(){},close(){},showModal(){this.open=true;}});
  const storage={getItem:()=>null,setItem(){},removeItem(){}};
- const ctx={window:{COLHEITA_CONFIG:{development:true},setInterval(){},setTimeout(){},addEventListener(){}},document:{getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createTextNode:text=>text,addEventListener(){}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,clearTimeout(){},HTMLInputElement:class{},HTMLSelectElement:class{}};
+ const ctx={window:{COLHEITA_CONFIG:{development:true},setInterval(){},setTimeout(){},addEventListener(){}},document:{getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createTextNode:text=>text,addEventListener(){}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,renderWallet(...args){wallets.push(args);},renderMarket(){},clearTimeout(){},HTMLInputElement:class{},HTMLSelectElement:class{}};
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
  source+='\nglobalThis.h={refresh,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog={crops:[],fertilizers:[]};}};';
- runInNewContext(stripTypeScriptTypes(source),ctx);return{h:ctx.h,elements};
+ runInNewContext(stripTypeScriptTypes(source),ctx);return{h:ctx.h,elements,wallets};
 }
+
+test('live client renders the same wallet as the visual sample',()=>{
+ const {h,elements,wallets}=app(),own=farm('alice');h.set({own,visited:farm('bob')});
+ elements.get('home').onclick();assert.equal(wallets.length,1);assert.equal(wallets[0][1],own);assert.equal(wallets[0][2],undefined);
+});
 test('late visit response cannot reopen a visit after returning home',async()=>{
  const {h,elements}=app(),started=deferred(),reply=deferred();
  h.set({own:farm('alice'),visited:farm('bob'),api:{pending:null,get:path=>path==='/v1/me/farm'?Promise.resolve(farm('alice')):(started.resolve(),reply.promise)}});

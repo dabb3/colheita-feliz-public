@@ -117,3 +117,12 @@ fixa, com abelhas próximas. Em painéis estreitos, HUD e ferramentas ficam fora
 do canvas para preservar a área das terras. Esta revisão não comprova animações
 de caminhada, fluxo econômico ou concorrência; esses ensaios pertencem às etapas
 seguintes da paridade web.
+
+A amostra de HUD e loja usa os mesmos renderizadores HTML do cliente real:
+carteira com avatar genérico, progresso de XP, saldos preservados como texto e
+loja com dez itens por página. Bloqueios por nível, VIP e animal já comprado
+ficam explícitos. O seletor de semente/adubo mantém teclado e ganha preview.
+Na revisão isolada, os botões de compra exibem apenas mensagem de demonstração.
+Paginação mantém foco e Escape fecha o dialog. Depósito, tarefas, amigos e
+popups contextuais continuam na próxima parte da etapa de interface, após
+aprovação visual da amostra. Não confundir essa fixture com teste multiplayer.

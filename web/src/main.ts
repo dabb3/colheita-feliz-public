@@ -3,6 +3,7 @@ import type {Farm,Catalog,Tile,Reply,CommandFields} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
 import {animalPath} from './presentation.ts';
+import {renderWallet,renderMarket,focusMarketPage} from './ui.ts';
 
 const config=window.COLHEITA_CONFIG;
 const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
@@ -26,8 +27,7 @@ function display(){return visited??own;}
 function render(){
  if(!own)return;
  element('welcome').hidden=true;element('game').hidden=false;
- const wallet=element('wallet');wallet.replaceChildren();const title=document.createElement('strong');title.textContent=visited?`Visitando ${visited.name}`:own.name;wallet.append(title);
- wallet.append(document.createTextNode(`Nível ${own.level} · ${own.currentXp} / ${own.xpToNext} XP`),document.createElement('br'),document.createTextNode(`🟡 ${own.coins} ouro   🟢 ${own.greenCoins} verdes`));
+ renderWallet(element('wallet'),own,visited?.name);
  element('home').hidden=!visited;
  const tutorial=element('tutorial');tutorial.hidden=!!visited||!own.tutorial;tutorial.replaceChildren();
  if(own.tutorial){const strong=document.createElement('strong');strong.textContent=own.tutorial.title??'';tutorial.append(strong);paragraph(own.tutorial.hint??'',tutorial);}
@@ -45,7 +45,12 @@ function renderTools(){
  select.value=choices.some(c=>c.id===prior)?prior:tool==='FERTILIZE'?selectedFertilizer:selectedSeed;
  if(select.selectedIndex<0&&choices.length)select.selectedIndex=0;
  element('item-label').hidden=!['PLANT','FERTILIZE'].includes(tool);
- select.onchange=()=>{if(tool==='FERTILIZE')selectedFertilizer=select.value;else selectedSeed=select.value;};
+ const fertilizing=tool==='FERTILIZE',choiceId=select.value;
+ element('item-title').textContent=fertilizing?'Adubo':'Semente';
+ const preview=element<HTMLImageElement>('item-preview');preview.hidden=!choiceId||!['PLANT','FERTILIZE'].includes(tool);
+ const crop=catalog.crops.find(c=>c.id===choiceId);
+ if(choiceId)preview.src='/assets/'+(fertilizing?`classic/icons/adubo-${choiceId}.png`:`classic/crops/plants_phase_one_to_five/${crop?.spriteStem}_5.png`);
+ select.onchange=()=>{if(tool==='FERTILIZE')selectedFertilizer=select.value;else selectedSeed=select.value;renderTools();};
 }
 async function refresh(){
  if(!api||busy)return;const client=api,generation=sessionGeneration,navigation=navigationGeneration;
@@ -91,13 +96,11 @@ function health(tile:Tile|null){
 }
 function tileList(){dialog('Terras da fazenda');const states:Record<string,string>={GRASS:'grama',PLOWED:'arada',DEAD:'planta morta',READY:'pronta',GROWING:'crescendo'};const grid=document.createElement('div');grid.className='tile-list';content.append(grid);for(const tile of display()?.tiles??[]){const crop=catalog.crops.find(c=>c.id===tile.cropId);const b=button(`Terra ${tile.column+1}, ${tile.row+1}: ${!tile.unlocked?'bloqueada':crop?.name??states[tile.state]}`,async()=>{modal.close();await tileAction(tile);},grid);b.title='Aplicar a ferramenta selecionada';}}
 function card(name:string,image?:string){const c=document.createElement('article');c.className='card';if(image){const img=document.createElement('img');img.loading='lazy';img.src='/assets/'+image;img.alt='';c.append(img);}const title=document.createElement('strong');title.textContent=name;c.append(title);return c;}
-function shop(category='crops'){
+function shop(category='crops',page=0){
  dialog('Loja');const tabs=document.createElement('div');tabs.className='tabs';content.append(tabs);
- for(const [id,label]of [['crops','Sementes'],['animals','Animais'],['fertilizers','Fertilizantes'],['owned','Meus animais'],['vip','VIP']])button(label,()=>shop(id),tabs);
- const grid=document.createElement('div');grid.className='cards';content.append(grid);
- if(category==='crops')for(const crop of catalog.crops){const c=card(crop.name,`classic/crops/plants_phase_one_to_five/${crop.spriteStem}_5.png`);grid.append(c);paragraph(`${crop.growthSeconds/3600} h · ${crop.seasons} temporada(s) · nível ${crop.requiredLevel}${crop.vipOnly?' · VIP':''}`,c);prices(c,crop.seedPrices,'BUY_SEED',crop.id,crop.requiredLevel,crop.vipOnly);}
- if(category==='animals')for(const animal of catalog.animals){const c=card(animal.name,animal.id==='abelha'?'classic/animals/abelha/abelha.png':animalPath(animal.id,'ADULT',false,false));grid.append(c);paragraph(`Nível ${animal.requiredLevel} · ${animal.productName}`,c);prices(c,animal.prices,'BUY_ANIMAL',animal.id,animal.requiredLevel);}
- if(category==='fertilizers')for(const fertilizer of catalog.fertilizers){const c=card(fertilizer.name,`classic/icons/adubo-${fertilizer.id}.png`);grid.append(c);paragraph(`Nível ${fertilizer.requiredLevel} · reduz ${fertilizer.reductionSeconds/60} min${fertilizer.friendsOnly?' · em amigos':''}`,c);prices(c,fertilizer.prices,'BUY_FERTILIZER',fertilizer.id,fertilizer.requiredLevel);}
+ for(const [id,label]of [['crops','Sementes'],['animals','Animais'],['fertilizers','Fertilizantes'],['owned','Meus animais'],['vip','VIP']]){const tab=button(label,()=>shop(id),tabs);tab.setAttribute('aria-pressed',String(category===id));}
+ const grid=document.createElement('div');grid.className=['crops','animals','fertilizers'].includes(category)?'market-body':'cards';content.append(grid);
+ if(['crops','animals','fertilizers'].includes(category))renderMarket(grid,catalog,own,category,page,next=>{shop(category,next);focusMarketPage(content,next>page);},fields=>void action(fields));
  if(category==='vip'){paragraph('VIP por 30 dias. Libera as culturas VIP conforme seu nível.',grid);button(`Ativar VIP · ${catalog.vip.greenPrice} verdes`,()=>action({action:'BUY_VIP'}),grid);}
  if(category==='owned'){
   if(!own?.animals.length)paragraph('Nenhum animal comprado.',grid);
@@ -107,9 +110,6 @@ function shop(category='crops'){
    if(type.kind==='GROWING')button('Vender adulto',()=>action({action:'SELL_ANIMAL',itemId:animal.id}),c);
   }
  }
-}
-function prices(parent:HTMLElement,prices:Record<string,number>,kind:string,id:string,level:number,vip=false){
- for(const [currency,price]of Object.entries(prices)){const b=button(`${price} ${currency==='GOLD'?'ouro':'verdes'}`,()=>action({action:kind,itemId:id,currency}),parent);b.disabled=(own?.level??0)<level||(vip&&!own?.vipActive);}
 }
 function deposit(){
  dialog('Depósito');button('Vender tudo',()=>action({action:'SELL_ALL'}));paragraph('Produtos VIP bloqueados são ignorados. Cada item é vendido na moeda de aquisição.');
