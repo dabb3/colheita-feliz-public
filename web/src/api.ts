@@ -26,9 +26,13 @@ export class ApiClient {
  async get<T>(path:string):Promise<T> {return this.request(path);}
  async mutate(path:string,fields:CommandFields):Promise<Reply> {
   if(this.pending || this.busy) throw new Error('Resolva a ação pendente antes de continuar.');
-  const pending={path,body:JSON.stringify({...fields,requestId:crypto.randomUUID()})};
-  // Persist before sending: a reload after an unknown result must reuse this UUID.
-  this.storage.setItem(this.key,JSON.stringify(pending)); this.pending=pending;
+  this.busy=true;
+  try {
+   const lease=await this.get<{requestId:string}>('/v1/request-id');
+   const pending={path,body:JSON.stringify({...fields,requestId:lease.requestId})};
+   // Persist before sending: a reload after an unknown result must reuse this UUID.
+   this.storage.setItem(this.key,JSON.stringify(pending)); this.pending=pending;
+  } finally {this.busy=false;}
   return this.retry();
  }
  async retry():Promise<Reply> {
@@ -38,7 +42,7 @@ export class ApiClient {
    const response=await this.request<Reply>(this.pending.path,this.pending.body);
    this.clear();return response;
   } catch(error) {
-   if(error instanceof ApiError && [400,403,404,409,413,415,429].includes(error.status)) this.clear();
+   if(error instanceof ApiError && [400,403,404,409,410,413,415,429].includes(error.status)) this.clear();
    throw error;
   } finally {this.busy=false;}
  }

@@ -57,7 +57,7 @@ async function refresh(){
 }
 function handleError(error:unknown){
  const message=error instanceof Error?error.message:'Falha de conexão.';
- if(error instanceof ApiError){notify(message);if(error.status===409)void refresh();}
+ if(error instanceof ApiError){notify(message);if(error.status===409||error.status===410)void refresh();}
  else{showConnection('Conexão interrompida. Aguarde o servidor e tente novamente.');notify(message);}
  syncPending();
 }
@@ -72,7 +72,7 @@ async function action(fields:CommandFields,path='/v1/me/actions'){
  if(!navigator.onLine){notify('Sem conexão. Reconecte antes de agir.');return;}
  busy=true;let stale=false;const client=api,generation=sessionGeneration;
  try{const reply=await client.mutate(path,{...fields,expectedRevision:path==='/v1/me/actions'?own.revision:visited!.revision});if(generation===sessionGeneration){receive(reply);if(reply.result?.success)playAction(fields.action as string);}}
- catch(error){stale=error instanceof ApiError&&error.status===409;if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();if(stale)void refresh();}}
+ catch(error){stale=error instanceof ApiError&&[409,410].includes(error.status);if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();if(stale)void refresh();}}
 }
 function playAction(action:string){if(!sound)return;const file=action==='WATER'?'water':action==='PLANT'?'plant':action==='HARVEST'?'harvest':action.startsWith('BUY_')?'buy':action.startsWith('SELL_')?'sell':action==='WEED'?'weed':undefined;if(file){const audio=new Audio(`/assets/sounds/${file}.wav`);audio.volume=.35;void audio.play().catch(()=>{});}}
 async function tileAction(tile:Tile){
