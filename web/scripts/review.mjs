@@ -8,7 +8,7 @@ const web=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const root=resolve(web,'..'),output=resolve(root,'.tools/web-visual-review');
 await mkdir(output,{recursive:true});
 await build({entryPoints:[resolve(web,'review/scenario.ts')],outfile:resolve(output,'review.js'),bundle:true,target:'es2022'});
-const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png'};
+const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.wav':'audio/wav','.mp3':'audio/mpeg'};
 createServer(async(request,response)=>{
  try{
   const pathname=decodeURIComponent(new URL(request.url,'http://localhost').pathname);

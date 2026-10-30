@@ -2,16 +2,18 @@ import {createClient} from '@supabase/supabase-js';
 import type {Farm,Catalog,Tile,Reply,CommandFields} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
+import {GameAudio} from './audio.ts';
 import {animalPath,tileCenter} from './presentation.ts';
 import {renderWallet,renderMarket,focusMarketPage} from './ui.ts';
-import {renderDeposit,renderPlantHealth,renderAnimal,renderMissions,renderFriends} from './ui-panels.ts';
+import {renderDeposit,renderPlantHealth,renderAnimal,renderMissions,renderFriends,renderAudioSettings} from './ui-panels.ts';
 
 const config=window.COLHEITA_CONFIG;
 const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const modal=element<HTMLDialogElement>('modal'),content=element('modal-content');
 const select=element<HTMLSelectElement>('item');
+const audio=new GameAudio();
 let api:ApiClient|undefined,catalog:Catalog,own:Farm|undefined,visited:Farm|undefined,scene:Scene|undefined;
-let tool='PLOW',selectedSeed='nabo',selectedFertilizer='comum',sound=false,busy=false;
+let tool='PLOW',selectedSeed='nabo',selectedFertilizer='comum',busy=false;
 let toastTimer:number,sessionGeneration=0,navigationGeneration=0;
 let modalGeneration=0,refreshPanel:(()=>void)|undefined;
 const login=element('login');
@@ -35,6 +37,7 @@ function syncPending(){element('pending').hidden=!api?.pending;element<HTMLButto
 function display(){return visited??own;}
 function render(){
  if(!own)return;
+ audio.setActive(!document.hidden);
  element('welcome').hidden=true;element('game').hidden=false;
  renderWallet(element('wallet'),own,visited?.name);
  element('home').hidden=!visited;
@@ -76,20 +79,24 @@ function handleError(error:unknown){
  syncPending();
 }
 function receive(reply:Reply){
+ const previousLevel=own?.level;
  if(reply.farm)own=acceptFarm(own,reply.farm);
  if(reply.visitedFarm&&visited?.owner===reply.visitedFarm.owner)visited=acceptFarm(visited,reply.visitedFarm);
  if(reply.result)notify(reply.result.message);
  render();
  updatePanel();
+ if(previousLevel!==undefined&&(own?.level??0)>previousLevel)audio.play('LEVEL_UP');
 }
 async function action(fields:CommandFields,path='/v1/me/actions'){
  if(!api||!own||busy)return;
  if(!navigator.onLine){notify('Sem conexão. Reconecte antes de agir.');return;}
- busy=true;let stale=false;const client=api,generation=sessionGeneration;
- try{const reply=await client.mutate(path,{...fields,expectedRevision:path==='/v1/me/actions'?own.revision:visited!.revision});if(generation===sessionGeneration){receive(reply);if(reply.result?.success)playAction(fields.action as string);}}
+ busy=true;let stale=false;const client=api,generation=sessionGeneration,targetOwner=display()?.owner;
+ try{const reply=await client.mutate(path,{...fields,expectedRevision:path==='/v1/me/actions'?own.revision:visited!.revision});if(generation===sessionGeneration){receive(reply);if(reply.result?.success){playAction(fields.action as string);if(display()?.owner===targetOwner&&typeof fields.column==='number'&&typeof fields.row==='number')scene?.effect(fields.action as string,fields.column,fields.row);}}}
  catch(error){stale=error instanceof ApiError&&[409,410].includes(error.status);if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();if(stale)void refresh();}}
 }
-function playAction(action:string){if(!sound)return;const file=action==='WATER'?'water':action==='PLANT'?'plant':action==='HARVEST'?'harvest':action.startsWith('BUY_')?'buy':action.startsWith('SELL_')?'sell':action==='WEED'?'weed':undefined;if(file){const audio=new Audio(`/assets/sounds/${file}.wav`);audio.volume=.35;void audio.play().catch(()=>{});}}
+function playAction(action:string){audio.play(action.startsWith('BUY_')?'BUY':action.startsWith('SELL_')?'SELL':action==='STEAL'?'HARVEST':action);}
+function audioButton(){element('sound').textContent=audio.settings.effects?'Efeitos: ligados':'Efeitos: desligados';element('sound').setAttribute('aria-pressed',String(audio.settings.effects));}
+function settings(){dialog('Ajustes de áudio');renderAudioSettings(content,audio.settings,(channel,enabled,volume)=>{audio.unlock();if(channel==='music')audio.setMusic(enabled);else audio.setEffects(enabled);audio.setVolume(channel,volume);audioButton();});}
 async function tileAction(tile:Tile){
  if(visited){await action({action:tool,column:tile.column,row:tile.row,harvestRevision:tile.harvestRevision},`/v1/farms/${visited.owner}/visit-actions`);return;}
  if(!tile.unlocked){if(own?.nextPlot?.column===tile.column&&own.nextPlot.row===tile.row&&confirm('Comprar esta terra por 50 moedas verdes?'))await action({action:'BUY_PLOT',column:tile.column,row:tile.row});return;}
@@ -143,6 +150,7 @@ async function friends(){
  catch(error){handleError(error);}
 }
 async function connect(user:string,token:()=>Promise<string>){
+ audio.setActive(false);
  sessionGeneration++;navigationGeneration++;busy=false;own=undefined;visited=undefined;scene?.close();const generation=sessionGeneration;
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
  scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>void tileAction(tile),animalPanel,health);
@@ -168,12 +176,14 @@ element('shop').onclick=()=>shop();element('deposit').onclick=()=>deposit();elem
 element('home').onclick=()=>{navigationGeneration++;visited=undefined;tool='PLOW';render();};element('close-modal').onclick=()=>modal.close();
 element('accessible-tiles').onclick=tileList;
 element('credits').onclick=()=>{dialog('Créditos');paragraph('Reimplementação independente e não oficial de Colheita Feliz. Acervo visual derivado da referência indicada no repositório, com uso não comercial.');const link=document.createElement('a');link.href='/assets/REFERENCE_LICENSE';link.textContent='Licença e atribuição dos assets';content.append(link);};
-element('sound').onclick=()=>{sound=!sound;element('sound').textContent=sound?'Som: ligado':'Som: desligado';element('sound').setAttribute('aria-pressed',String(sound));};
+element('sound').onclick=()=>{audio.unlock();audio.setEffects(!audio.settings.effects);audioButton();};element('settings').onclick=settings;audioButton();
+document.addEventListener('pointerdown',()=>audio.unlock(),{once:true});document.addEventListener('keydown',()=>audio.unlock(),{once:true});
 element('retry').onclick=async()=>{if(!api||busy)return;const client=api,generation=sessionGeneration;busy=true;try{const reply=await client.retry();if(generation!==sessionGeneration)return;receive(reply);if(reply.code){dialog('Convite confirmado');paragraph(reply.code);}}catch(error){if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();await refresh();}}};
-element('logout').onclick=async()=>{sessionGeneration++;navigationGeneration++;busy=false;api=undefined;own=undefined;visited=undefined;scene?.close();sessionStorage.removeItem('colheita:local-user');element('game').hidden=true;element('welcome').hidden=false;syncPending();if(supabase)await supabase.auth.signOut();};
+element('logout').onclick=async()=>{sessionGeneration++;navigationGeneration++;busy=false;api=undefined;own=undefined;visited=undefined;scene?.close();audio.setActive(false);sessionStorage.removeItem('colheita:local-user');element('game').hidden=true;element('welcome').hidden=false;syncPending();if(supabase)await supabase.auth.signOut();};
 window.addEventListener('offline',()=>showConnection('Sem conexão. Reconecte antes de agir.'));
 window.addEventListener('online',()=>void refresh());
 document.addEventListener('keydown',event=>{if(!own||modal.open||event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement)return;const keys:Record<string,string>={'2':'PLOW','3':'PLANT','4':'WATER','5':'WEED','6':'PESTICIDE','7':'HARVEST','8':'FERTILIZE'};if(!visited&&keys[event.key]){tool=keys[event.key];renderTools();}else if(event.key.toLowerCase()==='b')shop();else if(event.key.toLowerCase()==='v')deposit();});
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});
+document.addEventListener('visibilitychange',()=>{audio.setActive(!document.hidden&&!!own);if(!document.hidden)void refresh();});
+window.addEventListener('pagehide',()=>audio.setActive(false));window.addEventListener('pageshow',()=>audio.setActive(!document.hidden&&!!own));
 window.setInterval(()=>{if(!document.hidden)void refresh();},30_000);
 void start();

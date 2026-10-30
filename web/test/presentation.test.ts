@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {periodAt,tileCenter,pickTile,animalPath,animalLayout,cropSize,animalWidth,productPath,terrainSize,peacockWidth} from '../src/presentation.ts';
+import {periodAt,tileCenter,pickTile,animalPath,animalLayout,cropSize,animalWidth,productPath,terrainSize,peacockWidth,animalMotion,animalFlip,poseWidth} from '../src/presentation.ts';
 
 test('plant dimensions match desktop stage heights and preserve aspect',()=>{
  for(let stage=1;stage<=5;stage++)assert.deepEqual(cropSize(stage,1.5),{width:(32+stage*16)*1.5,height:32+stage*16});
@@ -37,3 +37,27 @@ test('pigeon stays static and peacock alternates only feather pose',()=>{
 });
 
 test('peacock poses preserve visible height and aspect',()=>{assert.equal(peacockWidth(80,.4),32);assert.equal(peacockWidth(80,1.5),120);});
+
+test('walks stay bounded and alternate frames only while translating, including horse',()=>{
+ for(const id of ['vaca','cavalo','burro','cabra','galinha']){
+  let previous=animalMotion(id,0,false),moved=false,rested=false;
+  for(let seconds=.05;seconds<20;seconds+=.05){const motion=animalMotion(id,seconds,false),[x,y]=animalLayout[id],radius=id==='cavalo'?36:20;
+   assert.ok(Math.abs(motion.x-x)<=radius+.001);assert.ok(Math.abs(motion.y-y)<=radius*.35+.001);
+   const distance=Math.hypot(motion.x-previous.x,motion.y-previous.y);assert.ok(distance<=18*.05+.001);
+   if(motion.walking){moved ||= distance>0;if(distance>.001)assert.equal(motion.facingRight,motion.x>previous.x);}
+   else{rested=true;assert.equal(motion.alternate,false);}
+   assert.equal(animalMotion(id,seconds,true).walking,false);previous=motion;
+  }
+  assert.ok(moved&&rested,id);
+ }
+});
+
+test('static species never roam and facing uses original sprite orientation',()=>{
+ for(const id of ['pombo','pavao','abelha'])for(const seconds of [0,4,12]){
+  const motion=animalMotion(id,seconds,false);assert.equal(motion.x,animalLayout[id][0]);assert.equal(motion.y,animalLayout[id][1]);assert.equal(motion.walking,false);
+ }
+ assert.equal(animalFlip('cavalo',true),false);assert.equal(animalFlip('cavalo',false),true);
+ assert.equal(animalFlip('vaca',true),true);assert.equal(animalFlip('vaca',false),false);
+ assert.equal(poseWidth(100,2,3),150);
+ assert.ok(animalPath('cavalo','ADULT',false,false,true).endsWith('cavalo-andando.png'));
+});

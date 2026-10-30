@@ -11,9 +11,9 @@ function app(){
  const wallets=[],panels=[];
  const elements=new Map();const make=()=>({value:'',selectedIndex:0,hidden:false,children:[],style:{setProperty(){}},replaceChildren(){this.children=[];},append(...nodes){this.children.push(...nodes);},setAttribute(){},addEventListener(){},close(){this.open=false;},showModal(){this.open=true;}});
  const storage={getItem:()=>null,setItem(){},removeItem(){}};
- const ctx={window:{COLHEITA_CONFIG:{development:true},setInterval(){},setTimeout(){},addEventListener(){}},document:{getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createTextNode:text=>text,addEventListener(){}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,renderWallet(...args){wallets.push(args);},renderMarket(){},renderDeposit(...args){panels.push(["deposit",...args]);},renderMissions(...args){panels.push(["missions",...args]);},renderAnimal(...args){panels.push(["animal",...args]);},renderPlantHealth(){},renderFriends(...args){panels.push(["friends",...args]);},tileCenter:()=>({x:585,y:400}),clearTimeout(){},HTMLInputElement:class{},HTMLSelectElement:class{}};
+ const ctx={window:{COLHEITA_CONFIG:{development:true},setInterval(){},setTimeout(){},addEventListener(){}},document:{getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createTextNode:text=>text,addEventListener(){}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,GameAudio:class{settings={effects:false,music:false,effectsVolume:.65,musicVolume:.3};setActive(){}play(){}unlock(){}close(){}},renderWallet(...args){wallets.push(args);},renderMarket(){},renderDeposit(...args){panels.push(["deposit",...args]);},renderMissions(...args){panels.push(["missions",...args]);},renderAnimal(...args){panels.push(["animal",...args]);},renderPlantHealth(){},renderFriends(...args){panels.push(["friends",...args]);},tileCenter:()=>({x:585,y:400}),clearTimeout(){},HTMLInputElement:class{},HTMLSelectElement:class{}};
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={refresh,friends,health,invitationForm,animalPanel:typeof animalPanel==="undefined"?undefined:animalPanel,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog={crops:[],fertilizers:[],animals:[]};}};';
+ source+='\nglobalThis.h={refresh,action,friends,health,invitationForm,animalPanel:typeof animalPanel==="undefined"?undefined:animalPanel,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;scene=v.scene;catalog={crops:[],fertilizers:[],animals:[]};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:ctx.h,elements,wallets,panels,doc:ctx.document};
 }
 
@@ -36,7 +36,7 @@ test('late retry response cannot restore a logged-out farm',async()=>{
 test('closed canvas scene removes previous event handlers',()=>{
  const handlers=new Map(),calls=[];
  const canvas={width:1600,height:900,getContext:()=>({}),getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(name,handler,options){const list=handlers.get(name)??[];list.push(handler);handlers.set(name,list);options?.signal?.addEventListener('abort',()=>handlers.set(name,handlers.get(name).filter(h=>h!==handler)));}};
- const ctx={window:{setInterval:()=>1},clearInterval(){},document:{hidden:true},AbortController,pickTile:()=>({column:0,row:0})};
+ const ctx={window:{setInterval:()=>1},clearInterval(){},document:{hidden:true,addEventListener(){}},AbortController,pickTile:()=>({column:0,row:0})};
  let source=readFileSync(new URL('../src/scene.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('export class Scene','class Scene');
  runInNewContext(stripTypeScriptTypes(source)+'\nglobalThis.TestScene=Scene;',ctx);
  for(const revision of ['1','2']){const scene=new ctx.TestScene(canvas,{},tile=>calls.push(tile.harvestRevision),()=>{},()=>{});scene.update({...farm('alice'),tiles:[{column:0,row:0,harvestRevision:revision}]});if(revision==='1')scene.close();}
@@ -75,4 +75,13 @@ test('late invitation acceptance cannot close a newer modal',async()=>{
  const controls=elements.get('modal-content').children[0];controls.children.find(n=>n.textContent==='Aceitar convite').onclick();
  elements.get('deposit').onclick();reply.resolve({});await new Promise(resolve=>setImmediate(resolve));
  assert.equal(elements.get('modal').open,true);
+});
+
+test('visual action feedback waits for server confirmation and remains on its farm',async()=>{
+ const {h,elements}=app(),reply=deferred(),effects=[],own=farm('alice');const scene={update(){},effect:(...args)=>effects.push(args)};
+ h.set({own,scene,api:{mutate:()=>reply.promise}});const action=h.action({action:'WATER',column:0,row:0});assert.equal(effects.length,0);
+ reply.resolve({farm:own,result:{success:true,message:'Regou'}});await action;assert.equal(effects.length,1);assert.equal(effects[0][0],'WATER');
+ const late=deferred();h.set({own,visited:farm('bob'),scene,api:{mutate:()=>late.promise}});
+ const visit=h.action({action:'STEAL',column:0,row:0},'/v1/farms/bob/visit-actions');elements.get('home').onclick();late.resolve({result:{success:true,message:'Colheu'}});await visit;
+ assert.equal(effects.length,1);
 });

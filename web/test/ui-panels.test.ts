@@ -10,7 +10,7 @@ function panels(){
  const make=tag=>({tag,children:[],attributes:{},textContent:'',style:{setProperty(){}},append(...nodes){this.children.push(...nodes);},replaceChildren(){this.children=[];},setAttribute(k,v){this.attributes[k]=v;}});
  const ctx={...values,animalPath,productPath,document:{createElement:make}};
  const load=name=>readFileSync(new URL('../src/'+name,import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
- runInNewContext(stripTypeScriptTypes(load('ui.ts')+'\n'+load('ui-panels.ts'))+'\nglobalThis.panels={renderDeposit,renderPlantHealth,renderAnimal,renderMissions,renderFriends};',ctx);
+ runInNewContext(stripTypeScriptTypes(load('ui.ts')+'\n'+load('ui-panels.ts'))+'\nglobalThis.panels={renderDeposit,renderPlantHealth,renderAnimal,renderMissions,renderFriends,renderAudioSettings:typeof renderAudioSettings==="undefined"?undefined:renderAudioSettings};',ctx);
  return{...ctx.panels,root:make('div')};
 }
 function nodes(root){return[root,...root.children.flatMap(child=>typeof child==='object'?nodes(child):[])];}
@@ -49,4 +49,12 @@ test('missions and friends use text nodes and retain target identity',()=>{
  assert.ok(nodes(root).some(n=>n.textContent==='Concluída'));
  const visits=[];renderFriends(root,[{id:'bob',name:'<Carlos>'}],id=>visits.push(id));
  nodes(root).find(n=>n.textContent==='Visitar <Carlos>').onclick();assert.deepEqual(visits,['bob']);
+});
+
+test('audio controls keep separate channel toggles and volume',()=>{
+ const {root,renderAudioSettings}=panels(),changes=[];
+ renderAudioSettings(root,{effects:false,music:true,effectsVolume:.65,musicVolume:.3},(...args)=>changes.push(args));
+ const all=nodes(root),check=all.find(n=>n.tag==='input'&&n.attributes['aria-label']==='Efeitos');
+ check.checked=true;check.onchange();assert.deepEqual(changes[0],['effects',true,.65]);
+ const volume=all.find(n=>n.attributes['aria-label']==='Volume de Música');volume.value='10';volume.oninput();assert.deepEqual(changes[1],['music',true,.1]);
 });
