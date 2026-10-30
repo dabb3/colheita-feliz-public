@@ -2,6 +2,8 @@ package br.com.colheitafeliz.server;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.Map;
@@ -18,7 +20,7 @@ public final class ServerMain {
         if (development && !Set.of("127.0.0.1", "localhost", "::1").contains(host)) throw new IllegalArgumentException("Development requires loopback HOST");
         UUID owner = UUID.fromString(development ? "00000000-0000-0000-0000-000000000001" : required(env, "OWNER_USER_ID"));
         String url = required(env, "DATABASE_URL");
-        if (!development && !url.matches(".*[?&]sslmode=(require|verify-full)(&.*)?")) throw new IllegalArgumentException("Production database requires sslmode=require or verify-full");
+        if (!development) validateProductionDatabaseUrl(url);
         var store = new JdbcOnlineStore(url, required(env, "DATABASE_USER"), env.getOrDefault("DATABASE_PASSWORD", ""), "colheita");
         Authenticator auth;
         if (development) auth = token -> {
@@ -43,6 +45,22 @@ public final class ServerMain {
         Runtime.getRuntime().addShutdownHook(new Thread(server::close, "server-shutdown"));
         server.start();
         System.out.println("Colheita API listening on " + host + ":" + server.port() + (development ? " (local development only)" : ""));
+    }
+    static void validateProductionDatabaseUrl(String url) {
+        if (!url.startsWith("jdbc:postgresql://")) throw new IllegalArgumentException("Use a PostgreSQL JDBC URL");
+        URI parsed = URI.create(url.substring("jdbc:".length()));
+        if (parsed.getHost() == null || parsed.getUserInfo() != null || parsed.getFragment() != null || parsed.getRawQuery() == null)
+            throw new IllegalArgumentException("Production database requires hostname and sslmode=verify-full");
+        Map<String, String> query = new java.util.HashMap<>();
+        for (String pair : parsed.getRawQuery().split("&")) {
+            String[] parts = pair.split("=", 2);
+            String key = URLDecoder.decode(parts[0], StandardCharsets.UTF_8);
+            String value = parts.length == 2 ? URLDecoder.decode(parts[1], StandardCharsets.UTF_8) : "";
+            if (!Set.of("sslmode", "sslrootcert").contains(key) || query.putIfAbsent(key, value) != null)
+                throw new IllegalArgumentException("Only unique sslmode and sslrootcert URL parameters are supported");
+        }
+        if (!"verify-full".equals(query.get("sslmode")))
+            throw new IllegalArgumentException("Production database requires sslmode=verify-full");
     }
     private static String required(Map<String, String> env, String key) {
         String value = env.get(key);

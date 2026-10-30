@@ -20,6 +20,7 @@ import java.util.function.Function;
 
 /** Persistência exclusivamente do online; não lê nem importa arquivos locais do jogador. */
 final class JdbcOnlineStore {
+    static final int RECEIPTS_PER_ACTOR = 1000;
     record Player(UUID id, String name, boolean active) {}
     record Farm(GameSnapshot snapshot, long revision, Instant time) {}
     record Receipt(String hash, JsonObject response) {}
@@ -47,6 +48,9 @@ final class JdbcOnlineStore {
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".farms (owner uuid PRIMARY KEY REFERENCES " + schema
                     + ".players(id), ruleset text NOT NULL, revision bigint NOT NULL CHECK(revision > 0), game_time timestamptz NOT NULL, snapshot jsonb NOT NULL)");
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".receipts (actor uuid NOT NULL, request_id uuid NOT NULL, hash text NOT NULL, response jsonb NOT NULL, PRIMARY KEY(actor,request_id))");
+            tx.execute("ALTER TABLE " + schema + ".receipts ADD COLUMN IF NOT EXISTS expires_at timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours')");
+            tx.execute("CREATE INDEX IF NOT EXISTS receipts_expiry_idx ON " + schema + ".receipts(expires_at)");
+            tx.execute("CREATE INDEX IF NOT EXISTS receipts_actor_expiry_idx ON " + schema + ".receipts(actor,expires_at)");
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".friendships (a uuid NOT NULL REFERENCES " + schema
                     + ".players(id), b uuid NOT NULL REFERENCES " + schema + ".players(id), PRIMARY KEY(a,b), CHECK(a::text < b::text))");
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".invitations (hash text PRIMARY KEY, owner uuid NOT NULL REFERENCES "
@@ -115,8 +119,19 @@ final class JdbcOnlineStore {
             return first(query("SELECT hash,response FROM " + schema + ".receipts WHERE actor=? AND request_id=?",
                     r -> new Receipt(r.getString(1), JsonParser.parseString(r.getString(2)).getAsJsonObject()), actor, request));
         }
-        void remember(UUID actor, UUID request, String hash, JsonObject response) {
-            execute("INSERT INTO " + schema + ".receipts VALUES (?,?,?,?::jsonb)", actor, request, hash, JSON.toJson(response));
+        void prepareReceipt(UUID actor, Instant now) {
+            // Bounded batches avoid unbounded cleanup work and competing cleaners skip locked rows.
+            execute("DELETE FROM " + schema + ".receipts WHERE (actor,request_id) IN (SELECT actor,request_id FROM "
+                    + schema + ".receipts WHERE expires_at<=? ORDER BY expires_at LIMIT 1000 FOR UPDATE SKIP LOCKED)",
+                    java.sql.Timestamp.from(now));
+            int count = query("SELECT count(*) FROM " + schema + ".receipts WHERE actor=? AND expires_at>?",
+                    r -> r.getInt(1), actor, java.sql.Timestamp.from(now)).get(0);
+            if (count >= RECEIPTS_PER_ACTOR)
+                throw new ApiFailure(429, "Limite de 1.000 ações nas últimas 24 horas. Aguarde antes de iniciar outra ação.");
+        }
+        void remember(UUID actor, UUID request, String hash, JsonObject response, Instant expires) {
+            execute("INSERT INTO " + schema + ".receipts (actor,request_id,hash,response,expires_at) VALUES (?,?,?,?::jsonb,?)",
+                    actor, request, hash, JSON.toJson(response), java.sql.Timestamp.from(expires));
         }
         void invite(String hash, UUID owner, Instant expires) {
             execute("INSERT INTO " + schema + ".invitations VALUES (?,?,NULL,?)", hash, owner, java.sql.Timestamp.from(expires));

@@ -14,7 +14,7 @@ record Command(UUID requestId, String expectedRevision, String action, String it
         if (!ACTIONS.contains(action)) throw new ApiFailure(400, "Ação desconhecida.");
         revision(expectedRevision);
         if (harvestRevision != null) revision(harvestRevision);
-        if (itemId != null && !itemId.matches("[a-z0-9-]{1,60}")) throw new ApiFailure(400, "Item inválido.");
+        if (itemId != null && !itemId.matches("[a-z0-9_-]{1,60}")) throw new ApiFailure(400, "Item inválido.");
         if (currency != null && !Set.of("GOLD", "GREEN").contains(currency)) throw new ApiFailure(400, "Moeda inválida.");
         if ((column != null && (column < 0 || column >= 6)) || (row != null && (row < 0 || row >= 5)))
             throw new ApiFailure(400, "Terreno inválido.");

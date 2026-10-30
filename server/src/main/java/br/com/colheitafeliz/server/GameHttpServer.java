@@ -62,7 +62,8 @@ final class GameHttpServer implements AutoCloseable {
             var identity = auth.authenticate(exchange.getRequestHeaders().getFirst("Authorization"));
             UUID actor = identity.id(); rate("actor:" + actor, 120);
             Object response;
-            if (method.equals("GET") && path.equals("/v1/me/farm")) response = service.farm(actor);
+            if (method.equals("GET") && path.equals("/v1/request-id")) response = service.requestId();
+            else if (method.equals("GET") && path.equals("/v1/me/farm")) response = service.farm(actor);
             else if (method.equals("GET") && path.equals("/v1/friends")) response = service.friends(actor);
             else if (method.equals("POST") && path.equals("/v1/me/actions")) response = service.command(actor, command(read(exchange, COMMAND_FIELDS)));
             else if (method.equals("POST") && path.equals("/v1/friend-invitations")) response = service.createInvitation(actor,
