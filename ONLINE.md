@@ -101,3 +101,19 @@ Fontes de hospedagem conferidas em 29/10/2026: [limites do Cloudflare Pages](htt
 A URL JDBC deve ter `sslmode=verify-full`; `require` não autentica o servidor e é recusado. Forneça a CA do banco em um arquivo legível pelo processo, por exemplo `sslrootcert=/etc/secrets/root.crt`, usando o certificado do projeto no painel Supabase. A URL aceita somente `sslmode` e `sslrootcert`, sem parâmetros duplicados ou factories SSL customizadas. Usuário e senha ficam em variáveis próprias. Não desative a validação para contornar erros de certificado ou hostname.
 
 Após aceitar uma visita sem mudança, as revisões das fazendas permanecem estáveis; relógio e atualização real de estado ainda podem mudar a revisão. Cada ação bem-sucedida continua sendo atômica.
+
+### Revisão visual isolada do cenário web
+
+Execute `npm.cmd run review --prefix web` e abra `http://127.0.0.1:5174/`.
+A cena usa dados sintéticos, sem autenticação, API, save ou alteração de saldo.
+Os links exibem dia, pôr do sol, noite, filhotes e jovens. Inclui plantas em cinco
+estágios, seca, pragas, morte, produtos prontos e todos os animais.
+O processo atende apenas localhost; encerre com Ctrl+C. O bundle fica em
+`.tools/web-visual-review` e não integra o build publicado.
+
+A apresentação usa altura por estágio das plantas, escala de crescimento dos
+animais, sprites de pragas e produtos somente quando prontos. A colmeia permanece
+fixa, com abelhas próximas. Em painéis estreitos, HUD e ferramentas ficam fora
+do canvas para preservar a área das terras. Esta revisão não comprova animações
+de caminhada, fluxo econômico ou concorrência; esses ensaios pertencem às etapas
+seguintes da paridade web.
