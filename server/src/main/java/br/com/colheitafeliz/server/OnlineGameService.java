@@ -61,17 +61,22 @@ final class OnlineGameService implements AutoCloseable {
     }
 
     JsonObject farm(UUID actor, String authenticatedName) {
-        return store.transaction(actor, tx -> {
+        return store.transaction(actor, tx -> farm(tx, actor, authenticatedName));
+    }
+
+    JsonObject farm(JdbcOnlineStore.Tx tx, UUID actor, String authenticatedName) {
             active(tx, actor);
             if (authenticatedName != null) tx.updateName(actor, cleanName(authenticatedName));
             tx.lockFarms(actor);
             var farm = load(tx, actor);
             return persist(tx, farm, false, true);
-        });
     }
 
     JsonObject command(UUID actor, Command command) {
-        return store.transaction(actor, tx -> {
+        return store.transaction(actor, tx -> command(tx, actor, command));
+    }
+
+    JsonObject command(JdbcOnlineStore.Tx tx, UUID actor, Command command) {
             active(tx, actor);
             return receipt(tx, actor, command.requestId(), hash("OWN:" + JSON.toJson(command)), () -> {
                 tx.lockFarms(actor);
@@ -80,7 +85,6 @@ final class OnlineGameService implements AutoCloseable {
                 var result = act(farm.game(), command);
                 return object("result", result, "farm", persist(tx, farm, true, true));
             });
-        });
     }
 
     JsonObject createInvitation(UUID actor, UUID requestId) {
@@ -116,8 +120,10 @@ final class OnlineGameService implements AutoCloseable {
     }
 
     JsonArray friends(UUID actor) {
-        return store.transaction(actor, tx -> { active(tx, actor); return JSON.toJsonTree(tx.friends(actor)).getAsJsonArray(); });
+        return store.transaction(actor, tx -> friends(tx, actor));
     }
+
+    JsonArray friends(JdbcOnlineStore.Tx tx, UUID actor) { active(tx, actor); return JSON.toJsonTree(tx.friends(actor)).getAsJsonArray(); }
 
     private static String cleanName(String name) {
         String clean = name == null ? "Fazendeiro" : name.replaceAll("\\p{Cntrl}", "").strip();
@@ -126,18 +132,26 @@ final class OnlineGameService implements AutoCloseable {
     }
 
     JsonObject visit(UUID actor, UUID owner) {
-        return store.transaction(actor, tx -> {
+        return store.transaction(actor, tx -> visit(tx, actor, owner));
+    }
+
+    JsonObject visit(JdbcOnlineStore.Tx tx, UUID actor, UUID owner) {
             authorizeVisit(tx, actor, owner);
             tx.lockFarms(owner);
             return persist(tx, load(tx, owner), false, false);
-        });
     }
 
     JsonObject visitAction(UUID actor, UUID owner, Command command) {
         command.requireTile();
         if (command.harvestRevision() == null) throw new ApiFailure(400, "Falta a revisão da temporada.");
         if (!command.action().equals("STEAL") && !command.action().equals("LOVE")) throw new ApiFailure(400, "Ação de visita inválida.");
-        return store.transaction(actor, tx -> {
+        return store.transaction(actor, tx -> visitAction(tx, actor, owner, command));
+    }
+
+    JsonObject visitAction(JdbcOnlineStore.Tx tx, UUID actor, UUID owner, Command command) {
+        command.requireTile();
+        if (command.harvestRevision() == null) throw new ApiFailure(400, "Falta a revisão da temporada.");
+        if (!command.action().equals("STEAL") && !command.action().equals("LOVE")) throw new ApiFailure(400, "Ação de visita inválida.");
             authorizeVisit(tx, actor, owner);
             return receipt(tx, actor, command.requestId(), hash("VISIT:" + owner + ":" + JSON.toJson(command)), () -> {
                 tx.lockFarms(actor, owner);
@@ -151,7 +165,6 @@ final class OnlineGameService implements AutoCloseable {
                 return object("result", result, "farm", persist(tx, visitor, false, true),
                         "visitedFarm", persist(tx, destination, false, false));
             });
-        });
     }
 
     private Loaded load(JdbcOnlineStore.Tx tx, UUID owner) {

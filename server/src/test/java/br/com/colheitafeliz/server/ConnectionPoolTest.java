@@ -14,6 +14,21 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ConnectionPoolTest {
+    @Test void diagnosticTransactionsAlwaysRollbackAndCannotCommitFixtureData() {
+        var source = new FakeDatabase();
+        var config = new HikariConfig();
+        config.setDataSource(source);
+        config.setMaximumPoolSize(1);
+        config.setMinimumIdle(1);
+        try (var store = new JdbcOnlineStore(new HikariDataSource(config), "test_probe")) {
+            assertEquals(9, store.probe(UUID.randomUUID(), tx -> 9).intValue());
+            assertThrows(IllegalStateException.class, () -> store.probe(UUID.randomUUID(), tx -> {
+                throw new IllegalStateException("probe failure");
+            }));
+            assertEquals(0, source.commits);
+            assertEquals(2, source.rollbacks);
+        }
+    }
     @Test void repeatedTransactionsReusePhysicalConnectionAndRollbackBeforeReuse() {
         var source = new FakeDatabase();
         var config = new HikariConfig();

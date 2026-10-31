@@ -60,12 +60,19 @@ export class ApiClient {
  }
  private clear() {this.storage.removeItem(this.key);this.pending=null;}
  private async request<T>(path:string,body?:string):Promise<T> {
+  const started=this.now();
   const token=await this.token();
   const send=this.send;
   const response=await send(this.base+path,{method:body?'POST':'GET',
    headers:{Authorization:`Bearer ${token}`,...(body?{'Content-Type':'application/json'}:{})},body,
    signal:AbortSignal.timeout(65_000),cache:'no-store'});
   const json=await response.json();
+  const serverTiming=response.headers.get('Server-Timing');
+  if(serverTiming)try{
+   const route=path.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,':farm');
+   const candidate=body?JSON.parse(body).action:undefined,action=typeof candidate==='string'&&/^[A-Z_]{1,32}$/.test(candidate)?candidate:undefined;
+   console.debug('Colheita API timing',JSON.stringify({route,action,durationMs:Math.round((this.now()-started)*100)/100,serverTiming}));
+  }catch{/* Diagnostics must never change the outcome of a confirmed action. */}
   if(!response.ok) throw new ApiError(response.status,json.error??'Não foi possível concluir.');
   return json as T;
  }

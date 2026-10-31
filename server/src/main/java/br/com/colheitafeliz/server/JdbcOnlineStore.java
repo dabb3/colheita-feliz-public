@@ -93,16 +93,24 @@ final class JdbcOnlineStore implements AutoCloseable {
     }
 
     <T> T transaction(UUID actor, Function<Tx, T> operation) {
+        return transaction(actor, operation, false);
+    }
+
+    <T> T probe(UUID actor, Function<Tx, T> operation) {
+        return transaction(actor, operation, true);
+    }
+
+    private <T> T transaction(UUID actor, Function<Tx, T> operation, boolean diagnostic) {
         long acquisitionStarted = System.nanoTime();
         try (Connection connection = pool.getConnection()) {
             RequestTimings.connection(acquisitionStarted);
             long transactionStarted = System.nanoTime();
             connection.setAutoCommit(false);
             try {
-                Tx tx = new Tx(connection);
+                Tx tx = new Tx(connection, diagnostic);
                 tx.lock("actor:" + actor);
                 T result = operation.apply(tx);
-                connection.commit();
+                if (diagnostic) connection.rollback(); else connection.commit();
                 return result;
             } catch (RuntimeException e) {
                 try { connection.rollback(); } catch (SQLException rollback) { e.addSuppressed(rollback); }
@@ -113,7 +121,12 @@ final class JdbcOnlineStore implements AutoCloseable {
 
     final class Tx {
         private final Connection connection;
-        Tx(Connection connection) { this.connection = connection; }
+        private final boolean diagnostic;
+        Tx(Connection connection, boolean diagnostic) { this.connection = connection; this.diagnostic = diagnostic; }
+        void benchmarkPlayer(UUID id) {
+            if (!diagnostic) throw new IllegalStateException("Synthetic participants require a rollback probe");
+            execute("INSERT INTO " + schema + ".players (id,name,active) VALUES (?, 'Latency benchmark', true)", id);
+        }
         void lock(String key) { query("SELECT pg_advisory_xact_lock(hashtextextended(?,0))", r -> 0, key); }
         void lockFarms(UUID... owners) { Arrays.stream(owners).map(UUID::toString).distinct().sorted().forEach(id -> lock("farm:" + id)); }
         Player player(UUID id) {
@@ -148,9 +161,11 @@ final class JdbcOnlineStore implements AutoCloseable {
         }
         void prepareReceipt(UUID actor, Instant now) {
             // Bounded batches avoid unbounded cleanup work and competing cleaners skip locked rows.
-            execute("DELETE FROM " + schema + ".receipts WHERE (actor,request_id) IN (SELECT actor,request_id FROM "
-                    + schema + ".receipts WHERE expires_at<=? ORDER BY expires_at LIMIT 1000 FOR UPDATE SKIP LOCKED)",
-                    java.sql.Timestamp.from(now));
+            String expired = "DELETE FROM " + schema + ".receipts WHERE (actor,request_id) IN (SELECT actor,request_id FROM "
+                    + schema + ".receipts WHERE expires_at<=?" + (diagnostic ? " AND actor=?" : "")
+                    + " ORDER BY expires_at LIMIT 1000 FOR UPDATE SKIP LOCKED)";
+            if (diagnostic) execute(expired, java.sql.Timestamp.from(now), actor);
+            else execute(expired, java.sql.Timestamp.from(now));
             int count = query("SELECT count(*) FROM " + schema + ".receipts WHERE actor=? AND expires_at>?",
                     r -> r.getInt(1), actor, java.sql.Timestamp.from(now)).get(0);
             if (count >= RECEIPTS_PER_ACTOR)

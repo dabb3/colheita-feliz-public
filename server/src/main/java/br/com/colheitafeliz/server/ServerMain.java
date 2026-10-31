@@ -45,6 +45,12 @@ public final class ServerMain {
         Runtime.getRuntime().addShutdownHook(new Thread(server::close, "server-shutdown"));
         server.start();
         System.out.println("Colheita API listening on " + host + ":" + server.port() + (development ? " (local development only)" : ""));
+        if ("once".equals(env.get("LATENCY_BENCHMARK"))) {
+            Thread.ofPlatform().name("latency-benchmark").daemon(true).start(() -> {
+                try { LatencyBenchmark.run(store); }
+                catch (RuntimeException error) { System.err.println("LATENCY_BENCHMARK aborted: " + error.getClass().getSimpleName()); }
+            });
+        }
     }
     static void validateProductionDatabaseUrl(String url) {
         if (!url.startsWith("jdbc:postgresql://")) throw new IllegalArgumentException("Use a PostgreSQL JDBC URL");
