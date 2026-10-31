@@ -1,0 +1,246 @@
+{
+  "commit": "845f857",
+  "scope": "service transaction, synthetic rollback",
+  "rows": [
+    {
+      "action": "BUY_SEED",
+      "label": "BUY_SEED",
+      "samplesMs": [
+        1150.920334,
+        1397.959608,
+        1127.12521
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "BUY_ANIMAL",
+      "label": "BUY_ANIMAL",
+      "samplesMs": [
+        1124.78978,
+        1406.651635,
+        1254.774331
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "BUY_FEED",
+      "label": "BUY_FEED",
+      "samplesMs": [
+        1122.472522,
+        1122.652913,
+        1121.349905
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "BUY_FERTILIZER",
+      "label": "BUY_FERTILIZER",
+      "samplesMs": [
+        1123.740527,
+        1121.639672,
+        1120.510765
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "BUY_VIP",
+      "label": "BUY_VIP",
+      "samplesMs": [
+        1120.314862,
+        1119.128272,
+        1124.654671
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "BUY_PLOT",
+      "label": "BUY_PLOT",
+      "samplesMs": [
+        1120.214756,
+        1121.168403,
+        1118.695996
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "PLOW",
+      "label": "PLOW",
+      "samplesMs": [
+        1126.379634,
+        1117.861192,
+        1117.899493
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "PLANT",
+      "label": "PLANT",
+      "samplesMs": [
+        1120.950365,
+        1132.232646,
+        1117.737314
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "WATER",
+      "label": "WATER",
+      "samplesMs": [
+        1117.49825,
+        1118.095905,
+        1117.922224
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "WEED",
+      "label": "WEED",
+      "samplesMs": [
+        1116.954927,
+        1117.478328,
+        1118.572733
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "PESTICIDE",
+      "label": "PESTICIDE",
+      "samplesMs": [
+        1119.014099,
+        1118.539621,
+        1118.54665
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "FERTILIZE",
+      "label": "FERTILIZE",
+      "samplesMs": [
+        1116.454946,
+        1117.706411,
+        1117.676239
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "HARVEST",
+      "label": "HARVEST",
+      "samplesMs": [
+        1118.478876,
+        1128.870815,
+        1117.759504
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "SELL_ITEM",
+      "label": "SELL_ITEM",
+      "samplesMs": [
+        1119.06521,
+        1119.684457,
+        1117.098883
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "SELL_ITEM_ALL",
+      "label": "SELL_ITEM_ALL",
+      "samplesMs": [
+        1119.542359,
+        1116.951685,
+        1124.346465
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "SELL_ALL",
+      "label": "SELL_ALL",
+      "samplesMs": [
+        1119.716529,
+        1127.849762,
+        1123.299011
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "TEND_ANIMAL",
+      "label": "TEND_ANIMAL_FEED",
+      "samplesMs": [
+        1125.972581,
+        1117.984045,
+        1120.759301
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "TEND_ANIMAL",
+      "label": "TEND_ANIMAL_COLLECT",
+      "samplesMs": [
+        1120.168885,
+        1117.932932,
+        1122.814292
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "SELL_ANIMAL",
+      "label": "SELL_ANIMAL",
+      "samplesMs": [
+        1120.557768,
+        1116.244281,
+        1115.976055
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "FARM",
+      "label": "FARM",
+      "samplesMs": [
+        744.208694,
+        744.694172,
+        745.100616
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "FRIENDS",
+      "label": "FRIENDS",
+      "samplesMs": [
+        247.562434,
+        272.596573,
+        297.037827
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "VISIT",
+      "label": "VISIT",
+      "samplesMs": [
+        872.010374,
+        889.503654,
+        880.432585
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "STEAL",
+      "label": "STEAL",
+      "samplesMs": [
+        1862.621192,
+        1872.897563,
+        1861.321304
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    },
+    {
+      "action": "LOVE",
+      "label": "LOVE",
+      "samplesMs": [
+        1859.842256,
+        1863.926109,
+        1874.542219
+      ],
+      "scope": "service_tx;synthetic;rollback;actor_receipt_cleanup;excludes_fixture_auth_network_begin_commit"
+    }
+  ]
+}
