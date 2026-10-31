@@ -7,7 +7,7 @@ import java.util.UUID;
 record Command(UUID requestId, String expectedRevision, String action, String itemId, String currency,
                Integer column, Integer row, String harvestRevision) {
     private static final Set<String> ACTIONS = Set.of("BUY_SEED", "BUY_ANIMAL", "BUY_FEED", "BUY_FERTILIZER",
-            "BUY_VIP", "BUY_PLOT", "SELL_ALL", "SELL_ITEM", "SELL_ANIMAL", "TEND_ANIMAL",
+            "BUY_VIP", "BUY_PLOT", "SELL_ALL", "SELL_ITEM", "SELL_ITEM_ALL", "SELL_ANIMAL", "TEND_ANIMAL",
             "PLOW", "PLANT", "WATER", "HARVEST", "WEED", "PESTICIDE", "FERTILIZE", "STEAL", "LOVE");
     Command {
         Objects.requireNonNull(requestId);

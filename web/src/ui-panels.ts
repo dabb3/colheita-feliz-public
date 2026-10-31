@@ -13,30 +13,45 @@ export function renderDeposit(root:HTMLElement,catalog:Catalog,farm:Farm,categor
  for(const [id,label]of [['products','Produtos'],['seeds','Sementes'],['supplies','Insumos']]){
   const tab=control(label,()=>onCategory(id));tab.setAttribute('aria-pressed',String(id===category));tabs.append(tab);
  }
- const grid=document.createElement('div');grid.className='cards inventory-cards';
  if(category==='products'){
-  root.append(control('Vender tudo',()=>onAction({action:'SELL_ALL'})),text('p','Produtos VIP bloqueados são ignorados. A venda preserva a moeda de aquisição.','muted'));
+  const overview=document.createElement('section');overview.className='deposit-overview';overview.append(text('h3','Você recebe ao vender tudo'));
+  const totals=farm.depositTotals??{},summary=document.createElement('div');summary.className='deposit-summary';let total=0;
+  for(const [currency,label,icon]of [['GOLD','Ouro','moeda-comum'],['GREEN','Verdes','moeda-verde']]){
+   const amount=totals[currency]??0;total+=Number(amount)||0;
+   const item=document.createElement('div');item.className='deposit-currency';item.append(image(`classic/icons/${icon}.png`),text('span',label),text('strong',String(amount)));summary.append(item);
+  }
+  overview.append(summary);
+  if(total>0){const value=Object.entries(totals).filter(([,amount])=>Number(amount)>0).map(([currency,amount])=>`${amount} ${currency==='GOLD'?'ouro':'verdes'}`).join(' + ');const sell=control(`Vender tudo · ${value}`,()=>onAction({action:'SELL_ALL'}));sell.className='deposit-sell-all';overview.append(sell);}
+  root.append(overview,text('p','Produtos VIP sem assinatura ficam bloqueados. Cada lote preserva sua moeda de aquisição.','muted'));
   const groups=new Map<string,NonNullable<Farm['produceLots']>>();
   for(const lot of farm.produceLots??[])groups.set(lot.itemId,[...(groups.get(lot.itemId)??[]),lot]);
-  for(const [id,lots]of groups){
-   const crop=catalog.crops.find(c=>c.id===id),animal=catalog.animals.find(a=>a.productId===id);
-   const art=crop?`classic/crops/plants_phase_one_to_five/${crop.spriteStem}_5.png`:animal?productPath(animal.id,'READY')??animalPath(animal.id,'ADULT',false,false):'classic/icons/deposit-icon.png';
-   const card=inventoryCard(crop?.name??animal?.productName??id,art,lots.reduce((sum,lot)=>sum+lot.quantity,0));
-   const currencies=new Map<string,number>();for(const lot of lots)currencies.set(lot.currency,(currencies.get(lot.currency)??0)+lot.quantity);
-   card.append(text('p',[...currencies].map(([currency,count])=>`${count} em ${currency==='GOLD'?'ouro':'verdes'}`).join(' · ')));
-   const blocked=(lot:typeof lots[number])=>(lot.vipOnly??crop?.vipOnly)&&!farm.vipActive;
-   const sell=control('Vender este produto',()=>onAction({action:'SELL_ITEM',itemId:id}));sell.disabled=lots.every(blocked);
-   sell.setAttribute('data-focus-key',`sell:${id}`);
-   if(lots.some(blocked))card.append(text('small','Lotes VIP bloqueados','status-badge'));
-   card.append(sell);grid.append(card);
+  let count=0;
+  for(const [kind,label]of [['crop','Colheitas'],['animal','Produtos dos animais'],['other','Outros produtos']] as const){
+   const items=[...groups].filter(([id])=>{const crop=catalog.crops.some(item=>item.id===id),animal=catalog.animals.some(item=>item.productId===id);return kind==='crop'?crop:kind==='animal'?animal:!crop&&!animal;});if(!items.length)continue;
+   const section=document.createElement('section');section.className='deposit-group';section.append(text('h3',label));const grid=document.createElement('div');grid.className='cards inventory-cards';section.append(grid);
+   for(const [id,lots]of items){count+=1;const crop=catalog.crops.find(item=>item.id===id),animal=catalog.animals.find(item=>item.productId===id);
+    const art=crop?`classic/crops/plants_phase_one_to_five/${crop.spriteStem}_5.png`:animal?productPath(animal.id,'READY')??animalPath(animal.id,'ADULT',false,false,false):'classic/icons/deposit-icon.png';
+    const quantity=lots.reduce((sum,lot)=>sum+lot.quantity,0),card=inventoryCard(crop?.name??animal?.productName??id,art,quantity);
+    const currencies=new Map<string,number>();for(const lot of lots)currencies.set(lot.currency,(currencies.get(lot.currency)??0)+lot.quantity);
+    card.append(text('p',[...currencies].map(([currency,amount])=>`${amount} em ${currency==='GOLD'?'ouro':'verdes'}`).join(' · ')));
+    const blocked=(lot:typeof lots[number])=>(lot.vipOnly??crop?.vipOnly)&&!farm.vipActive,sellable=lots.some(lot=>!blocked(lot));
+    if(lots.some(blocked))card.append(text('small','Lotes VIP bloqueados','status-badge'));
+    const actions=document.createElement('div');actions.className='deposit-sell-actions';const one=control('Vender 1',()=>onAction({action:'SELL_ITEM',itemId:id}));one.disabled=!sellable;one.setAttribute('aria-label',`Vender 1 ${crop?.name??animal?.productName??id}`);
+    const all=control('Vender tudo',()=>onAction({action:'SELL_ITEM_ALL',itemId:id}));all.disabled=!sellable;all.setAttribute('aria-label',`Vender todo o estoque de ${crop?.name??animal?.productName??id}`);actions.append(one,all);card.append(actions);grid.append(card);
+   }
+   root.append(section);
   }
+  if(!count)root.append(text('p','Seu depósito está vazio. Colha uma plantação ou recolha a produção dos animais.','empty-state'));
  }else if(category==='seeds'){
+  const grid=document.createElement('div');grid.className='cards inventory-cards';
   for(const crop of catalog.crops){const count=farm.seedCounts?.[crop.id]??0;if(count>0)grid.append(inventoryCard(crop.name,`classic/crops/plants_phase_one_to_five/${crop.spriteStem}_5.png`,count));}
+  root.append(grid);if(!grid.children.length)root.append(text('p','Nenhuma semente armazenada.','empty-state'));
  }else{
+  const grid=document.createElement('div');grid.className='cards inventory-cards';
   for(const fertilizer of catalog.fertilizers){const count=farm.fertilizers?.[fertilizer.id]??0;if(count>0)grid.append(inventoryCard(fertilizer.name,`classic/icons/adubo-${fertilizer.id}.png`,count));}
   for(const [id,count]of Object.entries(farm.feed??{}))if(count>0)grid.append(inventoryCard(`Ração de ${id==='producer'?'produção':'crescimento'}`,'classic/icons/racao-generica.png',count));
+  root.append(grid);if(!grid.children.length)root.append(text('p','Nenhum insumo armazenado.','empty-state'));
  }
- root.append(grid);if(!grid.children.length)root.append(text('p','Nenhum item nesta categoria.','empty-state'));
 }
 
 export function renderPlantHealth(root:HTMLElement,catalog:Catalog,tile:Tile|null) {
@@ -57,7 +72,7 @@ export function renderPlantHealth(root:HTMLElement,catalog:Catalog,tile:Tile|nul
 export function renderAnimal(root:HTMLElement,catalog:Catalog,farm:Farm,id:string,canTend:boolean,onAction:(fields:CommandFields)=>void) {
  root.replaceChildren();const animal=farm.animals.find(a=>a.id===id),type=catalog.animals.find(a=>a.id===id);
  if(!animal||!type){root.append(text('p','Este animal não está mais nesta fazenda.'));return;}
- const card=inventoryCard(type.name,animalPath(id,animal.stage,false,false),1);root.append(card);
+ const card=inventoryCard(type.name,animalPath(id,animal.stage,false,false,false),1);root.append(card);
  const stages:Record<string,string>={BABY:'Filhote',YOUNG:'Jovem',ADULT:'Adulto'};
  const status=animal.status==='HUNGRY'?'Com fome':animal.status==='READY'?(type.kind==='GROWING'?'Adulto disponível para venda':'Produto pronto'):type.kind==='PROTECTOR'?'Protegendo a fazenda':type.kind==='PRODUCER'?'Produzindo':'Em crescimento';
  card.append(text('p',`${stages[animal.stage]??animal.stage} · ${status}`));

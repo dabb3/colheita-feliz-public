@@ -212,6 +212,9 @@ final class OnlineGameService {
             case "SELL_ITEM" -> catalog.all().stream().anyMatch(type -> type.id().equals(c.requireItem()))
                     ? game.sellProduce(catalog.get(c.requireItem())) : game.sellProduct(game.animalTypes().stream()
                     .filter(type -> type.productId().equals(c.requireItem())).findFirst().orElseThrow(() -> new ApiFailure(400, "Produto inválido.")), false);
+            case "SELL_ITEM_ALL" -> catalog.all().stream().anyMatch(type -> type.id().equals(c.requireItem()))
+                    ? game.sellAllProduce(catalog.get(c.requireItem())) : game.sellProduct(game.animalTypes().stream()
+                    .filter(type -> type.productId().equals(c.requireItem())).findFirst().orElseThrow(() -> new ApiFailure(400, "Produto inválido.")), true);
             case "TEND_ANIMAL" -> game.tendAnimal(c.requireItem());
             case "SELL_ANIMAL" -> {
                 int index = -1;
