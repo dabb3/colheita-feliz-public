@@ -9,7 +9,7 @@ const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElemen
 const modal=element<HTMLDialogElement>('modal'),content=element('modal-content');
 let api:ApiClient|undefined,catalog:Catalog,own:Farm|undefined,visited:Farm|undefined,scene:Scene|undefined;
 let tool='CURSOR',selectedSeed='nabo',selectedFertilizer='comum',trayOpen=false,effectsEnabled=false,musicEnabled=false,music:HTMLAudioElement|undefined,busy=false,seedMarketGroup:'common'|'vip'='common',refreshDialog:(()=>void)|undefined;
-let toastTimer:number,sessionGeneration=0,navigationGeneration=0,healthTile:Tile|null=null,healthPoint:{x:number;y:number}|null=null;
+let toastTimer:number,sessionGeneration=0,navigationGeneration=0,dialogGeneration=0,healthTile:Tile|null=null,healthPoint:{x:number;y:number}|null=null;
 const login=element('login');
 const inviteFromUrl=new URL(location.href).searchParams.get('invite');
 if(inviteFromUrl)sessionStorage.setItem('colheita:invitation',inviteFromUrl);
@@ -37,7 +37,7 @@ function notifyAction(message:string,action:string,itemId:string|undefined,rewar
  if(reward.leveledUp){notice.replaceChildren();const title=document.createElement('strong');title.textContent=`Nível ${reward.level}!`;const unlocked=catalog.crops.filter(crop=>crop.requiredLevel===reward.level).map(crop=>crop.name);const sub=document.createElement('span');sub.textContent=unlocked.length?`${unlocked.join(', ')} liberado(s) na Loja`:'Continue colhendo para liberar mais culturas';notice.append(title,sub);notice.classList.add('level-notice');}
  clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>{notice.replaceChildren();notice.classList.remove('level-notice','reward-notice');},reward.leveledUp?2600:3200);
 }
-function dialog(title:string){refreshDialog=undefined;element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');content.replaceChildren();content.scrollTop=0;if(!modal.open)modal.showModal();}
+function dialog(title:string){dialogGeneration++;refreshDialog=undefined;element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');content.replaceChildren();content.scrollTop=0;if(!modal.open)modal.showModal();}
 function settings(){
  dialog('Ajustes');
  paragraph('Som, ferramentas e conta da fazenda.',content).className='settings-intro';
@@ -247,6 +247,7 @@ function deposit(){
 }
 function missions(){
  dialog('Tarefas diárias');
+ refreshDialog=missions;
  if(own?.tutorial){const card=document.createElement('article');card.className='mission-card tutorial-mission';const heading=document.createElement('div');heading.className='mission-heading';const label=document.createElement('span');label.textContent='Tutorial';const title=document.createElement('strong');title.textContent=own.tutorial.title??'';heading.append(label,title);card.append(heading);paragraph(own.tutorial.hint??'',card);const progress=document.createElement('progress');progress.max=Math.max(1,own.tutorialTotal??6);progress.value=Math.min(own.tutorialStep??0,progress.max);progress.setAttribute('aria-label',`Tutorial: ${progress.value} de ${progress.max}`);card.append(progress);const status=document.createElement('div');status.className='mission-status';status.textContent=`${progress.value} / ${progress.max}`;card.append(status);content.append(card);}
  for(const mission of own?.missions??[]){
   const card=document.createElement('article');card.className=`mission-card${mission.done?' done':''}`;const heading=document.createElement('div');heading.className='mission-heading';
@@ -261,12 +262,13 @@ function missions(){
 }
 function invitationForm(parent:HTMLElement){
  const input=document.createElement('input');input.placeholder='Cole o código de convite';input.setAttribute('aria-label','Código de convite');input.value=sessionStorage.getItem('colheita:invitation')??'';parent.append(input);
- button('Aceitar convite',async()=>{
-  if(!api){notify('Entre antes de aceitar o convite.');return;}
-  const client=api,generation=sessionGeneration;
-  try{await client.mutate('/v1/friend-invitations/accept',{code:input.value.trim()});if(generation!==sessionGeneration)return;await refresh();if(own)modal.close();}
-  catch(error){handleError(error);}finally{syncPending();}
- },parent);
+ button('Aceitar convite',()=>acceptInvitation(input.value.trim(),dialogGeneration,modal.open),parent);
+}
+async function acceptInvitation(code:string,panelGeneration:number,closeOnSuccess:boolean){
+ if(!api){notify('Entre antes de aceitar o convite.');return;}
+ const client=api,generation=sessionGeneration;
+ try{await client.mutate('/v1/friend-invitations/accept',{code});if(generation!==sessionGeneration)return;await refresh();if(own&&closeOnSuccess&&modal.open&&dialogGeneration===panelGeneration)modal.close();}
+ catch(error){handleError(error);}finally{syncPending();}
 }
 async function friends(){
  if(!api)return;const client=api,generation=sessionGeneration;dialog('Amigos');
