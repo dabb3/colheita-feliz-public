@@ -65,11 +65,12 @@ final class OnlineGameService implements AutoCloseable {
     }
 
     JsonObject farm(JdbcOnlineStore.Tx tx, UUID actor, String authenticatedName) {
-            active(tx, actor);
-            if (authenticatedName != null) tx.updateName(actor, cleanName(authenticatedName));
+            var participant = active(tx, actor);
+            if (authenticatedName != null && !cleanName(authenticatedName).equals(participant.name()))
+                tx.updateName(actor, cleanName(authenticatedName));
             tx.lockFarms(actor);
             var farm = load(tx, actor);
-            return persist(tx, farm, false, true);
+            return withRequestLease(persist(tx, farm, false, true));
     }
 
     JsonObject command(UUID actor, Command command) {
@@ -208,7 +209,12 @@ final class OnlineGameService implements AutoCloseable {
             return previous.response();
         }
         tx.prepareReceipt(actor, now);
-        var response = operation.get(); tx.remember(actor, id, hash, response, expires); return response;
+        tx.collectSaves();
+        var response = withRequestLease(operation.get()); tx.remember(actor, id, hash, response, expires); return response;
+    }
+    private JsonObject withRequestLease(JsonObject response) {
+        response.add("requestLease", requestId());
+        return response;
     }
     private static String hash(String value) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }

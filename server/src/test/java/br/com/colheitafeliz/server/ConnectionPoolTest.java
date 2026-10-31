@@ -14,6 +14,44 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ConnectionPoolTest {
+    @Test void anIncompleteReceiptCannotCommitDeferredFarmWrites() {
+        var source = new FakeDatabase();
+        var config = new HikariConfig();
+        config.setDataSource(source);
+        config.setMaximumPoolSize(1);
+        config.setMinimumIdle(1);
+        try (var store = new JdbcOnlineStore(new HikariDataSource(config), "test_receipt")) {
+            assertThrows(IllegalStateException.class, () -> store.transaction(source.playerId, tx -> {
+                tx.collectSaves();
+                return null;
+            }));
+            assertEquals(0, source.commits);
+            assertEquals(1, source.rollbacks);
+        }
+    }
+    @Test void lockedPlayerLookupUsesOneRoundTripAndInvalidatesAfterWritesAndAcrossTransactions() {
+        var source = new FakeDatabase();
+        var config = new HikariConfig();
+        config.setDataSource(source);
+        config.setMaximumPoolSize(1);
+        config.setMinimumIdle(1);
+        try (var store = new JdbcOnlineStore(new HikariDataSource(config), "test_player")) {
+            store.transaction(source.playerId, tx -> {
+                assertTrue(tx.player(source.playerId).active());
+                assertTrue(tx.player(source.playerId).active());
+                assertEquals(1, source.playerQueries);
+                tx.setActive(source.playerId, false);
+                assertFalse(tx.player(source.playerId).active());
+                assertEquals(2, source.playerQueries);
+                return null;
+            });
+            store.transaction(source.playerId, tx -> {
+                assertFalse(tx.player(source.playerId).active());
+                assertEquals(3, source.playerQueries);
+                return null;
+            });
+        }
+    }
     @Test void diagnosticTransactionsAlwaysRollbackAndCannotCommitFixtureData() {
         var source = new FakeDatabase();
         var config = new HikariConfig();
@@ -61,7 +99,9 @@ class ConnectionPoolTest {
     }
 
     private static final class FakeDatabase implements DataSource {
-        int opened, rollbacks, commits;
+        int opened, rollbacks, commits, playerQueries;
+        final UUID playerId = UUID.randomUUID();
+        boolean active = true;
         boolean closed, autoCommit = true;
         @Override public Connection getConnection() {
             opened++;
@@ -74,8 +114,23 @@ class ConnectionPoolTest {
                 case "commit" -> { commits++; yield null; }
                 case "rollback" -> { rollbacks++; yield null; }
                 case "getTransactionIsolation" -> Connection.TRANSACTION_READ_COMMITTED;
-                case "prepareStatement" -> proxy(PreparedStatement.class, (name, ignored) ->
-                    name.equals("executeQuery") ? proxy(ResultSet.class, (rowMethod, rowArgs) -> rowMethod.equals("next") ? false : null) : null);
+                case "prepareStatement" -> {
+                    String sql = (String) args[0];
+                    yield proxy(PreparedStatement.class, (name, statementArgs) -> {
+                        if (name.equals("setObject") && sql.contains("SET active=") && (int) statementArgs[0] == 1) active = (boolean) statementArgs[1];
+                        if (!name.equals("executeQuery")) return null;
+                        boolean playerQuery = sql.contains(".players WHERE id=");
+                        if (playerQuery) playerQueries++;
+                        var read = new java.util.concurrent.atomic.AtomicBoolean();
+                        return proxy(ResultSet.class, (rowMethod, rowArgs) -> switch (rowMethod) {
+                            case "next" -> playerQuery && !read.getAndSet(true);
+                            case "getObject" -> playerId;
+                            case "getString" -> "Player";
+                            case "getBoolean" -> active;
+                            default -> null;
+                        });
+                    });
+                }
                 default -> null;
             });
         }

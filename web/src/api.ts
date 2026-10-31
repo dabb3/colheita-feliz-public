@@ -40,7 +40,8 @@ export class ApiClient {
   if(this.pending || this.busy) throw new Error('Resolva a ação pendente antes de continuar.');
   this.busy=true;
   try {
-   const lease=await this.requestId();this.lease=undefined;
+   const reservation=this.requestId(),lease=await reservation;
+   if(this.lease?.promise===reservation)this.lease=undefined;
    const pending={path,body:JSON.stringify({...fields,requestId:lease.requestId})};
    // Persist before sending: a reload after an unknown result must reuse this UUID.
    this.storage.setItem(this.key,JSON.stringify(pending)); this.pending=pending;
@@ -74,6 +75,11 @@ export class ApiClient {
    console.debug('Colheita API timing',JSON.stringify({route,action,durationMs:Math.round((this.now()-started)*100)/100,serverTiming}));
   }catch{/* Diagnostics must never change the outcome of a confirmed action. */}
   if(!response.ok) throw new ApiError(response.status,json.error??'Não foi possível concluir.');
+  const lease=json?.requestLease,serverDate=Date.parse(response.headers.get('Date')??'');
+  if(typeof lease?.requestId==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(lease.requestId)
+   &&typeof lease.expiresAt==='string'&&Number.isFinite(serverDate)&&Date.parse(lease.expiresAt)>serverDate+30_000){
+   this.lease={started:this.now(),promise:Promise.resolve({requestId:lease.requestId})};
+  }
   return json as T;
  }
 }

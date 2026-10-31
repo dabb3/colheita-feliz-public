@@ -54,7 +54,7 @@ final class GameHttpServer implements AutoCloseable {
                 headers.set("Access-Control-Allow-Origin", origin);
                 headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
                 headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-                headers.set("Access-Control-Expose-Headers", "Server-Timing");
+                headers.set("Access-Control-Expose-Headers", "Server-Timing, Date");
                 headers.set("Timing-Allow-Origin", origin);
             }
             if (exchange.getRequestMethod().equals("OPTIONS")) { exchange.sendResponseHeaders(204, -1); return; }

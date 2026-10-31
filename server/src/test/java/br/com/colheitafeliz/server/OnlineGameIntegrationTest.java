@@ -23,6 +23,41 @@ class OnlineGameIntegrationTest {
 
     @AfterEach void closeStore() { if (store != null) store.close(); }
 
+    @Test void farmAndMutationCarryTheNextServerIdAndReplayKeepsTheExactReply() {
+        var farm = service.farm(alice);
+        var lease = farm.getAsJsonObject("requestLease");
+        assertNotNull(lease);
+        UUID request = UUID.fromString(lease.get("requestId").getAsString());
+        assertEquals(RequestIds.validate(request, clock.instant()).toString(), lease.get("expiresAt").getAsString());
+        var command = new Command(request, farm.get("revision").getAsString(), "BUY_SEED", "nabo", "GOLD", null, null, null);
+        var reply = service.command(alice, command);
+        UUID next = UUID.fromString(reply.getAsJsonObject("requestLease").get("requestId").getAsString());
+        assertNotEquals(request, next);
+        assertDoesNotThrow(() -> RequestIds.validate(next, clock.instant()));
+        assertEquals(reply, service.command(alice, command));
+        assertEquals("200", service.farm(alice).get("coins").getAsString());
+    }
+
+    @Test void farmAndReceiptBatchRollBackTogetherWhenReceiptInsertFails() {
+        var original = service.farm(alice);
+        UUID request = requestId();
+        var bought = service.command(alice, new Command(request, original.get("revision").getAsString(), "BUY_SEED", "nabo", "GOLD", null, null, null)).getAsJsonObject("farm");
+        assertEquals(503, assertThrows(ApiFailure.class, () -> store.transaction(alice, tx -> {
+            tx.lockFarms(alice);
+            var saved = tx.farm(alice);
+            var game = br.com.colheitafeliz.game.GameState.restore(clock::instant, clock,
+                    br.com.colheitafeliz.game.CropCatalogLoader.load(), saved.snapshot(), bound -> bound - 1);
+            game.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GOLD, new java.math.BigDecimal("99"));
+            tx.collectSaves();
+            tx.save(alice, game.snapshot(), saved.revision() + 1, clock.instant());
+            tx.remember(alice, request, "duplicate", new JsonObject(), clock.instant().plusSeconds(86400));
+            return null;
+        })).status());
+        var after = service.farm(alice);
+        assertEquals(bought.get("coins"), after.get("coins"));
+        assertEquals(bought.get("revision"), after.get("revision"));
+    }
+
     @Test void pooledConnectionSurvivesRollbackWithoutLeakingChangesToNextTransaction() {
         int backend = store.transaction(alice, tx -> tx.query("SELECT pg_backend_pid()", row -> row.getInt(1)).getFirst());
         assertThrows(IllegalStateException.class, () -> store.transaction(alice, tx -> {

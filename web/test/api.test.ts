@@ -31,6 +31,7 @@ test('a prepared server identifier removes issuance from the action critical pat
  await Promise.all([api.prepareRequestId(),api.prepareRequestId()]);assert.equal(ids,1);
  calls.length=0;await api.mutate('/v1/me/actions',{action:'PLOW'});
  assert.deepEqual(calls,['http://localhost/v1/me/actions']);assert.equal(bodies[0].requestId,'id-1');
+ await Promise.all([api.prepareRequestId(),api.prepareRequestId()]);assert.equal(ids,2);
  await api.mutate('/v1/me/actions',{action:'WATER'});assert.equal(ids,2);assert.equal(bodies[1].requestId,'id-2');
 });
 test('failed preparation can be retried without creating an unknown action',async()=>{
@@ -51,6 +52,7 @@ test('an old prepared id is discarded and an unknown POST retry keeps the exact 
  await assert.rejects(api.mutate('/v1/me/actions',{action:'PLOW'}));assert.equal(ids,2);
  now=100_000;await api.prepareRequestId();assert.equal(ids,2);
  fail=false;await api.retry();assert.equal(ids,2);assert.equal(bodies[0],bodies[1]);
+ await api.mutate('/v1/me/actions',{action:'WATER'});assert.equal(JSON.parse(bodies[2]).requestId,'id-3');
 });
 test('unknown purchase result preserves request across reload and blocks new commands', async () => {
  const storage = memory(); const bodies = []; let online = false;
@@ -92,4 +94,69 @@ test('request uses server id, guards concurrent issuance, and expires without au
  release();await assert.rejects(attempt);
  assert.equal(JSON.parse(bodies[0]).requestId,'019a0000-0000-7000-8000-000000000001');
  assert.equal(api.pending,null);assert.equal(leases,1);assert.equal(posts,1);
+});
+
+
+const serverDate='Sat, 31 Oct 2026 12:00:00 GMT';
+const id1='019a0000-0000-7000-8000-000000000001',id2='019a0000-0000-7000-8000-000000000002';
+function leased(requestId=id1,expiresAt='2026-10-31T12:05:00Z',date=serverDate,status=200) {
+ return new Response(JSON.stringify({requestLease:{requestId,expiresAt}}),{status,headers:date?{Date:date}:{}});
+}
+test('farm and action replies supply single-use server ids without an issuance GET',async()=>{
+ const calls=[],bodies=[];let now=9_000_000;
+ const api=new ApiClient('http://localhost','alice',async()=>'token',memory(),async(url,init)=>{
+  calls.push(url);assert.equal(url.endsWith('/v1/request-id'),false);
+  if(init.method==='POST'){bodies.push(JSON.parse(init.body));return leased(id2);}
+  return leased();
+ },()=>now);
+ await api.get('/v1/me/farm');await api.prepareRequestId();
+ now+=100;await api.mutate('/v1/me/actions',{action:'PLOW'});await api.prepareRequestId();
+ now+=100;await api.mutate('/v1/me/actions',{action:'WATER'});
+ assert.deepEqual(bodies.map(body=>body.requestId),[id1,id2]);assert.equal(calls.length,3);
+});
+test('expired, nearly expired, malformed and undated reply leases fall back to issuance',async()=>{
+ for(const response of [leased(id1,'2026-10-31T11:59:00Z'),leased(id1,'2026-10-31T12:00:30Z'),
+  leased(id1,'bad'),leased(id1,undefined,''),leased(id1,undefined,'bad'),leased('bad')]){
+  let issued=0;const bodies=[];
+  const api=new ApiClient('http://localhost','alice',async()=>'token',memory(),async(url,init)=>{
+   if(url.endsWith('/v1/request-id')){issued++;return new Response(JSON.stringify({requestId:id2}));}
+   if(init.method==='POST'){bodies.push(JSON.parse(init.body));return new Response('{}');}
+   return response;
+  });
+  await api.get('/v1/me/farm');await api.mutate('/v1/me/actions',{});
+  assert.equal(issued,1);assert.equal(bodies[0].requestId,id2);
+ }
+});
+test('error replies cannot prepare an id and adopted leases expire on the monotonic clock',async()=>{
+ let now=0,issued=0,status=409;
+ const api=new ApiClient('http://localhost','alice',async()=>'token',memory(),async(url)=>{
+  if(url.endsWith('/v1/request-id')){issued++;return new Response(JSON.stringify({requestId:id2}));}
+  return leased(id1,undefined,serverDate,status);
+ },()=>now);
+ await assert.rejects(api.get('/v1/me/farm'));await api.prepareRequestId();assert.equal(issued,1);
+ status=200;await api.get('/v1/me/farm');now=30_000;
+ await api.prepareRequestId();assert.equal(issued,2);
+});
+test('an older issuance failure cannot discard a lease adopted from a newer response',async()=>{
+ let reject,issued=0;const gate=new Promise((_,r)=>reject=r);
+ const api=new ApiClient('http://localhost','alice',async()=>'token',memory(),async(url)=>{
+  if(url.endsWith('/v1/request-id')){issued++;return gate;}
+  return leased();
+ });
+ const preparation=api.prepareRequestId();await new Promise(resolve=>setImmediate(resolve));
+ await api.get('/v1/me/farm');reject(new TypeError('offline'));await assert.rejects(preparation);
+ await api.prepareRequestId();assert.equal(issued,1);
+});
+test('consuming an older issuance preserves a newer adopted lease for the next action',async()=>{
+ let release,issued=0;const gate=new Promise(resolve=>release=resolve),bodies=[];
+ const api=new ApiClient('http://localhost','alice',async()=>'token',memory(),async(url,init)=>{
+  if(url.endsWith('/v1/request-id')){issued++;await gate;return new Response(JSON.stringify({requestId:id2}));}
+  if(init.method==='POST'){bodies.push(JSON.parse(init.body));return new Response('{}');}
+  return leased();
+ });
+ const action=api.mutate('/v1/me/actions',{action:'PLOW'});
+ await new Promise(resolve=>setImmediate(resolve));
+ await api.get('/v1/me/farm');release();await action;
+ await api.mutate('/v1/me/actions',{action:'WATER'});
+ assert.deepEqual(bodies.map(body=>body.requestId),[id2,id1]);assert.equal(issued,1);
 });
