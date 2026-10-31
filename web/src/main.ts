@@ -124,7 +124,7 @@ async function refresh(){
  try{
   const farm=await client.get<Farm>('/v1/me/farm');if(generation!==sessionGeneration)return;own=acceptFarm(own,farm);
   if(visited&&navigation===navigationGeneration){const target=visited.owner;const incoming=await client.get<Farm>(`/v1/farms/${target}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||visited?.owner!==target)return;visited=acceptFarm(visited,incoming);}
-  showConnection();render();
+  showConnection();render();void client.prepareRequestId().catch(()=>{});
  }catch(error){if(generation===sessionGeneration)handleError(error);}
 }
 function handleError(error:unknown){
@@ -144,7 +144,7 @@ async function action(fields:CommandFields,path='/v1/me/actions'){
  if(!navigator.onLine){notify('Sem conexão. Reconecte antes de agir.');return;}
  busy=true;let stale=false;const client=api,generation=sessionGeneration,previousFarm=own,animalReady=fields.action==='TEND_ANIMAL'&&own.animals.some(animal=>animal.id===fields.itemId&&animal.status==='READY');
  try{const reply=await client.mutate(path,{...fields,expectedRevision:path==='/v1/me/actions'?own.revision:visited!.revision});if(generation===sessionGeneration){receive(reply,false);if(reply.result?.success&&own){const reward=actionRewardModel(previousFarm,own);notifyAction(reply.result.message,String(fields.action),typeof fields.itemId==='string'?fields.itemId:undefined,reward);const cue=reward.leveledUp?'levelup':soundForAction(String(fields.action),animalReady);if(cue)playEffect(cue);}else if(reply.result)notify(reply.result.message);}}
- catch(error){stale=error instanceof ApiError&&[409,410].includes(error.status);if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();if(stale)void refresh();}}
+ catch(error){stale=error instanceof ApiError&&[409,410].includes(error.status);if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();if(stale)void refresh();else void client.prepareRequestId().catch(()=>{});}}
 }
 function playEffect(file:string){if(!effectsEnabled)return;const audio=new Audio(`/assets/sounds/${file}.wav`);audio.volume=.65;void audio.play().catch(()=>{});}
 async function tileAction(tile:Tile){

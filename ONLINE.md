@@ -4,6 +4,35 @@ O desktop continua disponível. O servidor online cria fazendas novas e não imp
 
 ## Testar o servidor
 
+### Latência e medição
+
+O servidor reutiliza conexões PostgreSQL com HikariCP 7.0.2: máximo de quatro,
+mínimo de uma ociosa, espera por conexão de até cinco segundos e renovação após
+dez minutos. O pool é encerrado com a API. TLS `verify-full`, transações, locks,
+rollback e validação remota da sessão continuam ativos. O Session pooler do
+Supabase não substitui este pool: a aplicação também precisa reaproveitar sua
+conexão TCP/TLS até ele.
+
+O cliente antecipa um único identificador emitido pelo servidor após atualizar a
+fazenda ou concluir uma ação. Ele é consumido uma vez e descartado depois de
+30 segundos sem uso. A intenção é gravada antes do POST; retries continuam usando
+exatamente o mesmo identificador e corpo. Falha da antecipação não impede a
+próxima tentativa. Não existe fila de ações econômicas offline.
+
+Respostas bem-sucedidas da API incluem `Server-Timing`, em milissegundos:
+`auth` (Supabase Auth), `db_connect` (aquisição no pool), `db` (transação) e
+`app` (processamento até enviar a resposta, incluindo as etapas anteriores).
+`db` inclui esperas por locks e viagens SQL; não significa apenas CPU do banco.
+Esses números não incluem a viagem de rede do navegador. As métricas não levam
+tokens, SQL nem dados do jogador. Compare no painel Network do navegador após
+aquecer a API; `/health` não mede autenticação nem banco.
+
+Em 31/10/2026, antes desta correção, Amigos levou 2.335 ms até mostrar a lista
+na sessão real, por observação da interface. O health acordado havia respondido
+em 173–203 ms. Esses valores são uma amostra, não percentis nem uma promessa de
+ganho. A melhora em produção depende de publicar cliente e API e repetir o
+ensaio. Hospedagem e regiões não foram alteradas.
+
 Requer JDK 21, Gradle Wrapper e PostgreSQL 17 descartável. Nunca aponte os testes para dados pessoais. A integração exige banco `colheita_test` em localhost e cria schemas exclusivos por caso.
 
 ```powershell

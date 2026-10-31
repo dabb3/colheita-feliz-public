@@ -25,7 +25,7 @@ import java.util.function.Supplier;
 import static br.com.colheitafeliz.server.OnlineViews.JSON;
 import static br.com.colheitafeliz.server.OnlineViews.object;
 
-final class OnlineGameService {
+final class OnlineGameService implements AutoCloseable {
     private record Loaded(UUID owner, String name, GameState game, long revision, GameSnapshot before) {}
     private final JdbcOnlineStore store;
     private final Clock clock;
@@ -37,6 +37,8 @@ final class OnlineGameService {
     OnlineGameService(JdbcOnlineStore store, Clock clock, RandomSource random, int limit) {
         this.store = store; this.clock = clock; this.random = random; this.limit = limit;
     }
+
+    @Override public void close() { store.close(); }
 
     JsonObject catalog() {
         var fixed = Clock.fixed(clock.instant(), ZoneOffset.UTC);

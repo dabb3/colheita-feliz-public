@@ -7,6 +7,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -19,6 +20,19 @@ class OnlineGameIntegrationTest {
     private JdbcOnlineStore store;
     private String testSchema;
     private OnlineGameService service;
+
+    @AfterEach void closeStore() { if (store != null) store.close(); }
+
+    @Test void pooledConnectionSurvivesRollbackWithoutLeakingChangesToNextTransaction() {
+        int backend = store.transaction(alice, tx -> tx.query("SELECT pg_backend_pid()", row -> row.getInt(1)).getFirst());
+        assertThrows(IllegalStateException.class, () -> store.transaction(alice, tx -> {
+            tx.setActive(alice, false);
+            throw new IllegalStateException("rollback probe");
+        }));
+        assertTrue(store.transaction(alice, tx -> tx.player(alice).active()).booleanValue());
+        int next = store.transaction(alice, tx -> tx.query("SELECT pg_backend_pid()", row -> row.getInt(1)).getFirst());
+        assertEquals(backend, next);
+    }
 
     @Test void httpRejectsForgedFieldsMalformedBodiesAndUnapprovedOrigins() throws Exception {
         Authenticator auth = header -> {
@@ -35,6 +49,10 @@ class OnlineGameIntegrationTest {
             var own = client.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base + "/v1/me/farm"))
                     .header("Authorization", "Bearer test").build(), java.net.http.HttpResponse.BodyHandlers.ofString());
             assertEquals(200, own.statusCode());
+            String timing = own.headers().firstValue("Server-Timing").orElseThrow();
+            assertTrue(timing.contains("auth;dur="));
+            assertTrue(timing.contains("db_connect;dur="));
+            assertTrue(timing.contains("db;dur="));
             assertEquals("Alice", com.google.gson.JsonParser.parseString(own.body()).getAsJsonObject().get("name").getAsString());
             var invitation = service.createInvitation(alice, requestId());
             service.acceptInvitation(bob, "Bob", invitation.get("code").getAsString(), requestId());
