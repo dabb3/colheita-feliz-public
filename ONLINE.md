@@ -83,6 +83,8 @@ No desenvolvimento, `Bearer dev-alice` e `Bearer dev-bob` representam duas conta
 
 ## Configuração de produção
 
+Preparação alternativa da API em São Paulo, sem deploy ou gastos autorizados: [Fly.io GRU](FLY.md). O piloto continua no Render até concluir medições e aprovar a troca.
+
 Construir com `docker build -t colheita-server .`. O runtime inclui somente Java, core, catálogo e servidor. Configurar no provedor, nunca no repositório:
 
 - `AUTH_MODE`: `production` (padrão).
