@@ -1,37 +1,43 @@
 # Preparação da API no Fly.io — São Paulo
 
-**Estado: arquivos preparados; nenhum recurso Fly criado ou publicado.** O responsável autorizou somente preparação, sem gastos. A configuração mantém uma máquina ligada e terá cobrança quando implantada. Aprovar preço regional, tráfego, eventual build remoto e teto de gasto antes de executar os comandos de criação/deploy abaixo. Alertas de orçamento não devem ser tratados como limite rígido de cobrança.
+**Estado: preparação local para a aplicação existente `colheita-feliz-public`, organização `akaza-291`.** A inspeção de 31/10/2026 encontrou uma máquina parada em GRU, sem secrets, com falha `Missing OWNER_USER_ID`. Esta atualização altera somente arquivos locais; não executa deploy, inicia máquinas, cadastra secrets ou altera recursos remotos. A configuração mantém uma máquina ligada quando aplicada; gastos exigem aprovação posterior. Alertas de orçamento não devem ser tratados como limite rígido de cobrança.
 
 O objetivo é medir o mesmo servidor perto do Supabase em São Paulo. Cloudflare Pages e o banco atual permanecem onde estão. Autenticação, quatro threads HTTP, fila de 32 e pool HikariCP de quatro conexões continuam iguais. Não há garantia de capacidade para 30 jogadores antes do teste de carga.
 
 ## Arquivos e limites
 
-- `fly.toml`: região `gru`, duas CPUs compartilhadas, 1 GB, HTTPS, porta 8080, sem suspensão automática e verificação `/health`.
+- `fly.toml`: região `gru`, uma CPU compartilhada, 512 MB, HTTPS, porta 8080, sem suspensão automática e verificação `/health`.
 - `Dockerfile`: reutilizado sem alterações, Java 21 e usuário `10001:10001`.
 - CA pública Supabase injetada em `/etc/secrets/root.crt` pelo secret `SUPABASE_CA_CERT`, cujo valor deve ser o PEM codificado em base64.
-- Nome `colheita-feliz-api` é uma proposta; disponibilidade e capacidade em GRU ainda não verificadas.
-- `min_machines_running = 1` não limita o máximo de máquinas. O primeiro deploy deve usar `--ha=false`, seguido da conferência de que há exatamente uma máquina em GRU. Não usar autoscaling nesta etapa.
+- Usar a aplicação existente `colheita-feliz-public`; não criar outra aplicação. Capacidade de produção para 10–30 jogadores não está comprovada.
+- `min_machines_running = 1` não limita o máximo de máquinas. O deploy futuro deve usar `--ha=false`, seguido da conferência de que há exatamente uma máquina em GRU. A aplicação já tem uma máquina; essa opção não remove máquinas extras existentes. Não usar autoscaling nesta etapa.
 - Uma máquina não oferece alta disponibilidade. Reinícios e deploys podem interromper conexões; recibos e o mesmo identificador de ação continuam necessários para retomada.
 
-## Antes de criar recursos
+## Custo estimado do teste econômico
+
+Na [calculadora oficial](https://fly.io/calculator/), consultada em 31/10/2026, uma máquina GRU com uma CPU compartilhada e 512 MB ligada por 730 horas apresentou estimativa de **US$ 5,97**, mais encargos aplicáveis. É uma estimativa de computação e memória, não um teto de cobrança nem uma franquia gratuita. O custo varia com tempo de execução, preços e recursos utilizados.
+
+Pelas [regras de cobrança](https://docs.fly.io/about/pricing), podem incidir tráfego de saída na América do Sul (US$ 0,04/GB), rootfs enquanto a máquina estiver parada (US$ 0,15/GB-mês) e eventuais IPs dedicados, volumes, impostos ou outros recursos contratados. Não há volume previsto e não é necessário IPv4 dedicado. Aprovar orçamento antes de iniciar o teste; não contratar recursos adicionais automaticamente.
+
+## Antes de aplicar a configuração
 
 1. Aprovar orçamento e confirmar preços de GRU no painel/tabela oficial. Não usar a tarifa de Virginia como estimativa definitiva para São Paulo.
-2. Criar/acessar a conta Fly pelo responsável, aceitar eventuais termos e configurar cobrança somente após essa decisão. A CLI não foi instalada nesta preparação.
+2. Confirmar a organização `akaza-291` e a elegibilidade de cobrança pelo responsável. A CLI não foi instalada nesta preparação; login MCP não substitui a autenticação da CLI.
 3. Conferir o commit aprovado e passar pelo fluxo de PR. O arquivo não dispara deploy automático; não foi criado workflow ou token de CI.
 4. Guardar configuração atual do Render e `PUBLIC_API_URL` do Pages sem imprimir senhas/tokens. Validar backup e restauração antes de liberar escrita no novo host.
 5. Revalidar comportamento com o PostgreSQL descartável do CI e build normal. Não apontar a suíte de integração ou testes de carga ao banco dos jogadores.
 
-## Provisionamento futuro, após aprovação
+## Aplicação futura, após aprovação
 
-Instalar `flyctl` apenas da fonte oficial, autenticar e verificar a organização correta. Confirmar nome disponível; se necessário, ajustar `app` no arquivo antes da criação. Não executar `fly launch` aceitando valores padrão que criem banco, volumes ou máquinas extras.
+Se necessário, instalar `flyctl` apenas da fonte oficial, autenticar e verificar a organização correta. Usar o app já existente, sem executar `fly apps create` ou `fly launch` com valores padrão que criem banco, volumes ou máquinas extras.
 
 ```powershell
 fly auth whoami
 fly config validate --config fly.toml
-fly apps create colheita-feliz-api --org <organizacao-aprovada>
+fly status --app colheita-feliz-public
 ```
 
-Esses comandos são um roteiro, não evidência de execução. A organização, a conta e a disponibilidade do nome continuam pendentes. A criação da conta/recursos exige aprovação posterior; a validação TOML local não substitui a validação do Fly.
+Esses comandos são um roteiro, não evidência de execução nesta atualização. A aplicação existente foi inspecionada em modo somente leitura. A aplicação de mudanças exige aprovação posterior; a validação TOML local não substitui a validação do Fly.
 
 ### Configuração e certificado
 
@@ -45,12 +51,12 @@ Começar com o mesmo Session pooler de São Paulo usado pelo Render: muda-se ape
 
 ```powershell
 fly deploy --config fly.toml --ha=false
-fly machine list --app colheita-feliz-api
-fly status --app colheita-feliz-api
-fly checks list --app colheita-feliz-api
+fly machine list --app colheita-feliz-public
+fly status --app colheita-feliz-public
+fly checks list --app colheita-feliz-public
 ```
 
-Conferir exatamente uma máquina, região GRU, 2 CPUs compartilhadas e 1 GB. No runtime, confirmar que o usuário 10001 lê o certificado. Falha de leitura ou conexão impede a migração; não alterar permissões de autenticação/SSL para contorná-la. Não há volume: fazendas continuam persistidas no PostgreSQL.
+Conferir exatamente uma máquina, região GRU, uma CPU compartilhada e 512 MB. Usar somente `memory = "512mb"`, sem o campo conflitante `memory_mb` da configuração remota anterior. Confirmar health check `/health`, HTTPS e conectividade pública; a inspeção anterior não encontrou IPs públicos atribuídos. Não alocar IPs nesta preparação. No runtime, confirmar que o usuário 10001 lê o certificado. Falha de leitura ou conexão impede a migração; não alterar permissões de autenticação/SSL para contorná-la. Não há volume: fazendas continuam persistidas no PostgreSQL.
 
 ## Comparação antes de trocar o frontend
 
@@ -74,6 +80,6 @@ Para rollback, restaurar `PUBLIC_API_URL=https://colheita-feliz-api.onrender.com
 
 ## Verificado nesta preparação
 
-Sintaxe TOML e contratos locais de porta, Dockerfile, usuário, certificado e configuração conferidos com parser padrão. Não houve instalação da CLI, criação de conta/app/máquina, deploy, teste de carga ou troca de endpoint. `fly config validate`, permissões reais do arquivo e desempenho em GRU permanecem pendentes.
+Sintaxe TOML e contratos locais de nome, região, CPU/RAM, porta, Dockerfile, usuário, certificado e configuração conferidos com parser padrão. Nesta atualização não houve instalação da CLI, criação de conta/app/máquina, deploy, inicialização, cadastro de secrets ou troca de endpoint. A máquina existente e a aplicação remota permanecem intactas. `fly config validate`, permissões reais do arquivo e desempenho em GRU permanecem pendentes.
 
 Fontes oficiais consultadas em 31/10/2026: [configuração](https://docs.fly.io/reference/configuration), [deploy e redundância padrão](https://docs.fly.io/launch/deploy), [secrets](https://docs.fly.io/apps/secrets), [preços](https://docs.fly.io/about/pricing). Context7 não foi usado para este provedor; configuração conferida na documentação oficial.

@@ -1,6 +1,6 @@
 # Preparação apenas: criar/deployar recursos exige aprovação de orçamento.
-# Nome sujeito a disponibilidade. Primeiro deploy: fly deploy --ha=false.
-app = "colheita-feliz-api"
+# Aplicação existente. Deploy futuro: fly deploy --ha=false; conferir uma máquina.
+app = "colheita-feliz-public"
 primary_region = "gru"
 kill_signal = "SIGTERM"
 kill_timeout = 30
@@ -29,8 +29,8 @@ kill_timeout = 30
 
 [[vm]]
   cpu_kind = "shared"
-  cpus = 2
-  memory = "1gb"
+  cpus = 1
+  memory = "512mb"
 
 [[files]]
   guest_path = "/etc/secrets/root.crt"
