@@ -39,7 +39,7 @@ export function renderMarket(root:HTMLElement,catalog:Catalog,farm:Farm|undefine
  }
  const entries=category==='crops'?catalog.crops.filter(c=>c.vipOnly===(seedGroup==='vip')).map(c=>({id:c.id,name:c.name,image:`classic/crops/plants_phase_one_to_five/${c.spriteStem}_5.png`,
   details:`${c.growthSeconds/3600} h · ${c.seasons} temporada(s)`,prices:c.seedPrices,level:c.requiredLevel,vip:c.vipOnly,action:'BUY_SEED',owned:false})):
-  category==='animals'?catalog.animals.map(a=>({id:a.id,name:a.name,image:a.id==='abelha'?'classic/animals/abelha/abelha.png':animalPath(a.id,'ADULT',false,false),
+  category==='animals'?catalog.animals.map(a=>({id:a.id,name:a.name,image:a.id==='abelha'?'classic/animals/abelha/abelha.png':animalPath(a.id,'ADULT',false,false,false),
    details:a.productName,prices:a.prices,level:a.requiredLevel,vip:false,action:'BUY_ANIMAL',owned:!!farm?.animals.some(animal=>animal.id===a.id)})):
   catalog.fertilizers.map(f=>({id:f.id,name:f.name,image:`classic/icons/adubo-${f.id}.png`,details:`Reduz ${f.reductionSeconds/60} min${f.friendsOnly?' · em amigos':''}`,
    prices:f.prices,level:f.requiredLevel,vip:false,action:'BUY_FERTILIZER',owned:false}));

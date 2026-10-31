@@ -13,10 +13,9 @@ const prices=(values:Record<string,number|undefined>)=>Object.fromEntries(Object
 const catalog:Catalog={crops:crops.map(crop=>({...crop,seedPrices:prices(crop.seedPrices)})),animals:animals.map(animal=>({...animal,prices:prices(animal.prices)})),fertilizers:fertilizers.map(f=>({...f,prices:prices(f.prices)})),feedPrices:{producer:120,growth:80},vip:{greenPrice:0}};
 const params=new URLSearchParams(location.search),period=params.get('period')??'day';
 const stage=params.get('stage')??'ADULT';
-const clock=()=>new Date(2026,9,30,period==='night'?22:period==='sunset'?18:12);
 const canvas=document.getElementById('farm') as HTMLCanvasElement;
 const audio=new GameAudio();audio.setActive(true);
-const scene=new Scene(canvas,catalog,tile=>{document.getElementById('notice')!.textContent=`Terra ${tile.column+1}, ${tile.row+1}`;},animalPanel,health,clock);
+const scene=new Scene(canvas,catalog,tile=>{document.getElementById('notice')!.textContent=`Terra ${tile.column+1}, ${tile.row+1}`;},animalPanel,health);
 const tiles=Array.from({length:30},(_,i)=>{
  const row=Math.floor(i/6),column=i%6,stage=row+1,crop=crops[column];
  return{column,row,unlocked:column<5,state:column===4?'DEAD':stage===5?'READY':'GROWING',cropId:column<5?crop.id:undefined,stage,season:1,seasons:crop.seasons,
@@ -60,7 +59,7 @@ document.getElementById('friends')!.onclick=()=>openPanel('Amigos — demonstra�
 document.getElementById('settings')!.onclick=()=>openPanel('Ajustes de áudio',root=>renderAudioSettings(root,audio.settings,(channel,enabled,volume)=>{audio.unlock();if(channel==='music')audio.setMusic(enabled);else audio.setEffects(enabled);audio.setVolume(channel,volume);}));
 document.addEventListener('pointerdown',()=>audio.unlock(),{once:true});document.addEventListener('keydown',()=>audio.unlock(),{once:true});
 document.addEventListener('visibilitychange',()=>audio.setActive(!document.hidden));
-document.querySelectorAll<HTMLButtonElement>('[data-effect]').forEach(button=>button.onclick=()=>{const action=button.dataset.effect!;audio.unlock();audio.play(action);scene.effect(action,2,0);demonstration();});
+document.querySelectorAll<HTMLButtonElement>('[data-effect]').forEach(button=>button.onclick=()=>{const action=button.dataset.effect!;audio.unlock();audio.play(action);demonstration();});
 document.getElementById('close-modal')!.onclick=()=>modal.close();
 document.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach(button=>button.onclick=()=>button.setAttribute('aria-pressed',String(button.getAttribute('aria-pressed')!=='true')));
 window.addEventListener('pagehide',()=>{scene.close();audio.close();},{once:true});

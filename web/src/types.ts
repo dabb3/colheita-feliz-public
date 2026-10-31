@@ -8,8 +8,9 @@ export interface Animal { id:string; stage:string; status:string; remainingSecon
 export interface Farm {
  owner:string; name:string; revision:string; serverTime:string; own:boolean;
  tiles:Tile[]; animals:Animal[];
- coins?:string; greenCoins?:string; level?:number; currentXp?:string; xpToNext?:string; depositTotals?:Record<string,string|number>;
+ coins?:string; greenCoins?:string; level?:number; currentXp?:string; xpToNext?:string;
  vipActive?:boolean; vipExpiresAt?:string; seedCounts?:Record<string,number>;
+ depositTotals?:Record<string,string|number>;
  produceLots?:{itemId:string; quantity:number; currency:string;vipOnly?:boolean}[];
  feed?:Record<string,number>; fertilizers?:Record<string,number>;
  tutorial?:{title?:string; hint?:string};tutorialStep?:number;tutorialTotal?:number; missions?:{id:string; title:string;green:number;progress:number;target:number;done:boolean}[];

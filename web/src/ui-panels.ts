@@ -30,7 +30,7 @@ export function renderDeposit(root:HTMLElement,catalog:Catalog,farm:Farm,categor
    const items=[...groups].filter(([id])=>{const crop=catalog.crops.some(item=>item.id===id),animal=catalog.animals.some(item=>item.productId===id);return kind==='crop'?crop:kind==='animal'?animal:!crop&&!animal;});if(!items.length)continue;
    const section=document.createElement('section');section.className='deposit-group';section.append(text('h3',label));const grid=document.createElement('div');grid.className='cards inventory-cards';section.append(grid);
    for(const [id,lots]of items){count+=1;const crop=catalog.crops.find(item=>item.id===id),animal=catalog.animals.find(item=>item.productId===id);
-    const art=crop?`classic/crops/plants_phase_one_to_five/${crop.spriteStem}_5.png`:animal?productPath(animal.id,'READY')??animalPath(animal.id,'ADULT',false,false):'classic/icons/deposit-icon.png';
+    const art=crop?`classic/crops/plants_phase_one_to_five/${crop.spriteStem}_5.png`:animal?productPath(animal.id,'READY')??animalPath(animal.id,'ADULT',false,false,false):'classic/icons/deposit-icon.png';
     const quantity=lots.reduce((sum,lot)=>sum+lot.quantity,0),card=inventoryCard(crop?.name??animal?.productName??id,art,quantity);
     const currencies=new Map<string,number>();for(const lot of lots)currencies.set(lot.currency,(currencies.get(lot.currency)??0)+lot.quantity);
     card.append(text('p',[...currencies].map(([currency,amount])=>`${amount} em ${currency==='GOLD'?'ouro':'verdes'}`).join(' · ')));
@@ -72,7 +72,7 @@ export function renderPlantHealth(root:HTMLElement,catalog:Catalog,tile:Tile|nul
 export function renderAnimal(root:HTMLElement,catalog:Catalog,farm:Farm,id:string,canTend:boolean,onAction:(fields:CommandFields)=>void) {
  root.replaceChildren();const animal=farm.animals.find(a=>a.id===id),type=catalog.animals.find(a=>a.id===id);
  if(!animal||!type){root.append(text('p','Este animal não está mais nesta fazenda.'));return;}
- const card=inventoryCard(type.name,animalPath(id,animal.stage,false,false),1);root.append(card);
+ const card=inventoryCard(type.name,animalPath(id,animal.stage,false,false,false),1);root.append(card);
  const stages:Record<string,string>={BABY:'Filhote',YOUNG:'Jovem',ADULT:'Adulto'};
  const status=animal.status==='HUNGRY'?'Com fome':animal.status==='READY'?(type.kind==='GROWING'?'Adulto disponível para venda':'Produto pronto'):type.kind==='PROTECTOR'?'Protegendo a fazenda':type.kind==='PRODUCER'?'Produzindo':'Em crescimento';
  card.append(text('p',`${stages[animal.stage]??animal.stage} · ${status}`));
