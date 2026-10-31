@@ -10,12 +10,13 @@ export interface Farm {
  tiles:Tile[]; animals:Animal[];
  coins?:string; greenCoins?:string; level?:number; currentXp?:string; xpToNext?:string;
  vipActive?:boolean; vipExpiresAt?:string; seedCounts?:Record<string,number>;
+ depositTotals?:Record<string,string|number>;
  produceLots?:{itemId:string; quantity:number; currency:string;vipOnly?:boolean}[];
  feed?:Record<string,number>; fertilizers?:Record<string,number>;
- tutorial?:{title?:string; hint?:string}; missions?:{id:string; title:string;green:number;done:boolean}[];
+ tutorial?:{title?:string; hint?:string};tutorialStep?:number;tutorialTotal?:number; missions?:{id:string; title:string;green:number;progress:number;target:number;done:boolean}[];
  nextPlot?:{column:number;row:number};
 }
-export interface Crop {id:string;name:string;growthSeconds:number;seasons:number;stages:number;spriteStem:string;requiredLevel:number;vipOnly:boolean;seedPrices:Record<string,number>;}
+export interface Crop {id:string;name:string;growthSeconds:number;regrowthSeconds:number;seasons:number;stages:number;spriteStem:string;requiredLevel:number;vipOnly:boolean;seedPrices:Record<string,number>;}
 export interface AnimalType {id:string;name:string;kind:string;requiredLevel:number;prices:Record<string,number>;productId:string;productName:string;}
 export interface Fertilizer {id:string;name:string;prices:Record<string,number>;requiredLevel:number;reductionSeconds:number;friendsOnly:boolean;}
 export interface Catalog {crops:Crop[];animals:AnimalType[];fertilizers:Fertilizer[];feedPrices:Record<string,number>;vip:{greenPrice:number};}

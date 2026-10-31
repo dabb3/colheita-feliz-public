@@ -8,19 +8,15 @@ import {ApiError,acceptFarm} from '../src/api.ts';
 const farm=owner=>({owner,name:owner,revision:'1',tiles:[],animals:[],seedCounts:{}});
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve};}
 function app(){
- const wallets=[],panels=[];
- const elements=new Map();const make=()=>({value:'',selectedIndex:0,hidden:false,children:[],style:{setProperty(){}},replaceChildren(){this.children=[];},append(...nodes){this.children.push(...nodes);},setAttribute(){},addEventListener(){},close(){this.open=false;},showModal(){this.open=true;}});
+ const elements=new Map(),listeners=new Map(),audioClips=[];const make=()=>({value:'',selectedIndex:0,hidden:false,children:[],classList:{add(){},remove(){},toggle(){}},replaceChildren(...nodes){this.children=nodes;},append(...nodes){this.children.push(...nodes);},prepend(...nodes){this.children.unshift(...nodes);},insertBefore(node,before){this.children.splice(this.children.indexOf(before),0,node);},setAttribute(){},querySelector(){return null;},addEventListener(){},close(){this.open=false;},showModal(){this.open=true;}});
  const storage={getItem:()=>null,setItem(){},removeItem(){}};
- const ctx={window:{COLHEITA_CONFIG:{development:true},setInterval(){},setTimeout(){},addEventListener(){}},document:{getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createTextNode:text=>text,addEventListener(){}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,GameAudio:class{settings={effects:false,music:false,effectsVolume:.65,musicVolume:.3};setActive(){}play(){}unlock(){}close(){}},renderWallet(...args){wallets.push(args);},renderMarket(){},renderDeposit(...args){panels.push(["deposit",...args]);},renderMissions(...args){panels.push(["missions",...args]);},renderAnimal(...args){panels.push(["animal",...args]);},renderPlantHealth(){},renderFriends(...args){panels.push(["friends",...args]);},tileCenter:()=>({x:585,y:400}),clearTimeout(){},HTMLInputElement:class{},HTMLSelectElement:class{}};
+ const ctx={window:{COLHEITA_CONFIG:{development:true},setInterval(){},setTimeout(){},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(){audioClips.push(this);}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={refresh,action,friends,health,invitationForm,animalPanel:typeof animalPanel==="undefined"?undefined:animalPanel,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;scene=v.scene;catalog={crops:[],fertilizers:[],animals:[]};}};';
- runInNewContext(stripTypeScriptTypes(source),ctx);return{h:ctx.h,elements,wallets,panels,doc:ctx.document};
+ source+='\nglobalThis.h={refresh,logout,toggleMusic,shop,missions,friends,receive,dialog,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
+ runInNewContext(stripTypeScriptTypes(source),ctx);return{h:ctx.h,elements,listeners,audioClips,ctx};
 }
-
-test('live client renders the same wallet as the visual sample',()=>{
- const {h,elements,wallets}=app(),own=farm('alice');h.set({own,visited:farm('bob')});
- elements.get('home').onclick();assert.equal(wallets.length,1);assert.equal(wallets[0][1],own);assert.equal(wallets[0][2],undefined);
-});
+function text(node){return(node.textContent??'')+(node.children??[]).map(child=>typeof child==='object'?text(child):child).join('');}
+function descendants(node){return[node,...(node.children??[]).flatMap(child=>typeof child==='object'?descendants(child):[])];}
 test('late visit response cannot reopen a visit after returning home',async()=>{
  const {h,elements}=app(),started=deferred(),reply=deferred();
  h.set({own:farm('alice'),visited:farm('bob'),api:{pending:null,get:path=>path==='/v1/me/farm'?Promise.resolve(farm('alice')):(started.resolve(),reply.promise)}});
@@ -30,58 +26,45 @@ test('late visit response cannot reopen a visit after returning home',async()=>{
 test('late retry response cannot restore a logged-out farm',async()=>{
  const {h,elements}=app(),reply=deferred();
  h.set({own:farm('alice'),api:{pending:{},retry:()=>reply.promise}});
- const retry=elements.get('retry').onclick();await elements.get('logout').onclick();reply.resolve({farm:farm('alice')});await retry;
+ const retry=elements.get('retry').onclick();await h.logout();reply.resolve({farm:farm('alice')});await retry;
  assert.equal(h.get().own,undefined);assert.equal(elements.get('game').hidden,true);
+});
+test('music pauses while hidden and on logout, then resumes when visible',async()=>{
+ const {h,listeners,ctx,audioClips}=app();h.set({own:farm('alice')});h.toggleMusic();const music=audioClips[0];assert.equal(music.playCount,1);
+ ctx.document.hidden=true;listeners.get('visibilitychange')();assert.equal(music.paused,true);
+ ctx.document.hidden=false;listeners.get('visibilitychange')();assert.equal(music.playCount,2);
+ await h.logout();assert.equal(music.paused,true);
+});
+test('open owned-animal screen refreshes after a successful state update',()=>{
+ const {h,elements}=app(),farmState={...farm('alice'),level:1,feed:{producer:1},animals:[{id:'vaca',stage:'ADULT',status:'READY',remainingSeconds:0}]};
+ h.set({own:farmState,catalog:{crops:[],fertilizers:[],feedPrices:{producer:10,growth:10},animals:[{id:'vaca',name:'Vaca',kind:'PRODUCER',productName:'Leite'}],vip:{greenPrice:20}}});
+ h.shop('owned');assert.match(text(elements.get('modal-content')),/Recolher produto/);
+ h.receive({farm:{...farmState,revision:'2',animals:[{id:'vaca',stage:'ADULT',status:'PRODUCING',remainingSeconds:3600}]}});
+ assert.doesNotMatch(text(elements.get('modal-content')),/Recolher produto/);assert.match(text(elements.get('modal-content')),/PRODUCING/);
+});
+test('open missions screen refreshes progress after a farm update',()=>{
+ const {h,elements}=app(),farmState={...farm('alice'),missions:[{id:'m',title:'Colher',green:1,progress:1,target:2,done:false}]};
+ h.set({own:farmState});h.missions();assert.match(text(elements.get('modal-content')),/1 \/ 2/);
+ h.receive({farm:{...farmState,revision:'2',missions:[{...farmState.missions[0],progress:2,done:true}]}});
+ assert.match(text(elements.get('modal-content')),/2 \/ 2 · Concluída · recompensa recebida/);
+});
+test('late invitation acceptance does not close a newer dialog',async()=>{
+ const {h,elements}=app(),reply=deferred();h.set({own:farm('alice'),api:{pending:null,mutate:()=>reply.promise,get:()=>Promise.resolve(farm('alice'))}});
+ h.dialog('Amigos');const acceptance=h.acceptInvitation('invite',h.dialogGeneration(),true);h.dialog('Loja');reply.resolve({});await acceptance;
+ assert.equal(elements.get('modal').open,true);assert.equal(elements.get('modal-title').textContent,'Loja');
+});
+test('late farm visit neither starts nor closes a newer dialog',async()=>{
+ const {h,elements}=app(),reply=deferred();h.set({own:farm('alice'),api:{pending:null,get:path=>path==='/v1/friends'?Promise.resolve([{id:'bob',name:'Bob'}]):reply.promise}});
+ await h.friends();descendants(elements.get('modal-content')).find(node=>node.textContent==='Visitar fazenda').onclick();h.dialog('Loja');reply.resolve(farm('bob'));
+ await new Promise(resolve=>setTimeout(resolve,0));assert.equal(h.get().visited,undefined);assert.equal(elements.get('modal').open,true);assert.equal(elements.get('modal-title').textContent,'Loja');
 });
 test('closed canvas scene removes previous event handlers',()=>{
  const handlers=new Map(),calls=[];
  const canvas={width:1600,height:900,getContext:()=>({}),getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(name,handler,options){const list=handlers.get(name)??[];list.push(handler);handlers.set(name,list);options?.signal?.addEventListener('abort',()=>handlers.set(name,handlers.get(name).filter(h=>h!==handler)));}};
- const ctx={window:{setInterval:()=>1},clearInterval(){},document:{hidden:true,addEventListener(){}},AbortController,pickTile:()=>({column:0,row:0})};
+ const cancelled=[];const ctx={window:{requestAnimationFrame:()=>1,cancelAnimationFrame:id=>cancelled.push(id)},document:{hidden:true},AbortController,pickTile:()=>({column:0,row:0})};
  let source=readFileSync(new URL('../src/scene.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('export class Scene','class Scene');
  runInNewContext(stripTypeScriptTypes(source)+'\nglobalThis.TestScene=Scene;',ctx);
  for(const revision of ['1','2']){const scene=new ctx.TestScene(canvas,{},tile=>calls.push(tile.harvestRevision),()=>{},()=>{});scene.update({...farm('alice'),tiles:[{column:0,row:0,harvestRevision:revision}]});if(revision==='1')scene.close();}
+ assert.deepEqual(cancelled,[1]);
  for(const handler of handlers.get('click'))handler({clientX:585,clientY:400});assert.deepEqual(calls,['2']);
-});
-
-test('inventory and individual animal are integrated with own versus visited identity',()=>{
- const {h,elements,panels}=app(),own=farm('alice'),visited=farm('bob');h.set({own,visited});
- elements.get('deposit').onclick();assert.equal(panels[0]?.[0],'deposit');assert.equal(panels[0][3],own);
- h.animalPanel('vaca');const animal=panels.find(p=>p[0]==='animal');assert.equal(animal[3],visited);assert.equal(animal[4],'vaca');assert.equal(animal[5],false);
- h.animalPanel('vaca',true);const ownAnimal=panels.at(-1);assert.equal(ownAnimal[3],own);assert.equal(ownAnimal[5],true);
-});
-
-test('late friend list cannot append to a different modal',async()=>{
- const {h,elements}=app(),reply=deferred();h.set({own:farm('alice'),api:{get:()=>reply.promise}});
- const request=h.friends();elements.get('deposit').onclick();const content=elements.get('modal-content'),before=[...content.children];
- reply.resolve([{id:'bob',name:'Bob'}]);await request;assert.deepEqual(content.children,before);
-});
-
-test('polling refreshes the open animal panel after a temporal state change',async()=>{
- const {h,panels}=app(),own=farm('alice'),ready={...own,revision:'2',animals:[{id:'vaca',status:'READY'}]};
- h.set({own,api:{get:()=>Promise.resolve(ready)}});h.animalPanel('vaca');await h.refresh();
- const animals=panels.filter(p=>p[0]==='animal');assert.equal(animals.length,2);assert.equal(animals[1][3],ready);
-});
-
-test('panel polling retains focus on the matching action',async()=>{
- const {h,elements,doc}=app(),own=farm('alice');h.set({own,api:{get:()=>Promise.resolve({...own,revision:'2'})}});h.animalPanel('vaca');
- let focused=0;doc.activeElement={getAttribute:()=> 'Alimentar'};const content=elements.get('modal-content');content.contains=()=>true;
- content.querySelectorAll=()=>[{getAttribute:()=> 'Alimentar',disabled:false,focus:()=>focused++}];
- await h.refresh();assert.equal(focused,1);
-});
-
-test('late invitation acceptance cannot close a newer modal',async()=>{
- const {h,elements}=app(),reply=deferred(),own=farm('alice');
- h.set({own,api:{get:path=>Promise.resolve(path==='/v1/friends'?[]:own),mutate:()=>reply.promise}});await h.friends();
- const controls=elements.get('modal-content').children[0];controls.children.find(n=>n.textContent==='Aceitar convite').onclick();
- elements.get('deposit').onclick();reply.resolve({});await new Promise(resolve=>setImmediate(resolve));
- assert.equal(elements.get('modal').open,true);
-});
-
-test('visual action feedback waits for server confirmation and remains on its farm',async()=>{
- const {h,elements}=app(),reply=deferred(),effects=[],own=farm('alice');const scene={update(){},effect:(...args)=>effects.push(args)};
- h.set({own,scene,api:{mutate:()=>reply.promise}});const action=h.action({action:'WATER',column:0,row:0});assert.equal(effects.length,0);
- reply.resolve({farm:own,result:{success:true,message:'Regou'}});await action;assert.equal(effects.length,1);assert.equal(effects[0][0],'WATER');
- const late=deferred();h.set({own,visited:farm('bob'),scene,api:{mutate:()=>late.promise}});
- const visit=h.action({action:'STEAL',column:0,row:0},'/v1/farms/bob/visit-actions');elements.get('home').onclick();late.resolve({result:{success:true,message:'Colheu'}});await visit;
- assert.equal(effects.length,1);
 });

@@ -18,11 +18,11 @@ const catalog={crops:[{id:'milho',name:'Milho',spriteStem:'milho',vipOnly:false}
 
 test('deposit preserves mixed currency quantities and skips VIP without blocking sell all',()=>{
  const {root,renderDeposit}=panels(),commands=[];
- renderDeposit(root,catalog,{vipActive:false,produceLots:[{itemId:'milho',quantity:2,currency:'GOLD'},{itemId:'milho',quantity:1,currency:'GREEN'},{itemId:'vip',quantity:1,currency:'GREEN',vipOnly:true}]},'products',()=>{},c=>commands.push(c));
+ renderDeposit(root,catalog,{vipActive:false,depositTotals:{GOLD:100,GREEN:5},produceLots:[{itemId:'milho',quantity:2,currency:'GOLD'},{itemId:'milho',quantity:1,currency:'GREEN'},{itemId:'vip',quantity:1,currency:'GREEN',vipOnly:true}]},'products',()=>{},c=>commands.push(c));
  const all=nodes(root);assert.equal(all.filter(n=>n.tag==='article').length,2);
  assert.ok(all.some(n=>n.textContent==='2 em ouro · 1 em verdes'));
- const sellAll=all.find(n=>n.textContent==='Vender tudo');assert.ok(!sellAll.disabled);sellAll.onclick();
- const buttons=all.filter(n=>n.textContent==='Vender este produto');assert.equal(buttons[1].disabled,true);buttons[0].onclick();
+ const sellAll=all.find(n=>n.textContent.includes('Vender tudo'));assert.ok(!sellAll.disabled);sellAll.onclick();
+ const buttons=all.filter(n=>n.textContent==='Vender 1');assert.equal(buttons[1].disabled,true);buttons[0].onclick();
  assert.equal(JSON.stringify(commands),JSON.stringify([{action:'SELL_ALL'},{action:'SELL_ITEM',itemId:'milho'}]));
 });
 
