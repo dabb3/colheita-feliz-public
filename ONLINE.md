@@ -29,8 +29,12 @@ rollback e validação remota da sessão continuam ativos. O Session pooler do
 Supabase não substitui este pool: a aplicação também precisa reaproveitar sua
 conexão TCP/TLS até ele.
 
-O cliente antecipa um único identificador emitido pelo servidor após atualizar a
-fazenda e prepara a próxima reserva em paralelo com o POST atual. Ele é consumido uma vez e descartado depois de
+O servidor inclui `requestLease` com o próximo identificador nas respostas de
+fazenda própria e nas respostas persistidas das mutações. O cliente valida UUIDv7
+e validade com o cabeçalho `Date` do servidor e reutiliza essa reserva sem outro
+GET de emissão no fluxo normal. O replay mantém a resposta completa idêntica,
+incluindo a reserva. APIs antigas ou reservas expiradas usam o GET como fallback.
+O identificador é consumido uma vez e descartado depois de
 30 segundos sem uso. A intenção é gravada antes do POST; retries continuam usando
 exatamente o mesmo identificador e corpo. Falha da antecipação não impede a
 próxima tentativa. Não existe fila de ações econômicas offline.

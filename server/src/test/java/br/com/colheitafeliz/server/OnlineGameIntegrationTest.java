@@ -23,6 +23,21 @@ class OnlineGameIntegrationTest {
 
     @AfterEach void closeStore() { if (store != null) store.close(); }
 
+    @Test void farmAndMutationCarryTheNextServerIdAndReplayKeepsTheExactReply() {
+        var farm = service.farm(alice);
+        var lease = farm.getAsJsonObject("requestLease");
+        assertNotNull(lease);
+        UUID request = UUID.fromString(lease.get("requestId").getAsString());
+        assertEquals(RequestIds.validate(request, clock.instant()).toString(), lease.get("expiresAt").getAsString());
+        var command = new Command(request, farm.get("revision").getAsString(), "BUY_SEED", "nabo", "GOLD", null, null, null);
+        var reply = service.command(alice, command);
+        UUID next = UUID.fromString(reply.getAsJsonObject("requestLease").get("requestId").getAsString());
+        assertNotEquals(request, next);
+        assertDoesNotThrow(() -> RequestIds.validate(next, clock.instant()));
+        assertEquals(reply, service.command(alice, command));
+        assertEquals("200", service.farm(alice).get("coins").getAsString());
+    }
+
     @Test void farmAndReceiptBatchRollBackTogetherWhenReceiptInsertFails() {
         var original = service.farm(alice);
         UUID request = requestId();

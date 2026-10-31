@@ -70,7 +70,7 @@ final class OnlineGameService implements AutoCloseable {
                 tx.updateName(actor, cleanName(authenticatedName));
             tx.lockFarms(actor);
             var farm = load(tx, actor);
-            return persist(tx, farm, false, true);
+            return withRequestLease(persist(tx, farm, false, true));
     }
 
     JsonObject command(UUID actor, Command command) {
@@ -210,7 +210,11 @@ final class OnlineGameService implements AutoCloseable {
         }
         tx.prepareReceipt(actor, now);
         tx.collectSaves();
-        var response = operation.get(); tx.remember(actor, id, hash, response, expires); return response;
+        var response = withRequestLease(operation.get()); tx.remember(actor, id, hash, response, expires); return response;
+    }
+    private JsonObject withRequestLease(JsonObject response) {
+        response.add("requestLease", requestId());
+        return response;
     }
     private static String hash(String value) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
