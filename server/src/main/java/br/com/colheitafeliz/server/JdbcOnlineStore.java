@@ -14,6 +14,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.function.Function;
@@ -25,6 +28,7 @@ final class JdbcOnlineStore implements AutoCloseable {
     record Farm(GameSnapshot snapshot, long revision, Instant time) {}
     record Receipt(String hash, JsonObject response) {}
     record Invitation(UUID owner, UUID usedBy, Instant expiresAt) {}
+    private record FarmWrite(UUID owner, GameSnapshot snapshot, long revision, Instant time) {}
     private static final Gson JSON = new Gson();
     private final String schema;
     private final HikariDataSource pool;
@@ -110,6 +114,7 @@ final class JdbcOnlineStore implements AutoCloseable {
                 Tx tx = new Tx(connection, diagnostic);
                 tx.lock("actor:" + actor);
                 T result = operation.apply(tx);
+                if (tx.pendingSaves != null) throw new IllegalStateException("Incomplete receipt transaction");
                 if (diagnostic) connection.rollback(); else connection.commit();
                 return result;
             } catch (RuntimeException e) {
@@ -122,6 +127,8 @@ final class JdbcOnlineStore implements AutoCloseable {
     final class Tx {
         private final Connection connection;
         private final boolean diagnostic;
+        private final Map<UUID, Player> players = new HashMap<>();
+        private Map<UUID, FarmWrite> pendingSaves;
         Tx(Connection connection, boolean diagnostic) { this.connection = connection; this.diagnostic = diagnostic; }
         void benchmarkPlayer(UUID id) {
             if (!diagnostic) throw new IllegalStateException("Synthetic participants require a rollback probe");
@@ -130,12 +137,18 @@ final class JdbcOnlineStore implements AutoCloseable {
         void lock(String key) { query("SELECT pg_advisory_xact_lock(hashtextextended(?,0))", r -> 0, key); }
         void lockFarms(UUID... owners) { Arrays.stream(owners).map(UUID::toString).distinct().sorted().forEach(id -> lock("farm:" + id)); }
         Player player(UUID id) {
-            return first(query("SELECT id,name,active FROM " + schema + ".players WHERE id=? FOR SHARE",
-                    r -> new Player(r.getObject(1, UUID.class), r.getString(2), r.getBoolean(3)), id));
+            // FOR SHARE keeps this row stable until the transaction ends; never cache across requests.
+            if (!players.containsKey(id)) players.put(id, first(query("SELECT id,name,active FROM " + schema + ".players WHERE id=? FOR SHARE",
+                    r -> new Player(r.getObject(1, UUID.class), r.getString(2), r.getBoolean(3)), id)));
+            return players.get(id);
         }
-        void setActive(UUID id, boolean active) { execute("UPDATE " + schema + ".players SET active=? WHERE id=?", active, id); }
+        void setActive(UUID id, boolean active) {
+            execute("UPDATE " + schema + ".players SET active=? WHERE id=?", active, id);
+            players.remove(id);
+        }
         void updateName(UUID id, String name) {
             execute("UPDATE " + schema + ".players SET name=? WHERE id=? AND active AND name<>?", name, id, name);
+            players.remove(id);
         }
         void addPlayer(UUID id, String name, int limit) {
             lock("membership");
@@ -143,6 +156,7 @@ final class JdbcOnlineStore implements AutoCloseable {
             int count = query("SELECT count(*) FROM " + schema + ".players WHERE active", r -> r.getInt(1)).getFirst();
             if (count >= limit) throw new ApiFailure(409, "O grupo de teste atingiu o limite de participantes.");
             execute("INSERT INTO " + schema + ".players VALUES (?,?,true)", id, name);
+            players.remove(id);
         }
         Farm farm(UUID owner) {
             return first(query("SELECT snapshot,revision,game_time,ruleset FROM " + schema + ".farms WHERE owner=? FOR UPDATE", r -> {
@@ -151,6 +165,10 @@ final class JdbcOnlineStore implements AutoCloseable {
             }, owner));
         }
         void save(UUID owner, GameSnapshot snapshot, long revision, Instant now) {
+            if (pendingSaves != null) {
+                pendingSaves.put(owner, new FarmWrite(owner, snapshot, revision, now));
+                return;
+            }
             execute("INSERT INTO " + schema + ".farms VALUES (?,?,?,?,?::jsonb) ON CONFLICT(owner) DO UPDATE SET "
                     + "revision=EXCLUDED.revision,game_time=EXCLUDED.game_time,snapshot=EXCLUDED.snapshot",
                     owner, GameSave.RULESET, revision, java.sql.Timestamp.from(now), JSON.toJson(snapshot));
@@ -164,16 +182,35 @@ final class JdbcOnlineStore implements AutoCloseable {
             String expired = "DELETE FROM " + schema + ".receipts WHERE (actor,request_id) IN (SELECT actor,request_id FROM "
                     + schema + ".receipts WHERE expires_at<=?" + (diagnostic ? " AND actor=?" : "")
                     + " ORDER BY expires_at LIMIT 1000 FOR UPDATE SKIP LOCKED)";
-            if (diagnostic) execute(expired, java.sql.Timestamp.from(now), actor);
-            else execute(expired, java.sql.Timestamp.from(now));
-            int count = query("SELECT count(*) FROM " + schema + ".receipts WHERE actor=? AND expires_at>?",
-                    r -> r.getInt(1), actor, java.sql.Timestamp.from(now)).get(0);
+            var values = new ArrayList<Object>();
+            values.add(java.sql.Timestamp.from(now));
+            if (diagnostic) values.add(actor);
+            values.add(actor); values.add(java.sql.Timestamp.from(now));
+            // Deleted expired rows and counted live rows are disjoint, even under the shared CTE snapshot.
+            int count = query("WITH expired AS (" + expired + " RETURNING 1) SELECT count(*) FROM " + schema
+                    + ".receipts WHERE actor=? AND expires_at>?", r -> r.getInt(1), values.toArray()).get(0);
             if (count >= RECEIPTS_PER_ACTOR)
                 throw new ApiFailure(429, "Limite de 1.000 ações nas últimas 24 horas. Aguarde antes de iniciar outra ação.");
         }
+        /** Defer only the writes belonging to the current receipt; remember must flush them before commit. */
+        void collectSaves() { pendingSaves = new LinkedHashMap<>(); }
         void remember(UUID actor, UUID request, String hash, JsonObject response, Instant expires) {
-            execute("INSERT INTO " + schema + ".receipts (actor,request_id,hash,response,expires_at) VALUES (?,?,?,?::jsonb,?)",
-                    actor, request, hash, JSON.toJson(response), java.sql.Timestamp.from(expires));
+            var sql = new StringBuilder();
+            var values = new ArrayList<Object>();
+            if (pendingSaves != null && !pendingSaves.isEmpty()) {
+                sql.append("WITH saved AS (INSERT INTO ").append(schema).append(".farms VALUES ");
+                for (var farm : pendingSaves.values()) {
+                    if (!values.isEmpty()) sql.append(',');
+                    sql.append("(?,?,?,?,?::jsonb)");
+                    values.add(farm.owner()); values.add(GameSave.RULESET); values.add(farm.revision());
+                    values.add(java.sql.Timestamp.from(farm.time())); values.add(JSON.toJson(farm.snapshot()));
+                }
+                sql.append(" ON CONFLICT(owner) DO UPDATE SET revision=EXCLUDED.revision,game_time=EXCLUDED.game_time,snapshot=EXCLUDED.snapshot RETURNING owner) ");
+            }
+            sql.append("INSERT INTO ").append(schema).append(".receipts (actor,request_id,hash,response,expires_at) VALUES (?,?,?,?::jsonb,?)");
+            values.add(actor); values.add(request); values.add(hash); values.add(JSON.toJson(response)); values.add(java.sql.Timestamp.from(expires));
+            execute(sql.toString(), values.toArray());
+            pendingSaves = null;
         }
         void invite(String hash, UUID owner, Instant expires) {
             execute("INSERT INTO " + schema + ".invitations VALUES (?,?,NULL,?)", hash, owner, java.sql.Timestamp.from(expires));

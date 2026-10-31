@@ -30,10 +30,17 @@ Supabase não substitui este pool: a aplicação também precisa reaproveitar su
 conexão TCP/TLS até ele.
 
 O cliente antecipa um único identificador emitido pelo servidor após atualizar a
-fazenda ou concluir uma ação. Ele é consumido uma vez e descartado depois de
+fazenda e prepara a próxima reserva em paralelo com o POST atual. Ele é consumido uma vez e descartado depois de
 30 segundos sem uso. A intenção é gravada antes do POST; retries continuam usando
 exatamente o mesmo identificador e corpo. Falha da antecipação não impede a
 próxima tentativa. Não existe fila de ações econômicas offline.
+
+Dentro de cada transação, a linha do participante já bloqueada com `FOR SHARE`
+é reutilizada, com invalidação após escritas e sem cache entre pedidos. O refresh
+pula o UPDATE do nome quando não mudou. Limpeza limitada e contagem de recibos
+usam uma consulta; as escritas de fazenda(s) e recibo usam um único comando SQL
+com CTE. Locks, limite de recibos, expiração e replay continuam autoritativos.
+Uma transação com escritas adiadas sem recibo completo é revertida.
 
 Respostas bem-sucedidas da API incluem `Server-Timing`, em milissegundos:
 `auth` (Supabase Auth), `db_connect` (aquisição no pool), `db` (transação) e

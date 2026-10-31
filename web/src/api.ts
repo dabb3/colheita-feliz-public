@@ -45,7 +45,10 @@ export class ApiClient {
    // Persist before sending: a reload after an unknown result must reuse this UUID.
    this.storage.setItem(this.key,JSON.stringify(pending)); this.pending=pending;
   } finally {this.busy=false;}
-  return this.retry();
+  const result=this.retry();
+  // Overlap the next lease with this POST; failure must not affect its persisted outcome.
+  void this.requestId().catch(()=>{});
+  return result;
  }
  async retry():Promise<Reply> {
   if(!this.pending || this.busy) throw new Error('Não há ação pendente disponível.');
