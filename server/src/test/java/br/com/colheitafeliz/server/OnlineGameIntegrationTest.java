@@ -112,6 +112,31 @@ class OnlineGameIntegrationTest {
         assertEquals(409, assertThrows(ApiFailure.class, () -> service.command(alice, altered)).status());
     }
 
+    @Test void farmSnapshotIncludesDailyMissionProgressAndTarget() {
+        var missions = service.farm(alice).getAsJsonArray("missions");
+        var care = missions.get(0).getAsJsonObject();
+        assertEquals("care", care.get("id").getAsString());
+        assertTrue(care.has("progress"));
+        assertTrue(care.has("target"));
+        assertEquals(0, care.get("progress").getAsInt());
+        assertEquals(1, care.get("target").getAsInt());
+        var farm = service.farm(alice);
+        assertEquals(0, farm.get("tutorialStep").getAsInt());
+        assertEquals(6, farm.get("tutorialTotal").getAsInt());
+    }
+
+    @Test void depositCanSellAllOfOneProduct() {
+        service.farm(alice);
+        prepare(alice, "morango", true, false);
+        JsonObject farm = service.farm(alice);
+        var harvest = new Command(requestId(), farm.get("revision").getAsString(), "HARVEST", null, null, 0, 0, null);
+        assertTrue(service.command(alice, harvest).getAsJsonObject("result").get("success").getAsBoolean());
+        farm = service.farm(alice);
+        var sell = new Command(requestId(), farm.get("revision").getAsString(), "SELL_ITEM_ALL", "morango", null, null, null, null);
+        assertTrue(service.command(alice, sell).getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(0, quantity(service.farm(alice)));
+    }
+
     @Test void friendshipAuthorizesVisitsButNeverExposesOwnerInventoryAndRevocationWinsOverReplay() {
         assertEquals(403, assertThrows(ApiFailure.class, () -> service.farm(bob)).status());
         JsonObject invite = service.createInvitation(alice, requestId());

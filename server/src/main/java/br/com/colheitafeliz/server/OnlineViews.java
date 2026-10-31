@@ -55,9 +55,12 @@ final class OnlineViews {
         view.add("feed", JSON.toJsonTree(game.inventory().feedSnapshot()));
         view.add("fertilizers", JSON.toJsonTree(game.inventory().fertilizerSnapshot()));
         view.add("tutorial", JSON.toJsonTree(game.tutorial().current()));
+        view.addProperty("tutorialStep", game.tutorial().stepIndex());
+        view.addProperty("tutorialTotal", br.com.colheitafeliz.game.Tutorial.STEPS.size());
         JsonArray missions = new JsonArray();
         for (var mission : game.dailyMissions().missions()) missions.add(object("id", mission.id(), "title", mission.title(),
-                "green", mission.green(), "done", game.dailyMissions().completed(mission)));
+                "green", mission.green(), "progress", game.dailyMissions().progress(mission), "target", mission.target(),
+                "done", game.dailyMissions().completed(mission)));
         view.add("missions", missions);
         LandExpansion.Plot next = game.land().next();
         view.add("nextPlot", JSON.toJsonTree(next));

@@ -10,9 +10,10 @@ export interface Farm {
  tiles:Tile[]; animals:Animal[];
  coins?:string; greenCoins?:string; level?:number; currentXp?:string; xpToNext?:string;
  vipActive?:boolean; vipExpiresAt?:string; seedCounts?:Record<string,number>;
+ depositTotals?:Record<string,string|number>;
  produceLots?:{itemId:string; quantity:number; currency:string}[];
  feed?:Record<string,number>; fertilizers?:Record<string,number>;
- tutorial?:{title?:string; hint?:string}; missions?:{id:string; title:string;green:number;done:boolean}[];
+ tutorial?:{title?:string; hint?:string};tutorialStep?:number;tutorialTotal?:number; missions?:{id:string; title:string;green:number;progress:number;target:number;done:boolean}[];
  nextPlot?:{column:number;row:number};
 }
 export interface Crop {id:string;name:string;growthSeconds:number;seasons:number;stages:number;spriteStem:string;requiredLevel:number;vipOnly:boolean;seedPrices:Record<string,number>;}
