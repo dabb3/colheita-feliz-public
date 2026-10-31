@@ -19,7 +19,7 @@ function text(node){return(node.textContent??'')+(node.children??[]).map(child=>
 function descendants(node){return[node,...(node.children??[]).flatMap(child=>typeof child==='object'?descendants(child):[])];}
 test('late visit response cannot reopen a visit after returning home',async()=>{
  const {h,elements}=app(),started=deferred(),reply=deferred();
- h.set({own:farm('alice'),visited:farm('bob'),api:{pending:null,get:path=>path==='/v1/me/farm'?Promise.resolve(farm('alice')):(started.resolve(),reply.promise)}});
+  h.set({own:farm('alice'),visited:farm('bob'),api:{pending:null,prepareRequestId:async()=>{},get:path=>path==='/v1/me/farm'?Promise.resolve(farm('alice')):(started.resolve(),reply.promise)}});
  const refresh=h.refresh();await started.promise;elements.get('home').onclick();reply.resolve(farm('bob'));await refresh;
  assert.equal(h.get().visited,undefined);
 });

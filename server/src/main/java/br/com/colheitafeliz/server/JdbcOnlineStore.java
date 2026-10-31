@@ -5,8 +5,8 @@ import br.com.colheitafeliz.persistence.GameSave;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -19,27 +19,48 @@ import java.util.UUID;
 import java.util.function.Function;
 
 /** Persistência exclusivamente do online; não lê nem importa arquivos locais do jogador. */
-final class JdbcOnlineStore {
+final class JdbcOnlineStore implements AutoCloseable {
     static final int RECEIPTS_PER_ACTOR = 1000;
     record Player(UUID id, String name, boolean active) {}
     record Farm(GameSnapshot snapshot, long revision, Instant time) {}
     record Receipt(String hash, JsonObject response) {}
     record Invitation(UUID owner, UUID usedBy, Instant expiresAt) {}
     private static final Gson JSON = new Gson();
-    private final String url, schema;
-    private final Properties properties = new Properties();
+    private final String schema;
+    private final HikariDataSource pool;
 
     JdbcOnlineStore(String url, String user, String password, String schema) {
         if (!url.startsWith("jdbc:postgresql://") || !schema.matches("[a-z][a-z0-9_]{0,50}"))
             throw new IllegalArgumentException("Invalid PostgreSQL configuration");
-        this.url = url;
         this.schema = schema;
+        this.pool = pool(url, user, password);
+    }
+
+    JdbcOnlineStore(HikariDataSource pool, String schema) {
+        if (!schema.matches("[a-z][a-z0-9_]{0,50}")) throw new IllegalArgumentException("Invalid schema");
+        this.pool = pool;
+        this.schema = schema;
+    }
+
+    static HikariDataSource pool(String url, String user, String password) {
+        var properties = new Properties();
         properties.setProperty("user", user);
         properties.setProperty("password", password);
         properties.setProperty("connectTimeout", "5");
         properties.setProperty("socketTimeout", "15");
         properties.setProperty("prepareThreshold", "0");
+        var pool = new HikariDataSource();
+        pool.setJdbcUrl(url);
+        pool.setDataSourceProperties(properties);
+        pool.setMaximumPoolSize(4);
+        pool.setMinimumIdle(1);
+        pool.setConnectionTimeout(5000);
+        pool.setValidationTimeout(2000);
+        pool.setMaxLifetime(600_000);
+        return pool;
     }
+
+    @Override public void close() { pool.close(); }
 
     void initialize(UUID owner) {
         transaction(owner, tx -> {
@@ -72,7 +93,10 @@ final class JdbcOnlineStore {
     }
 
     <T> T transaction(UUID actor, Function<Tx, T> operation) {
-        try (Connection connection = DriverManager.getConnection(url, properties)) {
+        long acquisitionStarted = System.nanoTime();
+        try (Connection connection = pool.getConnection()) {
+            RequestTimings.connection(acquisitionStarted);
+            long transactionStarted = System.nanoTime();
             connection.setAutoCommit(false);
             try {
                 Tx tx = new Tx(connection);
@@ -83,7 +107,7 @@ final class JdbcOnlineStore {
             } catch (RuntimeException e) {
                 try { connection.rollback(); } catch (SQLException rollback) { e.addSuppressed(rollback); }
                 throw e;
-            }
+            } finally { RequestTimings.database(transactionStarted); }
         } catch (SQLException e) { throw new ApiFailure(503, "Banco indisponível; tente novamente com o mesmo identificador de ação."); }
     }
 

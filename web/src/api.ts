@@ -17,18 +17,30 @@ export class ApiClient {
  private readonly send:typeof fetch;
  pending:Pending|null;
  busy=false;
- constructor(base:string,user:string,token:()=>Promise<string>,storage:StorageLike,send:typeof fetch=fetch) {
+ private lease?:{started:number;promise:Promise<{requestId:string}>};
+ private readonly now:()=>number;
+ constructor(base:string,user:string,token:()=>Promise<string>,storage:StorageLike,send:typeof fetch=fetch,now:()=>number=()=>performance.now()) {
   this.base=base;this.token=token;this.storage=storage;this.send=send;
   this.key=`colheita:pending:${base}:${user}`;
   const saved=storage.getItem(this.key);
   this.pending=saved ? JSON.parse(saved) : null;
+  this.now=now;
+ }
+ async prepareRequestId():Promise<void> {if(!this.pending)await this.requestId();}
+ private requestId():Promise<{requestId:string}> {
+  // Keep at most one server-issued id, briefly: long-hidden tabs must acquire a fresh one.
+  if(this.lease&&this.now()-this.lease.started<30_000)return this.lease.promise;
+  const lease={started:this.now(),promise:this.get<{requestId:string}>('/v1/request-id')};
+  this.lease=lease;
+  void lease.promise.catch(()=>{if(this.lease===lease)this.lease=undefined;});
+  return lease.promise;
  }
  async get<T>(path:string):Promise<T> {return this.request(path);}
  async mutate(path:string,fields:CommandFields):Promise<Reply> {
   if(this.pending || this.busy) throw new Error('Resolva a ação pendente antes de continuar.');
   this.busy=true;
   try {
-   const lease=await this.get<{requestId:string}>('/v1/request-id');
+   const lease=await this.requestId();this.lease=undefined;
    const pending={path,body:JSON.stringify({...fields,requestId:lease.requestId})};
    // Persist before sending: a reload after an unknown result must reuse this UUID.
    this.storage.setItem(this.key,JSON.stringify(pending)); this.pending=pending;

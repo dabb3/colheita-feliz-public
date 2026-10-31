@@ -44,7 +44,8 @@ final class GameHttpServer implements AutoCloseable {
     int port() { return http.getAddress().getPort(); }
 
     private void handle(HttpExchange exchange) throws IOException {
-        try {
+        try (var timing = RequestTimings.start()) {
+            java.util.Objects.requireNonNull(timing);
             var headers = exchange.getResponseHeaders();
             headers.set("Cache-Control", "no-store"); headers.set("X-Content-Type-Options", "nosniff"); headers.set("Vary", "Origin");
             String origin = exchange.getRequestHeaders().getFirst("Origin");
@@ -53,13 +54,18 @@ final class GameHttpServer implements AutoCloseable {
                 headers.set("Access-Control-Allow-Origin", origin);
                 headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
                 headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                headers.set("Access-Control-Expose-Headers", "Server-Timing");
+                headers.set("Timing-Allow-Origin", origin);
             }
             if (exchange.getRequestMethod().equals("OPTIONS")) { exchange.sendResponseHeaders(204, -1); return; }
             String path = exchange.getRequestURI().getPath(), method = exchange.getRequestMethod();
             if (method.equals("GET") && path.equals("/health")) { send(exchange, 200, object("ok", true, "development", development)); return; }
             rate("ip:" + exchange.getRemoteAddress().getAddress().getHostAddress(), 300);
             if (method.equals("GET") && path.equals("/v1/catalog")) { send(exchange, 200, service.catalog()); return; }
-            var identity = auth.authenticate(exchange.getRequestHeaders().getFirst("Authorization"));
+            Authenticator.Identity identity;
+            long authStarted = System.nanoTime();
+            try { identity = auth.authenticate(exchange.getRequestHeaders().getFirst("Authorization")); }
+            finally { RequestTimings.auth(authStarted); }
             UUID actor = identity.id(); rate("actor:" + actor, 120);
             Object response;
             if (method.equals("GET") && path.equals("/v1/request-id")) response = service.requestId();
@@ -129,8 +135,10 @@ final class GameHttpServer implements AutoCloseable {
     private static void send(HttpExchange exchange, int status, Object value) throws IOException {
         byte[] bytes = OnlineViews.JSON.toJson(value).getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+        String timing = RequestTimings.header();
+        if (timing != null) exchange.getResponseHeaders().set("Server-Timing", timing);
         exchange.sendResponseHeaders(status, bytes.length);
         exchange.getResponseBody().write(bytes);
     }
-    @Override public void close() { http.stop(1); threads.shutdownNow(); auth.close(); }
+    @Override public void close() { http.stop(1); threads.shutdownNow(); auth.close(); service.close(); }
 }
