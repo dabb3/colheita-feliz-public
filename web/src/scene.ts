@@ -1,5 +1,5 @@
-import type {Farm,Catalog,Tile} from './types.ts';
-import {periodAt,backgroundBounds,tileCenter,tileArtRect,pickTile,animalPath,animalLayout,animalShadowRect,spriteDrawRect,measureSpriteFootprint,animalMotion,beeOffset,animalFlip,animalLayer,animalInsidePen,animationFrame,cropHeight,tileEffect,showAnimalProduct,animalProductPath,type TileEffect} from './presentation.ts';
+import type {Farm,Catalog,Tile,Animal} from './types.ts';
+import {periodAt,tileCenter,pickTile,animalPath,animalLayout,cropSize,animalWidth,productPath,terrainSize,peacockWidth,animalMotion,animalFlip,poseWidth} from './presentation.ts';
 
 type Sprite={image:HTMLImageElement|HTMLCanvasElement;x:number;y:number;w:number;h:number;footBottom:number;footCenterX:number;footWidth:number};
 export class Scene {
@@ -12,115 +12,79 @@ export class Scene {
  private hover:Tile|null=null;
  private onTile:(tile:Tile)=>void;
  private onAnimal:(id:string)=>void;
- private onHover:(tile:Tile|null,point:{x:number;y:number}|null)=>void;
- private animation:number;
- private lastFrame=0;
- private animate=(time:number)=>{if(time-this.lastFrame>=33){this.lastFrame=time;this.draw();}this.animation=window.requestAnimationFrame(this.animate);};
+ private onHover:(tile:Tile|null)=>void;
+ private animation=0;
+ private seconds=0;
+ private animalSeconds=0;
+ private lastFrame:number|undefined;
+ private closed=false;
+ private effects:{x:number;y:number;label:string;born:number}[]=[];
+ private localTime:()=>Date;
  private events=new AbortController();
- constructor(canvas:HTMLCanvasElement,catalog:Catalog,onTile:(tile:Tile)=>void,onAnimal:(id:string)=>void,onHover:(tile:Tile|null,point:{x:number;y:number}|null)=>void) {
-  this.canvas=canvas;this.ctx=canvas.getContext('2d')!;this.catalog=catalog;this.onTile=onTile;this.onAnimal=onAnimal;this.onHover=onHover;
+ constructor(canvas:HTMLCanvasElement,catalog:Catalog,onTile:(tile:Tile)=>void,onAnimal:(id:string)=>void,onHover:(tile:Tile|null)=>void,localTime:()=>Date=()=>new Date()) {
+  this.localTime=localTime;this.canvas=canvas;this.ctx=canvas.getContext('2d')!;this.catalog=catalog;this.onTile=onTile;this.onAnimal=onAnimal;this.onHover=onHover;
   canvas.width=1600;canvas.height=900;
   canvas.addEventListener('pointermove',e=>{const p=this.point(e);const pick=pickTile(p.x,p.y);this.hover=pick?this.farm?.tiles.find(t=>t.column===pick.column&&t.row===pick.row)??null:null;this.onHover(this.hover,pick?tileCenter(pick.column,pick.row):null);},{signal:this.events.signal});
   canvas.addEventListener('pointerleave',()=>{this.hover=null;this.onHover(null,null);},{signal:this.events.signal});
   canvas.addEventListener('click',e=>{
    if(!this.farm)return;const p=this.point(e),pick=pickTile(p.x,p.y);
    if(pick){const tile=this.farm.tiles.find(t=>t.column===pick.column&&t.row===pick.row);if(tile)this.onTile(tile);return;}
-   const seconds=performance.now()/1000,sleep=periodAt(new Date())==='night';
-   for(const animal of this.farm.animals) {const [x,y,w]=animalLayout[animal.id]??[0,0,0],motion=animalMotion(animal.id,seconds,sleep);if(Math.abs(p.x-x-motion.dx)<w/2&&p.y<900-y+motion.dy&&p.y>900-y+motion.dy-w)this.onAnimal(animal.id);}
+   for(const animal of [...this.farm.animals].sort((a,b)=>this.view(a).y-this.view(b).y)) {
+    const {x,y,width,path}=this.view(animal),[homeX,homeY]=animalLayout[animal.id]??[0,0];
+    const product=productPath(animal.id,animal.status);
+    if(product&&Math.abs(p.x-homeX-38)<=18&&Math.abs(p.y-(912-homeY))<=22){this.onAnimal(animal.id);return;}
+    const s=this.sprite(path,true,animal.id==='abelha'?0:undefined);
+    if(s&&Math.abs(p.x-x)<=width/2&&p.y<=900-y&&p.y>=900-y-width*s.h/s.w){this.onAnimal(animal.id);return;}
+   }
   },{signal:this.events.signal});
-  // Cap redraws at 30 fps; requestAnimationFrame pauses naturally in hidden tabs.
-  this.animation=window.requestAnimationFrame(this.animate);
+  // A bounded visual clock pauses with the tab; it never advances the economic clock.
+  const visibility=()=>{clearInterval(this.animation);this.lastFrame=undefined;if(!document.hidden&&!this.closed)this.animation=window.setInterval(()=>this.tick(performance.now()),1000/30);};
+  document.addEventListener('visibilitychange',visibility,{signal:this.events.signal});visibility();
  }
- close(){window.cancelAnimationFrame(this.animation);this.events.abort();}
+ close(){this.closed=true;clearInterval(this.animation);this.effects=[];this.events.abort();}
+ effect(action:string,column:number,row:number){
+  const label:Record<string,string>={WATER:'Regado',PLANT:'Plantado',HARVEST:'Colhido',PLOW:'Terra pronta',WEED:'Ervas removidas',PESTICIDE:'Insetos removidos',FERTILIZE:'Adubado',STEAL:'Colhido',LOVE:'Amor aplicado'};
+  if(!label[action]||this.closed)return;const p=tileCenter(column,row);this.effects.push({...p,label:label[action],born:this.seconds});this.effects=this.effects.slice(-8);this.draw();
+ }
+ private tick(now:number){
+  if(this.closed||document.hidden)return;
+  const delta=this.lastFrame===undefined?0:Math.max(0,Math.min(.1,(now-this.lastFrame)/1000));this.lastFrame=now;this.seconds+=delta;
+  if(periodAt(this.localTime())!=='night')this.animalSeconds+=delta;
+  this.draw();
+ }
+ private view(animal:Animal){
+  const sleeping=periodAt(this.localTime())==='night',motion=animalMotion(animal.id,this.animalSeconds,sleeping),base=animalWidth(animal.id,animal.stage);
+  const path=animal.id==='abelha'?'classic/animals/abelha/colmeia-abelha-atlas.png':animalPath(animal.id,animal.stage,sleeping,motion.alternate,motion.walking&&motion.alternate);
+  const pose=this.sprite(path,true,animal.id==='abelha'?0:undefined),idle=this.sprite(animalPath(animal.id,animal.stage,false,false),true);
+  const width=pose&&animal.id==='pavao'?peacockWidth(base,pose.w/pose.h):pose&&idle&&motion.walking?poseWidth(base,idle.w/idle.h,pose.w/pose.h):base;
+  return{...motion,path,width,flipped:!sleeping&&motion.walking&&animalFlip(animal.id,motion.facingRight)};
+ }
  update(farm:Farm){
-  if(this.farm?.owner===farm.owner){
-   const incoming=new Map(farm.tiles.map(tile=>[`${tile.column}:${tile.row}`,tile]));
-   for(const previous of this.farm.tiles){const current=incoming.get(`${previous.column}:${previous.row}`);if(!current)continue;const kind=tileEffect(previous,current);if(kind)this.tileEffects.push({column:current.column,row:current.row,kind,started:performance.now()});}
-   this.tileEffects=this.tileEffects.slice(-24);
-  }
-  this.farm=farm;this.draw();
+  this.farm=farm;
+  if(this.hover){const previous=this.hover;this.hover=farm.tiles.find(tile=>tile.column===previous.column&&tile.row===previous.row)??null;this.onHover(this.hover);}
+  this.draw();
  }
- private point(e:PointerEvent|MouseEvent){const rect=this.canvas.getBoundingClientRect(),scale=Math.max(rect.width/1600,rect.height/900);return{x:(e.clientX-rect.left-(rect.width-1600*scale)/2)/scale,y:(e.clientY-rect.top-(rect.height-900*scale)/2)/scale};}
- private sprite(path:string,trim=false,half?:number):Sprite|undefined {
-  const key=`${path}:${trim}:${half??''}`;const cached=this.sprites.get(key);if(cached)return cached;if(cached===null)return;
+ private point(e:PointerEvent|MouseEvent){const rect=this.canvas.getBoundingClientRect();return{x:(e.clientX-rect.left)*1600/rect.width,y:(e.clientY-rect.top)*900/rect.height};}
+ private sprite(path:string,trim=false,part?:number):Sprite|undefined {
+  const key=`${path}:${trim}:${part??'all'}`;const cached=this.sprites.get(key);if(cached)return cached;if(cached===null)return;
   this.sprites.set(key,null);const image=new Image();image.src='/assets/'+path;
   image.onload=()=>{
-   let source:HTMLImageElement|HTMLCanvasElement=image;
-   if(half!==undefined){const part=document.createElement('canvas'),partWidth=Math.floor(image.width/2);part.width=partWidth;part.height=image.height;part.getContext('2d')!.drawImage(image,half*partWidth,0,partWidth,image.height,0,0,partWidth,image.height);source=part;}
-   let x=0,y=0,w=source.width,h=source.height,footBottom=0,footCenterX=.5,footWidth=1;
-   if(trim){const scratch=document.createElement('canvas');scratch.width=w;scratch.height=h;const context=scratch.getContext('2d',{willReadFrequently:true})!;context.drawImage(source,0,0);const pixels=context.getImageData(0,0,w,h).data;
-    const foot=measureSpriteFootprint(source.width,source.height,(col,row)=>pixels[(row*source.width+col)*4+3]);
-    x=foot.left;y=foot.top;w=foot.width;h=foot.height;footBottom=foot.footBottom;footCenterX=foot.footCenterX;footWidth=foot.footWidth;
+   let x=part===undefined?0:part*image.width/2,y=0,w=part===undefined?image.width:image.width/2,h=image.height;
+   if(trim){const scratch=document.createElement('canvas');scratch.width=w;scratch.height=h;const context=scratch.getContext('2d',{willReadFrequently:true})!;context.drawImage(image,x,0,w,h,0,0,w,h);const pixels=context.getImageData(0,0,w,h).data;
+    let left=w,top=h,right=0,bottom=0;
+    for(let row=0;row<h;row++)for(let col=0;col<w;col++)if(pixels[(row*w+col)*4+3]>12){left=Math.min(left,col);top=Math.min(top,row);right=Math.max(right,col);bottom=Math.max(bottom,row);}
+    if(right>=left&&bottom>=top){x+=left;y=top;w=right-left+1;h=bottom-top+1;}
    }
    this.sprites.set(key,{image:source,x,y,w,h,footBottom,footCenterX,footWidth});this.draw();
   };
   image.onerror=()=>{console.warn('Asset indisponível:',path);};return;
  }
- private drawSprite(s:Sprite,x:number,bottom:number,width:number,flip=false){
-  const rect=spriteDrawRect(x,bottom,width,s.x,s.y,s.w,s.h,s.footBottom,s.footCenterX),ctx=this.ctx;
-  if(flip){ctx.save();ctx.translate(x*2,0);ctx.scale(-1,1);}
-  ctx.drawImage(s.image,s.x,s.y,s.w,s.h,rect.x,rect.y,rect.width,rect.height);
-  if(flip)ctx.restore();
- }
- private thing(path:string,x:number,bottom:number,width:number,trim=false){const s=this.sprite(path,trim);if(s)this.drawSprite(s,x,bottom,width);}
- private shadow(sprite:Sprite,x:number,bottom:number,width:number){
-  const ctx=this.ctx,shadow=animalShadowRect(x,bottom,width,sprite.footWidth);
-  ctx.save();ctx.fillStyle='rgba(0,0,0,.26)';ctx.beginPath();ctx.ellipse(shadow.x+shadow.rx,shadow.y,shadow.rx,shadow.ry,0,0,Math.PI*2);ctx.fill();ctx.restore();
- }
- private animal(path:string,x:number,bottom:number,width:number,flip:boolean){
-  const sprite=this.sprite(path,true);if(!sprite)return;
-  this.shadow(sprite,x,bottom,width);
-  this.drawSprite(sprite,x,bottom,width,flip);
- }
- private drawAnimal(animal:Farm['animals'][number],seconds:number,sleep:boolean){
-  const layout=animalLayout[animal.id];if(!layout)return;
-  const[x,y,width]=layout,motion=animalMotion(animal.id,seconds,sleep),xAt=x+motion.dx,bottom=900-y+motion.dy,hungry=animal.status==='HUNGRY';
-  if(animal.id==='abelha'){
-   const path='classic/animals/abelha/colmeia-abelha-atlas.png',hive=this.sprite(path,true,0),bees=this.sprite(path,true,1);
-   if(hive){this.shadow(hive,x,bottom,width);this.drawSprite(hive,x,bottom,width);}
-   if(!sleep&&bees&&hive)for(let i=0;i<4;i++){const offset=beeOffset(i,seconds),beeX=x+offset.x+16*(bees.footCenterX-.5),beeBottom=bottom-width*hive.h/hive.w+8-offset.y;this.drawSprite(bees,beeX,beeBottom,16);}
-   if(hungry)this.feedMarker(x,bottom-width-2);
-   return;
-  }
-  const path=animalPath(animal.id,animal.stage,sleep,motion.walking,motion.open),sprite=this.sprite(path,true);
-  this.animal(path,xAt,bottom,width,animalFlip(animal.id,motion.facingRight));
-  const type=this.catalog.animals.find(item=>item.id===animal.id);
-  if(showAnimalProduct(animal.status,type?.kind??'',animal.id))this.product(animalProductPath(animal.id)!,x+38,bottom+12,28);
-  if(hungry&&sprite)this.feedMarker(xAt,bottom-width*sprite.h/sprite.w-2);
- }
- private product(path:string,x:number,bottom:number,width:number){
-  const sprite=this.sprite(path,true);if(!sprite)return;
-  this.drawSprite(sprite,x,bottom,width);
- }
- private feedMarker(x:number,bottom:number){const icon=this.sprite('classic/icons/racao-generica.png');if(icon)this.ctx.drawImage(icon.image,x-9,bottom-20,18,20);}
- private crop(path:string,x:number,bottom:number,height:number,dry:boolean){
-  const sprite=this.sprite(path);if(!sprite)return;
-  const width=height*sprite.image.width/sprite.image.height,ctx=this.ctx;
-  ctx.save();if(dry)ctx.filter='sepia(.6) saturate(.8)';ctx.drawImage(sprite.image,x-width/2,bottom-height,width,height);ctx.restore();
- }
- private matureGlow(x:number,y:number,seconds:number,offset:number){
-  const pulse=.55+.45*Math.sin(seconds*3.85+offset),ctx=this.ctx,gradient=ctx.createRadialGradient(x,y,5,x,y,74);
-  gradient.addColorStop(0,`rgba(255,236,150,${.45*pulse})`);gradient.addColorStop(1,'rgba(255,236,150,0)');
-  ctx.save();ctx.fillStyle=gradient;ctx.fillRect(x-74,y-54,148,108);ctx.restore();
- }
- private drawTileEffects(){
-  const now=performance.now(),duration=850,colors:Record<TileEffect,string>={plow:'#bd8952',plant:'#88d354',water:'#68c8ff',harvest:'#ffe36e',weed:'#a7d455',pest:'#df7a75',fertilize:'#d3a8f1'};
-  this.tileEffects=this.tileEffects.filter(effect=>now-effect.started<duration);
-  for(const effect of this.tileEffects){
-   const progress=(now-effect.started)/duration,p=tileCenter(effect.column,effect.row),ctx=this.ctx;
-   ctx.save();ctx.globalAlpha=1-progress;ctx.fillStyle=colors[effect.kind];
-   for(let i=0;i<4;i++){
-    const angle=i*Math.PI/2+progress*2,x=p.x+Math.cos(angle)*(12+progress*22),y=p.y-18-progress*48+Math.sin(angle)*(5+progress*7);
-    ctx.beginPath();ctx.ellipse(x,y,effect.kind==='water'?3:4,effect.kind==='water'?6:4,angle,0,Math.PI*2);ctx.fill();
-   }
-   ctx.restore();
-  }
- }
+ private thing(path:string,x:number,bottom:number,width:number,trim=false,part?:number,flipped=false){const s=this.sprite(path,trim,part);if(s){this.ctx.save();this.ctx.translate(x,0);if(flipped)this.ctx.scale(-1,1);this.ctx.drawImage(s.image,s.x,s.y,s.w,s.h,-width/2,bottom-width*s.h/s.w,width,width*s.h/s.w);this.ctx.restore();}}
  private fence(points:number[][]){const ctx=this.ctx;for(let i=1;i<points.length;i++){
   const a=points[i-1],b=points[i];for(const height of [26,49]){ctx.save();ctx.translate(a[0],900-a[1]-height);ctx.rotate(Math.atan2(a[1]-b[1],b[0]-a[0]));const s=this.sprite('classic/fence/trilho.png');if(s)ctx.drawImage(s.image,0,-5,Math.hypot(b[0]-a[0],b[1]-a[1]),10);ctx.restore();}
  }for(const [x,y]of points)this.thing('classic/fence/mourao.png',x,903-y,25);}
  private draw(){
-  if(document.hidden)return;const ctx=this.ctx,period=periodAt(new Date());
+  if(document.hidden||this.closed)return;const ctx=this.ctx,period=periodAt(this.localTime());
   ctx.clearRect(0,0,1600,900);ctx.fillStyle=period==='night'?'#15464f':'#84ba30';ctx.fillRect(0,0,1600,900);
   const background=this.sprite(`classic/background/background${period==='day'?'':'-'+period}.png`);
   if(background){const bounds=backgroundBounds(1600,900,background.image.width,background.image.height);ctx.drawImage(background.image,bounds.x,bounds.y,bounds.width,bounds.height);}
@@ -136,19 +100,38 @@ export class Scene {
    const p=tileCenter(tile.column,tile.row);
    const terrain=!tile.unlocked||tile.state==='GRASS'?'grama-default':tile.dry?'terra-seca':tile.state==='PLOWED'?'terra-arada':'terra-molhada';
    const s=this.sprite(`classic/terrain/${terrain}.png`);
-   const art=tileArtRect(tile.column,tile.row);
-   if(s){ctx.save();if(!tile.unlocked)ctx.globalAlpha=.72;ctx.drawImage(s.image,art.x,art.y,art.width,art.height);ctx.restore();}
-   const crop=this.catalog.crops.find(c=>c.id===tile.cropId),ready=tile.state==='READY';
-   if(ready)this.matureGlow(p.x,p.y-10,seconds,tile.column+tile.row);
-   if(tile.weeds)this.thing(`classic/effects/erva_daninha_${animationFrame(seconds,4,.16)+1}.png`,p.x+2,p.y+20,72,true);
+   if(s)ctx.drawImage(s.image,s.x,s.y,s.w,s.h,p.x-terrainSize.width/2,p.y-terrainSize.height/2,terrainSize.width,terrainSize.height);
    if(tile.state==='DEAD')this.thing('classic/terrain/planta-morta.png',p.x,p.y+10,86,true);
-   else if(crop)this.crop(`classic/crops/plants_phase_one_to_five/${crop.spriteStem}_${tile.stage}.png`,p.x,p.y+10,cropHeight(tile.stage),tile.dry&&!ready);
-   if(tile.insects>0)this.thing(`classic/effects/verme_${Math.min(3,tile.insects)}.png`,p.x-4,p.y+21,70,true);
+   else if(tile.cropId){
+    const crop=this.catalog.crops.find(c=>c.id===tile.cropId),plant=crop?this.sprite(`classic/crops/plants_phase_one_to_five/${crop.spriteStem}_${tile.stage}.png`,true):undefined;
+    if(tile.state==='READY'){const glow=ctx.createRadialGradient(p.x,p.y-30,0,p.x,p.y-30,75);glow.addColorStop(0,'#fff5a155');glow.addColorStop(1,'#fff5a100');ctx.fillStyle=glow;ctx.fillRect(p.x-75,p.y-105,150,150);}
+    if(tile.weeds){const weeds=this.sprite(`classic/effects/erva_daninha_${Math.floor(this.seconds/.16)%4+1}.png`);if(weeds)ctx.drawImage(weeds.image,p.x+2,p.y-50,72,72);}
+    if(plant){const size=cropSize(tile.stage,plant.w/plant.h);ctx.save();if(tile.dry&&tile.state!=='READY')ctx.filter='sepia(.65) saturate(.6)';ctx.drawImage(plant.image,plant.x,plant.y,plant.w,plant.h,p.x-size.width/2,p.y+8-size.height,size.width,size.height);ctx.restore();}
+    if(tile.insects)this.thing(`classic/effects/verme_${Math.min(3,tile.insects)}.png`,p.x-4+Math.sin(this.seconds*5+tile.column*3)*1.5,p.y+24,70);
+   }
    if(tile.protected){ctx.fillStyle='#90def1';ctx.font='18px sans-serif';ctx.fillText('◆',p.x+58,p.y);}
    if(this.hover===tile){const highlight=this.sprite('classic/terrain/terra-destaque.png');if(highlight){ctx.save();ctx.globalAlpha=.65+.35*Math.sin(seconds*4.5);ctx.drawImage(highlight.image,p.x-96,p.y-51,192,102);ctx.restore();}}
   }
-  for(const animal of this.farm.animals)if(animalLayer(animal.id)==='front')this.drawAnimal(animal,seconds,sleep);
-  this.drawTileEffects();
-  if(this.farm.own&&this.farm.nextPlot){const p=tileCenter(this.farm.nextPlot.column,this.farm.nextPlot.row);this.thing('classic/terrain/placa-terreno.png',p.x,p.y,65,true);}
+  if(this.farm.own&&this.farm.nextPlot){const p=tileCenter(this.farm.nextPlot.column,this.farm.nextPlot.row);this.thing('classic/terrain/placa-terreno.png',p.x,p.y,110,true);ctx.save();ctx.textAlign='center';ctx.fillStyle='#fff9dd';ctx.shadowColor='#67431f';ctx.shadowBlur=2;ctx.font='bold 16px sans-serif';ctx.fillText('50 verdes',p.x,p.y-70);ctx.restore();}
+  const inside=new Set(['porco','ovelha','vaca','galinha','pato']);
+  const ordered=[...this.farm.animals].sort((a,b)=>this.view(b).y-this.view(a).y);
+  for(const animal of ordered.filter(animal=>inside.has(animal.id)))this.drawAnimal(animal,period);
+  this.fence([[986,410],[1072,370],[1160,334],[1250,304],[1342,280],[1434,262],[1526,250],[1618,244]]);
+  for(const animal of ordered.filter(animal=>!inside.has(animal.id)))this.drawAnimal(animal,period);
+  this.effects=this.effects.filter(effect=>this.seconds-effect.born<1.2);
+  for(const effect of this.effects){const age=this.seconds-effect.born;ctx.save();ctx.globalAlpha=1-age/1.2;ctx.font='bold 22px sans-serif';ctx.textAlign='center';ctx.fillStyle='#fffbd5';ctx.shadowColor='#274c23';ctx.shadowBlur=4;ctx.fillText(effect.label,effect.x,effect.y-45-age*35);ctx.restore();}
+ }
+ private drawAnimal(animal:Animal,period:string){
+   const layout=animalLayout[animal.id];if(!layout)return;const {x,y,width:w,path,flipped}=this.view(animal),bottom=900-y,ctx=this.ctx;
+   ctx.save();ctx.fillStyle='#152b1942';ctx.beginPath();ctx.ellipse(x,bottom,w*.325,w*.052,0,0,Math.PI*2);ctx.fill();ctx.restore();
+   if(animal.id==='abelha'){
+    const hive=this.sprite(path,true,0);
+    this.thing(path,x,bottom,w,true,0);
+    if(hive&&period!=='night'&&animal.status!=='HUNGRY')for(let i=0;i<3;i++){const t=this.animalSeconds*1.4+i*1.7;this.thing(path,x+Math.sin(t)*28,bottom-w*hive.h/hive.w+8-Math.cos(t*1.3)*12,16,true,1);}
+   }else{
+    // Visible alpha bounds meet the ground anchor; avoid the old detached shadow.
+    this.thing(path,x,bottom,w,true,undefined,flipped);
+   }
+   const product=productPath(animal.id,animal.status);if(product)this.thing(product,layout[0]+38,912-layout[1],28,true);
  }
 }

@@ -101,3 +101,80 @@ Fontes de hospedagem conferidas em 29/10/2026: [limites do Cloudflare Pages](htt
 A URL JDBC deve ter `sslmode=verify-full`; `require` não autentica o servidor e é recusado. Forneça a CA do banco em um arquivo legível pelo processo, por exemplo `sslrootcert=/etc/secrets/root.crt`, usando o certificado do projeto no painel Supabase. A URL aceita somente `sslmode` e `sslrootcert`, sem parâmetros duplicados ou factories SSL customizadas. Usuário e senha ficam em variáveis próprias. Não desative a validação para contornar erros de certificado ou hostname.
 
 Após aceitar uma visita sem mudança, as revisões das fazendas permanecem estáveis; relógio e atualização real de estado ainda podem mudar a revisão. Cada ação bem-sucedida continua sendo atômica.
+
+### Revisão visual isolada do cenário web
+
+Execute `npm.cmd run review --prefix web` e abra `http://127.0.0.1:5174/`.
+A cena usa dados sintéticos, sem autenticação, API, save ou alteração de saldo.
+Os links exibem dia, pôr do sol, noite, filhotes e jovens. Inclui plantas em cinco
+estágios, seca, pragas, morte, produtos prontos e todos os animais.
+O processo atende apenas localhost; encerre com Ctrl+C. O bundle fica em
+`.tools/web-visual-review` e não integra o build publicado.
+
+A apresentação usa altura por estágio das plantas, escala de crescimento dos
+animais, sprites de pragas e produtos somente quando prontos. A colmeia permanece
+fixa, com abelhas próximas. Em painéis estreitos, HUD e ferramentas ficam fora
+do canvas para preservar a área das terras. Esta revisão não comprova animações
+de caminhada, fluxo econômico ou concorrência; esses ensaios pertencem às etapas
+seguintes da paridade web.
+
+A amostra de HUD e loja usa os mesmos renderizadores HTML do cliente real:
+carteira com avatar genérico, progresso de XP, saldos preservados como texto e
+loja com dez itens por página. Bloqueios por nível, VIP e animal já comprado
+ficam explícitos. O seletor de semente/adubo mantém teclado e ganha preview.
+Na revisão isolada, os botões de compra exibem apenas mensagem de demonstração.
+Paginação mantém foco e Escape fecha o dialog. Não confundir essa fixture com
+teste multiplayer.
+
+### Depósito e painéis contextuais
+
+O depósito tem abas de produtos, sementes e insumos. Produtos indicam quantidades
+por moeda de aquisição; vender um produto usa a operação existente para o estoque
+daquele item. Não há venda unitária nem preço estimado no cliente. Lotes VIP
+bloqueados permanecem no estoque e não impedem a operação Vender tudo.
+
+O popup da planta informa temporada, estágio, condições e dois tempos com rótulos
+distintos: com rega contínua e sem nova rega. A posição acompanha a terra; em
+painéis estreitos, a informação aparece fora do canvas. A atualização recebida da
+API renova o popup mesmo com o cursor parado.
+
+Clique em animal abre o alvo escolhido. Ações de alimentação, coleta ou venda
+seguem espécie, estágio e estado projetados pelo servidor. Animais da fazenda
+visitada são somente leitura; Loja → Meus animais continua mostrando os próprios,
+inclusive durante visitas. O painel aberto acompanha as atualizações periódicas,
+preservando o foco quando a ação ainda existe. Percentual de fome não é exibido,
+pois esse dado não integra a projeção atual.
+
+Tarefas usam cartões de estado e amigos usam nomes e botões de visita. Listagem,
+criação e aceite de convite não preenchem nem fecham uma janela diferente após
+resposta tardia. A revisão isolada apresenta esses painéis com dados sintéticos e
+callbacks de demonstração. Validar economia e duas pessoas simultâneas continua
+sendo parte dos ensaios de integração, com PostgreSQL descartável.
+
+### Animações e áudio
+
+Animais móveis percorrem trajetos locais curtos, com repouso, orientação e quadros
+de caminhada vinculados ao deslocamento. Pombo e colmeia permanecem fixos; pavão
+alterna penas a cada quatro segundos. Pés, sombras e seleção usam a mesma posição
+visual; produtos prontos continuam nas âncoras de produção. A cerca frontal separa
+os cinco animais internos dos animais externos.
+
+O relógio visual usa tempo decorrido, com atualização a30fps enquanto a aba está
+visível e delta máximo de100ms. Não substitui o relógio autoritativo da API.
+Noite local interrompe deslocamento e abelhas; retomar a aba não compensa tempo
+visual oculto. Indicadores de rega, plantio, colheita e cuidados nas terras só
+aparecem após sucesso confirmado, sem animar outra fazenda após sair da visita.
+
+Ajustes oferece controles separados de música, efeitos e volumes, guardados na
+chave local `colheita:audio`. Ambos começam desligados sem preferência anterior;
+reprodução depende de interação do usuário. O toggle da toolbar controla efeitos.
+Logout e aba oculta pausam áudio. O player reutiliza `farm_loop.mp3` e os oito cues
+do desktop, com até três efeitos simultâneos e intervalo mínimo de150ms por cue.
+Falha de storage, decoder ou autoplay não interrompe o jogo.
+
+Na revisão isolada, Ajustes usa o player real e os botões Regar/Plantar/Colher
+apresentam efeitos demonstrativos sem comandar a API. Para ouvir, habilite Efeitos
+nos Ajustes antes de usar os botões. Sons novos de animais permanecem pendentes:
+nesta entrega não há novos arquivos sonoros nem geração paga. Audição subjetiva,
+autoplay em Firefox/Safari e medição de fluidez em diferentes máquinas ainda
+precisam de ensaio; testes automatizados não comprovam esses resultados.
