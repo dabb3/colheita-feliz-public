@@ -88,3 +88,68 @@
  .friend-card button { max-width: 100%; }
 }
 .audio-setting { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; padding: 1rem; background: #f1f4e5; margin: .7rem 0; border-radius: 8px; } .audio-setting label { display: flex; align-items: center; gap: .5rem; min-width: 110px; } .audio-setting input[type=checkbox] { min-width: 0; width: 20px; height: 20px; } .audio-setting input[type=range] { min-width: 100px; width: 220px; max-width: 100%; }
+
+/* Full-screen farm, with world coordinates preserved under cover scaling. */
+html, body, #app { width: 100%; height: 100%; min-height: 100%; margin: 0; }
+#app { max-width: none; min-height: 100dvh; }
+#game { width: 100vw; height: 100vh; height: 100dvh; min-height: 0; aspect-ratio: auto; overflow: hidden; background: #153e39; }
+#game > canvas { width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; }
+.market-body { display: flex; flex-direction: column; min-height: 0; }
+.market-scroll { overflow: auto; min-height: 0; max-height: 68vh; overscroll-behavior: contain; }
+.seed-tabs { margin-bottom: .65rem; }
+.seed-tabs button[aria-pressed=true] { background: linear-gradient(#fff3a0, #e9bd47); box-shadow: inset 0 2px 4px #87641955; }
+.settings-sections { display: grid; gap: .8rem; }
+.settings-section { padding: .8rem 1rem; border: 1px solid #ded4aa; border-radius: 12px; background: linear-gradient(145deg, #fffdf3, #f8f0d5); box-shadow: 0 2px 7px #755b1b12; }
+#modal-content .settings-section h3 { margin: 0 0 .55rem; color: #705719; }
+.settings-action, .settings-logout { margin: .25rem .35rem .25rem 0; }
+.settings-logout { background: linear-gradient(#fff3ed, #e8c6b9); border-color: #c8a397; }
+.audio-setting { background: #fff9e6; border: 1px solid #eadcae; }
+.audio-setting label { min-width: 145px; font-weight: 700; color: #57471f; }
+.audio-setting input[type=checkbox] { appearance: none; position: relative; flex: 0 0 48px; width: 48px; height: 28px; margin: 0; border: 1px solid #b8b8ad; border-radius: 999px; background: #c9cbc5; cursor: pointer; transition: background .16s ease, border-color .16s ease; }
+.audio-setting input[type=checkbox]::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0003; transition: transform .16s ease; }
+.audio-setting input[type=checkbox]:checked { border-color: #c79a27; background: #f1c84c; }
+.audio-setting input[type=checkbox]:checked::after { transform: translateX(20px); }
+.audio-setting input[type=checkbox]:focus-visible { outline: 3px solid #1668cd; outline-offset: 3px; }
+.audio-setting input[type=range] { accent-color: #d5a92f; }
+.deposit-overview { padding: 1rem; border: 1px solid #e2d19b; border-radius: 12px; background: linear-gradient(145deg, #fff9df, #f4e7bd); }
+.deposit-summary { display: flex; flex-wrap: wrap; gap: .65rem; }
+.deposit-currency { display: flex; align-items: center; gap: .45rem; min-width: 145px; padding: .5rem .7rem; border-radius: 9px; background: #fffdf4; }
+.deposit-currency img { width: 25px; height: 25px; object-fit: contain; }
+.deposit-currency strong { margin-left: auto; color: #685015; }
+.deposit-sell-all, .vip-buy { margin-top: .7rem; background: linear-gradient(#fff09a, #eab735); }
+.deposit-group { margin-top: 1.2rem; }
+.deposit-sell-actions { display: flex; gap: .4rem; width: 100%; margin-top: auto; }
+.deposit-sell-actions button { flex: 1; padding-inline: .35rem; }
+.vip-offer { display: grid; grid-template-columns: minmax(120px, 220px) 1fr; gap: 1rem; align-items: center; max-width: 680px; margin: auto; padding: 1.25rem; border: 1px solid #dfc56e; border-radius: 16px; background: linear-gradient(145deg, #fff9df, #f2e5b4); box-shadow: 0 7px 20px #80631e20; }
+.vip-offer > img { width: 100%; max-height: 190px; object-fit: contain; }
+.vip-offer h3 { color: #785b12; }
+.vip-offer li { margin: .35rem 0; }
+.vip-status { padding: .55rem .7rem; border-radius: 8px; background: #fffdf4; }
+@media(max-width:1000px) {
+ #game header { position: absolute; z-index: 2; inset: max(8px, env(safe-area-inset-top)) 8px auto; display: flex; align-items: flex-start; flex-wrap: wrap; gap: .4rem; padding: 0; }
+ #game header nav { gap: .25rem; }
+ #game header nav button { min-height: 34px; padding: .3rem .45rem; font-size: 11px; }
+ #game #wallet { width: auto; min-width: 160px; max-width: 46vw; font-size: 11px; }
+ #game #tutorial { position: absolute; z-index: 2; top: 100px; left: 8px; max-width: min(270px, 65vw); margin: 0; font-size: 11px; }
+ #game #plant-health { position: absolute; left: var(--health-x, 50%); top: var(--health-y, 50%); transform: translate(-50%, -100%); width: 250px; max-width: 75vw; }
+ #game footer { position: absolute; z-index: 2; left: 50%; bottom: max(8px, env(safe-area-inset-bottom)); transform: translateX(-50%); flex-wrap: nowrap; justify-content: center; margin: 0; max-width: calc(100vw - 12px); }
+ #game #tools { flex-wrap: wrap; justify-content: center; }
+ #game #tools button { width: 36px; height: 36px; }
+ #game footer select { max-width: 96px; }
+ #game footer > button { font-size: 10px; }
+}
+@media(max-width:560px) {
+ #game header { right: 5px; left: 5px; }
+ #game header nav { flex: 1; }
+ #game header nav button { font-size: 10px; padding: .25rem .35rem; }
+ #game #wallet { max-width: 44vw; min-width: 135px; padding: .4rem .5rem; }
+ #game #tutorial { top: 100px; max-width: 53vw; padding: .4rem .55rem; }
+ #game footer { gap: .2rem; padding: .3rem; }
+ #game #tools { max-width: 190px; }
+ #game #tools button { width: 32px; height: 32px; }
+ #game footer label { font-size: 9px; }
+ #game footer select { max-width: 78px; font-size: 11px; }
+ #game footer > button { max-width: 56px; padding: .3rem; }
+ .vip-offer { grid-template-columns: 1fr; text-align: center; }
+ .vip-offer > img { max-height: 130px; }
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {periodAt,tileCenter,pickTile,animalPath,animalLayout,cropSize,animalWidth,productPath,terrainSize,peacockWidth,animalMotion,animalFlip,poseWidth} from '../src/presentation.ts';
+import {periodAt,tileCenter,pickTile,animalPath,animalLayout,cropSize,animalWidth,productPath,terrainSize,peacockWidth,animalMotion,animalFlip,poseWidth,gameShortcut,shortcutPanelState} from '../src/presentation.ts';
 
 test('plant dimensions match desktop stage heights and preserve aspect',()=>{
  for(let stage=1;stage<=5;stage++)assert.deepEqual(cropSize(stage,1.5),{width:(32+stage*16)*1.5,height:32+stage*16});

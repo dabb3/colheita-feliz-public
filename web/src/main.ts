@@ -3,8 +3,8 @@ import type {Farm,Catalog,Tile,Reply,CommandFields} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
 import {GameAudio} from './audio.ts';
-import {animalPath,tileCenter} from './presentation.ts';
-import {renderWallet,renderMarket,focusMarketPage} from './ui.ts';
+import {animalPath,tileCenter,tileCommand,gameShortcut,shortcutPanelState} from './presentation.ts';
+import {renderWallet,renderMarket} from './ui.ts';
 import {renderDeposit,renderPlantHealth,renderAnimal,renderMissions,renderFriends,renderAudioSettings} from './ui-panels.ts';
 
 const config=window.COLHEITA_CONFIG;
@@ -13,7 +13,7 @@ const modal=element<HTMLDialogElement>('modal'),content=element('modal-content')
 const select=element<HTMLSelectElement>('item');
 const audio=new GameAudio();
 let api:ApiClient|undefined,catalog:Catalog,own:Farm|undefined,visited:Farm|undefined,scene:Scene|undefined;
-let tool='PLOW',selectedSeed='nabo',selectedFertilizer='comum',busy=false;
+let tool='PLOW',selectedSeed='nabo',selectedFertilizer='comum',busy=false,marketSeedGroup:'common'|'vip'='common';
 let toastTimer:number,sessionGeneration=0,navigationGeneration=0;
 let modalGeneration=0,refreshPanel:(()=>void)|undefined;
 const login=element('login');
@@ -82,7 +82,7 @@ function receive(reply:Reply){
  const previousLevel=own?.level;
  if(reply.farm)own=acceptFarm(own,reply.farm);
  if(reply.visitedFarm&&visited?.owner===reply.visitedFarm.owner)visited=acceptFarm(visited,reply.visitedFarm);
- if(reply.result&&announce)notify(reply.result.message);
+ if(reply.result)notify(reply.result.message);
  render();
  updatePanel();
  if(previousLevel!==undefined&&(own?.level??0)>previousLevel)audio.play('LEVEL_UP');
@@ -96,16 +96,25 @@ async function action(fields:CommandFields,path='/v1/me/actions'){
 }
 function playAction(action:string){audio.play(action.startsWith('BUY_')?'BUY':action.startsWith('SELL_')?'SELL':action==='STEAL'?'HARVEST':action);}
 function audioButton(){element('sound').textContent=audio.settings.effects?'Efeitos: ligados':'Efeitos: desligados';element('sound').setAttribute('aria-pressed',String(audio.settings.effects));}
-function settings(){dialog('Ajustes de áudio');renderAudioSettings(content,audio.settings,(channel,enabled,volume)=>{audio.unlock();if(channel==='music')audio.setMusic(enabled);else audio.setEffects(enabled);audio.setVolume(channel,volume);audioButton();});}
+function shortcutPanel(title:string,open:()=>void){if(shortcutPanelState(modal.open,element('modal-title').textContent,title)==='close')modal.close();else open();}
+function settings(){
+ dialog('Ajustes');const sections=document.createElement('div');sections.className='settings-sections';content.append(sections);
+ const audioSection=document.createElement('section');audioSection.className='settings-section';audioSection.append(Object.assign(document.createElement('h3'),{textContent:'Áudio'}));sections.append(audioSection);const controls=document.createElement('div');audioSection.append(controls);
+ renderAudioSettings(controls,audio.settings,(channel,enabled,volume)=>{audio.unlock();if(channel==='music')audio.setMusic(enabled);else audio.setEffects(enabled);audio.setVolume(channel,volume);audioButton();});
+ const game=document.createElement('section');game.className='settings-section';game.append(Object.assign(document.createElement('h3'),{textContent:'Jogo'}));sections.append(game);button('Lista de terras',tileList,game).className='settings-action';
+ const account=document.createElement('section');account.className='settings-section';account.append(Object.assign(document.createElement('h3'),{textContent:'Informações e conta'}));sections.append(account);button('Créditos',credits,account).className='settings-action';button('Sair da conta',logout,account).className='settings-logout';
+}
+function credits(){dialog('Créditos');paragraph('Reimplementação independente e não oficial de Colheita Feliz. Acervo visual derivado da referência indicada no repositório, com uso não comercial.');const link=document.createElement('a');link.href='/assets/REFERENCE_LICENSE';link.textContent='Licença e atribuição dos assets';content.append(link);}
+async function logout(){sessionGeneration++;navigationGeneration++;busy=false;api=undefined;own=undefined;visited=undefined;scene?.close();audio.setActive(false);sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;syncPending();if(supabase)await supabase.auth.signOut();}
 async function tileAction(tile:Tile){
  if(visited){await action(tileCommand(tool,tile,selectedSeed,selectedFertilizer,true),`/v1/farms/${visited.owner}/visit-actions`);return;}
- if(!tile.unlocked){await action({action:'BUY_PLOT',column:tile.column,row:tile.row});return;}
+ if(!tile.unlocked){if(own?.nextPlot?.column===tile.column&&own.nextPlot.row===tile.row&&confirm('Comprar esta terra por 50 moedas verdes?'))await action({action:'BUY_PLOT',column:tile.column,row:tile.row});return;}
  if(tool==='CURSOR')return;
  await action(tileCommand(tool,tile,selectedSeed,selectedFertilizer));
 }
 function health(tile:Tile|null){
  const panel=element('plant-health');renderPlantHealth(panel,catalog,modal.open?null:tile);
- if(tile){const p=tileCenter(tile.column,tile.row);panel.style.setProperty('--health-x',`${Math.max(12,Math.min(88,p.x/16))}%`);panel.style.setProperty('--health-y',`${(p.y-45)/9}%`);}
+ if(tile){const p=tileCenter(tile.column,tile.row),canvas=element<HTMLCanvasElement>('farm'),rect=canvas.getBoundingClientRect(),scale=Math.max(rect.width/1600,rect.height/900);const x=(p.x*scale+(rect.width-1600*scale)/2)/rect.width*100,y=(p.y*scale+(rect.height-900*scale)/2)/rect.height*100;panel.style.setProperty('--health-x',`${Math.max(12,Math.min(88,x))}%`);panel.style.setProperty('--health-y',`${Math.max(10,Math.min(90,y-5))}%`);}
 }
 function animalPanel(id:string,ownAnimal=false){
  dialog(catalog.animals.find(a=>a.id===id)?.name??'Animal');
@@ -113,12 +122,17 @@ function animalPanel(id:string,ownAnimal=false){
 }
 function tileList(){dialog('Terras da fazenda');const states:Record<string,string>={GRASS:'grama',PLOWED:'arada',DEAD:'planta morta',READY:'pronta',GROWING:'crescendo'};const grid=document.createElement('div');grid.className='tile-list';content.append(grid);for(const tile of display()?.tiles??[]){const crop=catalog.crops.find(c=>c.id===tile.cropId);const b=button(`Terra ${tile.column+1}, ${tile.row+1}: ${!tile.unlocked?'bloqueada':crop?.name??states[tile.state]}`,async()=>{modal.close();await tileAction(tile);},grid);b.title='Aplicar a ferramenta selecionada';}}
 function card(name:string,image?:string){const c=document.createElement('article');c.className='card';if(image){const img=document.createElement('img');img.loading='lazy';img.src='/assets/'+image;img.alt='';c.append(img);}const title=document.createElement('strong');title.textContent=name;c.append(title);return c;}
-function shop(category='crops',page=0){
+function shop(category='crops'){
  dialog('Loja');const tabs=document.createElement('div');tabs.className='tabs';content.append(tabs);
  for(const [id,label]of [['crops','Sementes'],['animals','Animais'],['fertilizers','Fertilizantes'],['owned','Meus animais'],['vip','VIP']]){const tab=button(label,()=>shop(id),tabs);tab.setAttribute('aria-pressed',String(category===id));}
- const grid=document.createElement('div');grid.className=['crops','animals','fertilizers'].includes(category)?'market-body':'cards';content.append(grid);
- if(['crops','animals','fertilizers'].includes(category))renderMarket(grid,catalog,own,category,page,next=>{shop(category,next);focusMarketPage(content,next>page);},fields=>void action(fields));
- if(category==='vip'){paragraph('VIP por 30 dias. Libera as culturas VIP conforme seu nível.',grid);button(`Ativar VIP · ${catalog.vip.greenPrice} verdes`,()=>action({action:'BUY_VIP'}),grid);}
+ const grid=document.createElement('div');grid.className=['crops','animals','fertilizers'].includes(category)?'market-body':category==='vip'?'vip-page':'cards';content.append(grid);
+ if(['crops','animals','fertilizers'].includes(category))renderMarket(grid,catalog,own,category,marketSeedGroup,next=>{marketSeedGroup=next;shop(category);},fields=>void action(fields));
+ if(category==='vip'){
+  const offer=document.createElement('article');offer.className='vip-offer';const art=document.createElement('img');art.src='/assets/classic/icons/cartao-vip.png';art.alt='Cartão VIP';
+  const details=document.createElement('div');details.append(Object.assign(document.createElement('h3'),{textContent:'Cartão VIP'}),paragraph('Mais benefícios para sua fazenda durante 30 dias.',details));
+  const benefits=document.createElement('ul');for(const label of ['Acesso às sementes e produtos VIP','Maior valor ao vender animais','Renovações somam 30 dias ao período ativo'])benefits.append(Object.assign(document.createElement('li'),{textContent:label}));details.append(benefits);
+  const status=document.createElement('p');status.className='vip-status';status.textContent=own?.vipActive?`Ativo até ${own.vipExpiresAt??'data não disponível'}`:'Ainda não ativo';details.append(status);button(`Ativar VIP · ${catalog.vip.greenPrice} verdes`,()=>void action({action:'BUY_VIP'}),details).className='vip-buy';offer.append(art,details);grid.append(offer);
+ }
  if(category==='owned'){
   if(!own?.animals.length)paragraph('Nenhum animal comprado.',grid);
   for(const animal of own?.animals??[]){const type=catalog.animals.find(a=>a.id===animal.id);const c=card(type?.name??animal.id,animalPath(animal.id,animal.stage,false,false));grid.append(c);button('Ver animal',()=>animalPanel(animal.id,true),c);}
@@ -161,7 +175,7 @@ async function start(){
  showConnection('Conectando à fazenda… O primeiro acesso pode levar cerca de um minuto.');
  try{
   const response=await fetch(config.api+'/health',{signal:AbortSignal.timeout(65_000),cache:'no-store'});if(!response.ok)throw new Error('Servidor indisponível.');const health=await response.json();
-  catalog=await (await fetch(config.api+'/v1/catalog',{signal:AbortSignal.timeout(65_000)})).json();selectedSeed=catalog.crops[0]?.id??selectedSeed;
+  catalog=await (await fetch(config.api+'/v1/catalog',{signal:AbortSignal.timeout(65_000)})).json();
   showConnection();
   if(config.development){if(!health.development)throw new Error('Contas locais exigem servidor de desenvolvimento.');for(const name of ['Alice','Bob'])button(`Testar como ${name}`,async()=>{sessionStorage.setItem('colheita:local-user',name);await connect(name.toLowerCase(),async()=>`dev-${name.toLowerCase()}`);},login);const previous=sessionStorage.getItem('colheita:local-user');if(previous==='Alice'||previous==='Bob')await connect(previous.toLowerCase(),async()=>`dev-${previous.toLowerCase()}`);}
   else{
@@ -172,15 +186,18 @@ async function start(){
 }
 element('shop').onclick=()=>shop();element('deposit').onclick=()=>deposit();element('missions').onclick=missions;element('friends').onclick=()=>void friends();
 element('home').onclick=()=>{navigationGeneration++;visited=undefined;tool='PLOW';render();};element('close-modal').onclick=()=>modal.close();
-element('accessible-tiles').onclick=tileList;
-element('credits').onclick=()=>{dialog('Créditos');paragraph('Reimplementação independente e não oficial de Colheita Feliz. Acervo visual derivado da referência indicada no repositório, com uso não comercial.');const link=document.createElement('a');link.href='/assets/REFERENCE_LICENSE';link.textContent='Licença e atribuição dos assets';content.append(link);};
 element('sound').onclick=()=>{audio.unlock();audio.setEffects(!audio.settings.effects);audioButton();};element('settings').onclick=settings;audioButton();
 document.addEventListener('pointerdown',()=>audio.unlock(),{once:true});document.addEventListener('keydown',()=>audio.unlock(),{once:true});
 element('retry').onclick=async()=>{if(!api||busy)return;const client=api,generation=sessionGeneration;busy=true;try{const reply=await client.retry();if(generation!==sessionGeneration)return;receive(reply);if(reply.code){dialog('Convite confirmado');paragraph(reply.code);}}catch(error){if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();await refresh();}}};
-element('logout').onclick=async()=>{sessionGeneration++;navigationGeneration++;busy=false;api=undefined;own=undefined;visited=undefined;scene?.close();audio.setActive(false);sessionStorage.removeItem('colheita:local-user');element('game').hidden=true;element('welcome').hidden=false;syncPending();if(supabase)await supabase.auth.signOut();};
 window.addEventListener('offline',()=>showConnection('Sem conexão. Reconecte antes de agir.'));
 window.addEventListener('online',()=>void refresh());
-document.addEventListener('keydown',event=>{if(!own||modal.open||event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement)return;const keys:Record<string,string>={'2':'PLOW','3':'PLANT','4':'WATER','5':'WEED','6':'PESTICIDE','7':'HARVEST','8':'FERTILIZE'};if(!visited&&keys[event.key]){tool=keys[event.key];renderTools();}else if(event.key.toLowerCase()==='b')shop();else if(event.key.toLowerCase()==='v')deposit();});
+document.addEventListener('keydown',event=>{
+ if(!own||event.repeat||event.altKey||event.ctrlKey||event.metaKey||event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement)return;
+ const shortcut=gameShortcut(event.key,!!visited);if(!shortcut)return;
+ if(shortcut.action==='tool'){if(!modal.open){tool=shortcut.tool;renderTools();}return;}
+ if(shortcut.action==='music'||shortcut.action==='effects'){audio.unlock();if(shortcut.action==='music')audio.setMusic(!audio.settings.music);else audio.setEffects(!audio.settings.effects);audioButton();if(modal.open&&element('modal-title').textContent==='Ajustes')settings();return;}
+ const title=shortcut.action==='shop'?'Loja':shortcut.action==='deposit'?'Depósito':'Tarefas diárias';shortcutPanel(title,()=>{if(shortcut.action==='shop')shop();else if(shortcut.action==='deposit')deposit();else missions();});
+});
 document.addEventListener('visibilitychange',()=>{audio.setActive(!document.hidden&&!!own);if(!document.hidden)void refresh();});
 window.addEventListener('pagehide',()=>audio.setActive(false));window.addEventListener('pageshow',()=>audio.setActive(!document.hidden&&!!own));
 window.setInterval(()=>{if(!document.hidden)void refresh();},30_000);

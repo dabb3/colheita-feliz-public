@@ -1,6 +1,6 @@
 # Desktop/Web: matriz de paridade
 
-Baseline: branch codex/online-core-compartilhado, commit 42dd8f0 (30/10/2026). Comparação estática entre desktop LibGDX e cliente web TypeScript. Cada diferença só passa a migrada após verificação visual e funcional.
+Baseline: branch codex/online-core-compartilhado, commit 3cce613 (30/10/2026). Comparação estática entre desktop LibGDX e cliente web TypeScript. Cada diferença só passa a migrada após verificação visual e funcional.
 
 | Área | Desktop atual | Navegador atual | Trabalho para paridade | Estado |
 |---|---|---|---|---|

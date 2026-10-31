@@ -1,54 +1,6 @@
-import type {Crop,Farm,Tile} from './types.ts';
-export function untilUtcMidnight(serverTime:string){
- const now=new Date(serverTime),midnight=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+1),minutes=Math.max(1,Math.ceil((midnight-now.getTime())/60_000)),hours=Math.floor(minutes/60);
- return hours>0?`${hours} h${minutes%60?String(minutes%60).padStart(2,'0'):''}`:`${minutes} min`;
-}
-export function cropGroups(crops:Crop[]){return {common:crops.filter(crop=>!crop.vipOnly),vip:crops.filter(crop=>crop.vipOnly)};}
-export function soundForAction(action:string,animalReady=false){
- if(action==='PLOW')return 'click_button';
- if(action==='PLANT'||action==='FERTILIZE'||action==='LOVE')return 'plant';
- if(action==='WATER')return 'water';
- if(action==='HARVEST'||action==='STEAL'||(action==='TEND_ANIMAL'&&animalReady))return 'harvest';
- if(action==='WEED'||action==='PESTICIDE')return 'weed';
- if(action==='TEND_ANIMAL')return 'plant';
- if(action.startsWith('BUY_'))return 'buy';
- if(action.startsWith('SELL_'))return 'sell';
- return undefined;
-}
-export function showAnimalProduct(status:string,kind:string,id:string){return status==='READY'&&kind==='PRODUCER'&&animalProductPath(id)!==undefined;}
-export function animalProductPath(id:string){
- if(id==='galinha'||id==='pato')return 'classic/animals/ninho-geral/ninho-com-ovos.png';
- if(id==='ovelha')return 'classic/animals/ovelha/la-ovelha.png';
- if(id==='vaca')return 'classic/animals/vaca/balde-vaca.png';
- return undefined;
-}
-export function actionRewardModel(before:Pick<Farm,'coins'|'greenCoins'|'currentXp'|'level'>,after:Pick<Farm,'coins'|'greenCoins'|'currentXp'|'level'>){
- const level=after.level??before.level??0,leveledUp=level>(before.level??0);
- const gain=(previous:string|undefined,current:string|undefined)=>Math.max(0,Number(current??0)-Number(previous??0));
- return {coins:gain(before.coins,after.coins),greens:gain(before.greenCoins,after.greenCoins),xp:leveledUp?0:gain(before.currentXp,after.currentXp),level,leveledUp};
-}
-export function cropTooltipModel(tile:Tile,name:string,vipOnly:boolean,vipActive:boolean){
- const growthProgress=tile.nominalRemainingSeconds>0?Math.max(0,Math.min(1,1-tile.remainingSeconds/tile.nominalRemainingSeconds)):tile.state==='READY'?1:0;
- const hours=Math.ceil(tile.remainingSeconds/3600),minutes=Math.ceil(tile.remainingSeconds/60);
- const remaining=hours>=24?`${Math.floor(hours/24)}d ${hours%24}h`:hours>0?`${hours}h${String(minutes%60).padStart(2,'0')}`:`${Math.max(1,minutes)} min`;
- const growthText=tile.state==='DEAD'?'Planta morta · use a pá':tile.state==='READY'?'Pronta! Use a luvinha':tile.weeds&&tile.insects>0?'Pausado por erva e insetos':tile.weeds?'Pausado pela erva daninha':tile.insects>0?'Pausado pelos insetos':tile.dry&&growthProgress===0?'Regue para começar':`${remaining}${tile.dry?' · seca: cresce a 50%':' restantes'}`;
- const chips:string[]=[];
- if(tile.state==='READY')chips.push('PRONTA!');
- if(tile.weeds)chips.push('PRAGA');
- if(tile.insects>0)chips.push(tile.insects===1?'VERME':`${tile.insects} VERMES`);
- if(tile.dry&&tile.state!=='READY')chips.push('SECA');
- if(tile.protected)chips.push('PROTEGIDA');
- if(!chips.length)chips.push('SAUDÁVEL');
- return {title:name,seasonText:`${tile.season} / ${tile.seasons} · ${vipOnly&&!vipActive?'venda bloqueada sem VIP':'1 unidade'}`,seasonProgress:tile.seasons>0?Math.max(0,Math.min(1,tile.season/tile.seasons)):0,growthText,growthProgress,chips:chips.slice(0,4)};
-}
 export function periodAt(date:Date):'day'|'sunset'|'night' {
  const minute=date.getHours()*60+date.getMinutes();
  return minute>=360 && minute<1020 ? 'day' : minute>=1020 && minute<=1110 ? 'sunset' : 'night';
-}
-export function backgroundBounds(viewportWidth:number,viewportHeight:number,imageWidth:number,imageHeight:number) {
- const scale=Math.max(viewportWidth/imageWidth,viewportHeight/imageHeight);
- const width=imageWidth*scale,height=imageHeight*scale;
- return {x:(viewportWidth-width)/2,y:0,width,height};
 }
 export function tileCenter(column:number,row:number) {return {x:585+(column-row)*85,y:400+(column+row)*36};}
 export const terrainSize={width:188,height:100};
@@ -99,4 +51,14 @@ export function animalMotion(id:string,seconds:number,sleeping:boolean){
  const phase=(seconds+offset)%(half*2),leg=Math.floor(phase/half),local=phase%half,progress=Math.max(0,Math.min(1,(local-2)/travel));
  const dx=(leg===0?-radius:radius)+(leg===0?2*radius:-2*radius)*progress,walking=!sleeping&&local>=2;
  return{x:homeX+dx,y:homeY+dx*.35,walking,facingRight:leg===0,alternate:walking&&Math.floor((leg+progress)*distance/6)%2!==0};
+}
+
+export const toolShortcutOrder=['CURSOR','PLOW','PLANT','WATER','WEED','PESTICIDE','HARVEST','FERTILIZE'];
+export function gameShortcut(key:string,visiting=false):{action:'tool';tool:string}|{action:'shop'|'deposit'|'missions'|'music'|'effects'}|undefined{
+ if(!visiting&&/^[1-8]$/.test(key))return{action:'tool',tool:toolShortcutOrder[Number(key)-1]};
+ const action=({b:'shop',v:'deposit',q:'missions',m:'music',n:'effects'} as Record<string,'shop'|'deposit'|'missions'|'music'|'effects'>)[key.toLowerCase()];return action?{action}:undefined;
+}
+export function shortcutPanelState(isOpen:boolean,currentTitle:string,targetTitle:string):'close'|'open'{return isOpen&&currentTitle===targetTitle?'close':'open';}
+export function tileCommand(tool:string,tile:import('./types.ts').Tile,seedId:string,fertilizerId:string,visiting=false):Record<string,string|number>{
+ const fields:Record<string,string|number>={action:tool,column:tile.column,row:tile.row};if(visiting)fields.harvestRevision=tile.harvestRevision;if(tool==='PLANT')fields.itemId=seedId;if(tool==='FERTILIZE'||(visiting&&tool==='LOVE'))fields.itemId=fertilizerId;return fields;
 }
