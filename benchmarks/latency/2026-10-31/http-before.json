@@ -1,0 +1,248 @@
+{
+  "commit": "845f857",
+  "started": "2026-10-31T03:59:09.684Z",
+  "ui": [
+    {
+      "action": "FRIENDS",
+      "ms": 1500
+    },
+    {
+      "action": "VISIT",
+      "ms": 2018
+    },
+    {
+      "action": "FRIENDS",
+      "ms": 1376
+    },
+    {
+      "action": "VISIT",
+      "ms": 1741
+    },
+    {
+      "action": "FRIENDS",
+      "ms": 1118
+    },
+    {
+      "action": "VISIT",
+      "ms": 1755
+    }
+  ],
+  "rows": [
+    {
+      "timestamp": "2026-10-31T03:50:32.294Z",
+      "route": "/v1/me/farm",
+      "durationMs": 4398.5,
+      "serverTiming": "auth;dur=2841.37, db_connect;dur=126.62, db;dur=1053.09, app;dur=4021.85, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:50:33.059Z",
+      "route": "/v1/request-id",
+      "durationMs": 763.1,
+      "serverTiming": "auth;dur=433.75, db_connect;dur=0.00, db;dur=0.00, app;dur=434.05, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:50:59.436Z",
+      "route": "/v1/me/farm",
+      "durationMs": 1888.8,
+      "serverTiming": "auth;dur=436.00, db_connect;dur=126.45, db;dur=1017.86, app;dur=1580.66, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:51:29.726Z",
+      "route": "/v1/me/farm",
+      "durationMs": 2173.1,
+      "serverTiming": "auth;dur=437.37, db_connect;dur=123.80, db;dur=993.32, app;dur=1554.80, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:51:30.464Z",
+      "route": "/v1/request-id",
+      "durationMs": 742.5,
+      "serverTiming": "auth;dur=429.19, db_connect;dur=0.00, db;dur=0.00, app;dur=429.34, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:51:59.179Z",
+      "route": "/v1/me/farm",
+      "durationMs": 1630.8,
+      "serverTiming": "auth;dur=161.48, db_connect;dur=126.30, db;dur=1015.03, app;dur=1303.23, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:52:29.421Z",
+      "route": "/v1/me/farm",
+      "durationMs": 1872.3,
+      "serverTiming": "auth;dur=434.12, db_connect;dur=124.01, db;dur=993.82, app;dur=1552.51, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:52:30.310Z",
+      "route": "/v1/request-id",
+      "durationMs": 888.2,
+      "serverTiming": "auth;dur=583.57, db_connect;dur=0.00, db;dur=0.00, app;dur=583.76, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:52:59.431Z",
+      "route": "/v1/me/farm",
+      "durationMs": 1883.7,
+      "serverTiming": "auth;dur=436.60, db_connect;dur=126.47, db;dur=1015.19, app;dur=1578.72, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:52:59.915Z",
+      "route": "/v1/request-id",
+      "durationMs": 483.2,
+      "serverTiming": "auth;dur=173.41, db_connect;dur=0.00, db;dur=0.00, app;dur=173.57, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:53:29.409Z",
+      "route": "/v1/me/farm",
+      "durationMs": 1860.7,
+      "serverTiming": "auth;dur=431.88, db_connect;dur=123.86, db;dur=993.79, app;dur=1549.77, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:53:59.452Z",
+      "route": "/v1/me/farm",
+      "durationMs": 1903.1,
+      "serverTiming": "auth;dur=450.14, db_connect;dur=126.70, db;dur=1014.66, app;dur=1591.84, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:53:59.921Z",
+      "route": "/v1/request-id",
+      "durationMs": 468.6,
+      "serverTiming": "auth;dur=163.10, db_connect;dur=0.00, db;dur=0.00, app;dur=163.25, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:54:29.667Z",
+      "route": "/v1/me/farm",
+      "durationMs": 2119.7,
+      "serverTiming": "auth;dur=558.54, db_connect;dur=123.77, db;dur=992.68, app;dur=1675.27, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:54:30.408Z",
+      "route": "/v1/request-id",
+      "durationMs": 739.8,
+      "serverTiming": "auth;dur=435.37, db_connect;dur=0.00, db;dur=0.00, app;dur=435.51, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:54:59.485Z",
+      "route": "/v1/me/farm",
+      "durationMs": 1937,
+      "serverTiming": "auth;dur=178.54, db_connect;dur=126.36, db;dur=1019.75, app;dur=1324.94, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:55:29.184Z",
+      "route": "/v1/me/farm",
+      "durationMs": 1633.7,
+      "serverTiming": "auth;dur=160.10, db_connect;dur=123.44, db;dur=1036.93, app;dur=1320.76, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:55:29.679Z",
+      "route": "/v1/request-id",
+      "durationMs": 496.3,
+      "serverTiming": "auth;dur=171.06, db_connect;dur=0.00, db;dur=0.00, app;dur=171.25, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:55:59.563Z",
+      "route": "/v1/me/farm",
+      "durationMs": 2015.8,
+      "serverTiming": "auth;dur=429.12, db_connect;dur=126.46, db;dur=1016.29, app;dur=1572.15, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:56:00.052Z",
+      "route": "/v1/request-id",
+      "durationMs": 488.1,
+      "serverTiming": "auth;dur=176.00, db_connect;dur=0.00, db;dur=0.00, app;dur=176.19, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:56:29.516Z",
+      "route": "/v1/me/farm",
+      "durationMs": 1968.6,
+      "serverTiming": "auth;dur=422.50, db_connect;dur=123.64, db;dur=991.60, app;dur=1537.98, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:56:59.419Z",
+      "route": "/v1/me/farm",
+      "durationMs": 1871.2,
+      "serverTiming": "auth;dur=440.96, db_connect;dur=123.41, db;dur=992.09, app;dur=1556.73, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:57:00.280Z",
+      "route": "/v1/request-id",
+      "durationMs": 860,
+      "serverTiming": "auth;dur=421.96, db_connect;dur=0.00, db;dur=0.00, app;dur=422.12, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:57:29.693Z",
+      "route": "/v1/me/farm",
+      "durationMs": 2144.2,
+      "serverTiming": "auth;dur=434.63, db_connect;dur=121.09, db;dur=974.13, app;dur=1530.10, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:57:30.458Z",
+      "route": "/v1/request-id",
+      "durationMs": 764.2,
+      "serverTiming": "auth;dur=435.63, db_connect;dur=0.00, db;dur=0.00, app;dur=435.82, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:57:59.379Z",
+      "route": "/v1/me/farm",
+      "durationMs": 1831.6,
+      "serverTiming": "auth;dur=428.97, db_connect;dur=121.48, db;dur=973.19, app;dur=1523.91, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:58:29.117Z",
+      "route": "/v1/me/farm",
+      "durationMs": 1569.1,
+      "serverTiming": "auth;dur=169.35, db_connect;dur=121.06, db;dur=973.98, app;dur=1264.68, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:58:29.917Z",
+      "route": "/v1/request-id",
+      "durationMs": 799.2,
+      "serverTiming": "auth;dur=421.00, db_connect;dur=0.00, db;dur=0.00, app;dur=421.18, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:58:59.378Z",
+      "route": "/v1/me/farm",
+      "durationMs": 1830.6,
+      "serverTiming": "auth;dur=424.23, db_connect;dur=121.09, db;dur=973.35, app;dur=1518.96, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:58:59.860Z",
+      "route": "/v1/request-id",
+      "durationMs": 481.3,
+      "serverTiming": "auth;dur=167.22, db_connect;dur=0.00, db;dur=0.00, app;dur=167.35, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:59:11.195Z",
+      "route": "/v1/friends",
+      "durationMs": 1453.7,
+      "serverTiming": "auth;dur=420.74, db_connect;dur=121.17, db;dur=485.93, app;dur=1028.55, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:59:13.220Z",
+      "route": "/v1/farms/:farm/visit",
+      "durationMs": 1981.4,
+      "serverTiming": "auth;dur=155.28, db_connect;dur=121.23, db;dur=1095.29, app;dur=1374.23, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:59:14.784Z",
+      "route": "/v1/friends",
+      "durationMs": 1335.6,
+      "serverTiming": "auth;dur=423.44, db_connect;dur=121.20, db;dur=485.50, app;dur=1030.86, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:59:16.520Z",
+      "route": "/v1/farms/:farm/visit",
+      "durationMs": 1696.6,
+      "serverTiming": "auth;dur=165.84, db_connect;dur=121.19, db;dur=1098.91, app;dur=1386.27, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:59:17.836Z",
+      "route": "/v1/friends",
+      "durationMs": 1072,
+      "serverTiming": "auth;dur=152.33, db_connect;dur=123.87, db;dur=494.08, app;dur=770.42, cfExtPri"
+    },
+    {
+      "timestamp": "2026-10-31T03:59:19.598Z",
+      "route": "/v1/farms/:farm/visit",
+      "durationMs": 1716.5,
+      "serverTiming": "auth;dur=159.94, db_connect;dur=123.39, db;dur=1113.85, app;dur=1397.53, cfExtPri"
+    }
+  ]
+}
