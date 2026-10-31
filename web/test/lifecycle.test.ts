@@ -12,10 +12,11 @@ function app(){
  const storage={getItem:()=>null,setItem(){},removeItem(){}};
  const ctx={window:{COLHEITA_CONFIG:{development:true},setInterval(){},setTimeout(){},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(){audioClips.push(this);}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={refresh,logout,toggleMusic,shop,missions,receive,dialog,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
+ source+='\nglobalThis.h={refresh,logout,toggleMusic,shop,missions,friends,receive,dialog,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:ctx.h,elements,listeners,audioClips,ctx};
 }
 function text(node){return(node.textContent??'')+(node.children??[]).map(child=>typeof child==='object'?text(child):child).join('');}
+function descendants(node){return[node,...(node.children??[]).flatMap(child=>typeof child==='object'?descendants(child):[])];}
 test('late visit response cannot reopen a visit after returning home',async()=>{
  const {h,elements}=app(),started=deferred(),reply=deferred();
  h.set({own:farm('alice'),visited:farm('bob'),api:{pending:null,get:path=>path==='/v1/me/farm'?Promise.resolve(farm('alice')):(started.resolve(),reply.promise)}});
@@ -51,6 +52,11 @@ test('late invitation acceptance does not close a newer dialog',async()=>{
  const {h,elements}=app(),reply=deferred();h.set({own:farm('alice'),api:{pending:null,mutate:()=>reply.promise,get:()=>Promise.resolve(farm('alice'))}});
  h.dialog('Amigos');const acceptance=h.acceptInvitation('invite',h.dialogGeneration(),true);h.dialog('Loja');reply.resolve({});await acceptance;
  assert.equal(elements.get('modal').open,true);assert.equal(elements.get('modal-title').textContent,'Loja');
+});
+test('late farm visit neither starts nor closes a newer dialog',async()=>{
+ const {h,elements}=app(),reply=deferred();h.set({own:farm('alice'),api:{pending:null,get:path=>path==='/v1/friends'?Promise.resolve([{id:'bob',name:'Bob'}]):reply.promise}});
+ await h.friends();descendants(elements.get('modal-content')).find(node=>node.textContent==='Visitar fazenda').onclick();h.dialog('Loja');reply.resolve(farm('bob'));
+ await new Promise(resolve=>setTimeout(resolve,0));assert.equal(h.get().visited,undefined);assert.equal(elements.get('modal').open,true);assert.equal(elements.get('modal-title').textContent,'Loja');
 });
 test('closed canvas scene removes previous event handlers',()=>{
  const handlers=new Map(),calls=[];
