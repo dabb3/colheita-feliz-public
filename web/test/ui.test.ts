@@ -33,7 +33,7 @@ test('market scrolls through all common crops, keeps VIP separate and preserves 
  assert.equal(all.find(n=>n.tag==='button'&&n.disabled)?.disabled,true);
  assert.equal(all.find(n=>n.className==='market-scroll')!==undefined,true);
  all.find(n=>n.attributes['aria-label']==='Comprar Planta 1 por 500 ouro').onclick();
- assert.deepEqual(commands,[{action:'BUY_SEED',itemId:'crop1',currency:'GOLD'}]);
+ assert.equal(JSON.stringify(commands),JSON.stringify([{action:'BUY_SEED',itemId:'crop1',currency:'GOLD'}]));
  all.find(n=>n.textContent==='VIP').onclick();assert.deepEqual(pages,['vip']);assert.equal(commands.length,1);
  renderMarket(root,catalog,farm,'crops','vip',group=>pages.push(group),command=>commands.push(command));
  all=nodes(root);assert.equal(all.filter(n=>n.tag==='article').length,0);
