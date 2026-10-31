@@ -3,6 +3,25 @@ import assert from 'node:assert/strict';
 import {ApiClient, acceptFarm} from '../src/api.ts';
 
 function memory() { const entries = new Map(); return { getItem: k => entries.get(k) ?? null, setItem: (k,v) => entries.set(k,v), removeItem: k => entries.delete(k) }; }
+test('a diagnostic logger failure cannot turn a confirmed action into an unknown result',async()=>{
+ const previous=console.debug;console.debug=()=>{throw new Error('logger unavailable');};
+ try{
+  const api=new ApiClient('https://example.invalid','alice',async()=>'token',memory(),async(url)=>new Response(
+   url.endsWith('/v1/request-id')?'{"requestId":"id"}':'{"result":{"success":true}}',{headers:{'Server-Timing':'auth;dur=1'}}));
+  assert.equal((await api.mutate('/v1/me/actions',{action:'PLOW'})).result.success,true);assert.equal(api.pending,null);
+ }finally{console.debug=previous;}
+});
+test('timing diagnostics contain durations and action but no credentials, request body or player id',async()=>{
+ const logs=[],previous=console.debug;console.debug=(...args)=>logs.push(args);
+ try{
+  const api=new ApiClient('https://example.invalid','private-user',async()=>'private-token',memory(),async(url)=>
+   new Response(url.endsWith('/v1/request-id')?'{"requestId":"private-request"}':'{}',{headers:{'Server-Timing':'auth;dur=20, db;dur=100'}}));
+  await api.mutate('/v1/farms/00000000-0000-0000-0000-000000000002/visit-actions',{action:'LOVE',itemId:'amor'});
+  const output=JSON.stringify(logs);
+  assert.match(output,/LOVE/);assert.match(output,/auth;dur=20/);assert.match(output,/durationMs/);
+  for(const secret of ['private-token','private-user','private-request','00000000-0000-0000-0000-000000000002','itemId'])assert.equal(output.includes(secret),false);
+ }finally{console.debug=previous;}
+});
 test('a prepared server identifier removes issuance from the action critical path and is single use',async()=>{
  const calls=[],bodies=[];let ids=0;
  const api=new ApiClient('http://localhost','alice',async()=>'token',memory(),async(url,init)=>{

@@ -6,6 +6,22 @@ O desktop continua disponível. O servidor online cria fazendas novas e não imp
 
 ### Latência e medição
 
+Para comparar ações sem usar fazendas pessoais, `LATENCY_BENCHMARK=once` habilita
+um ensaio interno após o startup. Não cria endpoint HTTP. São 24 cenários com
+participantes sintéticos e três amostras após um aquecimento por cenário. Cada
+amostra roda em uma transação sempre revertida; fixtures e resultados não são
+commitados. A limpeza de recibos do ensaio restringe-se ao ator sintético.
+O ensaio usa uma conexão enquanto roda e deve ser habilitado apenas durante
+diagnóstico controlado; remova a variável após a comparação para não repetir
+trabalho nos próximos restarts. Logs `LATENCY_BENCHMARK` incluem apenas rótulos,
+tempos e escopo, sem dados dos jogadores.
+
+O tempo desse ensaio mede o serviço/transação após preparar o fixture e antes do
+rollback: exclui setup, autenticação, rede do navegador, BEGIN/lock inicial e
+commit. Não apresente esses valores como tempo de clique até resposta. O cliente
+também registra no console `Colheita API timing` quando a API envia Server-Timing:
+rota com UUID substituído, ação e durações. Não registra corpo, token ou saldo.
+
 O servidor reutiliza conexões PostgreSQL com HikariCP 7.0.2: máximo de quatro,
 mínimo de uma ociosa, espera por conexão de até cinco segundos e renovação após
 dez minutos. O pool é encerrado com a API. TLS `verify-full`, transações, locks,
