@@ -115,16 +115,37 @@ final class JdbcOnlineStore implements AutoCloseable {
                 tx.lock("actor:" + actor);
                 T result = operation.apply(tx);
                 if (tx.pendingSaves != null) throw new IllegalStateException("Incomplete receipt transaction");
-                if (diagnostic) connection.rollback(); else connection.commit();
+                if (diagnostic) connection.rollback();
+                else connection.commit();
                 return result;
             } catch (RuntimeException e) {
-                try { connection.rollback(); } catch (SQLException rollback) { e.addSuppressed(rollback); }
+                try {
+                    connection.rollback();
+                } catch (SQLException rollback) {
+                    e.addSuppressed(rollback);
+                }
                 throw e;
-            } finally { RequestTimings.database(transactionStarted); }
-        } catch (SQLException e) { throw new ApiFailure(503, "Banco indisponível; tente novamente com o mesmo identificador de ação."); }
+            } finally {
+                RequestTimings.database(transactionStarted);
+            }
+
+        } catch (SQLException e) {
+            System.err.println(
+                    "DB_DIAGNOSTIC sqlState=" + e.getSQLState()
+                            + " exception=" + e.getClass().getSimpleName()
+                            + " cause=" + (e.getCause() == null
+                            ? "none"
+                            : e.getCause().getClass().getSimpleName())
+            );
+
+            throw new ApiFailure(
+                    503,
+                    "Banco indisponível; tente novamente com o mesmo identificador de ação."
+            );
+        }
     }
 
-    final class Tx {
+        final class Tx {
         private final Connection connection;
         private final boolean diagnostic;
         private final Map<UUID, Player> players = new HashMap<>();
