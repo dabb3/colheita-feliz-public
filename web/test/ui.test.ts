@@ -14,7 +14,7 @@ function ui(){
  return{...context.ui,root:make('div')};
 }
 function nodes(root){return[root,...root.children.flatMap(child=>typeof child==='object'?nodes(child):[])];}
-const crop=i=>({id:'crop'+i,name:'Planta '+i,spriteStem:'nabo',growthSeconds:72000,seasons:1,requiredLevel:i===0?3:1,seedPrices:{GOLD:500},vipOnly:false});
+const crop=i=>({id:'crop'+i,name:'Planta '+i,spriteStem:'nabo',growthSeconds:72000,regrowthSeconds:0,seasons:1,requiredLevel:i===0?3:1,seedPrices:{GOLD:500},vipOnly:false});
 
 test('wallet uses authenticated name and exact balances with a labelled XP meter',()=>{
  const {renderWallet,root}=ui();renderWallet(root,{name:'<akaza>',level:2,currentXp:'0.5',xpToNext:'25',coins:'9007199254740993.1',greenCoins:'5'});

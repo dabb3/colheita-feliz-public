@@ -28,10 +28,10 @@ export function actionRewardModel(before:Pick<Farm,'coins'|'greenCoins'|'current
  const gain=(previous:string|undefined,current:string|undefined)=>Math.max(0,Number(current??0)-Number(previous??0));
  return {coins:gain(before.coins,after.coins),greens:gain(before.greenCoins,after.greenCoins),xp:leveledUp?0:gain(before.currentXp,after.currentXp),level,leveledUp};
 }
-export function cropTooltipModel(tile:Tile,name:string,vipOnly:boolean,vipActive:boolean){
- const growthProgress=tile.nominalRemainingSeconds>0?Math.max(0,Math.min(1,1-tile.remainingSeconds/tile.nominalRemainingSeconds)):tile.state==='READY'?1:0;
- const hours=Math.ceil(tile.remainingSeconds/3600),minutes=Math.ceil(tile.remainingSeconds/60);
- const remaining=hours>=24?`${Math.floor(hours/24)}d ${hours%24}h`:hours>0?`${hours}h${String(minutes%60).padStart(2,'0')}`:`${Math.max(1,minutes)} min`;
+export function cropTooltipModel(tile:Tile,name:string,vipOnly:boolean,vipActive:boolean,growthDurationSeconds=tile.nominalRemainingSeconds){
+ const growthProgress=growthDurationSeconds>0?Math.max(0,Math.min(1,1-tile.nominalRemainingSeconds/growthDurationSeconds)):tile.state==='READY'?1:0;
+ const minutes=Math.max(1,Math.ceil(tile.remainingSeconds/60)),hours=Math.floor(minutes/60);
+ const remaining=hours>=24?`${Math.floor(hours/24)}d ${hours%24}h`:hours>0?`${hours}h${String(minutes%60).padStart(2,'0')}`:`${minutes} min`;
  const growthText=tile.state==='DEAD'?'Planta morta · use a pá':tile.state==='READY'?'Pronta! Use a luvinha':tile.weeds&&tile.insects>0?'Pausado por erva e insetos':tile.weeds?'Pausado pela erva daninha':tile.insects>0?'Pausado pelos insetos':tile.dry&&growthProgress===0?'Regue para começar':`${remaining}${tile.dry?' · seca: cresce a 50%':' restantes'}`;
  const chips:string[]=[];
  if(tile.state==='READY')chips.push('PRONTA!');

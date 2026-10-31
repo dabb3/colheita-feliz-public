@@ -8,8 +8,8 @@ const config=window.COLHEITA_CONFIG;
 const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const modal=element<HTMLDialogElement>('modal'),content=element('modal-content');
 let api:ApiClient|undefined,catalog:Catalog,own:Farm|undefined,visited:Farm|undefined,scene:Scene|undefined;
-let tool='CURSOR',selectedSeed='nabo',selectedFertilizer='comum',trayOpen=false,effectsEnabled=false,musicEnabled=false,music:HTMLAudioElement|undefined,busy=false,seedMarketGroup:'common'|'vip'='common';
-let toastTimer:number,sessionGeneration=0,navigationGeneration=0;
+let tool='CURSOR',selectedSeed='nabo',selectedFertilizer='comum',trayOpen=false,effectsEnabled=false,musicEnabled=false,music:HTMLAudioElement|undefined,busy=false,seedMarketGroup:'common'|'vip'='common',refreshDialog:(()=>void)|undefined;
+let toastTimer:number,sessionGeneration=0,navigationGeneration=0,healthTile:Tile|null=null,healthPoint:{x:number;y:number}|null=null;
 const login=element('login');
 const inviteFromUrl=new URL(location.href).searchParams.get('invite');
 if(inviteFromUrl)sessionStorage.setItem('colheita:invitation',inviteFromUrl);
@@ -20,7 +20,8 @@ function paragraph(text:string,parent:HTMLElement=content){const p=document.crea
 function formatToolDuration(seconds:number){const minutes=Math.max(1,Math.ceil(seconds/60));return minutes>=60?`${Math.floor(minutes/60)} h${String(minutes%60).padStart(2,'0')}`:`${minutes} min`;}
 function notify(message:string){const notice=element('notice');notice.classList.remove('level-notice','reward-notice');notice.replaceChildren(document.createTextNode(message));clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>notice.replaceChildren(),7000);}
 function toggleEffects(){effectsEnabled=!effectsEnabled;const control=document.getElementById('sound');if(control){control.setAttribute('aria-pressed',String(effectsEnabled));const state=control.querySelector('.settings-state');if(state)state.textContent=effectsEnabled?'Ligado':'Desligado';}}
-function toggleMusic(){musicEnabled=!musicEnabled;const control=document.getElementById('music');if(control){control.setAttribute('aria-pressed',String(musicEnabled));const state=control.querySelector('.settings-state');if(state)state.textContent=musicEnabled?'Ligado':'Desligado';}if(musicEnabled){music??=new Audio('/assets/sounds/farm_loop.mp3');music.loop=true;music.volume=.25;void music.play().catch(()=>{});}else music?.pause();}
+function syncMusic(){if(!musicEnabled||!own||document.hidden){music?.pause();return;}music??=new Audio('/assets/sounds/farm_loop.mp3');music.loop=true;music.volume=.25;if(music.paused)void music.play().catch(()=>{});}
+function toggleMusic(){musicEnabled=!musicEnabled;const control=document.getElementById('music');if(control){control.setAttribute('aria-pressed',String(musicEnabled));const state=control.querySelector('.settings-state');if(state)state.textContent=musicEnabled?'Ligado':'Desligado';}syncMusic();}
 function shortcutPanel(title:string,open:()=>void){if(shortcutPanelState(modal.open,element('modal-title').textContent,title)==='close')modal.close();else open();}
 function actionIcon(action:string,itemId?:string){
  const icon:Record<string,string>={PLOW:'hud/pa-ui',PLANT:'hud/saco-ui',WATER:'hud/regador-ui',WEED:'hud/herbicida-ui',PESTICIDE:'hud/pesticida-ui',HARVEST:'hud/mao-restaurada',STEAL:'hud/mao-restaurada',FERTILIZE:'adubo-comum',LOVE:'adubo-amor'};
@@ -36,7 +37,7 @@ function notifyAction(message:string,action:string,itemId:string|undefined,rewar
  if(reward.leveledUp){notice.replaceChildren();const title=document.createElement('strong');title.textContent=`Nível ${reward.level}!`;const unlocked=catalog.crops.filter(crop=>crop.requiredLevel===reward.level).map(crop=>crop.name);const sub=document.createElement('span');sub.textContent=unlocked.length?`${unlocked.join(', ')} liberado(s) na Loja`:'Continue colhendo para liberar mais culturas';notice.append(title,sub);notice.classList.add('level-notice');}
  clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>{notice.replaceChildren();notice.classList.remove('level-notice','reward-notice');},reward.leveledUp?2600:3200);
 }
-function dialog(title:string){element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');content.replaceChildren();content.scrollTop=0;if(!modal.open)modal.showModal();}
+function dialog(title:string){refreshDialog=undefined;element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');content.replaceChildren();content.scrollTop=0;if(!modal.open)modal.showModal();}
 function settings(){
  dialog('Ajustes');
  paragraph('Som, ferramentas e conta da fazenda.',content).className='settings-intro';
@@ -59,19 +60,20 @@ function settings(){
  const credits=button('',()=>{dialog('Créditos');paragraph('Reimplementação independente e não oficial de Colheita Feliz. Acervo visual derivado da referência indicada no repositório, com uso não comercial.');const link=document.createElement('a');link.href='/assets/REFERENCE_LICENSE';link.textContent='Licença e atribuição dos assets';content.append(link);},info);credits.className='settings-action';const creditsCopy=document.createElement('span');creditsCopy.className='settings-toggle-copy';const creditsName=document.createElement('strong');creditsName.textContent='Créditos';const creditsDescription=document.createElement('small');creditsDescription.textContent='Sobre o projeto e os assets';creditsCopy.append(creditsName,creditsDescription);const creditsArrow=document.createElement('span');creditsArrow.className='settings-chevron';creditsArrow.textContent='›';credits.append(creditsCopy,creditsArrow);
  const logoutButton=button('Sair da conta',logout,info);logoutButton.className='settings-logout';
 }
-async function logout(){sessionGeneration++;navigationGeneration++;busy=false;api=undefined;own=undefined;visited=undefined;scene?.close();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;syncPending();if(supabase)await supabase.auth.signOut();}
+async function logout(){sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;scene?.close();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;syncPending();if(supabase)await supabase.auth.signOut();}
 function showConnection(message?:string){element('connection').hidden=!message;element('connection').textContent=message??'';}
 function syncPending(){element('pending').hidden=!api?.pending;element<HTMLButtonElement>('retry').disabled=!!api?.busy;}
 function display(){return visited??own;}
 function render(){
  if(!own)return;
+ syncMusic();
  element('welcome').hidden=true;element('game').hidden=false;
  const wallet=element('wallet');wallet.replaceChildren();const avatar=document.createElement('img');avatar.className='profile-avatar';avatar.src='/assets/classic/icons/avatar_masculino.png';avatar.alt='';const details=document.createElement('div');details.className='profile-details';const title=document.createElement('strong');title.textContent=visited?`Visitando ${visited.name}`:own.name;details.append(title,document.createTextNode(`Nível ${own.level}`));
  const xp=document.createElement('div');xp.className='profile-xp';const progress=document.createElement('progress');progress.max=Math.max(1,Number(own.xpToNext)||0);progress.value=Math.max(0,Math.min(Number(own.currentXp)||0,progress.max));progress.setAttribute('aria-label',`Experiência: ${own.currentXp} de ${own.xpToNext} XP`);const label=document.createElement('span');label.textContent=`${own.currentXp} / ${own.xpToNext} XP`;xp.append(progress,label);details.append(xp,document.createTextNode(`🟡 ${own.coins} ouro   🟢 ${own.greenCoins} verdes`));wallet.append(avatar,details);
  element('home').hidden=!visited;
  const tutorial=element('tutorial');tutorial.hidden=!!visited||!own.tutorial;tutorial.replaceChildren();
  if(own.tutorial){const strong=document.createElement('strong');strong.textContent=own.tutorial.title??'';tutorial.append(strong);paragraph(own.tutorial.hint??'',tutorial);}
- scene?.update(display()!);syncPending();renderTools();
+ scene?.update(display()!);syncPending();renderTools();if(modal.open)refreshDialog?.();const currentHealthTile=healthTile&&display()?.tiles.find(tile=>tile.column===healthTile!.column&&tile.row===healthTile!.row);health(currentHealthTile??null,healthPoint);
 }
 function renderTools(){
  const toolbar=element('tools');toolbar.replaceChildren();
@@ -153,10 +155,11 @@ async function tileAction(tile:Tile){
 }
 let healthKey='';
 function health(tile:Tile|null,point:{x:number;y:number}|null){
+ healthTile=tile;healthPoint=point;
  const panel=element('plant-health'),game=element('game');
  panel.hidden=!tile?.cropId||!point;
  if(!tile?.cropId||!point){healthKey='';return;}
- const crop=catalog.crops.find(c=>c.id===tile.cropId),model=cropTooltipModel(tile,crop?.name??tile.cropId,!!crop?.vipOnly,!!display()?.vipActive);
+ const crop=catalog.crops.find(c=>c.id===tile.cropId),duration=crop?(tile.season===1?crop.growthSeconds:crop.regrowthSeconds):0,model=cropTooltipModel(tile,crop?.name??tile.cropId,!!crop?.vipOnly,!!display()?.vipActive,duration);
  const key=JSON.stringify([tile.cropId,tile.state,tile.season,tile.seasons,tile.remainingSeconds,tile.nominalRemainingSeconds,tile.dry,tile.paused,tile.weeds,tile.insects,tile.protected,model]);
  const bounds=game.getBoundingClientRect(),width=Math.min(bounds.width-24,330),left=Math.max(width/2+12,Math.min(bounds.width-width/2-12,point.x/1600*bounds.width));
  panel.style.left=`${left}px`;panel.style.top=`${point.y/900*bounds.height}px`;panel.classList.toggle('above',point.y>610);
@@ -176,6 +179,7 @@ function marketCard(name:string,imagePath:string,details:string,level:number,pri
 }
 function shop(category='crops'){
  dialog('Loja');const tabs=document.createElement('div');tabs.className='tabs';content.append(tabs);
+ refreshDialog=()=>shop(category);
  for(const [id,label]of [['crops','Sementes'],['animals','Animais'],['fertilizers','Fertilizantes'],['owned','Meus animais'],['vip','VIP']]){const tab=button(label,()=>shop(id),tabs);tab.className='shop-tab';tab.setAttribute('aria-pressed',String(category===id));}
  const scroll=document.createElement('div');scroll.className='market-scroll';content.append(scroll);
  if(category==='crops'){
@@ -208,6 +212,7 @@ function animalPopup(id:string){
  const type=catalog.animals.find(item=>item.id===id);if(!type)return;
  const stage:Record<string,string>={BABY:'Filhote',YOUNG:'Jovem',ADULT:'Adulto'};
  dialog(type.name);
+ refreshDialog=()=>animalPopup(id);
  const image=id==='abelha'?'classic/animals/abelha/abelha.png':animalPath(id,animal.stage,false,false,false);
  const detail=card(type.name,image);content.append(detail);
  paragraph(`${stage[animal.stage]??animal.stage} · ${animalStatusText(animal.status,type.kind,animal.remainingSeconds)}`,detail);
@@ -220,6 +225,7 @@ function animalPopup(id:string){
 }
 function deposit(){
  dialog('Depósito');
+ refreshDialog=deposit;
  const groups=new Map<string,number>();for(const lot of own?.produceLots??[])groups.set(lot.itemId,(groups.get(lot.itemId)??0)+lot.quantity);
  const totals=own?.depositTotals??{},value=Object.entries(totals).filter(([,amount])=>Number(amount)>0).map(([currency,amount])=>`${amount} ${currency==='GOLD'?'ouro':'verdes'}`).join(' + ');
  paragraph('Produtos colhidos e itens prontos para vender.',content).className='deposit-intro';
@@ -300,6 +306,6 @@ element('retry').onclick=async()=>{if(!api||busy)return;const client=api,generat
 window.addEventListener('offline',()=>showConnection('Sem conexão. Reconecte antes de agir.'));
 window.addEventListener('online',()=>void refresh());
 document.addEventListener('keydown',event=>{if(!own||event.repeat||event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement)return;const shortcut=gameShortcut(event.key,!!visited);if(!shortcut)return;if(shortcut.action==='tool'){if(!modal.open)pickTool(shortcut.tool);return;}if(shortcut.action==='shop')shortcutPanel('Loja',()=>shop());else if(shortcut.action==='deposit')shortcutPanel('Depósito',deposit);else if(shortcut.action==='missions')shortcutPanel('Tarefas diárias',missions);else if(shortcut.action==='music')toggleMusic();else if(shortcut.action==='effects')toggleEffects();});
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});
+document.addEventListener('visibilitychange',()=>{syncMusic();if(!document.hidden)void refresh();});
 window.setInterval(()=>{if(!document.hidden)void refresh();},30_000);
 void start();

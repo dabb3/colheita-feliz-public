@@ -132,12 +132,14 @@ test('each toolbar tool sends the selected seed, fertilizer, and visit revision'
  assert.deepEqual(tileCommand('STEAL',tile,'nabo','amor',true),{action:'STEAL',column:2,row:1,harvestRevision:'17'});
  assert.deepEqual(tileCommand('LOVE',tile,'nabo','amor',true),{action:'LOVE',column:2,row:1,harvestRevision:'17',itemId:'amor'});
 });
-test('crop tooltip reports desktop-style season, growth, and field conditions',()=>{
+test('crop tooltip uses total nominal duration for growth and rounds remaining time down to elapsed hours',()=>{
  const tile={state:'GROWING',season:2,seasons:4,nominalRemainingSeconds:3600,remainingSeconds:900,dry:true,paused:true,weeds:true,insects:2,protected:true} as import('../src/types.ts').Tile;
- assert.deepEqual(cropTooltipModel(tile,'Nabo',false,false),{
+ assert.deepEqual(cropTooltipModel(tile,'Nabo',false,false,14400),{
   title:'Nabo',seasonText:'2 / 4 · 1 unidade',seasonProgress:.5,
   growthText:'Pausado por erva e insetos',growthProgress:.75,chips:['PRAGA','2 VERMES','SECA','PROTEGIDA']
  });
+ const timed={...tile,dry:false,weeds:false,insects:0,remainingSeconds:5400,nominalRemainingSeconds:3600};
+ assert.equal(cropTooltipModel(timed,'Nabo',false,false,14400).growthText,'1h30 restantes');
 });
 test('daily mission reset countdown follows UTC midnight',()=>{
  assert.equal(untilUtcMidnight('2026-10-30T23:30:00Z'),'30 min');
