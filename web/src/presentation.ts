@@ -144,9 +144,9 @@ export function animationFrame(seconds:number,frameCount:number,frameSeconds:num
 }
 export function cropHeight(stage:number){return 32+Math.max(1,Math.min(5,stage))*16;}
 export const toolShortcutOrder=['CURSOR','PLOW','PLANT','WATER','WEED','PESTICIDE','HARVEST','FERTILIZE'];
-export function gameShortcut(key:string,visiting=false):{action:'tool';tool:string}|{action:'shop'|'deposit'|'missions'|'music'|'effects'}|undefined {
+export function gameShortcut(key:string,visiting=false):{action:'tool';tool:string}|{action:'shop'|'deposit'|'missions'|'music'|'effects'|'plots'}|undefined {
  if(!visiting&&/^[1-8]$/.test(key))return {action:'tool',tool:toolShortcutOrder[Number(key)-1]};
- const actions:Record<string,'shop'|'deposit'|'missions'|'music'|'effects'>={b:'shop',v:'deposit',q:'missions',m:'music',n:'effects'};
+ const actions:Record<string,'shop'|'deposit'|'missions'|'music'|'effects'|'plots'>={b:'shop',v:'deposit',q:'missions',m:'music',n:'effects',t:'plots'};
  const action=actions[key.toLowerCase()];return action?{action}:undefined;
 }
 export function shortcutPanelState(isOpen:boolean,currentTitle:string,targetTitle:string):'close'|'open' {

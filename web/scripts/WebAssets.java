@@ -11,10 +11,24 @@ class WebAssets {
         resize("buildings/dog-house.png", 320);
         for (String id : new String[]{"avatar_masculino", "avatar_masculino2", "avatar_masculino3", "avatar_feminino", "avatar_feminino2", "avatar_feminino3", "amigos", "moeda-comum", "moeda-verde", "icon-shop", "deposit-icon"})
             resize("icons/" + id + ".png", 128);
-        for (String id : new String[]{"comum", "rapido", "super", "amor"}) resize("icons/adubo-" + id + ".png", 96);
-        for (String id : new String[]{"pa-ui", "saco-ui", "regador-ui", "mao-restaurada", "herbicida-ui", "pesticida-ui"})
+        for (String id : new String[]{"comum", "rapido", "super", "amor"}) {
+            resize("icons/adubo-" + id + ".png", 96);
+            toolCursor("icons/adubo-" + id + ".png", "adubo-" + id);
+        }
+        for (String id : new String[]{"pa-ui", "saco-ui", "regador-ui", "mao-restaurada", "herbicida-ui", "pesticida-ui"}) {
             resize("icons/hud/" + id + ".png", 96);
+            toolCursor("icons/hud/" + id + ".png", id);
+        }
         cursor();
+    }
+    private static void toolCursor(String name, String id) throws Exception {
+        var source = ImageIO.read(Path.of("assets/classic", name).toFile());
+        var output = new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB);
+        var image = scaled(source, 32);
+        var graphics = output.createGraphics();
+        try { graphics.drawImage(image, (32 - image.getWidth()) / 2, (32 - image.getHeight()) / 2, null); }
+        finally { graphics.dispose(); }
+        write("icons/cursors/" + id + ".png", output);
     }
     private static void cursor() throws Exception {
         var source = ImageIO.read(Path.of("assets/classic/icons/cursor-action.png").toFile());

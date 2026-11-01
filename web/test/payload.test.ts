@@ -30,3 +30,10 @@ test('mouse pointer is a cropped 32px asset separate from the toolbar cursor',()
  assert.equal(png.readUInt32BE(16),32);assert.equal(png.readUInt32BE(20),32);
  assert.ok(existsSync(new URL('../../assets/classic/icons/hud/cursor-ui.png',import.meta.url)));
 });
+
+test('each tool pointer is shipped at a browser-safe size',()=>{
+ for(const icon of ['pa-ui','saco-ui','regador-ui','herbicida-ui','pesticida-ui','mao-restaurada','adubo-comum','adubo-rapido','adubo-super','adubo-amor']){
+  const png=readFileSync(new URL(`../public/assets/classic/icons/cursors/${icon}.png`,import.meta.url));
+  assert.ok(png.readUInt32BE(16)<=32&&png.readUInt32BE(20)<=32,icon);
+ }
+});

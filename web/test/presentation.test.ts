@@ -100,6 +100,7 @@ test('keyboard shortcuts cover desktop panels and settings',()=>{
  assert.deepEqual(gameShortcut('1'),{action:'tool',tool:'CURSOR'});
  assert.deepEqual(gameShortcut('8'),{action:'tool',tool:'FERTILIZE'});
  assert.deepEqual(gameShortcut('q'),{action:'missions'});
+ assert.deepEqual(gameShortcut('T'),{action:'plots'});
  assert.deepEqual(gameShortcut('M'),{action:'music'});
  assert.deepEqual(gameShortcut('n'),{action:'effects'});
  assert.deepEqual(gameShortcut('b'),{action:'shop'});
