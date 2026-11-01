@@ -7,6 +7,7 @@ export interface Tile {
   stage: number;
   season: number;
   seasons: number;
+  watered: boolean;
   dry: boolean;
   paused: boolean;
   weeds: boolean;

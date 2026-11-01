@@ -141,9 +141,9 @@ html, body, #app { width: 100%; height: 100%; min-height: 100%; margin: 0; }
 }
 @media(max-width:560px){.vip-offer{grid-template-columns:1fr;text-align:center}.vip-offer>img{max-height:130px}}
 
-/* Stretch the game canvas to the viewport without blurred side fills. */
+/* Keep the farm at its native 16:9 ratio inside responsive scene space. */
 #scene{position:absolute;inset:0;overflow:hidden;isolation:isolate;background:#153e39}
-#scene>canvas{position:relative;width:100%;height:100%;object-fit:fill}
+#scene>canvas{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(100%,177.7778dvh);height:auto;aspect-ratio:16/9}
 #game{isolation:isolate}
 #game #plant-health{transform:none;max-width:calc(100% - 24px)}
 
@@ -196,6 +196,10 @@ html, body, #app { width: 100%; height: 100%; min-height: 100%; margin: 0; }
  #game footer{padding:10px;gap:12px}
  .tool-tray{left:8px;bottom:124px;transform:none;width:calc(100% - 16px);max-height:38dvh}
  .tile-list{grid-template-columns:repeat(2,minmax(0,1fr))}.tile-list button{font-size:13px}
+}
+@media(max-width:700px) and (orientation:portrait){
+ #app{min-height:100dvh}
+ #game{width:100%;max-width:none;min-height:100dvh;aspect-ratio:auto}
 }
 
 /* Use the game pointer without changing the toolbar selection icon. */

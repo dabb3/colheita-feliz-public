@@ -65,6 +65,7 @@ const tiles = Array.from({ length: 30 }, (_, i) => {
     stage,
     season: 1,
     seasons: crop.seasons,
+    watered: true,
     dry: column === 1,
     paused: false,
     weeds: column === 2,

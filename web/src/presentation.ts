@@ -2,12 +2,30 @@ import type { Crop, Farm, Tile } from "./types.ts";
 type Point = { x: number; y: number };
 type SceneTransform = { scaleX: number; scaleY: number; offsetX: number; offsetY: number };
 export function sceneTransform(width: number, height: number): SceneTransform {
+  const scale = Math.max(0, Math.min(width / 1600, height / 900));
   return {
-    scaleX: Math.max(0, width / 1600),
-    scaleY: Math.max(0, height / 900),
-    offsetX: 0,
-    offsetY: 0,
+    scaleX: scale,
+    scaleY: scale,
+    offsetX: (width - 1600 * scale) / 2,
+    offsetY: (height - 900 * scale) / 2,
   };
+}
+export function cropRemainingAfter(
+  tile: Pick<Tile, "state" | "watered" | "paused">,
+  remainingSeconds: number,
+  elapsedSeconds: number,
+) {
+  return tile.state !== "GROWING" || !tile.watered || tile.paused
+    ? remainingSeconds
+    : Math.max(0, remainingSeconds - elapsedSeconds);
+}
+export function cropNominalRemainingAfter(
+  tile: Pick<Tile, "state" | "watered" | "dry" | "paused">,
+  nominalRemainingSeconds: number,
+  elapsedSeconds: number,
+) {
+  const rate = tile.state !== "GROWING" || !tile.watered || tile.paused ? 0 : tile.dry ? 0.5 : 1;
+  return Math.max(0, nominalRemainingSeconds - elapsedSeconds * rate);
 }
 export function worldToScreen(point: Point, transform: SceneTransform): Point {
   return {

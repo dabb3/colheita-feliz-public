@@ -221,26 +221,28 @@ test('resize observer repositions the active tooltip and disconnects when the se
  ctx.Scene=class{update(){}close(){}};
  ctx.ApiClient=class{pending=null;get(){return Promise.resolve(farm('alice'));}prepareRequestId(){return Promise.resolve();}};
  h.set({own:undefined});await h.connect('alice',async()=> 'synthetic-token');h.set({own:h.get().own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[],vip:{greenPrice:20}}});
- let width=2560,height=1080;
- for(const id of ['game','farm'])elements.get(id).getBoundingClientRect=()=>({left:0,top:0,width,height});
+ let gameBounds={left:380,top:33.75,width:1800,height:1012.5},canvasBounds={...gameBounds};
+ elements.get('game').getBoundingClientRect=()=>gameBounds;elements.get('farm').getBoundingClientRect=()=>canvasBounds;
  const panel=elements.get('plant-health');panel.hidden=true;panel.getBoundingClientRect=()=>({width:330,height:160});
- h.health({cropId:'nabo',state:'GROWING',season:1,seasons:1,remainingSeconds:60,nominalRemainingSeconds:60},{x:585,y:400});
+ h.health({cropId:'nabo',state:'GROWING',watered:true,season:1,seasons:1,remainingSeconds:60,nominalRemainingSeconds:60},{x:585,y:400});
  h.runTimeouts();
- assert.equal(panel.style.left,'756px');
- width=390;height=844;observers[0].callback();assert.equal(panel.style.left,'12px');assert.ok(Number.parseFloat(panel.style.top)>=12&&Number.parseFloat(panel.style.top)<844);
+ const projected=presentation.worldToScreen({x:585,y:400},presentation.sceneTransform(canvasBounds.width,canvasBounds.height));
+ assert.equal(panel.style.left,`${projected.x-180}px`);
+ gameBounds={left:0,top:0,width:390,height:844};canvasBounds={left:8,top:365.4375,width:374,height:210.375};observers[0].callback();assert.equal(panel.style.left,'12px');assert.ok(Number.parseFloat(panel.style.top)>=12&&Number.parseFloat(panel.style.top)<844);
  await h.logout();assert.equal(observers[0].disconnected,true);assert.equal(panel.hidden,true);
 });
 
 test('crop tooltip follows contain projection, repositions unchanged content and stays inside the game',()=>{
  const {h,elements,ctx}=app();h.set({own:farm('alice'),catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[],vip:{greenPrice:20}}});
- let width=2560,height=1080;
- for(const id of ['game','farm'])ctx.document.getElementById(id).getBoundingClientRect=()=>({left:20,top:30,width,height});
+ let gameBounds={left:380,top:33.75,width:1800,height:1012.5},canvasBounds={...gameBounds};
+ ctx.document.getElementById('game').getBoundingClientRect=()=>gameBounds;ctx.document.getElementById('farm').getBoundingClientRect=()=>canvasBounds;
  const panel=ctx.document.getElementById('plant-health');panel.hidden=true;panel.getBoundingClientRect=()=>({width:330,height:160});
- const tile={cropId:'nabo',stage:1,state:'GROWING',season:1,seasons:1,remainingSeconds:3600,nominalRemainingSeconds:3600};
+ const tile={cropId:'nabo',stage:1,state:'GROWING',watered:true,season:1,seasons:1,remainingSeconds:3600,nominalRemainingSeconds:3600};
  h.health(tile,{x:585,y:400});
  h.runTimeouts();
- assert.equal(panel.style.left,'756px');assert.equal(panel.style.top,'254px');
- width=390;height=844;h.health(tile,{x:585,y:400});
+ const projected=presentation.worldToScreen({x:585,y:400},presentation.sceneTransform(canvasBounds.width,canvasBounds.height));
+ assert.equal(panel.style.left,`${projected.x-180}px`);assert.equal(panel.style.top,`${projected.y-160-54-12}px`);
+ gameBounds={left:0,top:0,width:390,height:844};canvasBounds={left:8,top:365.4375,width:374,height:210.375};h.health(tile,{x:585,y:400});
  assert.equal(panel.style.left,'12px');assert.ok(Number.parseFloat(panel.style.top)>=12&&Number.parseFloat(panel.style.top)<844);
  h.health(tile,{x:1600,y:900});assert.equal(panel.style.left,'18px');assert.ok(Number.parseFloat(panel.style.top)>=12&&Number.parseFloat(panel.style.top)<844);
  h.dialog('Loja');assert.equal(panel.hidden,true);

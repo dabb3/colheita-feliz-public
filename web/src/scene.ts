@@ -497,12 +497,6 @@ export class Scene {
     if (this.backgroundPeriod !== period) {
       this.backgroundPeriod = period;
       this.onPeriodChange(period);
-      const path = `url('/assets/classic/background/background${period === "day" ? "" : "-" + period}.png')`;
-      this.canvas.parentElement?.style.setProperty("--scene-background", path);
-      this.canvas.parentElement?.parentElement?.style.setProperty(
-        "--scene-background",
-        path,
-      );
     }
     ctx.clearRect(0, 0, 1600, 900);
     ctx.fillStyle = period === "night" ? "#15464f" : "#84ba30";
