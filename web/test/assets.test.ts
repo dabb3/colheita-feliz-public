@@ -27,5 +27,5 @@ test('animated weed and insect frames use desktop assets',()=>{
  for(const frame of [1,2,3])assert.ok(existsSync(new URL(`../../assets/classic/effects/verme_${frame}.png`,import.meta.url)));
 });
 test('music loop and action sound cues exist locally',()=>{
- for(const name of ['farm_loop.mp3',...['click_button','plant','water','harvest','buy','sell','weed','levelup'].map(id=>`${id}.wav`)])assert.ok(existsSync(new URL(`../../assets/sounds/${name}`,import.meta.url)),name);
+ for(const name of ['farm_loop.mp3','noite.mp3',...['click_button','plant','water','harvest','buy','sell','weed','levelup'].map(id=>`${id}.wav`)])assert.ok(existsSync(new URL(`../../assets/sounds/${name}`,import.meta.url)),name);
 });

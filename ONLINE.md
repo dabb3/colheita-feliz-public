@@ -107,7 +107,7 @@ Comandos carregam UUID único e revisão decimal em string. A API registra recib
 
 Os recibos recebem `expires_at` e são limpos em lotes de até 1.000, com locks ignorados por outros limpadores. Cada participante pode manter até 1.000 recibos válidos na janela de 24 horas; o limite recusa novas ações antes de alterar o jogo, mas permite repetir recibos existentes. A implantação atualiza somente a estrutura da tabela de recibos; não muda snapshots nem saves locais. IDs UUIDv4 usados no protótipo anterior deixam de ser aceitos; consulte a fazenda para confirmar seus efeitos e não os converta em IDs novos.
 
-Tempo, saldos, XP, proteção e sorteios pertencem ao servidor. Visitantes recebem apenas a projeção pública. O relógio local controla somente a aparência dia/noite.
+Tempo, saldos, XP, proteção e sorteios pertencem ao servidor. Visitantes recebem apenas a projeção pública. O relógio local controla a aparência dia/noite e a trilha ambiente, sem alterar a economia.
 
 Antes de publicar: validar duas contas, configurar Google OAuth e redirects, testar restauração de backup PostgreSQL e conferir limites gratuitos vigentes. Proposta: Cloudflare Pages para arquivos, Render para API e Supabase para PostgreSQL/Auth. Nenhum deploy realizado. Serviços gratuitos podem suspender por inatividade ou atingir quotas.
 
@@ -129,7 +129,7 @@ Abra `http://127.0.0.1:5173`. Entre como Alice, crie um convite em Amigos e abra
 
 Uma compra cujo resultado ficou desconhecido bloqueia novas ações até confirmar a mesma requisição. O navegador guarda somente essa intenção por conta e aba, além da sessão Auth; não guarda um save econômico. Não limpe o armazenamento da aba enquanto houver ação pendente. Faça login novamente com a mesma conta se a sessão expirar. Sem conexão, novas ações ficam indisponíveis.
 
-As imagens carregam conforme o cenário ou a loja precisa. A pasta completa de arte vai ao host estático; não é baixada inteira no primeiro acesso. Dia/noite segue o relógio local; crescimento e tarefas usam tempo UTC do servidor. A previsão sem nova rega pode exceder a duração nominal porque solo seco cresce mais devagar.
+O build Web copia os assets de `assets/classic`, `assets/sounds` e `web/public`, nessa ordem; as cópias otimizadas em `web/public` substituem somente os arquivos publicados. O MP3 diurno original permanece em `assets/sounds/farm_loop.mp3`; a cópia Web estéreo em `web/public/assets/sounds/farm_loop.mp3` usa 128 kb/s e preserva a duração inteira. Para regenerá-la com FFmpeg: `ffmpeg -i assets/sounds/farm_loop.mp3 -map 0:a:0 -vn -map_metadata -1 -c:a libmp3lame -b:a 128k web/public/assets/sounds/farm_loop.mp3`. FFmpeg não é necessário na CI. O build valida o pacote final e recusa qualquer arquivo acima de 25 MiB, limite por asset do Cloudflare Pages, indicando seu caminho e tamanho. As imagens carregam conforme o cenário ou a loja precisa. A pasta completa de arte vai ao host estático; não é baixada inteira no primeiro acesso. Dia/noite segue o relógio local; crescimento e tarefas usam tempo UTC do servidor. A previsão sem nova rega pode exceder a duração nominal porque solo seco cresce mais devagar.
 
 ### Enquadramento e interface principal
 
@@ -248,7 +248,7 @@ aparecem após sucesso confirmado, sem animar outra fazenda após sair da visita
 Ajustes oferece controles separados de música, efeitos e volumes, guardados na
 chave local `colheita:audio`. Ambos começam desligados sem preferência anterior;
 reprodução depende de interação do usuário. O toggle da toolbar controla efeitos.
-Logout e aba oculta pausam áudio. O player reutiliza `farm_loop.mp3` e os oito cues
+Logout e aba oculta pausam áudio. O player usa `farm_loop.mp3` de dia e no pôr do sol; ao entrar no mesmo período do fundo noturno, troca para `noite.mp3`, também em looping. A faixa anterior pausa antes da troca e a escolha Música continua valendo. O período é o mesmo relógio local do cenário. Reutiliza os oito cues
 do desktop, com até três efeitos simultâneos e intervalo mínimo de150ms por cue.
 Falha de storage, decoder ou autoplay não interrompe o jogo.
 
