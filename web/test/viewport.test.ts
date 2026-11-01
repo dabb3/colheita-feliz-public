@@ -5,7 +5,7 @@ import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
 import * as presentation from '../src/presentation.ts';
 
-test('the complete world fits and all plot centers roundtrip across window shapes',()=>{
+test('the stretched world fills and all plot centers roundtrip across window shapes',()=>{
  for(const [width,height]of [[390,844],[1024,600],[1280,1024],[1366,768],[2560,1080]]){
   const transform=presentation.sceneTransform(width,height);
   for(const point of [{x:0,y:0},{x:1600,y:900},...Array.from({length:30},(_,i)=>presentation.tileCenter(i%6,Math.floor(i/6)))]){
@@ -19,10 +19,11 @@ test('the complete world fits and all plot centers roundtrip across window shape
  }
 });
 
-test('letterbox space and a collapsed canvas cannot produce a world point',()=>{
+test('stretched canvas bounds map to the world and a collapsed canvas cannot produce a point',()=>{
  const transform=presentation.sceneTransform(390,844);
- assert.equal(presentation.screenToWorld({x:195,y:50},transform),null);
- assert.equal(presentation.screenToWorld({x:195,y:800},transform),null);
+ const top=presentation.screenToWorld({x:195,y:50},transform)!,bottom=presentation.screenToWorld({x:195,y:800},transform)!;
+ assert.equal(top.x,800);assert.ok(Math.abs(top.y-50*900/844)<1e-8);
+ assert.equal(bottom.x,800);assert.ok(Math.abs(bottom.y-800*900/844)<1e-8);
  assert.equal(presentation.screenToWorld({x:0,y:0},presentation.sceneTransform(0,0)),null);
 });
 
@@ -45,18 +46,18 @@ test('canvas clicks and hover keep their plot after resize and ignore the surrou
  let bounds={left:10,top:20,width:390,height:844};
  const canvas={width:0,height:0,getContext:()=>({}),getBoundingClientRect:()=>bounds,addEventListener:(name,handler)=>handlers.set(name,handler)};
  const context={...presentation,window:{requestAnimationFrame:()=>1,cancelAnimationFrame(){}},document:{hidden:true},AbortController};
- const source=readFileSync(new URL('../src/scene.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('export class Scene','class Scene');
+ const source=readFileSync(new URL('../src/scene.ts',import.meta.url),'utf8').replace(/^import\b[\s\S]*?;\s*/gm,'').replace('export class Scene','class Scene');
  runInNewContext(stripTypeScriptTypes(source)+'\nglobalThis.Scene=Scene;',context);
  const scene=new context.Scene(canvas,{},tile=>selected.push([tile.column,tile.row]),()=>{},tile=>hovered.push(tile));
  const tiles=Array.from({length:30},(_,i)=>({column:i%6,row:Math.floor(i/6)}));
  scene.update({owner:'synthetic',tiles,animals:[]});
- // At 390 × 844, contain fits the world into 390 × 219.375, centered vertically.
- handlers.get('click')({clientX:10+585*390/1600,clientY:20+(844-900*390/1600)/2+400*390/1600});
+ // The stretched canvas maps the full viewport directly to the logical world.
+ handlers.get('click')({clientX:10+585*390/1600,clientY:20+400*844/900});
  assert.deepEqual(selected,[[0,0]]);
- handlers.get('pointermove')({clientX:10+585*390/1600,clientY:20+(844-900*390/1600)/2+400*390/1600});
+ handlers.get('pointermove')({clientX:10+585*390/1600,clientY:20+400*844/900});
  assert.equal(hovered.at(-1),tiles[0]);
- handlers.get('click')({clientX:205,clientY:40});
- handlers.get('pointermove')({clientX:205,clientY:40});
+ handlers.get('click')({clientX:9,clientY:20});
+ handlers.get('pointermove')({clientX:9,clientY:20});
  assert.equal(selected.length,1);assert.equal(hovered.at(-1),null);
  bounds={left:0,top:0,width:1600,height:900};
  handlers.get('click')({clientX:670,clientY:724});

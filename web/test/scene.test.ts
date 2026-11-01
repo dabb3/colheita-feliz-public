@@ -14,7 +14,7 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  const canvas={width:1600,height:900,getContext:()=>context,getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(name,handler){events.set(name,handler);}};
  const environment={...presentation,periodAt:()=>period,performance:{now:()=>now},window:{requestAnimationFrame:fn=>{tick=fn;return ++timers;},cancelAnimationFrame:id=>cancelled.push(id)},AbortController,document:{hidden:false,createElement:()=>({getContext:()=>context})},
   Image:class{width=100;height=200;onload;src;constructor(){pending.push(this);images.push(this);}}};
- const source=readFileSync(new URL('../src/scene.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('export class Scene','class Scene');
+ const source=readFileSync(new URL('../src/scene.ts',import.meta.url),'utf8').replace(/^import\b[\s\S]*?;\s*/gm,'').replace('export class Scene','class Scene');
  runInNewContext(stripTypeScriptTypes(source)+'\nglobalThis.Scene=Scene;',environment);
  const scene=new environment.Scene(canvas,{crops:[{id:'nabo',spriteStem:'nabo'}],animals:[{id:'vaca',kind:'PRODUCER'},{id:'abelha',kind:'PROTECTOR'}]},()=>{},id=>selected.push(id),tile=>hovered.push(tile),value=>periods.push(value));
  const tile={column:0,row:0,unlocked:true,state:'READY',cropId:'nabo',stage:3,weeds:true,insects:2};

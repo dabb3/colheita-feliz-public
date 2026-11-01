@@ -4,6 +4,17 @@ O desktop continua disponível. O servidor online cria fazendas novas e não imp
 
 ## Testar o servidor
 
+### Ambiente local em um comando
+
+Na raiz do repositório, execute `./dev.sh`. O script inicia o PostgreSQL 17
+com `docker compose`, compila e sobe a API e o cliente Web. Abra
+`http://127.0.0.1:5173`; a API fica em `http://127.0.0.1:8080`.
+Requer Docker Compose, JDK 21, Node 24, npm e curl. A primeira execução instala
+as dependências Web e pode baixar dependências Gradle. O banco fica em um volume
+Docker local e continua ativo ao encerrar o script com Ctrl+C; use
+`docker compose stop postgres` para pará-lo. As contas de desenvolvimento são
+Alice (`dev-alice`) e Bob (`dev-bob`).
+
 ### Latência e medição
 
 Para comparar ações sem usar fazendas pessoais, `LATENCY_BENCHMARK=once` habilita

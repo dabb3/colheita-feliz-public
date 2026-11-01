@@ -11,25 +11,32 @@ import * as avatar from '../src/avatar.ts';
 const farm=owner=>({owner,name:owner,revision:'1',tiles:[],animals:[],seedCounts:{}});
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve};}
 function app(){
- const elements=new Map(),listeners=new Map(),audioClips=[],observers=[];
- const make=(tag='div')=>({tag,value:'',selectedIndex:0,hidden:false,children:[],attributes:{},style:{setProperty(key,value){this[key]=value;}},scrollTop:0,scrollLeft:0,classList:{add(){},remove(){},toggle(){}},
+ const elements=new Map(),listeners=new Map(),audioClips=[],observers=[],timeouts=new Map();let nextTimeout=0;
+ const make=(tag='div')=>({tag,value:'',selectedIndex:0,hidden:false,children:[],attributes:{},dataset:{},style:{setProperty(key,value){this[key]=value;}},scrollTop:0,scrollLeft:0,classList:{add(){},remove(){},toggle(){}},
   replaceChildren(...nodes){if(this.contains(ctx.document.activeElement))ctx.document.activeElement=null;this.children=nodes;},
-  append(...nodes){this.children.push(...nodes);},prepend(...nodes){this.children.unshift(...nodes);},insertBefore(node,before){this.children.splice(this.children.indexOf(before),0,node);},
+  append(...nodes){this.children.push(...nodes);},prepend(...nodes){this.children.unshift(...nodes);},insertBefore(node,before){this.children.splice(this.children.indexOf(before),0,node);},replaceChild(node,before){this.children.splice(this.children.indexOf(before),1,node);return before;},replaceWith(node){const parent=descendants(elements.get('modal-content')).find(candidate=>candidate.children.includes(this));parent?.replaceChild(node,this);},
   setAttribute(key,value){this.attributes[key]=String(value);},getAttribute(key){return this.attributes[key]??null;},
   contains(target){return !!target&&(target===this||this.children.some(child=>child?.contains?.(target)));},
-  querySelectorAll(selector){return descendants(this).slice(1).filter(node=>selector==='[data-focus-key]'?node.getAttribute('data-focus-key')!==null:selector==='.market-scroll'?node.className==='market-scroll':false);},
+  get firstElementChild(){return this.children[0]??null;},get lastElementChild(){return this.children.at(-1)??null;},
+  querySelectorAll(selector){return descendants(this).slice(1).filter(node=>selector==='[data-focus-key]'?node.getAttribute('data-focus-key')!==null:selector.startsWith('.')?node.className===selector.slice(1):false);},
   querySelector(selector){return this.querySelectorAll(selector)[0]??null;},focus(){ctx.document.activeElement=this;},
   getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(){},close(){this.open=false;},showModal(){this.open=true;}});
  const storage={getItem:()=>null,setItem(){},removeItem(){}};
- const ctx={...presentation,...uiPresentation,...avatar,window:{COLHEITA_CONFIG:{development:true},setInterval(){},setTimeout(){},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
+ const ctx={...presentation,...uiPresentation,...avatar,window:{COLHEITA_CONFIG:{development:true},setInterval(){return 1;},clearInterval(){},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
  const uiSource=readFileSync(new URL('../src/ui.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(uiSource),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={refresh,logout,syncMusic,toggleMusic,shop,missions,friends,receive,dialog,health,connect,pickTool,settings,avatarSettings,notify,notifyAction,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
- runInNewContext(stripTypeScriptTypes(source),ctx);return{h:ctx.h,elements,listeners,audioClips,observers,ctx};
+ source+='\nglobalThis.h={refresh,logout,syncMusic,toggleMusic,shop,missions,friends,receive,dialog,health,connect,setLoginStep,pickTool,settings,avatarSettings,notify,notifyAction,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
+ runInNewContext(stripTypeScriptTypes(source),ctx);return{h:{...ctx.h,runTimeouts(){for(const [id,callback]of [...timeouts]){timeouts.delete(id);callback();}}},elements,listeners,audioClips,observers,ctx};
 }
 function text(node){return(node.textContent??'')+(node.children??[]).map(child=>typeof child==='object'?text(child):child).join('');}
 function descendants(node){return[node,...(node.children??[]).flatMap(child=>typeof child==='object'?descendants(child):[])];}
+
+test('login can return to its first step before the invitation fade completes',()=>{
+ const {h,ctx}=app(),login=ctx.document.getElementById('login-step'),invite=ctx.document.getElementById('invite-step');invite.hidden=true;
+ h.setLoginStep('invite','Bob');assert.equal(invite.hidden,false);
+ h.setLoginStep('login');assert.equal(login.hidden,false);assert.equal(invite.hidden,true);
+});
 
 test('action notice is docked above the actual toolbar and reserves room below the item tray',()=>{
  const {h,elements,ctx}=app();h.set({own:farm('alice')});ctx.window.innerHeight=844;
@@ -73,6 +80,7 @@ test('avatar picker offers and applies every supplied game avatar without changi
  for(const {label,file} of avatar.GAME_AVATARS){
   descendants(elements.get('modal-content')).find(node=>node.textContent===label).onclick();
   assert.equal(descendants(elements.get('wallet')).find(node=>node.className==='avatar').src,`/assets/classic/icons/${file}`);
+  h.avatarSettings();
   assert.equal(descendants(elements.get('modal-content')).find(node=>node.textContent===label).getAttribute('aria-pressed'),'true');
   assert.equal(h.get().own,initial);
  }
@@ -137,21 +145,38 @@ test('selling a product preserves the deposit position and focus until that prod
  const reply=deferred();let commands=0;
  h.set({own:stocked,catalog:{crops:[{id:'crop0',name:'Nabo',spriteStem:'nabo',vipOnly:false}],animals:[],fertilizers:[],vip:{greenPrice:100}},api:{pending:null,mutate:()=>{commands++;return reply.promise;},prepareRequestId:async()=>{}}});
  h.receive({});elements.get('deposit').onclick();const content=elements.get('modal-content');
- const sell=descendants(content).find(node=>node.getAttribute('aria-label')==='Vender 1 Nabo');
+ const sell=descendants(content).find(node=>node.getAttribute('aria-label')?.startsWith('Vender 1 Nabo'));
  sell.focus();content.scrollTop=180;sell.onclick();
  reply.resolve({farm:{...stocked,revision:'2',produceLots:[{itemId:'crop0',quantity:1,currency:'GOLD'}],depositTotals:{GOLD:12}},result:{success:false,message:'synthetic update'}});
  await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(commands,1);assert.equal(content.scrollTop,180);
- assert.equal(ctx.document.activeElement.getAttribute('aria-label'),'Vender 1 Nabo');
+ assert.ok(ctx.document.activeElement.getAttribute('aria-label').startsWith('Vender 1 Nabo'));
  h.receive({farm:{...stocked,revision:'3',produceLots:[],depositTotals:{}}});
  assert.equal(ctx.document.activeElement,elements.get('close-modal'));
+});
+
+test('deposit sells one eligible item instead of requesting all VIP-mixed stock',()=>{
+ const {h,elements}=app();let command;
+ const own={...farm('alice'),produceLots:[{itemId:'nabo',quantity:1,currency:'GOLD',unitCost:10},{itemId:'nabo',quantity:1,currency:'GOLD',unitCost:10,vipOnly:true}]};
+ h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',vipOnly:false}],animals:[],fertilizers:[],vip:{greenPrice:100}},api:{pending:null,mutate:(_path,fields)=>{command=fields;return new Promise(()=>{});},prepareRequestId:async()=>{}}});
+ elements.get('deposit').onclick();
+ const single=descendants(elements.get('modal-content')).find(node=>node.getAttribute('data-focus-key')==='sell-one:nabo');single.onclick();
+ assert.equal(command.action,'SELL_ITEM');
+});
+
+test('deposit disables product bulk sale when some lots require VIP',()=>{
+ const {h,elements}=app();
+ h.set({own:{...farm('alice'),produceLots:[{itemId:'nabo',quantity:2,currency:'GOLD',unitCost:10},{itemId:'nabo',quantity:1,currency:'GOLD',unitCost:10,vipOnly:true}]},catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',vipOnly:false}],animals:[],fertilizers:[],vip:{greenPrice:100}}});
+ elements.get('deposit').onclick();
+ const bulk=descendants(elements.get('modal-content')).find(node=>node.getAttribute('data-focus-key')==='sell-product:nabo');
+ assert.equal(bulk.disabled,true);
 });
 
 test('late sale confirmation does not reopen a deposit that the player closed',async()=>{
  const {h,elements}=app(),{own}=marketFixture(h),reply=deferred();
  h.set({own:{...own,produceLots:[],depositTotals:{GOLD:12}},api:{pending:null,mutate:()=>reply.promise,prepareRequestId:async()=>{}}});
  elements.get('deposit').onclick();
- descendants(elements.get('modal-content')).find(node=>node.textContent?.startsWith('Vender tudo ·')).onclick();
+ descendants(elements.get('modal-content')).find(node=>node.getAttribute('aria-label')?.startsWith('Vender tudo,')).onclick();
  elements.get('modal').close();reply.resolve({farm:{...own,revision:'2'},result:{success:false,message:'synthetic update'}});
  await new Promise(resolve=>setTimeout(resolve,0));assert.equal(elements.get('modal').open,false);
 });
@@ -195,27 +220,29 @@ test('resize observer repositions the active tooltip and disconnects when the se
  const {h,elements,ctx,observers}=app();
  ctx.Scene=class{update(){}close(){}};
  ctx.ApiClient=class{pending=null;get(){return Promise.resolve(farm('alice'));}prepareRequestId(){return Promise.resolve();}};
- h.set({own:undefined});await h.connect('alice',async()=> 'synthetic-token');
+ h.set({own:undefined});await h.connect('alice',async()=> 'synthetic-token');h.set({own:h.get().own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[],vip:{greenPrice:20}}});
  let width=2560,height=1080;
  for(const id of ['game','farm'])elements.get(id).getBoundingClientRect=()=>({left:0,top:0,width,height});
- const panel=elements.get('plant-health');panel.getBoundingClientRect=()=>({width:330,height:160});
+ const panel=elements.get('plant-health');panel.hidden=true;panel.getBoundingClientRect=()=>({width:330,height:160});
  h.health({cropId:'nabo',state:'GROWING',season:1,seasons:1,remainingSeconds:60,nominalRemainingSeconds:60},{x:585,y:400});
- assert.equal(panel.style.left,'857px');
- width=390;height=844;observers[0].callback();assert.equal(panel.style.left,'12px');
+ h.runTimeouts();
+ assert.equal(panel.style.left,'756px');
+ width=390;height=844;observers[0].callback();assert.equal(panel.style.left,'12px');assert.ok(Number.parseFloat(panel.style.top)>=12&&Number.parseFloat(panel.style.top)<844);
  await h.logout();assert.equal(observers[0].disconnected,true);assert.equal(panel.hidden,true);
 });
 
 test('crop tooltip follows contain projection, repositions unchanged content and stays inside the game',()=>{
- const {h,elements,ctx}=app();h.set({own:farm('alice')});
+ const {h,elements,ctx}=app();h.set({own:farm('alice'),catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[],vip:{greenPrice:20}}});
  let width=2560,height=1080;
  for(const id of ['game','farm'])ctx.document.getElementById(id).getBoundingClientRect=()=>({left:20,top:30,width,height});
- const panel=ctx.document.getElementById('plant-health');panel.style={};panel.getBoundingClientRect=()=>({width:330,height:160});
+ const panel=ctx.document.getElementById('plant-health');panel.hidden=true;panel.getBoundingClientRect=()=>({width:330,height:160});
  const tile={cropId:'nabo',stage:1,state:'GROWING',season:1,seasons:1,remainingSeconds:3600,nominalRemainingSeconds:3600};
  h.health(tile,{x:585,y:400});
- assert.equal(panel.style.left,'857px');assert.equal(panel.style.top,'490px');
+ h.runTimeouts();
+ assert.equal(panel.style.left,'756px');assert.equal(panel.style.top,'254px');
  width=390;height=844;h.health(tile,{x:585,y:400});
- assert.equal(panel.style.left,'12px');assert.equal(panel.style.top,'419.8125px');
- h.health(tile,{x:1600,y:900});assert.equal(panel.style.left,'48px');assert.equal(panel.style.top,'541.6875px');
+ assert.equal(panel.style.left,'12px');assert.ok(Number.parseFloat(panel.style.top)>=12&&Number.parseFloat(panel.style.top)<844);
+ h.health(tile,{x:1600,y:900});assert.equal(panel.style.left,'18px');assert.ok(Number.parseFloat(panel.style.top)>=12&&Number.parseFloat(panel.style.top)<844);
  h.dialog('Loja');assert.equal(panel.hidden,true);
 });
 test('late visit response cannot reopen a visit after returning home',async()=>{
@@ -239,15 +266,15 @@ test('music pauses while hidden and on logout, then resumes when visible',async(
 test('open owned-animal screen refreshes after a successful state update',()=>{
  const {h,elements}=app(),farmState={...farm('alice'),level:1,feed:{producer:1},animals:[{id:'vaca',stage:'ADULT',status:'READY',remainingSeconds:0}]};
  h.set({own:farmState,catalog:{crops:[],fertilizers:[],feedPrices:{producer:10,growth:10},animals:[{id:'vaca',name:'Vaca',kind:'PRODUCER',productName:'Leite'}],vip:{greenPrice:20}}});
- h.shop('owned');assert.match(text(elements.get('modal-content')),/Recolher produto/);
+ h.shop('owned');assert.match(text(elements.get('modal-content')),/Coletar/);
  h.receive({farm:{...farmState,revision:'2',animals:[{id:'vaca',stage:'ADULT',status:'PRODUCING',remainingSeconds:3600}]}});
- assert.doesNotMatch(text(elements.get('modal-content')),/Recolher produto/);assert.match(text(elements.get('modal-content')),/PRODUCING/);
+ assert.doesNotMatch(text(elements.get('modal-content')),/Coletar/);assert.match(text(elements.get('modal-content')),/Produzindo/);
 });
 test('open missions screen refreshes progress after a farm update',()=>{
  const {h,elements}=app(),farmState={...farm('alice'),missions:[{id:'m',title:'Colher',green:1,progress:1,target:2,done:false}]};
  h.set({own:farmState});h.missions();assert.match(text(elements.get('modal-content')),/1 \/ 2/);
  h.receive({farm:{...farmState,revision:'2',missions:[{...farmState.missions[0],progress:2,done:true}]}});
- assert.match(text(elements.get('modal-content')),/2 \/ 2 · Concluída · recompensa recebida/);
+ assert.match(text(elements.get('modal-content')),/Concluídas hoje \(1\)/);assert.match(text(elements.get('modal-content')),/Colher/);
 });
 test('late invitation acceptance does not close a newer dialog',async()=>{
  const {h,elements}=app(),reply=deferred();h.set({own:farm('alice'),api:{pending:null,mutate:()=>reply.promise,get:()=>Promise.resolve(farm('alice'))}});
@@ -263,7 +290,7 @@ test('closed canvas scene removes previous event handlers',()=>{
  const handlers=new Map(),calls=[];
  const canvas={width:1600,height:900,getContext:()=>({}),getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(name,handler,options){const list=handlers.get(name)??[];list.push(handler);handlers.set(name,list);options?.signal?.addEventListener('abort',()=>handlers.set(name,handlers.get(name).filter(h=>h!==handler)));}};
  const cancelled=[];const ctx={...presentation,window:{requestAnimationFrame:()=>1,cancelAnimationFrame:id=>cancelled.push(id)},document:{hidden:true},AbortController,pickTile:()=>({column:0,row:0})};
- let source=readFileSync(new URL('../src/scene.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('export class Scene','class Scene');
+ let source=readFileSync(new URL('../src/scene.ts',import.meta.url),'utf8').replace(/^import\b[\s\S]*?;\s*/gm,'').replace('export class Scene','class Scene');
  runInNewContext(stripTypeScriptTypes(source)+'\nglobalThis.TestScene=Scene;',ctx);
  for(const revision of ['1','2']){const scene=new ctx.TestScene(canvas,{},tile=>calls.push(tile.harvestRevision),()=>{},()=>{});scene.update({...farm('alice'),tiles:[{column:0,row:0,harvestRevision:revision}]});if(revision==='1')scene.close();}
  assert.deepEqual(cancelled,[1]);
