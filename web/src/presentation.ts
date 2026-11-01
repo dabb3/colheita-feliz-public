@@ -1,4 +1,18 @@
 import type {Crop,Farm,Tile} from './types.ts';
+type Point={x:number;y:number};
+type SceneTransform={scale:number;offsetX:number;offsetY:number};
+export function sceneTransform(width:number,height:number):SceneTransform {
+ const scale=Math.max(0,Math.min(width/1600,height/900));
+ return {scale,offsetX:(width-1600*scale)/2,offsetY:(height-900*scale)/2};
+}
+export function worldToScreen(point:Point,transform:SceneTransform):Point {
+ return {x:point.x*transform.scale+transform.offsetX,y:point.y*transform.scale+transform.offsetY};
+}
+export function screenToWorld(point:Point,transform:SceneTransform):Point|null {
+ const {scale,offsetX,offsetY}=transform;
+ if(scale===0||point.x<offsetX||point.y<offsetY||point.x>offsetX+1600*scale||point.y>offsetY+900*scale)return null;
+ return {x:Math.max(0,Math.min(1600,(point.x-offsetX)/scale)),y:Math.max(0,Math.min(900,(point.y-offsetY)/scale))};
+}
 export function untilUtcMidnight(serverTime:string){
  const now=new Date(serverTime),midnight=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+1),minutes=Math.max(1,Math.ceil((midnight-now.getTime())/60_000)),hours=Math.floor(minutes/60);
  return hours>0?`${hours} h${minutes%60?String(minutes%60).padStart(2,'0'):''}`:`${minutes} min`;

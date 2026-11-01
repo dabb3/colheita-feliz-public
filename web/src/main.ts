@@ -2,12 +2,14 @@ import {createClient} from '@supabase/supabase-js';
 import type {Farm,Catalog,Tile,Reply,CommandFields} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
-import {animalPath,animalStatusText,animalActionLabel,animalClickCommand,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,actionRewardModel} from './presentation.ts';
+import {renderWallet,control} from './ui.ts';
+import {sceneTransform,worldToScreen,animalPath,animalStatusText,animalActionLabel,animalClickCommand,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,actionRewardModel} from './presentation.ts';
 
 const config=window.COLHEITA_CONFIG;
 const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const modal=element<HTMLDialogElement>('modal'),content=element('modal-content');
 let api:ApiClient|undefined,catalog:Catalog,own:Farm|undefined,visited:Farm|undefined,scene:Scene|undefined;
+let sceneResize:ResizeObserver|undefined;
 let tool='CURSOR',selectedSeed='nabo',selectedFertilizer='comum',trayOpen=false,effectsEnabled=false,musicEnabled=false,music:HTMLAudioElement|undefined,busy=false,seedMarketGroup:'common'|'vip'='common',refreshDialog:(()=>void)|undefined;
 let toastTimer:number,sessionGeneration=0,navigationGeneration=0,dialogGeneration=0,healthTile:Tile|null=null,healthPoint:{x:number;y:number}|null=null;
 const login=element('login');
@@ -15,7 +17,7 @@ const inviteFromUrl=new URL(location.href).searchParams.get('invite');
 if(inviteFromUrl)sessionStorage.setItem('colheita:invitation',inviteFromUrl);
 const supabase=config.development?undefined:createClient(config.supabaseUrl,config.supabaseKey,{auth:{flowType:'pkce',detectSessionInUrl:true}});
 const toolDefinitions=[['CURSOR','Selecionar','cursor-ui'],['PLOW','Arar / limpar','pa-ui'],['PLANT','Plantar','saco-ui'],['WATER','Regar','regador-ui'],['WEED','Remover ervas','herbicida-ui'],['PESTICIDE','Remover insetos','pesticida-ui'],['HARVEST','Colher','mao-restaurada'],['FERTILIZE','Adubar','adubo-comum']];
-function button(label:string,action:()=>void|Promise<void>,parent:HTMLElement=content){const b=document.createElement('button');b.textContent=label;b.onclick=()=>void action();parent.append(b);return b;}
+function button(label:string,action:()=>void|Promise<void>,parent:HTMLElement=content,focusKey?:string){const b=control(label,()=>void action());if(focusKey)b.setAttribute('data-focus-key',focusKey);parent.append(b);return b;}
 function paragraph(text:string,parent:HTMLElement=content){const p=document.createElement('p');p.textContent=text;parent.append(p);return p;}
 function formatToolDuration(seconds:number){const minutes=Math.max(1,Math.ceil(seconds/60));return minutes>=60?`${Math.floor(minutes/60)} h${String(minutes%60).padStart(2,'0')}`:`${minutes} min`;}
 function notify(message:string){const notice=element('notice');notice.classList.remove('level-notice','reward-notice');notice.replaceChildren(document.createTextNode(message));clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>notice.replaceChildren(),7000);}
@@ -37,7 +39,7 @@ function notifyAction(message:string,action:string,itemId:string|undefined,rewar
  if(reward.leveledUp){notice.replaceChildren();const title=document.createElement('strong');title.textContent=`Nível ${reward.level}!`;const unlocked=catalog.crops.filter(crop=>crop.requiredLevel===reward.level).map(crop=>crop.name);const sub=document.createElement('span');sub.textContent=unlocked.length?`${unlocked.join(', ')} liberado(s) na Loja`:'Continue colhendo para liberar mais culturas';notice.append(title,sub);notice.classList.add('level-notice');}
  clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>{notice.replaceChildren();notice.classList.remove('level-notice','reward-notice');},reward.leveledUp?2600:3200);
 }
-function dialog(title:string){dialogGeneration++;refreshDialog=undefined;element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');content.replaceChildren();content.scrollTop=0;if(!modal.open)modal.showModal();}
+function dialog(title:string){dialogGeneration++;refreshDialog=undefined;element('plant-health').hidden=true;element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');content.replaceChildren();content.scrollTop=0;if(!modal.open)modal.showModal();}
 function settings(){
  dialog('Ajustes');
  paragraph('Som, ferramentas e conta da fazenda.',content).className='settings-intro';
@@ -60,20 +62,32 @@ function settings(){
  const credits=button('',()=>{dialog('Créditos');paragraph('Reimplementação independente e não oficial de Colheita Feliz. Acervo visual derivado da referência indicada no repositório, com uso não comercial.');const link=document.createElement('a');link.href='/assets/REFERENCE_LICENSE';link.textContent='Licença e atribuição dos assets';content.append(link);},info);credits.className='settings-action';const creditsCopy=document.createElement('span');creditsCopy.className='settings-toggle-copy';const creditsName=document.createElement('strong');creditsName.textContent='Créditos';const creditsDescription=document.createElement('small');creditsDescription.textContent='Sobre o projeto e os assets';creditsCopy.append(creditsName,creditsDescription);const creditsArrow=document.createElement('span');creditsArrow.className='settings-chevron';creditsArrow.textContent='›';credits.append(creditsCopy,creditsArrow);
  const logoutButton=button('Sair da conta',logout,info);logoutButton.className='settings-logout';
 }
-async function logout(){sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;scene?.close();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;syncPending();if(supabase)await supabase.auth.signOut();}
+function closeScene(){sceneResize?.disconnect();sceneResize=undefined;scene?.close();health(null,null);}
+async function logout(){sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;syncPending();if(supabase)await supabase.auth.signOut();}
 function showConnection(message?:string){element('connection').hidden=!message;element('connection').textContent=message??'';}
 function syncPending(){element('pending').hidden=!api?.pending;element<HTMLButtonElement>('retry').disabled=!!api?.busy;}
 function display(){return visited??own;}
+function refreshOpenDialog(){
+ if(!modal.open||!refreshDialog)return;
+ const hadFocus=content.contains(document.activeElement),key=document.activeElement?.getAttribute('data-focus-key');
+ const scrollContainers=()=>[modal,content,...content.querySelectorAll<HTMLElement>('.market-scroll')];
+ const scroll=scrollContainers().map(node=>({top:node.scrollTop,left:node.scrollLeft}));
+ refreshDialog();
+ if(hadFocus){
+  const target=Array.from(content.querySelectorAll<HTMLButtonElement>('[data-focus-key]')).find(node=>node.getAttribute('data-focus-key')===key&&!node.disabled);
+  (target??element('close-modal')).focus({preventScroll:true});
+ }
+ scrollContainers().forEach((node,index)=>{const position=scroll[index];if(position){node.scrollTop=position.top;node.scrollLeft=position.left;}});
+}
 function render(){
  if(!own)return;
  syncMusic();
  element('welcome').hidden=true;element('game').hidden=false;
- const wallet=element('wallet');wallet.replaceChildren();const avatar=document.createElement('img');avatar.className='profile-avatar';avatar.src='/assets/classic/icons/avatar_masculino.png';avatar.alt='';const details=document.createElement('div');details.className='profile-details';const title=document.createElement('strong');title.textContent=visited?`Visitando ${visited.name}`:own.name;details.append(title,document.createTextNode(`Nível ${own.level}`));
- const xp=document.createElement('div');xp.className='profile-xp';const progress=document.createElement('progress');progress.max=Math.max(1,Number(own.xpToNext)||0);progress.value=Math.max(0,Math.min(Number(own.currentXp)||0,progress.max));progress.setAttribute('aria-label',`Experiência: ${own.currentXp} de ${own.xpToNext} XP`);const label=document.createElement('span');label.textContent=`${own.currentXp} / ${own.xpToNext} XP`;xp.append(progress,label);details.append(xp,document.createTextNode(`🟡 ${own.coins} ouro   🟢 ${own.greenCoins} verdes`));wallet.append(avatar,details);
+ renderWallet(element('wallet'),own,visited?.name);
  element('home').hidden=!visited;
  const tutorial=element('tutorial');tutorial.hidden=!!visited||!own.tutorial;tutorial.replaceChildren();
  if(own.tutorial){const strong=document.createElement('strong');strong.textContent=own.tutorial.title??'';tutorial.append(strong);paragraph(own.tutorial.hint??'',tutorial);}
- scene?.update(display()!);syncPending();renderTools();if(modal.open)refreshDialog?.();const currentHealthTile=healthTile&&display()?.tiles.find(tile=>tile.column===healthTile!.column&&tile.row===healthTile!.row);health(currentHealthTile??null,healthPoint);
+ scene?.update(display()!);syncPending();renderTools();refreshOpenDialog();const currentHealthTile=healthTile&&display()?.tiles.find(tile=>tile.column===healthTile!.column&&tile.row===healthTile!.row);health(currentHealthTile??null,healthPoint);
 }
 function renderTools(){
  const toolbar=element('tools');toolbar.replaceChildren();
@@ -86,6 +100,7 @@ function renderTools(){
    const crop=catalog.crops.find(item=>item.id===selectedSeed),seedCount=own?.seedCounts?.[selectedSeed]??0;
    if(crop){const seed=document.createElement('img');seed.className='tool-selected-item';seed.alt='';seed.src=`/assets/classic/crops/seeds/semente_${crop.spriteStem}.png`;b.append(seed);const count=document.createElement('span');count.className='tool-count';count.textContent=`x${seedCount}`;b.append(count);}
   }
+  if(id==='FERTILIZE'||id==='LOVE'){const count=document.createElement('span');count.className='tool-count';count.textContent=`x${own?.fertilizers?.[selectedFertilizer]??0}`;b.append(count);}
   if(!visited){const key=document.createElement('span');key.className='tool-key';key.textContent=String(index+1);b.append(key);}
  }
  renderToolTray();
@@ -157,16 +172,21 @@ let healthKey='';
 function health(tile:Tile|null,point:{x:number;y:number}|null){
  healthTile=tile;healthPoint=point;
  const panel=element('plant-health'),game=element('game');
- panel.hidden=!tile?.cropId||!point;
- if(!tile?.cropId||!point){healthKey='';return;}
+ panel.hidden=modal.open||!tile?.cropId||!point;
+ if(panel.hidden||!tile?.cropId||!point){healthKey='';return;}
  const crop=catalog.crops.find(c=>c.id===tile.cropId),duration=crop?(tile.season===1?crop.growthSeconds:crop.regrowthSeconds):0,model=cropTooltipModel(tile,crop?.name??tile.cropId,!!crop?.vipOnly,!!display()?.vipActive,duration);
  const key=JSON.stringify([tile.cropId,tile.state,tile.season,tile.seasons,tile.remainingSeconds,tile.nominalRemainingSeconds,tile.dry,tile.paused,tile.weeds,tile.insects,tile.protected,model]);
- const bounds=game.getBoundingClientRect(),width=Math.min(bounds.width-24,330),left=Math.max(width/2+12,Math.min(bounds.width-width/2-12,point.x/1600*bounds.width));
- panel.style.left=`${left}px`;panel.style.top=`${point.y/900*bounds.height}px`;panel.classList.toggle('above',point.y>610);
- if(key===healthKey)return;healthKey=key;panel.replaceChildren();
+ const position=()=>{
+  const bounds=game.getBoundingClientRect(),canvas=element('farm').getBoundingClientRect(),projected=worldToScreen(point,sceneTransform(canvas.width,canvas.height));
+  const width=Math.min(bounds.width-24,330),height=panel.getBoundingClientRect().height,x=canvas.left-bounds.left+projected.x,y=canvas.top-bounds.top+projected.y;
+  panel.style.left=`${Math.max(12,Math.min(bounds.width-width-12,x-width/2))}px`;
+  panel.style.top=`${Math.max(12,Math.min(bounds.height-height-12,y+height+10>bounds.height-12?y-height-10:y+10))}px`;
+ };
+ if(key===healthKey){position();return;}healthKey=key;panel.replaceChildren();
  const heading=document.createElement('div');heading.className='crop-tooltip-head';const title=document.createElement('strong');title.textContent=model.title;heading.append(title);
  for(const label of model.chips){const chip=document.createElement('span');chip.textContent=label;heading.append(chip);}panel.append(heading);
  for(const [label,text,value]of [['Temporada',model.seasonText,model.seasonProgress],['Crescimento',model.growthText,model.growthProgress]] as [string,string,number][]){const row=document.createElement('div');row.className='crop-progress-row';const caption=document.createElement('div');caption.className='crop-progress-caption';const name=document.createElement('span');name.textContent=label;const status=document.createElement('span');status.textContent=text;caption.append(name,status);const progress=document.createElement('progress');progress.max=1;progress.value=value;progress.setAttribute('aria-label',`${label}: ${text}`);row.append(caption,progress);panel.append(row);}
+ position();
 }
 function tileList(){dialog('Terras da fazenda');const states:Record<string,string>={GRASS:'grama',PLOWED:'arada',DEAD:'planta morta',READY:'pronta',GROWING:'crescendo'};const grid=document.createElement('div');grid.className='tile-list';content.append(grid);for(const tile of display()?.tiles??[]){const crop=catalog.crops.find(c=>c.id===tile.cropId);const b=button(`Terra ${tile.column+1}, ${tile.row+1}: ${!tile.unlocked?'bloqueada':crop?.name??states[tile.state]}`,async()=>{modal.close();await tileAction(tile);},grid);b.title='Aplicar a ferramenta selecionada';}}
 function card(name:string,image?:string){const c=document.createElement('article');c.className='card';if(image){const img=document.createElement('img');img.loading='lazy';img.src='/assets/'+image;img.alt='';c.append(img);}const title=document.createElement('strong');title.textContent=name;c.append(title);return c;}
@@ -174,17 +194,17 @@ function marketCard(name:string,imagePath:string,details:string,level:number,pri
  const c=document.createElement('article');c.className='card market-card';const title=document.createElement('h3');title.textContent=name;const image=document.createElement('img');image.className='market-art';image.loading='lazy';image.src=`/assets/${imagePath}`;image.alt='';const description=paragraph(details,c);description.className='market-details';const levelLabel=document.createElement('small');levelLabel.textContent=`Nível ${level}${vip?' · VIP':''}`;
  const locked=(own?.level??0)<level||vip&&!own?.vipActive;if(locked)c.classList.add('locked');c.prepend(title);c.insertBefore(image,description);c.append(levelLabel);
  if(locked){const badge=document.createElement('span');badge.className='lock-badge';badge.textContent=(own?.level??0)<level?`Nível ${level}`:'Exige VIP';c.append(badge);}
- for(const [currency,price]of Object.entries(prices)){const label=currency==='GOLD'?'ouro':'verdes',buy=button(`Comprar · ${price}`,()=>action({action:kind,itemId:id,currency}),c);buy.className='market-buy';buy.disabled=locked;buy.setAttribute('aria-label',`Comprar ${name} por ${price} ${label}`);buy.title=locked?((own?.level??0)<level?`Nível ${level}`:'Exige VIP'):`${price} ${label}`;const coin=document.createElement('img');coin.className='price-coin';coin.src=`/assets/classic/icons/moeda-${currency==='GOLD'?'comum':'verde'}.png`;coin.alt='';buy.append(coin);}
+ for(const [currency,price]of Object.entries(prices)){const label=currency==='GOLD'?'ouro':'verdes',buy=button(`Comprar · ${price}`,()=>action({action:kind,itemId:id,currency}),c,`buy:${kind}:${id}:${currency}`);buy.className='market-buy';buy.disabled=locked;buy.setAttribute('aria-label',`Comprar ${name} por ${price} ${label}`);buy.title=locked?((own?.level??0)<level?`Nível ${level}`:'Exige VIP'):`${price} ${label}`;const coin=document.createElement('img');coin.className='price-coin';coin.src=`/assets/classic/icons/moeda-${currency==='GOLD'?'comum':'verde'}.png`;coin.alt='';buy.append(coin);}
  return c;
 }
 function shop(category='crops'){
  dialog('Loja');const tabs=document.createElement('div');tabs.className='tabs';content.append(tabs);
  refreshDialog=()=>shop(category);
- for(const [id,label]of [['crops','Sementes'],['animals','Animais'],['fertilizers','Fertilizantes'],['owned','Meus animais'],['vip','VIP']]){const tab=button(label,()=>shop(id),tabs);tab.className='shop-tab';tab.setAttribute('aria-pressed',String(category===id));}
+ for(const [id,label]of [['crops','Sementes'],['animals','Animais'],['fertilizers','Fertilizantes'],['owned','Meus animais'],['vip','VIP']]){const tab=button(label,()=>shop(id),tabs,`shop-tab:${id}`);tab.className='shop-tab';tab.setAttribute('aria-pressed',String(category===id));}
  const scroll=document.createElement('div');scroll.className='market-scroll';content.append(scroll);
  if(category==='crops'){
   const groups=document.createElement('div');groups.className='tabs seed-tabs';content.insertBefore(groups,scroll);
-  for(const [id,label]of [['common','Comuns'],['vip','VIP']] as const){const tab=button(label,()=>{seedMarketGroup=id;shop(category);},groups);tab.className='shop-tab';tab.setAttribute('aria-pressed',String(seedMarketGroup===id));}
+  for(const [id,label]of [['common','Comuns'],['vip','VIP']] as const){const tab=button(label,()=>{seedMarketGroup=id;shop(category);},groups,`seed-group:${id}`);tab.className='shop-tab';tab.setAttribute('aria-pressed',String(seedMarketGroup===id));}
   const cards=document.createElement('div');cards.className='market-cards';scroll.append(cards);
   for(const crop of cropGroups(catalog.crops)[seedMarketGroup])cards.append(marketCard(crop.name,`classic/crops/plants_phase_one_to_five/${crop.spriteStem}_5.png`,`${crop.growthSeconds/3600} h · ${crop.seasons} temporada(s)`,crop.requiredLevel,crop.seedPrices,'BUY_SEED',crop.id,crop.vipOnly));
  }
@@ -202,8 +222,8 @@ function shop(category='crops'){
  if(category==='owned'){
   if(!own?.animals.length)paragraph('Nenhum animal comprado.',scroll);
   for(const animal of own?.animals??[]){const type=catalog.animals.find(a=>a.id===animal.id)!;const c=card(type.name,animalPath(animal.id,animal.stage,false,false,false));scroll.append(c);const stage:Record<string,string>={BABY:'Filhote',YOUNG:'Jovem',ADULT:'Adulto'};paragraph(`${stage[animal.stage]} · ${animalStatusText(animal.status,type.kind,animal.remainingSeconds)}`,c);
-   const label=animalActionLabel(animal.status,type.kind,animal.stage);if(label)button(label,()=>action({action:'TEND_ANIMAL',itemId:animal.id}),c);
-   const feedId=type.kind==='PRODUCER'?'producer':'growth';button(`Ração · ${catalog.feedPrices[feedId]} ouro`,()=>action({action:'BUY_FEED',itemId:feedId}),c);
+   const label=animalActionLabel(animal.status,type.kind,animal.stage);if(label)button(label,()=>action({action:'TEND_ANIMAL',itemId:animal.id}),c,`tend:${animal.id}`);
+   const feedId=type.kind==='PRODUCER'?'producer':'growth';button(`Ração · ${catalog.feedPrices[feedId]} ouro`,()=>action({action:'BUY_FEED',itemId:feedId}),c,`feed:${animal.id}`);
   }
  }
 }
@@ -233,14 +253,14 @@ function deposit(){
  const summary=document.createElement('div');summary.className='deposit-summary';
  for(const [currency,label,icon]of [['GOLD','Ouro','moeda-comum.png'],['GREEN','Verdes','moeda-verde.png']]){const amount=totals[currency]??0,item=document.createElement('div');item.className='deposit-currency';const image=document.createElement('img');image.src=`/assets/classic/icons/${icon}`;image.alt='';const detail=document.createElement('span');detail.textContent=label;const total=document.createElement('strong');total.textContent=String(amount);item.append(image,detail,total);summary.append(item);}
  overview.append(summary);
- if(value){const sellAll=button(`Vender tudo · ${value}`,async()=>{await action({action:'SELL_ALL'});deposit();},overview);sellAll.className='deposit-sell-all';}
+ if(value){const sellAll=button(`Vender tudo · ${value}`,()=>action({action:'SELL_ALL'}),overview,'sell-all');sellAll.className='deposit-sell-all';}
  content.append(overview);
  const products=[...groups].map(([id,count])=>{const crop=catalog.crops.find(c=>c.id===id),animal=catalog.animals.find(a=>a.productId===id);return{id,count,crop,animal,name:crop?.name??animal?.productName??id,icon:crop?`classic/crops/plants_phase_one_to_five/${crop.spriteStem}_5.png`:animal?.id==='galinha'||animal?.id==='pato'?'classic/animals/ninho-geral/ninho-com-ovos.png':animal?.id==='ovelha'?'classic/animals/ovelha/la-ovelha.png':animal?.id==='vaca'?'classic/animals/vaca/balde-vaca.png':animal?animalPath(animal.id,'ADULT',false,false,false):undefined};});
  if(!products.length){const empty=document.createElement('div');empty.className='deposit-empty';const title=document.createElement('strong');title.textContent='Seu depósito está vazio';const message=document.createElement('p');message.textContent='Colha uma plantação ou recolha a produção dos animais para ver os itens aqui.';empty.append(title,message);content.append(empty);}
  for(const [kind,label]of [['crop','Colheitas'],['animal','Produtos dos animais'],['other','Outros produtos']] as const){const items=products.filter(item=>kind==='crop'?!!item.crop:kind==='animal'?!!item.animal:!item.crop&&!item.animal);if(!items.length)continue;const section=document.createElement('section');section.className='deposit-group';const heading=document.createElement('h3');heading.textContent=label;section.append(heading);
   for(const item of items){const row=document.createElement('article');row.className='deposit-item';if(item.icon){const image=document.createElement('img');image.src=`/assets/${item.icon}`;image.alt='';row.append(image);}
    const details=document.createElement('div');details.className='deposit-item-details';const title=document.createElement('strong');title.textContent=item.name;const quantity=document.createElement('span');quantity.textContent=`${item.count} ${item.count===1?'unidade armazenada':'unidades armazenadas'}`;details.append(title,quantity);if(item.crop?.vipOnly&&!own?.vipActive){const locked=document.createElement('small');locked.className='deposit-vip-note';locked.textContent='Exige VIP para vender';details.append(locked);}row.append(details);
-   const sellable=item.count>0&&(!item.crop?.vipOnly||own?.vipActive),actions=document.createElement('div');actions.className='deposit-item-actions';const sellOne=button('Vender 1',async()=>{await action({action:'SELL_ITEM',itemId:item.id});deposit();},actions);sellOne.disabled=!sellable;sellOne.setAttribute('aria-label',`Vender 1 ${item.name}`);const sellProduct=button('Vender tudo',async()=>{await action({action:'SELL_ITEM_ALL',itemId:item.id});deposit();},actions);sellProduct.disabled=!sellable;sellProduct.setAttribute('aria-label',`Vender todas as unidades de ${item.name}`);row.append(actions);section.append(row);
+   const sellable=item.count>0&&(!item.crop?.vipOnly||own?.vipActive),actions=document.createElement('div');actions.className='deposit-item-actions';const sellOne=button('Vender 1',()=>action({action:'SELL_ITEM',itemId:item.id}),actions,`sell-one:${item.id}`);sellOne.disabled=!sellable;sellOne.setAttribute('aria-label',`Vender 1 ${item.name}`);const sellProduct=button('Vender tudo',()=>action({action:'SELL_ITEM_ALL',itemId:item.id}),actions,`sell-product:${item.id}`);sellProduct.disabled=!sellable;sellProduct.setAttribute('aria-label',`Vender todas as unidades de ${item.name}`);row.append(actions);section.append(row);
   }content.append(section);
  }
  const feed=Object.entries(own?.feed??{}),feedSection=document.createElement('section');feedSection.className='deposit-feed';const feedTitle=document.createElement('h3');feedTitle.textContent='Ração armazenada';feedSection.append(feedTitle);if(feed.length){for(const [id,count]of feed){const item=document.createElement('div');item.className='deposit-feed-row';const label=document.createElement('span');label.textContent=id==='producer'?'Ração de produção':'Ração de crescimento';const amount=document.createElement('strong');amount.textContent=String(count);item.append(label,amount);feedSection.append(item);}}else{const message=document.createElement('p');message.textContent='Nenhuma ração armazenada.';feedSection.append(message);}content.append(feedSection);
@@ -281,9 +301,10 @@ async function friends(){
  catch(error){handleError(error);}
 }
 async function connect(user:string,token:()=>Promise<string>){
- sessionGeneration++;navigationGeneration++;busy=false;own=undefined;visited=undefined;scene?.close();const generation=sessionGeneration;
+ sessionGeneration++;navigationGeneration++;busy=false;own=undefined;visited=undefined;closeScene();const generation=sessionGeneration;
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
  scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>void tileAction(tile),id=>{const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health);
+ sceneResize=new ResizeObserver(()=>health(healthTile,healthPoint));sceneResize.observe(element('farm'));
  try{await refresh();if(generation===sessionGeneration&&!own){paragraph('Esta conta precisa de um convite para começar.',login);invitationForm(login);}}
  catch(error){handleError(error);}
 }
@@ -302,11 +323,12 @@ async function start(){
   }
  }catch(error){showConnection();notify(error instanceof Error?error.message:'Servidor indisponível.');button('Tentar conectar novamente',start,login);}
 }
-element('shop').onclick=()=>shop();element('deposit').onclick=deposit;element('missions').onclick=missions;element('friends').onclick=()=>void friends();
+element('shop').onclick=()=>shop();element('deposit').onclick=deposit;element('missions').onclick=missions;element('friends').onclick=()=>void friends();element('plots').onclick=tileList;
 element('home').onclick=()=>{navigationGeneration++;visited=undefined;tool='PLOW';render();};element('settings').onclick=()=>shortcutPanel('Ajustes',settings);element('close-modal').onclick=()=>modal.close();
 element('retry').onclick=async()=>{if(!api||busy)return;const client=api,generation=sessionGeneration;busy=true;try{const reply=await client.retry();if(generation!==sessionGeneration)return;receive(reply);if(reply.code){dialog('Convite confirmado');paragraph(reply.code);}}catch(error){if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();await refresh();}}};
 window.addEventListener('offline',()=>showConnection('Sem conexão. Reconecte antes de agir.'));
 window.addEventListener('online',()=>void refresh());
+modal.addEventListener('close',()=>health(healthTile,healthPoint));
 document.addEventListener('keydown',event=>{if(!own||event.repeat||event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement)return;const shortcut=gameShortcut(event.key,!!visited);if(!shortcut)return;if(shortcut.action==='tool'){if(!modal.open)pickTool(shortcut.tool);return;}if(shortcut.action==='shop')shortcutPanel('Loja',()=>shop());else if(shortcut.action==='deposit')shortcutPanel('Depósito',deposit);else if(shortcut.action==='missions')shortcutPanel('Tarefas diárias',missions);else if(shortcut.action==='music')toggleMusic();else if(shortcut.action==='effects')toggleEffects();});
 document.addEventListener('visibilitychange',()=>{syncMusic();if(!document.hidden)void refresh();});
 window.setInterval(()=>{if(!document.hidden)void refresh();},30_000);

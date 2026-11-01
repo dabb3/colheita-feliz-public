@@ -15,26 +15,19 @@
 .shop-tab[aria-pressed=true]{background:linear-gradient(#ffe987,#e7b83d);border-color:#99742d;color:#4a3914;box-shadow:inset 0 2px 3px #9a752844,0 1px 0 #fff8;transform:translateY(1px)}
 #farm-menu{gap:6px;align-items:flex-start}.farm-menu-button{width:78px;height:88px;padding:2px 3px;border:0;border-radius:10px;background:transparent;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:1px;text-shadow:0 1px 3px #172b13;box-shadow:none}.farm-menu-button:hover,.farm-menu-button:focus-visible{background:#d9ebaa55;filter:none}.farm-menu-button img,.settings-icon{width:56px;height:56px;object-fit:contain;filter:drop-shadow(1px 3px 2px #0005)}.settings-icon{display:grid;place-items:center;font-size:48px;line-height:56px;color:#d8dce0}.farm-menu-button span:last-child{font-size:13px;font-weight:750;white-space:nowrap}.farm-menu-button[hidden]{display:none!important}.settings-menu{display:grid;gap:.55rem}.settings-menu button{width:100%;text-align:left}.settings-menu button[aria-pressed=true]{background:linear-gradient(#ffe987,#e7b83d);box-shadow:inset 0 2px 3px #9a752844}
 @media(max-width:1000px){#farm-menu{gap:0}.farm-menu-button{width:58px;height:68px;padding:0}.farm-menu-button img,.settings-icon{width:40px;height:40px}.settings-icon{font-size:36px;line-height:40px}.farm-menu-button span:last-child{font-size:10px}}
-#wallet{display:flex;align-items:center;gap:.65rem;min-width:320px}.profile-avatar{width:66px;height:66px;flex:none;object-fit:contain;border:1px solid #d8d0ae;border-radius:5px;background:#fff8df}.profile-details{min-width:0;flex:1;line-height:1.35}
-.profile-xp{position:relative;height:14px;margin:.15rem 0 .2rem}.profile-xp progress{display:block;width:100%;height:14px;border:0;border-radius:8px;overflow:hidden;background:#dce9ec;accent-color:#2f9dd5}.profile-xp progress::-webkit-progress-bar{border-radius:8px;background:#dce9ec}.profile-xp progress::-webkit-progress-value{border-radius:8px;background:linear-gradient(#64c1ed,#228bc9)}.profile-xp progress::-moz-progress-bar{border-radius:8px;background:linear-gradient(#64c1ed,#228bc9)}.profile-xp span{position:absolute;inset:0;display:grid;place-items:center;color:#163b52;font-size:10px;font-weight:750;text-shadow:0 1px 1px #fff8;line-height:14px;pointer-events:none}
-@media(max-width:1000px){#wallet{min-width:210px}#wallet .profile-avatar{width:50px;height:50px}}
 #modal.shop-dialog[open]{display:flex;flex-direction:column;height:min(760px,84vh)}#modal.shop-dialog .dialog-header{flex:none;background:linear-gradient(#fbfdff,#dce4e9);border-bottom-color:#a7afb8}#modal.shop-dialog #modal-content{display:flex;flex:1;min-height:0;flex-direction:column;overflow:hidden}#modal.shop-dialog .tabs{flex:none;gap:4px;padding-bottom:5px;border-bottom:1px solid #b8bdad}#modal.shop-dialog .tabs button{flex:1;border-radius:6px 6px 0 0;background:linear-gradient(#f9fcff,#d9e0e5);font-size:13px}#modal.shop-dialog .tabs button[aria-pressed=true]{background:#fffdf1;border-bottom-color:#fffdf1;box-shadow:inset 0 3px #e6b843}.seed-tabs{justify-content:center}.seed-tabs button{max-width:180px}.market-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#a6b7a0 #e7ead9}.market-cards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.55rem}.market-card{position:relative;gap:.25rem;padding:.5rem;border-color:transparent;border-radius:6px;background:transparent}.market-card:hover,.market-card:focus-within{border-color:#e8c354;background:#fff7ce}#modal-content .market-card h3{font-size:13px;margin:.15rem 0}.market-card .market-art{height:88px;width:100%;object-fit:contain}.market-card p{min-height:2.6em;font-size:11px}.market-card small{font-size:11px;color:#65715a}.market-card .market-buy{margin-top:auto;font-size:12px;padding:.35rem .25rem;background:linear-gradient(#fff4a2,#f2b500);display:flex;gap:.25rem;justify-content:center;align-items:center}.market-card .price-coin{width:15px;height:15px;object-fit:contain}.market-card.locked .market-art{opacity:.45;filter:grayscale(.5)}.market-card .lock-badge{position:absolute;top:75px;left:50%;transform:translateX(-50%);white-space:nowrap;padding:.15rem .4rem;font-size:11px;font-weight:750;background:#fffff2ed;border:1px solid #c9d0bd;border-radius:4px}@media(max-width:1000px){.market-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:560px){.market-cards{grid-template-columns:repeat(2,minmax(0,1fr))}#modal.shop-dialog #modal-content{padding:.65rem}}
 .vip-offer{display:grid;grid-template-columns:minmax(120px,180px) minmax(0,1fr);align-items:center;gap:1.4rem;width:min(680px,100%);margin:1.4rem auto;padding:1.3rem;border:1px solid #dcc876;border-radius:12px;background:linear-gradient(135deg,#fff9d8,#fffdf2 65%);box-shadow:0 4px 14px #654a1720}.vip-offer>img{width:100%;max-height:210px;object-fit:contain;filter:drop-shadow(0 4px 3px #5b431544)}#modal-content .vip-offer h3{margin:0 0 .4rem;color:#76591b;font:700 22px Georgia,serif}.vip-intro{margin:.2rem 0 .55rem;color:#526353}.vip-offer ul{margin:.35rem 0 .75rem;padding-left:1.2rem;color:#526353}.vip-offer li{margin:.25rem 0}.vip-status{display:inline-block;margin:.2rem 0 .7rem;padding:.3rem .55rem;border:1px solid #cbd9ae;border-radius:7px;background:#f0f5dc;color:#426b36;font-weight:700;font-size:13px}.vip-buy{display:flex;align-items:center;justify-content:center;gap:.4rem;width:100%;padding:.55rem;background:linear-gradient(#fff4a2,#f2b500)}.vip-buy img{width:20px;height:20px;object-fit:contain}@media(max-width:560px){.vip-offer{grid-template-columns:1fr;text-align:center;gap:.4rem;padding:.9rem}.vip-offer>img{width:130px;height:130px;margin:auto}.vip-offer ul{text-align:left}}
 
-@media(max-width:700px){body{overflow-x:hidden}#app{min-height:100svh;place-items:start center}#game{display:flex;flex-direction:column;gap:.5rem;width:100%;height:100svh;min-height:100svh;aspect-ratio:auto;padding:.5rem;margin:0 auto}#game>canvas{order:0;flex:1;min-height:0;width:100%;height:100%;aspect-ratio:auto;object-fit:cover}#game>header{position:static;order:-1;display:flex;flex-direction:column;gap:.35rem;width:100%}#wallet{width:100%;min-width:0}#farm-menu{width:100%;justify-content:space-around;gap:0}.farm-menu-button{flex:1;min-width:0}#tutorial,#plant-health{position:static;order:1;max-width:none}footer{position:static;order:2;transform:none;align-self:center;max-width:100%;flex-wrap:wrap;justify-content:center}.tool-tray{position:static;order:3;transform:none;width:100%;max-height:38svh}.tray-items{grid-template-columns:repeat(auto-fit,minmax(48px,56px))}}
 
-#app{width:100vw;height:100vh;height:100dvh;max-width:none;min-height:100vh;min-height:100dvh;place-items:stretch}#game{width:100%;height:100%;max-width:none;aspect-ratio:auto;margin:0}#game>canvas{object-fit:cover}
-@media(max-width:700px){#game{display:block;padding:0;overflow:hidden}#game>canvas{position:absolute;inset:0;width:100%;height:100%}#game>header{position:absolute;top:env(safe-area-inset-top);left:1%;right:1%;width:auto}#tutorial{position:absolute;top:170px;left:1%;right:1%;width:auto;max-width:none}#plant-health{position:absolute;top:42%;left:1%;right:1%;width:auto;max-width:none}footer{position:absolute;bottom:env(safe-area-inset-bottom);left:50%;transform:translateX(-50%);max-width:98%;width:max-content;flex-wrap:nowrap}.tool-tray{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 68px);left:1%;width:98%;max-height:38svh;transform:none}}
 
 #modal.settings-dialog[open],#modal.deposit-dialog[open]{display:flex;flex-direction:column;max-height:88vh;max-height:88dvh}#modal.settings-dialog{width:min(720px,94vw)}#modal.deposit-dialog{width:min(850px,94vw)}#modal.settings-dialog .dialog-header,#modal.deposit-dialog .dialog-header{flex:none}#modal.settings-dialog #modal-content,#modal.deposit-dialog #modal-content{min-height:0;overflow-y:auto}.settings-intro,.deposit-intro{margin:0 0 1rem;color:#526353}.settings-sections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:.75rem}.settings-section{min-width:0;padding:.8rem;border:1px solid #d2d9c2;border-radius:10px;background:#f5f7e8}.settings-section h3,.deposit-overview h3,.deposit-group h3,.deposit-feed h3{margin:0 0 .55rem;color:#426b36;font:700 17px Georgia,serif}.settings-audio{grid-column:1/-1}.settings-toggles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem}.settings-toggle,.settings-action{display:flex;align-items:center;justify-content:space-between;gap:.65rem;width:100%;min-width:0;padding:.7rem .8rem;text-align:left;border:1px solid #c9d2b8;border-radius:8px;background:#fffef7;color:#344638;box-shadow:none}.settings-toggle:hover,.settings-action:hover{filter:none;background:#f9f5dd;border-color:#c5a74f}.settings-toggle[aria-pressed=true]{border-color:#88a36f;background:#f1f6e5}.settings-toggle-copy{display:grid;gap:.15rem;min-width:0}.settings-toggle-copy small{color:#66735d;font-size:12px;font-weight:400}.settings-state{flex:none;padding:.2rem .45rem;border-radius:12px;background:#e6e9df;color:#66705f;font-size:11px;font-weight:750}.settings-toggle[aria-pressed=true] .settings-state{background:#d9edbf;color:#426b36}.settings-chevron{font-size:24px;color:#70815b;line-height:1}.settings-logout{width:100%;margin-top:.65rem;text-align:left;color:#8a3f35;background:#fff0ec;border-color:#d9b4a9}.settings-logout:hover{filter:none;background:#fbe4dd}.deposit-overview{margin-bottom:1.1rem;padding:.85rem;border:1px solid #d2d9c2;border-radius:10px;background:#f5f7e8}.deposit-overview h3{margin-bottom:.6rem}.deposit-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;margin:0}.deposit-summary .deposit-currency{display:grid;grid-template-columns:26px 1fr auto;align-items:center;gap:.4rem;border:1px solid #d5dbbf;border-radius:8px;background:#fff;padding:.5rem .65rem;color:#526353}.deposit-summary img{width:24px;height:24px}.deposit-currency strong{color:#426b36;font-size:18px}.deposit-sell-all{width:100%;margin-top:.65rem}.deposit-group{margin:1rem 0}.deposit-group h3,.deposit-feed h3{padding-bottom:.4rem;border-bottom:1px solid #d6c992}.deposit-item{display:flex;align-items:center;gap:.65rem;margin:.45rem 0;padding:.55rem .65rem;border:1px solid #d8ddc9;border-radius:9px;background:#fff}.deposit-item>img{width:54px;height:54px;flex:none;object-fit:contain}.deposit-item-details{min-width:0}.deposit-item-details strong{overflow-wrap:anywhere}.deposit-item-details span,.deposit-vip-note{font-size:12px;color:#526353}.deposit-vip-note{color:#8b6418!important;font-weight:700}.deposit-item-actions{display:flex;gap:.35rem;flex:none}.deposit-item-actions button{padding:.45rem .55rem;font-size:12px;white-space:nowrap}.deposit-empty{display:grid;justify-items:center;gap:.35rem;margin:1rem 0;padding:1.3rem 1rem;border:1px dashed #b7c59f;border-radius:10px;background:#f7f8ed;text-align:center}.deposit-empty strong{color:#426b36;font:700 18px Georgia,serif}.deposit-empty p,.deposit-feed p{margin:.1rem 0;color:#526353;font-size:13px}.deposit-feed{margin-top:1.1rem;padding:.85rem;border:1px solid #d8ddc9;border-radius:10px;background:#fbfcf5}.deposit-feed-row{display:flex;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid #e6e9dc}.deposit-feed-row:last-child{border:0}.deposit-feed-row strong{color:#426b36}
 @media(max-width:560px){#modal.settings-dialog[open],#modal.deposit-dialog[open]{width:calc(100vw - 16px);max-height:92vh;max-height:92dvh}.settings-sections{grid-template-columns:1fr}.settings-audio{grid-column:auto}.settings-toggles{grid-template-columns:1fr}.deposit-summary{grid-template-columns:1fr}.deposit-item{display:grid;grid-template-columns:46px minmax(0,1fr);gap:.4rem}.deposit-item>img{width:46px;height:46px}.deposit-item-actions{grid-column:1/-1;justify-content:flex-end}.deposit-item-actions button{flex:1}}
 
 .settings-section{border-color:#e4d59d;background:#fff9e7}.settings-section h3,.deposit-overview h3{color:#785a1d}.settings-toggle,.settings-action{border-color:#ded6ba;background:#fffef8}.settings-toggle[aria-pressed=true]{border-color:#dfbe58;background:#fff8dc;box-shadow:inset 0 0 0 1px #f6e39b}.settings-toggle:hover,.settings-action:hover{background:#fff3c8;border-color:#d5b44c}.settings-state{position:relative;width:48px;height:28px;padding:0;border:1px solid #bfc4bf;border-radius:999px;background:#c8cdca;color:transparent;font-size:0;transition:background-color .16s,border-color .16s}.settings-state::after{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0003;content:'';transition:transform .16s}.settings-toggle[aria-pressed=true] .settings-state{border-color:#d2a82d;background:#efc442;color:transparent}.settings-toggle[aria-pressed=true] .settings-state::after{transform:translateX(20px)}.deposit-overview{border-color:#e4d18c;background:#fff9e3}.deposit-summary .deposit-currency{border-color:#e8d891;background:#fffef8}.deposit-empty{border-color:#dec76f;background:#fff9df}
-/* Full-screen farm, with world coordinates preserved under cover scaling. */
+/* Full-screen container; the logical world is fitted separately below. */
 html, body, #app { width: 100%; height: 100%; min-height: 100%; margin: 0; }
 #app { max-width: none; min-height: 100dvh; }
-#game { width: 100vw; height: 100vh; height: 100dvh; min-height: 0; aspect-ratio: auto; overflow: hidden; background: #153e39; }
-#game > canvas { width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; }
+#game { width: 100vw; max-width: none; height: 100vh; height: 100dvh; min-height: 0; aspect-ratio: auto; overflow: hidden; background: #153e39; }
 .market-body { display: flex; flex-direction: column; min-height: 0; }
 .market-scroll { overflow: auto; min-height: 0; max-height: 68vh; overscroll-behavior: contain; }
 .seed-tabs { margin-bottom: .65rem; }
@@ -66,31 +59,52 @@ html, body, #app { width: 100%; height: 100%; min-height: 100%; margin: 0; }
 .vip-offer h3 { color: #785b12; }
 .vip-offer li { margin: .35rem 0; }
 .vip-status { padding: .55rem .7rem; border-radius: 8px; background: #fffdf4; }
-@media(max-width:1000px) {
- #game header { position: absolute; z-index: 2; inset: max(8px, env(safe-area-inset-top)) 8px auto; display: flex; align-items: flex-start; flex-wrap: wrap; gap: .4rem; padding: 0; }
- #game header nav { gap: .25rem; }
- #game header nav button { min-height: 34px; padding: .3rem .45rem; font-size: 11px; }
- #game #wallet { width: auto; min-width: 160px; max-width: 46vw; font-size: 11px; }
- #game #tutorial { position: absolute; z-index: 2; top: 100px; left: 8px; max-width: min(270px, 65vw); margin: 0; font-size: 11px; }
- #game #plant-health { position: absolute; left: var(--health-x, 50%); top: var(--health-y, 50%); transform: translate(-50%, -100%); width: 250px; max-width: 75vw; }
- #game footer { position: absolute; z-index: 2; left: 50%; bottom: max(8px, env(safe-area-inset-bottom)); transform: translateX(-50%); flex-wrap: nowrap; justify-content: center; margin: 0; max-width: calc(100vw - 12px); }
- #game #tools { flex-wrap: wrap; justify-content: center; }
- #game #tools button { width: 36px; height: 36px; }
- #game footer select { max-width: 96px; }
- #game footer > button { font-size: 10px; }
+@media(max-width:560px){.vip-offer{grid-template-columns:1fr;text-align:center}.vip-offer>img{max-height:130px}}
+
+/* Keep the complete logical world visible; its surrounding space is decorative. */
+#scene{position:absolute;inset:0;overflow:hidden;isolation:isolate;background:#153e39}
+#scene::before{content:'';position:absolute;inset:-20px;background:var(--scene-background) center top/cover no-repeat;filter:blur(12px) brightness(.6);z-index:-1}
+#scene>canvas{position:relative;width:100%;height:100%;object-fit:contain}
+#game #plant-health{transform:none;max-width:calc(100% - 24px)}
+
+/* The profile and tutorial share a flow so long names never cover the menu. */
+#game header{z-index:2;gap:16px}
+.player-panel{width:360px;max-width:100%;min-width:0;display:grid;gap:8px}
+#game #wallet{display:flex;align-items:center;gap:10px;width:100%;min-width:0;line-height:1.25;font-size:14px}
+#wallet .avatar{width:64px;height:64px;flex:none;object-fit:contain;border:1px solid #d8d0ae;border-radius:5px;background:#fff8df}
+.wallet-info{flex:1;min-width:0}.farm-heading{display:flex;align-items:flex-start;gap:8px}.farm-heading strong{flex:1;min-width:0;overflow-wrap:anywhere}
+.level-badge{flex:none;border-radius:10px;padding:2px 6px;background:#2f9dd5;color:white;font-size:11px;font-weight:750}
+.wallet-info progress{display:block;width:100%;height:10px;margin-top:4px;border:0;border-radius:8px;overflow:hidden;accent-color:#2f9dd5}
+.wallet-info progress::-webkit-progress-bar{background:#dce9ec}.wallet-info progress::-webkit-progress-value{background:#2f9dd5}.wallet-info progress::-moz-progress-bar{background:#2f9dd5}
+.xp-label{display:block;font-size:10px;text-align:center;overflow-wrap:anywhere;margin:2px 0 4px}
+.balances{display:grid;gap:3px}.balances>div{display:flex;align-items:center;gap:6px;min-width:0}.balances img{width:20px;height:20px;object-fit:contain;flex:none}.balances strong{min-width:0;overflow-wrap:anywhere}
+#game #tutorial{position:static;max-width:none;margin:0;font-size:13px}#tutorial p{margin:4px 0 0}
+#game footer{z-index:3;max-width:calc(100% - 16px)}
+#game #tools{display:flex;gap:4px;flex-wrap:nowrap;max-width:none}#game #tools button{width:44px;height:44px;flex:none}
+#game #plots{display:none;min-height:44px;max-width:none;padding:8px;font-size:13px}
+.tile-list button{min-height:44px}
+
+@media(max-width:1100px){
+ #game{display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:8px;padding:8px;padding-top:max(8px,env(safe-area-inset-top));padding-bottom:max(8px,env(safe-area-inset-bottom))}
+ #game header{position:static;grid-row:1;display:grid;grid-template-columns:minmax(0,330px) minmax(0,1fr);gap:12px;min-width:0}
+ .player-panel{width:100%}
+ #game #farm-menu{flex-wrap:wrap;justify-content:flex-end;align-content:start;gap:4px;min-width:0}
+ #game .farm-menu-button{width:64px;min-width:44px;height:64px;padding:0;font-size:12px;flex:none}
+ #game .farm-menu-button img,#game .settings-icon{width:40px;height:40px;font-size:36px;line-height:40px}
+ #game .farm-menu-button span:last-child{font-size:11px}
+ #scene{position:relative;grid-row:2;inset:auto;min-width:0;min-height:0}
+ #game footer{position:relative;grid-row:3;inset:auto;transform:none;justify-self:center;width:max-content;margin:0;gap:8px;padding:8px;max-width:100%}
+ #game #plots{display:block}
+ .tool-tray{bottom:80px;max-height:40dvh}
 }
-@media(max-width:560px) {
- #game header { right: 5px; left: 5px; }
- #game header nav { flex: 1; }
- #game header nav button { font-size: 10px; padding: .25rem .35rem; }
- #game #wallet { max-width: 44vw; min-width: 135px; padding: .4rem .5rem; }
- #game #tutorial { top: 100px; max-width: 53vw; padding: .4rem .55rem; }
- #game footer { gap: .2rem; padding: .3rem; }
- #game #tools { max-width: 190px; }
- #game #tools button { width: 32px; height: 32px; }
- #game footer label { font-size: 9px; }
- #game footer select { max-width: 78px; font-size: 11px; }
- #game footer > button { max-width: 56px; padding: .3rem; }
- .vip-offer { grid-template-columns: 1fr; text-align: center; }
- .vip-offer > img { max-height: 130px; }
+@media(max-width:700px){
+ #game header{display:flex;flex-direction:column;gap:8px}
+ #game #farm-menu{width:100%;justify-content:space-around;gap:0}
+ #game .farm-menu-button{width:16%;max-width:70px;height:60px;min-width:44px}
+ #game #wallet{font-size:13px;padding:8px 10px}#wallet .avatar{width:52px;height:52px}
+ #game #tutorial{font-size:12px;padding:8px 10px}
+ #game #tools{display:grid;grid-template-columns:repeat(4,44px)}
+ #game footer{padding:8px;gap:12px}#game #plots{min-width:60px}
+ .tool-tray{left:8px;bottom:124px;transform:none;width:calc(100% - 16px);max-height:38dvh}
+ .tile-list{grid-template-columns:repeat(2,minmax(0,1fr))}.tile-list button{font-size:13px}
 }

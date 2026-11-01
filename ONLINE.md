@@ -131,6 +131,20 @@ Uma compra cujo resultado ficou desconhecido bloqueia novas ações até confirm
 
 As imagens carregam conforme o cenário ou a loja precisa. A pasta completa de arte vai ao host estático; não é baixada inteira no primeiro acesso. Dia/noite segue o relógio local; crescimento e tarefas usam tempo UTC do servidor. A previsão sem nova rega pode exceder a duração nominal porque solo seco cresce mais devagar.
 
+### Enquadramento e interface principal
+
+O navegador ajusta o mundo lógico de 1600 × 900 inteiro à área disponível, preservando as proporções da casa, dos terrenos e dos animais. Espaços externos usam o fundo do período como decoração; não repetem as faixas verdes da janela Desktop. Cliques, hover e dicas usam a mesma transformação após redimensionar. Clicar fora do mundo não envia ação.
+
+Em janelas de até 1100 px de largura, o cabeçalho e a barra de ferramentas reservam espaço para a cena. O tutorial acompanha a altura do perfil, e o botão **Terras** abre a lista acessível existente. Em telas estreitas, os terrenos ficam menores para manter a fazenda inteira visível; use essa lista para selecionar cada um com alvos maiores. As oito ferramentas mantêm botões de 44 × 44 CSS px; sementes e fertilizantes mostram o estoque selecionado.
+
+O perfil usa os ícones originais de ouro/verdes e mantém os valores decimais recebidos. Durante visitas, mostra o nome visitado e os saldos do próprio jogador. A barra de XP usa o renderizador compartilhado da interface; preços, recompensas e elegibilidade continuam autoritativos no servidor.
+
+Atualizações da Loja e do Depósito preservam a posição de rolagem e o controle focado. Se o item desaparecer ou ficar indisponível, o foco vai para Fechar. Trocar de categoria começa no topo. Uma venda confirmada depois de fechar o Depósito não reabre a janela.
+
+Ao receber respostas fora de ordem, o cliente mantém a revisão econômica mais recente. Apenas no empate da revisão e do dono, compara `serverTime` para não voltar a uma projeção temporal anterior. Horários ausentes ou inválidos conservam o comportamento de aceitar a resposta recebida no empate; uma revisão maior sempre vence. UUID, corpo de retry e autoridade do servidor permanecem iguais.
+
+Verifique com `npm.cmd test --prefix web`, `npm.cmd run typecheck --prefix web` e `npm.cmd run build:local --prefix web`. Os testes de viewport cobrem 390 × 844, 1024 × 600, 1280 × 1024, 1366 × 768 e 2560 × 1080. A revisão manual deve conferir tooltip, nome/saldos longos, bandejas, teclado, visita e modal nessas dimensões. Testes sintéticos não comprovam paridade funcional integral nem alterações já publicadas.
+
 O piloto foi desenhado para Chrome/Edge em desktop, a partir de 1280×720. Não há promessa de suporte móvel ou reprodução visual idêntica ao desktop. Sons de ferramentas existentes são opcionais; novos sons de animais não foram gerados.
 
 ## Publicação gratuita proposta

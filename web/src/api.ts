@@ -6,8 +6,13 @@ export class ApiError extends Error {
  readonly status:number;
  constructor(status:number,message:string) {super(message);this.status=status;}
 }
-export function acceptFarm<T extends {owner:string;revision:string}>(current:T|undefined,incoming:T):T {
- return current?.owner===incoming.owner && BigInt(current.revision)>BigInt(incoming.revision) ? current : incoming;
+export function acceptFarm<T extends {owner:string;revision:string;serverTime?:string}>(current:T|undefined,incoming:T):T {
+ if(current?.owner!==incoming.owner)return incoming;
+ const previous=BigInt(current.revision),next=BigInt(incoming.revision);
+ if(previous>next)return current;
+ // Time orders projections only; a newer economic revision always wins.
+ if(previous===next&&Date.parse(current.serverTime??'')>Date.parse(incoming.serverTime??''))return current;
+ return incoming;
 }
 export class ApiClient {
  private readonly key:string;
