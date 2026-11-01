@@ -1,4 +1,5 @@
 import {build} from 'esbuild';
+import {checkAssetSizes} from './check-assets.mjs';
 import {mkdir,cp,writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {dirname,resolve} from 'node:path';
@@ -15,4 +16,5 @@ await cp(resolve(root,'../assets/sounds'),resolve(dist,'assets/sounds'),{recursi
 await cp(resolve(root,'public'),dist,{recursive:true});
 await writeFile(resolve(dist,'config.js'),`window.COLHEITA_CONFIG=${JSON.stringify(config)};\n`);
 await writeFile(resolve(dist,'_headers'),`/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://lh3.googleusercontent.com; connect-src 'self' ${config.api} ${config.supabaseUrl}; base-uri 'none'; frame-ancestors 'none'; form-action 'self'\n/config.js\n  Cache-Control: no-store\n/index.html\n  Cache-Control: no-cache\n`);
+await checkAssetSizes(dist);
 console.log(`Built ${local?'localhost test':'production'} client in web/dist`);
