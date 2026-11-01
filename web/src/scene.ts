@@ -11,6 +11,7 @@ export class Scene {
  private catalog:Catalog;
  private hover:Tile|null=null;
  private backgroundPeriod?:string;
+ private onPeriodChange:(period:ReturnType<typeof periodAt>)=>void;
  private onTile:(tile:Tile)=>void;
  private onAnimal:(id:string)=>void;
  private onHover:(tile:Tile|null,point:{x:number;y:number}|null)=>void;
@@ -18,8 +19,9 @@ export class Scene {
  private lastFrame=0;
  private animate=(time:number)=>{if(time-this.lastFrame>=33){this.lastFrame=time;this.draw();}this.animation=window.requestAnimationFrame(this.animate);};
  private events=new AbortController();
- constructor(canvas:HTMLCanvasElement,catalog:Catalog,onTile:(tile:Tile)=>void,onAnimal:(id:string)=>void,onHover:(tile:Tile|null,point:{x:number;y:number}|null)=>void) {
+ constructor(canvas:HTMLCanvasElement,catalog:Catalog,onTile:(tile:Tile)=>void,onAnimal:(id:string)=>void,onHover:(tile:Tile|null,point:{x:number;y:number}|null)=>void,onPeriodChange:(period:ReturnType<typeof periodAt>)=>void=()=>{}) {
   this.canvas=canvas;this.ctx=canvas.getContext('2d')!;this.catalog=catalog;this.onTile=onTile;this.onAnimal=onAnimal;this.onHover=onHover;
+  this.onPeriodChange=onPeriodChange;
   canvas.width=1600;canvas.height=900;
   canvas.addEventListener('pointermove',e=>{const p=this.point(e);const pick=p?pickTile(p.x,p.y):null;this.hover=pick?this.farm?.tiles.find(t=>t.column===pick.column&&t.row===pick.row)??null:null;this.onHover(this.hover,pick?tileCenter(pick.column,pick.row):null);},{signal:this.events.signal});
   canvas.addEventListener('pointerleave',()=>{this.hover=null;this.onHover(null,null);},{signal:this.events.signal});
@@ -122,7 +124,7 @@ export class Scene {
  }for(const [x,y]of points)this.thing('classic/fence/mourao.png',x,903-y,25);}
  private draw(){
   if(document.hidden)return;const ctx=this.ctx,period=periodAt(new Date());
-  if(this.backgroundPeriod!==period){this.backgroundPeriod=period;const path=`url('/assets/classic/background/background${period==='day'?'':'-'+period}.png')`;this.canvas.parentElement?.style.setProperty('--scene-background',path);this.canvas.parentElement?.parentElement?.style.setProperty('--scene-background',path);}
+  if(this.backgroundPeriod!==period){this.backgroundPeriod=period;this.onPeriodChange(period);const path=`url('/assets/classic/background/background${period==='day'?'':'-'+period}.png')`;this.canvas.parentElement?.style.setProperty('--scene-background',path);this.canvas.parentElement?.parentElement?.style.setProperty('--scene-background',path);}
   ctx.clearRect(0,0,1600,900);ctx.fillStyle=period==='night'?'#15464f':'#84ba30';ctx.fillRect(0,0,1600,900);
   const background=this.sprite(`classic/background/background${period==='day'?'':'-'+period}.png`);
   if(background){const bounds=backgroundBounds(1600,900,background.image.width,background.image.height);ctx.drawImage(background.image,bounds.x,bounds.y,bounds.width,bounds.height);}

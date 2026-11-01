@@ -4,7 +4,7 @@ import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
 import {renderWallet,control} from './ui.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,readAvatar,saveAvatar,type AvatarChoice} from './avatar.ts';
-import {sceneTransform,worldToScreen,animalPath,animalStatusText,animalActionLabel,animalClickCommand,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,actionRewardModel} from './presentation.ts';
+import {periodAt,sceneTransform,worldToScreen,animalPath,animalStatusText,animalActionLabel,animalClickCommand,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,actionRewardModel} from './presentation.ts';
 
 const config=window.COLHEITA_CONFIG;
 const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
@@ -13,6 +13,7 @@ let api:ApiClient|undefined,catalog:Catalog,own:Farm|undefined,visited:Farm|unde
 let sceneResize:ResizeObserver|undefined;
 let avatarUser='',googlePhoto:string|undefined,avatarChoice:AvatarChoice='classic',avatarStore:Storage|undefined;
 try{avatarStore=window.localStorage;}catch{/* Playing remains available when browser preferences are blocked. */}
+let musicTrack='';
 let tool='CURSOR',selectedSeed='nabo',selectedFertilizer='comum',trayOpen=false,effectsEnabled=false,musicEnabled=false,music:HTMLAudioElement|undefined,busy=false,seedMarketGroup:'common'|'vip'='common',refreshDialog:(()=>void)|undefined;
 let toastTimer:number,sessionGeneration=0,navigationGeneration=0,dialogGeneration=0,healthTile:Tile|null=null,healthPoint:{x:number;y:number}|null=null;
 const login=element('login');
@@ -32,7 +33,12 @@ function layoutHud(){
 }
 function notify(message:string){const notice=element('notice');notice.classList.remove('level-notice','reward-notice');notice.replaceChildren(document.createTextNode(message));layoutHud();clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>{notice.replaceChildren();layoutHud();},7000);}
 function toggleEffects(){effectsEnabled=!effectsEnabled;const control=document.getElementById('sound');if(control){control.setAttribute('aria-pressed',String(effectsEnabled));const state=control.querySelector('.settings-state');if(state)state.textContent=effectsEnabled?'Ligado':'Desligado';}}
-function syncMusic(){if(!musicEnabled||!own||document.hidden){music?.pause();return;}music??=new Audio('/assets/sounds/farm_loop.mp3');music.loop=true;music.volume=.25;if(music.paused)void music.play().catch(()=>{});}
+function syncMusic(period=periodAt(new Date())){
+ if(!musicEnabled||!own||document.hidden){music?.pause();return;}
+ const track=period==='night'?'noite.mp3':'farm_loop.mp3';
+ if(!music||musicTrack!==track){music?.pause();music=new Audio('/assets/sounds/'+track);musicTrack=track;music.loop=true;}
+ music.volume=.25;if(music.paused)void music.play().catch(()=>{});
+}
 function toggleMusic(){musicEnabled=!musicEnabled;const control=document.getElementById('music');if(control){control.setAttribute('aria-pressed',String(musicEnabled));const state=control.querySelector('.settings-state');if(state)state.textContent=musicEnabled?'Ligado':'Desligado';}syncMusic();}
 function shortcutPanel(title:string,open:()=>void){if(shortcutPanelState(modal.open,element('modal-title').textContent,title)==='close')modal.close();else open();}
 function actionIcon(action:string,itemId?:string){
@@ -67,7 +73,7 @@ function settings(){
  const profile=document.createElement('section');profile.className='settings-section';sections.append(profile);const profileTitle=document.createElement('h3');profileTitle.textContent='Seu perfil';profile.append(profileTitle);button('Trocar avatar',avatarSettings,profile);
  const info=document.createElement('section');info.className='settings-section';sections.append(info);
  const infoTitle=document.createElement('h3');infoTitle.textContent='Informações e conta';info.append(infoTitle);
- const credits=button('',()=>{dialog('Créditos');paragraph('Reimplementação independente e não oficial de Colheita Feliz. Acervo visual derivado da referência indicada no repositório, com uso não comercial.');const link=document.createElement('a');link.href='/assets/REFERENCE_LICENSE';link.textContent='Licença e atribuição dos assets';content.append(link);},info);credits.className='settings-action';const creditsCopy=document.createElement('span');creditsCopy.className='settings-toggle-copy';const creditsName=document.createElement('strong');creditsName.textContent='Créditos';const creditsDescription=document.createElement('small');creditsDescription.textContent='Sobre o projeto e os assets';creditsCopy.append(creditsName,creditsDescription);const creditsArrow=document.createElement('span');creditsArrow.className='settings-chevron';creditsArrow.textContent='›';credits.append(creditsCopy,creditsArrow);
+ const credits=button('',()=>{dialog('Créditos');paragraph('Reimplementação independente e não oficial de Colheita Feliz. Acervo visual derivado da referência indicada no repositório, com uso não comercial.');},info);credits.className='settings-action';const creditsCopy=document.createElement('span');creditsCopy.className='settings-toggle-copy';const creditsName=document.createElement('strong');creditsName.textContent='Créditos';const creditsDescription=document.createElement('small');creditsDescription.textContent='Sobre o projeto e os assets';creditsCopy.append(creditsName,creditsDescription);const creditsArrow=document.createElement('span');creditsArrow.className='settings-chevron';creditsArrow.textContent='›';credits.append(creditsCopy,creditsArrow);
  const logoutButton=button('Sair da conta',logout,info);logoutButton.className='settings-logout';
 }
 function closeScene(){sceneResize?.disconnect();sceneResize=undefined;scene?.close();health(null,null);}
@@ -324,7 +330,7 @@ async function connect(user:string,token:()=>Promise<string>,photo?:unknown){
  sessionGeneration++;navigationGeneration++;busy=false;own=undefined;visited=undefined;closeScene();const generation=sessionGeneration;
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
  avatarUser=`${config.api}:${user}`;googlePhoto=googleAvatar(photo);avatarChoice=readAvatar(avatarStore,avatarUser);
- scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>void tileAction(tile),id=>{const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health);
+ scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>void tileAction(tile),id=>{const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health,syncMusic);
  sceneResize=new ResizeObserver(()=>{layoutHud();health(healthTile,healthPoint);});for(const id of ['farm','farm-header','tools-bar','notice'])sceneResize.observe(element(id));
  try{await refresh();if(generation===sessionGeneration&&!own){paragraph('Esta conta precisa de um convite para começar.',login);invitationForm(login);}}
  catch(error){handleError(error);}
