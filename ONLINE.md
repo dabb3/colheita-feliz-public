@@ -139,7 +139,7 @@ Em janelas de até 1100 px de largura, o cabeçalho e a barra de ferramentas res
 
 O perfil usa os ícones originais de ouro/verdes e mantém os valores decimais recebidos. Durante visitas, mostra o nome visitado e os saldos do próprio jogador. A barra de XP usa o renderizador compartilhado da interface; preços, recompensas e elegibilidade continuam autoritativos no servidor.
 
-O perfil usa branco com opacidade de 65%, o tutorial mantém 82%, e a barra inferior usa vidro escuro translúcido com ferramentas sem blocos opacos. Ouro e verdes ficam lado a lado. **Missões** usa a prancheta exportada do mesmo gerador do Desktop. Os sprites de terreno têm margens transparentes diferentes; o cliente normaliza seu corpo opaco para o losango clicável e desenha todos os terrenos antes das plantas.
+O perfil usa branco com opacidade de 65%, o tutorial mantém 82%, e a barra inferior usa vidro escuro translúcido com ferramentas sem blocos opacos. Ouro e verdes ficam lado a lado. **Missões** usa a prancheta exportada do mesmo gerador do Desktop. Os sprites de terreno têm margens transparentes diferentes; o cliente normaliza seu corpo opaco para o losango clicável e desenha todos os terrenos antes das plantas. A planta morta usa o centro da arte recortada, largura de 86 unidades e base 10 unidades abaixo do centro do terreno, como no Desktop; a faixa inferior assimétrica das folhas não desloca sua âncora.
 
 Os avisos de ação ficam acima da altura real da barra de ferramentas; a bandeja de sementes/adubos reserva espaço acima do aviso. Textos longos têm altura limitada e rolagem, sem cobrir as ferramentas. Falhas de conexão antes do login continuam visíveis.
 
