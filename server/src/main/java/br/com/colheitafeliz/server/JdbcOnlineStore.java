@@ -145,7 +145,7 @@ final class JdbcOnlineStore implements AutoCloseable {
         }
     }
 
-        final class Tx {
+    final class Tx {
         private final Connection connection;
         private final boolean diagnostic;
         private final Map<UUID, Player> players = new HashMap<>();
