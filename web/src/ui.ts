@@ -18,7 +18,7 @@ export function renderWallet(root:HTMLElement,farm:Farm,visitedName?:string) {
  const info=document.createElement('div');info.className='wallet-info';
  const heading=document.createElement('div');heading.className='farm-heading';
  const name=text('strong',visitedName?`Visitando ${visitedName}`:farm.name);name.title=name.textContent??'';
- heading.append(name,text('span',String(farm.level??1),'level-badge'));
+ heading.append(name,text('span',`Nível ${farm.level??1}`,'level-badge'));
  const progress=document.createElement('progress');progress.max=100;progress.value=xpPercent(farm.currentXp,farm.xpToNext);
  progress.setAttribute('aria-label',`Experiência: ${farm.currentXp??0} de ${farm.xpToNext??0} XP`);
  const xp=text('small',`${farm.currentXp??0} / ${farm.xpToNext??0} XP`,'xp-label');

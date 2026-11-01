@@ -1,5 +1,5 @@
 import type {Farm,Catalog,Tile} from './types.ts';
-import {periodAt,backgroundBounds,tileCenter,tileArtRect,pickTile,animalPath,animalLayout,animalShadowRect,spriteDrawRect,measureSpriteFootprint,animalMotion,beeOffset,animalFlip,animalLayer,animalInsidePen,animationFrame,cropHeight,tileEffect,showAnimalProduct,animalProductPath,type TileEffect} from './presentation.ts';
+import {sceneTransform,screenToWorld,periodAt,backgroundBounds,tileCenter,tileArtRect,pickTile,animalPath,animalLayout,animalShadowRect,spriteDrawRect,measureSpriteFootprint,animalMotion,beeOffset,animalFlip,animalLayer,animalInsidePen,animationFrame,cropHeight,tileEffect,showAnimalProduct,animalProductPath,type TileEffect} from './presentation.ts';
 
 type Sprite={image:HTMLImageElement|HTMLCanvasElement;x:number;y:number;w:number;h:number;footBottom:number;footCenterX:number;footWidth:number};
 export class Scene {
@@ -10,6 +10,7 @@ export class Scene {
  private tileEffects:{column:number;row:number;kind:TileEffect;started:number}[]=[];
  private catalog:Catalog;
  private hover:Tile|null=null;
+ private backgroundPeriod?:string;
  private onTile:(tile:Tile)=>void;
  private onAnimal:(id:string)=>void;
  private onHover:(tile:Tile|null,point:{x:number;y:number}|null)=>void;
@@ -20,10 +21,10 @@ export class Scene {
  constructor(canvas:HTMLCanvasElement,catalog:Catalog,onTile:(tile:Tile)=>void,onAnimal:(id:string)=>void,onHover:(tile:Tile|null,point:{x:number;y:number}|null)=>void) {
   this.canvas=canvas;this.ctx=canvas.getContext('2d')!;this.catalog=catalog;this.onTile=onTile;this.onAnimal=onAnimal;this.onHover=onHover;
   canvas.width=1600;canvas.height=900;
-  canvas.addEventListener('pointermove',e=>{const p=this.point(e);const pick=pickTile(p.x,p.y);this.hover=pick?this.farm?.tiles.find(t=>t.column===pick.column&&t.row===pick.row)??null:null;this.onHover(this.hover,pick?tileCenter(pick.column,pick.row):null);},{signal:this.events.signal});
+  canvas.addEventListener('pointermove',e=>{const p=this.point(e);const pick=p?pickTile(p.x,p.y):null;this.hover=pick?this.farm?.tiles.find(t=>t.column===pick.column&&t.row===pick.row)??null:null;this.onHover(this.hover,pick?tileCenter(pick.column,pick.row):null);},{signal:this.events.signal});
   canvas.addEventListener('pointerleave',()=>{this.hover=null;this.onHover(null,null);},{signal:this.events.signal});
   canvas.addEventListener('click',e=>{
-   if(!this.farm)return;const p=this.point(e),pick=pickTile(p.x,p.y);
+   if(!this.farm)return;const p=this.point(e);if(!p)return;const pick=pickTile(p.x,p.y);
    if(pick){const tile=this.farm.tiles.find(t=>t.column===pick.column&&t.row===pick.row);if(tile)this.onTile(tile);return;}
    const seconds=performance.now()/1000,sleep=periodAt(new Date())==='night';
    for(const animal of this.farm.animals) {const [x,y,w]=animalLayout[animal.id]??[0,0,0],motion=animalMotion(animal.id,seconds,sleep);if(Math.abs(p.x-x-motion.dx)<w/2&&p.y<900-y+motion.dy&&p.y>900-y+motion.dy-w)this.onAnimal(animal.id);}
@@ -40,7 +41,7 @@ export class Scene {
   }
   this.farm=farm;this.draw();
  }
- private point(e:PointerEvent|MouseEvent){const rect=this.canvas.getBoundingClientRect(),scale=Math.max(rect.width/1600,rect.height/900);return{x:(e.clientX-rect.left-(rect.width-1600*scale)/2)/scale,y:(e.clientY-rect.top-(rect.height-900*scale)/2)/scale};}
+ private point(e:PointerEvent|MouseEvent){const rect=this.canvas.getBoundingClientRect();return screenToWorld({x:e.clientX-rect.left,y:e.clientY-rect.top},sceneTransform(rect.width,rect.height));}
  private sprite(path:string,trim=false,half?:number):Sprite|undefined {
   const key=`${path}:${trim}:${half??''}`;const cached=this.sprites.get(key);if(cached)return cached;if(cached===null)return;
   this.sprites.set(key,null);const image=new Image();image.src='/assets/'+path;
@@ -121,6 +122,7 @@ export class Scene {
  }for(const [x,y]of points)this.thing('classic/fence/mourao.png',x,903-y,25);}
  private draw(){
   if(document.hidden)return;const ctx=this.ctx,period=periodAt(new Date());
+  if(this.backgroundPeriod!==period){this.backgroundPeriod=period;this.canvas.parentElement?.style.setProperty('--scene-background',`url('/assets/classic/background/background${period==='day'?'':'-'+period}.png')`);}
   ctx.clearRect(0,0,1600,900);ctx.fillStyle=period==='night'?'#15464f':'#84ba30';ctx.fillRect(0,0,1600,900);
   const background=this.sprite(`classic/background/background${period==='day'?'':'-'+period}.png`);
   if(background){const bounds=backgroundBounds(1600,900,background.image.width,background.image.height);ctx.drawImage(background.image,bounds.x,bounds.y,bounds.width,bounds.height);}

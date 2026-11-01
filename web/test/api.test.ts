@@ -78,6 +78,33 @@ test('late replay cannot replace a newer farm even beyond safe JS integer',()=>{
  assert.equal(acceptFarm(current,{owner:'alice',revision:'9007199254740994'}).revision,'9007199254740994');
 });
 
+test('equal revisions keep the newest server projection regardless of arrival order',()=>{
+ const newer={owner:'alice',revision:'9007199254740993',serverTime:'2026-11-01T12:01:00Z',status:'READY'};
+ const older={...newer,serverTime:'2026-11-01T12:00:00Z',status:'PRODUCING'};
+ assert.equal(acceptFarm(newer,older),newer);
+ assert.equal(acceptFarm(older,newer),newer);
+});
+
+test('revision and owner take precedence over projection time',()=>{
+ const current={owner:'alice',revision:'9007199254740993',serverTime:'2026-11-01T12:01:00Z'};
+ const next={...current,revision:'9007199254740994',serverTime:'2026-11-01T12:00:00Z'};
+ assert.equal(acceptFarm(current,next),next);
+ assert.equal(acceptFarm(next,current),next);
+ const other={...current,owner:'bob',revision:'1',serverTime:'2026-11-01T11:00:00Z'};
+ assert.equal(acceptFarm(current,other),other);
+ assert.equal(acceptFarm(undefined,current),current);
+});
+
+test('equal revision falls back to the incoming reply when either projection time is unavailable',()=>{
+ const current={owner:'alice',revision:'7',serverTime:'2026-11-01T12:01:00Z'};
+ for(const invalid of [undefined,'','invalid date']){
+  const incoming={...current,serverTime:invalid};
+  assert.equal(acceptFarm(current,incoming),incoming);
+  assert.equal(acceptFarm(incoming,current),current);
+ }
+ const equal={...current};assert.equal(acceptFarm(current,equal),equal);
+});
+
 test('fetch is called without binding API instance as browser receiver',async()=>{
  const api=new ApiClient('http://localhost','alice',async ()=>'token',memory(),async function(){assert.equal(this,undefined);return new Response('{}');});
  await api.get('/health');
