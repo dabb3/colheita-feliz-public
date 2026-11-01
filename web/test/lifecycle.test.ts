@@ -168,11 +168,27 @@ test('active wallet uses original coin icons, exact XP and the own balance durin
  assert.equal(elements.get('home').hidden,false);
 });
 
-test('fertilizer tool shows the selected stock and direct land access opens the existing list',()=>{
- const {h,elements}=app();h.set({own:{...farm('alice'),fertilizers:{comum:7},tiles:[{column:0,row:0,unlocked:true,state:'GRASS'}]}});h.receive({});
+test('fertilizer tool shows the selected stock and keyboard land access opens the existing list',()=>{
+ const {h,elements,listeners}=app();h.set({own:{...farm('alice'),fertilizers:{comum:7},tiles:[{column:0,row:0,unlocked:true,state:'GRASS'}]}});h.receive({});
  const tools=elements.get('tools').children;assert.equal(text(tools.at(-1)).includes('x7'),true);
- elements.get('plots').onclick();assert.equal(elements.get('modal-title').textContent,'Terras da fazenda');
+ h.pickTool('FERTILIZE');
+ assert.match(elements.get('farm').style.cursor,/cursors\/adubo-comum.png/);
+ listeners.get('keydown')({key:'t',target:{}});assert.equal(elements.get('modal-title').textContent,'Terras da fazenda');
  assert.match(text(elements.get('modal-content')),/Terra 1, 1: grama/);
+});
+
+test('scene pointer follows tools and selected fertilizer across visits and returning home',()=>{
+ const {h,elements}=app(),initial={...farm('alice'),fertilizers:{rapido:3}};
+ h.set({own:initial,catalog:{crops:[],fertilizers:[{id:'rapido',name:'Rápido'},{id:'amor',friendsOnly:true}],animals:[]}});h.receive({});
+ for(const [tool,icon]of [['PLOW','pa-ui'],['PLANT','saco-ui'],['WATER','regador-ui'],['WEED','herbicida-ui'],['PESTICIDE','pesticida-ui'],['HARVEST','mao-restaurada']]){
+  h.pickTool(tool);assert.equal(elements.get('farm').style.cursor,`url("/assets/classic/icons/cursors/${icon}.png") 16 16, auto`);
+ }
+ h.pickTool('FERTILIZE');descendants(elements.get('tool-tray')).find(node=>node.getAttribute('aria-label')==='Rápido, 3 no estoque').onclick();
+ assert.match(elements.get('farm').style.cursor,/adubo-rapido.png/);
+ h.set({own:initial,visited:farm('bob')});h.receive({});assert.match(elements.get('farm').style.cursor,/mao-restaurada.png/);
+ h.pickTool('LOVE');assert.match(elements.get('farm').style.cursor,/adubo-amor.png/);
+ h.set({own:initial});h.receive({});assert.equal(elements.get('farm').style.cursor,'url("/assets/classic/icons/cursor-action.png") 1 1, auto');
+ assert.equal(elements.get('tools').children[0].children[0].src,'/assets/classic/icons/hud/cursor-ui.png');
 });
 
 test('resize observer repositions the active tooltip and disconnects when the session closes',async()=>{

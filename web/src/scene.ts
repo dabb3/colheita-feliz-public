@@ -149,7 +149,10 @@ export class Scene {
    const crop=this.catalog.crops.find(c=>c.id===tile.cropId),ready=tile.state==='READY';
    if(ready)this.matureGlow(p.x,p.y-10,seconds,tile.column+tile.row);
    if(tile.weeds)this.thing(`classic/effects/erva_daninha_${animationFrame(seconds,4,.16)+1}.png`,p.x+2,p.y+20,72,true);
-   if(tile.state==='DEAD')this.thing('classic/terrain/planta-morta.png',p.x,p.y+10,86,true);
+   if(tile.state==='DEAD'){
+    const plant=this.sprite('classic/terrain/planta-morta.png',true);
+    if(plant){const height=86*plant.h/plant.w;ctx.drawImage(plant.image,plant.x,plant.y,plant.w,plant.h,p.x-43,p.y+10-height,86,height);}
+   }
    else if(crop)this.crop(`classic/crops/plants_phase_one_to_five/${crop.spriteStem}_${tile.stage}.png`,p.x,p.y+10,cropHeight(tile.stage),tile.dry&&!ready);
    if(tile.insects>0)this.thing(`classic/effects/verme_${Math.min(3,tile.insects)}.png`,p.x-4,p.y+21,70,true);
    if(tile.protected){ctx.fillStyle='#90def1';ctx.font='18px sans-serif';ctx.fillText('◆',p.x+58,p.y);}

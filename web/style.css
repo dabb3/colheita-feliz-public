@@ -81,9 +81,9 @@ html, body, #app { width: 100%; height: 100%; min-height: 100%; margin: 0; }
 .balances{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.balances>div{display:flex;align-items:center;gap:6px;min-width:0}.balances img{width:20px;height:20px;object-fit:contain;flex:none}.balances strong{min-width:0;overflow-wrap:anywhere}
 #game #tutorial{position:static;max-width:none;margin:0;font-size:13px;background:rgba(255,255,255,.82)}#tutorial p{margin:4px 0 0}
 #game footer{z-index:3;max-width:calc(100% - 16px);background:rgba(16,51,44,.68);border-color:#ffffff55;backdrop-filter:blur(5px);box-shadow:0 3px 12px #0004,inset 0 1px #ffffff22}
-#game #tools{display:flex;gap:4px;flex-wrap:nowrap;max-width:none}#game #tools button{width:44px;height:44px;flex:none}
+#game #tools{display:flex;gap:5px;flex-wrap:nowrap;max-width:none}#game #tools button{width:53px;height:53px;flex:none}
 #game #tools button{background:transparent;border-color:transparent;box-shadow:none}#game #tools button[aria-pressed=true]{background:radial-gradient(ellipse,#d4ff7899,transparent 72%);filter:drop-shadow(0 0 5px #c3f956)}
-#game #plots{display:block;min-height:44px;max-width:none;padding:8px;font-size:13px;background:#ffffff14;color:white;border-color:#ffffff55}
+
 .tile-list button{min-height:44px}
 .avatar-picker{padding:0;border:0;background:none;flex:none}.avatar-picker:focus-visible{outline-offset:3px}
 .avatar-options{display:flex;flex-wrap:wrap;gap:12px}.avatar-options button{display:grid;justify-items:center;gap:8px;min-width:145px;min-height:120px}.avatar-options img{width:64px;height:64px;object-fit:cover;border-radius:8px}.avatar-options [aria-pressed=true]{box-shadow:inset 0 0 0 2px #5a8d35}
@@ -101,7 +101,7 @@ html, body, #app { width: 100%; height: 100%; min-height: 100%; margin: 0; }
  #game .farm-menu-button span:last-child{font-size:11px}
  #scene{position:relative;grid-row:2;inset:auto;min-width:0;min-height:0}
  #game footer{position:relative;grid-row:3;inset:auto;transform:none;justify-self:center;width:max-content;margin:0;gap:8px;padding:8px;max-width:100%}
- #game #plots{display:block}
+
  .tool-tray{bottom:80px;max-height:40dvh}
 }
 @media(max-width:700px){
@@ -110,11 +110,20 @@ html, body, #app { width: 100%; height: 100%; min-height: 100%; margin: 0; }
  #game .farm-menu-button{width:16%;max-width:70px;height:70px;min-width:44px}
  #game #wallet{font-size:13px;padding:8px 10px}#wallet .avatar{width:52px;height:52px}
  #game #tutorial{font-size:12px;padding:8px 10px}
- #game #tools{display:grid;grid-template-columns:repeat(4,44px)}
- #game footer{padding:8px;gap:12px}#game #plots{min-width:60px}
+ #game #tools{display:grid;grid-template-columns:repeat(4,53px)}
+ #game footer{padding:10px;gap:12px}
  .tool-tray{left:8px;bottom:124px;transform:none;width:calc(100% - 16px);max-height:38dvh}
  .tile-list{grid-template-columns:repeat(2,minmax(0,1fr))}.tile-list button{font-size:13px}
 }
 
 /* Use the game pointer without changing the toolbar selection icon. */
 body,button,select,a,[role=button],.audio-setting input[type=checkbox]{cursor:url("/assets/classic/icons/cursor-action.png") 1 1,auto}
+
+/* Dialog surfaces share the avatar glass treatment. Keep controls and text opaque. */
+#modal{background:rgba(255,252,238,.65)}
+#modal .dialog-header,#modal.shop-dialog .dialog-header{background:rgba(236,242,223,.4)}
+#modal :is(.card,.mission-card,.invite-card,.friend-card,.settings-section,.deposit-overview,.deposit-item,.deposit-empty,.deposit-feed,.deposit-currency,.vip-offer,.audio-setting){background:rgba(255,252,238,.65)}
+#modal .mission-card.done{background:rgba(240,245,220,.65)}
+#game footer{padding:10px}
+#game #tools img:not(.tool-selected-item){width:38px;height:38px}
+#game #tools .tool-selected-item{width:18px;height:18px}#game .tool-count{font-size:11px;line-height:17px}#game .tool-key{font-size:11px;line-height:13px}

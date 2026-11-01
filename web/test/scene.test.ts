@@ -10,7 +10,7 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  let tick,now=0,timers=0,ellipses=0;const cancelled=[];
  const context={clearRect(){},fillRect(){},save(){},restore(){},translate(){},scale(){},rotate(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},stroke(){},fill(){},
   drawImage(image,...args){drawn.push({path:image.src,args});},fillText(text){texts.push(text);},ellipse(){ellipses++;},
-  createRadialGradient(){return{addColorStop(){}};},getImageData(x,y,w,h){const data=new Uint8ClampedArray(w*h*4);for(let i=3;i<data.length;i+=4)data[i]=255;return{data};}};
+  createRadialGradient(){return{addColorStop(){}};},getImageData(x,y,w,h){const data=new Uint8ClampedArray(w*h*4);for(let row=0;row<h;row++)for(let col=0;col<w;col++)if(row<h*.88||col<w*.25)data[(row*w+col)*4+3]=255;return{data};}};
  const canvas={width:1600,height:900,getContext:()=>context,getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(name,handler){events.set(name,handler);}};
  const environment={...presentation,periodAt:()=> 'day',performance:{now:()=>now},window:{requestAnimationFrame:fn=>{tick=fn;return ++timers;},cancelAnimationFrame:id=>cancelled.push(id)},AbortController,document:{hidden:false,createElement:()=>({getContext:()=>context})},
   Image:class{width=100;height=200;onload;src;constructor(){pending.push(this);images.push(this);}}};
@@ -38,6 +38,10 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  const beforeEffects=ellipses;now=100;scene.update({owner:'alice',tiles:[{...tile,state:'DEAD',weeds:false}],animals:[{id:'vaca',stage:'ADULT',status:'PRODUCING'}]});
  while(pending.length)pending.shift().onload();
  assert.ok(drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('planta-morta.png')&&d.args.at(-2)===86));
+ const dead=drawn.findLast(d=>typeof d.path==='string'&&d.path.endsWith('planta-morta.png'));
+ const [x,y,width,height]=dead.args.slice(-4),center=presentation.tileCenter(tile.column,tile.row);
+ assert.equal(x+width/2,center.x,'dead leaves use the full trimmed artwork center, not the asymmetric bottom band');
+ assert.equal(y+height,center.y+10,'dead leaves rest ten units below the tile center, like Desktop');
  assert.ok(!drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('balde-vaca.png')));
  assert.ok(ellipses>beforeEffects);
  events.get('pointermove')({clientX:585,clientY:400});assert.equal(hovered.at(-1).state,'DEAD');
