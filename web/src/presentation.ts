@@ -66,9 +66,12 @@ export function backgroundBounds(viewportWidth:number,viewportHeight:number,imag
  return {x:(viewportWidth-width)/2,y:0,width,height};
 }
 export function tileCenter(column:number,row:number) {return {x:585+(column-row)*85,y:400+(column+row)*36};}
-export function tileArtRect(column:number,row:number) {
+// Opaque bounds (alpha > 250) in the original 1536 × 1024 terrain sprites; exclude their uneven glow margins.
+const terrainBounds={'grama-default':[71,86,1394,841],'terra-arada':[53,124,1430,791],'terra-molhada':[28,86,1480,852],'terra-seca':[44,93,1451,838],'terra-destaque':[61,83,1425,838]} as const;
+export function tileArtRect(column:number,row:number,terrain:keyof typeof terrainBounds='grama-default') {
  const p=tileCenter(column,row);
- return {x:p.x-94,y:p.y-50,width:188,height:100};
+ const [left,top,width,height]=terrainBounds[terrain],scaleX=170/width,scaleY=72/height;
+ return {x:p.x-85-left*scaleX,y:p.y-36-top*scaleY,width:1536*scaleX,height:1024*scaleY};
 }
 export function animalShadowRect(x:number,bottom:number,width:number,footWidth=1) {
  const shadowWidth=width*footWidth*.65;

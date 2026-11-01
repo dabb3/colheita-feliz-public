@@ -23,6 +23,15 @@ test('wallet uses authenticated name and exact balances with a labelled XP meter
  const meter=all.find(n=>n.tag==='progress');assert.equal(meter.value,2);assert.equal(meter.attributes['aria-label'],'Experiência: 0.5 de 25 XP');
 });
 
+test('wallet offers avatar selection and falls back to the original when the photo fails',()=>{
+ const {renderWallet,root}=ui();let clicked=0;
+ renderWallet(root,{name:'Alice',level:1},undefined,'https://lh3.googleusercontent.com/a/synthetic',()=>clicked++);
+ const all=nodes(root),pick=all.find(n=>n.attributes['aria-label']==='Trocar avatar'),avatar=all.find(n=>n.className==='avatar');
+ assert.ok(pick);pick.onclick();assert.equal(clicked,1);
+ assert.equal(avatar.src,'https://lh3.googleusercontent.com/a/synthetic');
+ avatar.onerror();assert.equal(avatar.src,'/assets/classic/icons/avatar_masculino.png');assert.equal(avatar.onerror,null);
+});
+
 test('market scrolls through all common crops, keeps VIP separate and preserves purchase fields',()=>{
  const {renderMarket,root}=ui(),pages=[],commands=[];
  const catalog={crops:Array.from({length:12},(_,i)=>crop(i)),animals:[],fertilizers:[]};

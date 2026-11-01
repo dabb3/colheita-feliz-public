@@ -3,6 +3,7 @@ import type {Farm,Catalog,Tile,Reply,CommandFields} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
 import {renderWallet,control} from './ui.ts';
+import {GAME_AVATARS,googleAvatar,avatarSource,readAvatar,saveAvatar,type AvatarChoice} from './avatar.ts';
 import {sceneTransform,worldToScreen,animalPath,animalStatusText,animalActionLabel,animalClickCommand,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,actionRewardModel} from './presentation.ts';
 
 const config=window.COLHEITA_CONFIG;
@@ -10,6 +11,8 @@ const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElemen
 const modal=element<HTMLDialogElement>('modal'),content=element('modal-content');
 let api:ApiClient|undefined,catalog:Catalog,own:Farm|undefined,visited:Farm|undefined,scene:Scene|undefined;
 let sceneResize:ResizeObserver|undefined;
+let avatarUser='',googlePhoto:string|undefined,avatarChoice:AvatarChoice='classic',avatarStore:Storage|undefined;
+try{avatarStore=window.localStorage;}catch{/* Playing remains available when browser preferences are blocked. */}
 let tool='CURSOR',selectedSeed='nabo',selectedFertilizer='comum',trayOpen=false,effectsEnabled=false,musicEnabled=false,music:HTMLAudioElement|undefined,busy=false,seedMarketGroup:'common'|'vip'='common',refreshDialog:(()=>void)|undefined;
 let toastTimer:number,sessionGeneration=0,navigationGeneration=0,dialogGeneration=0,healthTile:Tile|null=null,healthPoint:{x:number;y:number}|null=null;
 const login=element('login');
@@ -20,7 +23,14 @@ const toolDefinitions=[['CURSOR','Selecionar','cursor-ui'],['PLOW','Arar / limpa
 function button(label:string,action:()=>void|Promise<void>,parent:HTMLElement=content,focusKey?:string){const b=control(label,()=>void action());if(focusKey)b.setAttribute('data-focus-key',focusKey);parent.append(b);return b;}
 function paragraph(text:string,parent:HTMLElement=content){const p=document.createElement('p');p.textContent=text;parent.append(p);return p;}
 function formatToolDuration(seconds:number){const minutes=Math.max(1,Math.ceil(seconds/60));return minutes>=60?`${Math.floor(minutes/60)} h${String(minutes%60).padStart(2,'0')}`:`${minutes} min`;}
-function notify(message:string){const notice=element('notice');notice.classList.remove('level-notice','reward-notice');notice.replaceChildren(document.createTextNode(message));clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>notice.replaceChildren(),7000);}
+function layoutHud(){
+ const root=element('app'),game=element('game'),bar=element('tools-bar').getBoundingClientRect(),notice=element('notice');
+ const toolsTop=own&&!game.hidden?Math.max(0,(window.innerHeight||game.getBoundingClientRect().height)-bar.top):0;
+ root.style.setProperty('--tools-top',`${toolsTop}px`);root.style.setProperty('--notice-bottom',`${toolsTop+12}px`);
+ root.style.setProperty('--notice-height',`${notice.textContent||notice.children.length?notice.getBoundingClientRect().height:0}px`);
+ const header=element('farm-header').getBoundingClientRect();root.style.setProperty('--hud-bottom',`${header.top+header.height}px`);
+}
+function notify(message:string){const notice=element('notice');notice.classList.remove('level-notice','reward-notice');notice.replaceChildren(document.createTextNode(message));layoutHud();clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>{notice.replaceChildren();layoutHud();},7000);}
 function toggleEffects(){effectsEnabled=!effectsEnabled;const control=document.getElementById('sound');if(control){control.setAttribute('aria-pressed',String(effectsEnabled));const state=control.querySelector('.settings-state');if(state)state.textContent=effectsEnabled?'Ligado':'Desligado';}}
 function syncMusic(){if(!musicEnabled||!own||document.hidden){music?.pause();return;}music??=new Audio('/assets/sounds/farm_loop.mp3');music.loop=true;music.volume=.25;if(music.paused)void music.play().catch(()=>{});}
 function toggleMusic(){musicEnabled=!musicEnabled;const control=document.getElementById('music');if(control){control.setAttribute('aria-pressed',String(musicEnabled));const state=control.querySelector('.settings-state');if(state)state.textContent=musicEnabled?'Ligado':'Desligado';}syncMusic();}
@@ -37,7 +47,7 @@ function notifyAction(message:string,action:string,itemId:string|undefined,rewar
  for(const [amount,label,asset]of [[reward.xp,'XP','classic/icons/xp.png'],[reward.coins,'ouro','classic/icons/moeda-comum.png'],[reward.greens,'verdes','classic/icons/moeda-verde.png']] as [number,string,string][]){if(amount<=0)continue;const item=document.createElement('span');const image=document.createElement('img');image.src=`/assets/${asset}`;image.alt='';item.append(image,document.createTextNode(`+${amount} ${label}`));gains.append(item);}
  if(gains.childElementCount)notice.append(gains);notice.classList.remove('level-notice');notice.classList.add('reward-notice');
  if(reward.leveledUp){notice.replaceChildren();const title=document.createElement('strong');title.textContent=`Nível ${reward.level}!`;const unlocked=catalog.crops.filter(crop=>crop.requiredLevel===reward.level).map(crop=>crop.name);const sub=document.createElement('span');sub.textContent=unlocked.length?`${unlocked.join(', ')} liberado(s) na Loja`:'Continue colhendo para liberar mais culturas';notice.append(title,sub);notice.classList.add('level-notice');}
- clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>{notice.replaceChildren();notice.classList.remove('level-notice','reward-notice');},reward.leveledUp?2600:3200);
+ layoutHud();clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>{notice.replaceChildren();notice.classList.remove('level-notice','reward-notice');layoutHud();},reward.leveledUp?2600:3200);
 }
 function dialog(title:string){dialogGeneration++;refreshDialog=undefined;element('plant-health').hidden=true;element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');content.replaceChildren();content.scrollTop=0;if(!modal.open)modal.showModal();}
 function settings(){
@@ -54,15 +64,23 @@ function settings(){
  };
  addToggle('sound','Efeitos sonoros','Sons das ações na fazenda',effectsEnabled,toggleEffects);
  addToggle('music','Música ambiente','Trilha sonora durante o jogo',musicEnabled,toggleMusic);
- const game=document.createElement('section');game.className='settings-section';sections.append(game);
- const gameTitle=document.createElement('h3');gameTitle.textContent='Jogo';game.append(gameTitle);
- const plots=button('',tileList,game);plots.className='settings-action';const plotCopy=document.createElement('span');plotCopy.className='settings-toggle-copy';const plotName=document.createElement('strong');plotName.textContent='Lista de terras';const plotDescription=document.createElement('small');plotDescription.textContent='Ver e selecionar cada terreno';plotCopy.append(plotName,plotDescription);const plotArrow=document.createElement('span');plotArrow.className='settings-chevron';plotArrow.textContent='›';plots.append(plotCopy,plotArrow);
+ const profile=document.createElement('section');profile.className='settings-section';sections.append(profile);const profileTitle=document.createElement('h3');profileTitle.textContent='Seu perfil';profile.append(profileTitle);button('Trocar avatar',avatarSettings,profile);
  const info=document.createElement('section');info.className='settings-section';sections.append(info);
  const infoTitle=document.createElement('h3');infoTitle.textContent='Informações e conta';info.append(infoTitle);
  const credits=button('',()=>{dialog('Créditos');paragraph('Reimplementação independente e não oficial de Colheita Feliz. Acervo visual derivado da referência indicada no repositório, com uso não comercial.');const link=document.createElement('a');link.href='/assets/REFERENCE_LICENSE';link.textContent='Licença e atribuição dos assets';content.append(link);},info);credits.className='settings-action';const creditsCopy=document.createElement('span');creditsCopy.className='settings-toggle-copy';const creditsName=document.createElement('strong');creditsName.textContent='Créditos';const creditsDescription=document.createElement('small');creditsDescription.textContent='Sobre o projeto e os assets';creditsCopy.append(creditsName,creditsDescription);const creditsArrow=document.createElement('span');creditsArrow.className='settings-chevron';creditsArrow.textContent='›';credits.append(creditsCopy,creditsArrow);
  const logoutButton=button('Sair da conta',logout,info);logoutButton.className='settings-logout';
 }
 function closeScene(){sceneResize?.disconnect();sceneResize=undefined;scene?.close();health(null,null);}
+function avatarSettings(){
+ dialog('Seu avatar');paragraph('Escolha um dos seis avatares do jogo ou a foto da sua conta Google. Esta preferência vale neste navegador.');
+ const options=document.createElement('div');options.className='avatar-options';content.append(options);
+ for(const {id:choice,label}of [...GAME_AVATARS,{id:'google',label:'Foto do Google'}] as const){
+  const pick=button(label,()=>{avatarChoice=choice;saveAvatar(avatarStore,avatarUser,choice);render();avatarSettings();},options);
+  pick.setAttribute('aria-pressed',String(avatarChoice===choice));pick.disabled=choice==='google'&&!googlePhoto;
+  if(choice!=='google'||googlePhoto){const image=document.createElement('img');image.src=avatarSource(choice,googlePhoto);image.alt='';image.referrerPolicy='no-referrer';pick.prepend(image);}
+ }
+ if(!googlePhoto)paragraph('A foto do Google não está disponível nesta sessão.');
+}
 async function logout(){sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;syncPending();if(supabase)await supabase.auth.signOut();}
 function showConnection(message?:string){element('connection').hidden=!message;element('connection').textContent=message??'';}
 function syncPending(){element('pending').hidden=!api?.pending;element<HTMLButtonElement>('retry').disabled=!!api?.busy;}
@@ -83,11 +101,11 @@ function render(){
  if(!own)return;
  syncMusic();
  element('welcome').hidden=true;element('game').hidden=false;
- renderWallet(element('wallet'),own,visited?.name);
+ renderWallet(element('wallet'),own,visited?.name,avatarSource(avatarChoice,googlePhoto),avatarSettings);
  element('home').hidden=!visited;
  const tutorial=element('tutorial');tutorial.hidden=!!visited||!own.tutorial;tutorial.replaceChildren();
  if(own.tutorial){const strong=document.createElement('strong');strong.textContent=own.tutorial.title??'';tutorial.append(strong);paragraph(own.tutorial.hint??'',tutorial);}
- scene?.update(display()!);syncPending();renderTools();refreshOpenDialog();const currentHealthTile=healthTile&&display()?.tiles.find(tile=>tile.column===healthTile!.column&&tile.row===healthTile!.row);health(currentHealthTile??null,healthPoint);
+ scene?.update(display()!);syncPending();renderTools();refreshOpenDialog();const currentHealthTile=healthTile&&display()?.tiles.find(tile=>tile.column===healthTile!.column&&tile.row===healthTile!.row);health(currentHealthTile??null,healthPoint);layoutHud();
 }
 function renderTools(){
  const toolbar=element('tools');toolbar.replaceChildren();
@@ -266,7 +284,7 @@ function deposit(){
  const feed=Object.entries(own?.feed??{}),feedSection=document.createElement('section');feedSection.className='deposit-feed';const feedTitle=document.createElement('h3');feedTitle.textContent='Ração armazenada';feedSection.append(feedTitle);if(feed.length){for(const [id,count]of feed){const item=document.createElement('div');item.className='deposit-feed-row';const label=document.createElement('span');label.textContent=id==='producer'?'Ração de produção':'Ração de crescimento';const amount=document.createElement('strong');amount.textContent=String(count);item.append(label,amount);feedSection.append(item);}}else{const message=document.createElement('p');message.textContent='Nenhuma ração armazenada.';feedSection.append(message);}content.append(feedSection);
 }
 function missions(){
- dialog('Tarefas diárias');
+ dialog('Missões');
  refreshDialog=missions;
  if(own?.tutorial){const card=document.createElement('article');card.className='mission-card tutorial-mission';const heading=document.createElement('div');heading.className='mission-heading';const label=document.createElement('span');label.textContent='Tutorial';const title=document.createElement('strong');title.textContent=own.tutorial.title??'';heading.append(label,title);card.append(heading);paragraph(own.tutorial.hint??'',card);const progress=document.createElement('progress');progress.max=Math.max(1,own.tutorialTotal??6);progress.value=Math.min(own.tutorialStep??0,progress.max);progress.setAttribute('aria-label',`Tutorial: ${progress.value} de ${progress.max}`);card.append(progress);const status=document.createElement('div');status.className='mission-status';status.textContent=`${progress.value} / ${progress.max}`;card.append(status);content.append(card);}
  for(const mission of own?.missions??[]){
@@ -300,11 +318,12 @@ async function friends(){
  try{const list=await client.get<{id:string;name:string}[]>('/v1/friends');if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open)return;for(const friend of list){const row=document.createElement('article');row.className='friend-card';const badge=document.createElement('span');badge.className='friend-avatar';badge.textContent=friend.name.slice(0,1).toUpperCase();const name=document.createElement('strong');name.textContent=friend.name;const visit=button('Visitar fazenda',async()=>{const navigation=++navigationGeneration;try{const farm=await client.get<Farm>(`/v1/farms/${friend.id}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||dialogGeneration!==panelGeneration||!modal.open)return;visited=farm;tool='STEAL';render();modal.close();}catch(error){handleError(error);}},row);row.prepend(badge,name);listPanel.append(row);}if(!list.length)paragraph('Nenhum amigo adicionado ainda.',listPanel);}
  catch(error){handleError(error);}
 }
-async function connect(user:string,token:()=>Promise<string>){
+async function connect(user:string,token:()=>Promise<string>,photo?:unknown){
  sessionGeneration++;navigationGeneration++;busy=false;own=undefined;visited=undefined;closeScene();const generation=sessionGeneration;
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
+ avatarUser=`${config.api}:${user}`;googlePhoto=googleAvatar(photo);avatarChoice=readAvatar(avatarStore,avatarUser);
  scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>void tileAction(tile),id=>{const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health);
- sceneResize=new ResizeObserver(()=>health(healthTile,healthPoint));sceneResize.observe(element('farm'));
+ sceneResize=new ResizeObserver(()=>{layoutHud();health(healthTile,healthPoint);});for(const id of ['farm','farm-header','tools-bar','notice'])sceneResize.observe(element(id));
  try{await refresh();if(generation===sessionGeneration&&!own){paragraph('Esta conta precisa de um convite para começar.',login);invitationForm(login);}}
  catch(error){handleError(error);}
 }
@@ -319,7 +338,7 @@ async function start(){
   if(config.development){if(!health.development)throw new Error('Contas locais exigem servidor de desenvolvimento.');for(const name of ['Alice','Bob'])button(`Testar como ${name}`,async()=>{sessionStorage.setItem('colheita:local-user',name);await connect(name.toLowerCase(),async()=>`dev-${name.toLowerCase()}`);},login);const previous=sessionStorage.getItem('colheita:local-user');if(previous==='Alice'||previous==='Bob')await connect(previous.toLowerCase(),async()=>`dev-${previous.toLowerCase()}`);}
   else{
    const {data,error}=await supabase!.auth.getSession();if(error)throw error;
-   if(data.session){const userId=data.session.user.id;await connect(userId,async()=>{const {data,error}=await supabase!.auth.getSession();if(error||!data.session||data.session.user.id!==userId)throw new ApiError(401,'Entre novamente com a mesma conta para continuar.');return data.session.access_token;});}
+   if(data.session){const userId=data.session.user.id;await connect(userId,async()=>{const {data,error}=await supabase!.auth.getSession();if(error||!data.session||data.session.user.id!==userId)throw new ApiError(401,'Entre novamente com a mesma conta para continuar.');return data.session.access_token;},data.session.user.user_metadata?.avatar_url??data.session.user.user_metadata?.picture);}
   }
  }catch(error){showConnection();notify(error instanceof Error?error.message:'Servidor indisponível.');button('Tentar conectar novamente',start,login);}
 }
@@ -329,7 +348,7 @@ element('retry').onclick=async()=>{if(!api||busy)return;const client=api,generat
 window.addEventListener('offline',()=>showConnection('Sem conexão. Reconecte antes de agir.'));
 window.addEventListener('online',()=>void refresh());
 modal.addEventListener('close',()=>health(healthTile,healthPoint));
-document.addEventListener('keydown',event=>{if(!own||event.repeat||event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement)return;const shortcut=gameShortcut(event.key,!!visited);if(!shortcut)return;if(shortcut.action==='tool'){if(!modal.open)pickTool(shortcut.tool);return;}if(shortcut.action==='shop')shortcutPanel('Loja',()=>shop());else if(shortcut.action==='deposit')shortcutPanel('Depósito',deposit);else if(shortcut.action==='missions')shortcutPanel('Tarefas diárias',missions);else if(shortcut.action==='music')toggleMusic();else if(shortcut.action==='effects')toggleEffects();});
+document.addEventListener('keydown',event=>{if(!own||event.repeat||event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement)return;const shortcut=gameShortcut(event.key,!!visited);if(!shortcut)return;if(shortcut.action==='tool'){if(!modal.open)pickTool(shortcut.tool);return;}if(shortcut.action==='shop')shortcutPanel('Loja',()=>shop());else if(shortcut.action==='deposit')shortcutPanel('Depósito',deposit);else if(shortcut.action==='missions')shortcutPanel('Missões',missions);else if(shortcut.action==='music')toggleMusic();else if(shortcut.action==='effects')toggleEffects();});
 document.addEventListener('visibilitychange',()=>{syncMusic();if(!document.hidden)void refresh();});
 window.setInterval(()=>{if(!document.hidden)void refresh();},30_000);
 void start();
