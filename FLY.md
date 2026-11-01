@@ -1,79 +1,118 @@
-# Preparação da API no Fly.io — São Paulo
+# Colheita Feliz — backend Fly.io (São Paulo)
 
-**Estado: arquivos preparados; nenhum recurso Fly criado ou publicado.** O responsável autorizou somente preparação, sem gastos. A configuração mantém uma máquina ligada e terá cobrança quando implantada. Aprovar preço regional, tráfego, eventual build remoto e teto de gasto antes de executar os comandos de criação/deploy abaixo. Alertas de orçamento não devem ser tratados como limite rígido de cobrança.
+> **Estado em 01/11/2026:** migração do backend **ativa em produção**. O Cloudflare Pages de produção está configurado para `https://colheita-feliz-public.fly.dev`; a aplicação Fly.io respondeu a `/health`, `/v1/catalog` e `/v1/me/farm` e o jogo foi validado com login Google e persistência de ações. O Render permanece disponível como contingência. Este documento descreve o estado observado e procedimentos de operação, **não** autoriza mudanças adicionais. Reconfirmar estados no painel antes de agir.
 
-O objetivo é medir o mesmo servidor perto do Supabase em São Paulo. Cloudflare Pages e o banco atual permanecem onde estão. Autenticação, quatro threads HTTP, fila de 32 e pool HikariCP de quatro conexões continuam iguais. Não há garantia de capacidade para 30 jogadores antes do teste de carga.
+## Arquitetura e recursos
 
-## Arquivos e limites
+| Componente | Configuração |
+| --- | --- |
+| Frontend de produção | `https://colheita-feliz-amigos.pages.dev` (Cloudflare Pages) |
+| API de produção | `https://colheita-feliz-public.fly.dev` (Fly.io, região `gru`) |
+| API de contingência | `https://colheita-feliz-api.onrender.com` (Render) |
+| Banco e autenticação | Supabase existente; **compartilhado** entre Fly.io e Render |
+| Aplicação Fly | `colheita-feliz-public` |
+| Organização Fly observada na preparação | `akaza-291` (confirmar conta/organização antes de qualquer ação) |
+| Máquina observada | `d8946d7c92d7d8`, processo `app`, uma CPU compartilhada, 512 MB |
+| Imagem verificada no deploy | `deployment-01M69BY898E7F9PJV8C9GVHKG6` |
+| Versão de máquina observada | v8 após atualização do secret de CORS |
+| HTTP | Porta interna 8080, HTTPS público obrigatório, GET `/health` a cada 15 segundos |
+| Operação | `auto_stop_machines = "off"`, `min_machines_running = 1`; uma máquina sem alta disponibilidade |
+| Endereço público | IPv4 compartilhado `66.241.124.160` alocado no teste |
 
-- `fly.toml`: região `gru`, duas CPUs compartilhadas, 1 GB, HTTPS, porta 8080, sem suspensão automática e verificação `/health`.
-- `Dockerfile`: reutilizado sem alterações, Java 21 e usuário `10001:10001`.
-- CA pública Supabase injetada em `/etc/secrets/root.crt` pelo secret `SUPABASE_CA_CERT`, cujo valor deve ser o PEM codificado em base64.
-- Nome `colheita-feliz-api` é uma proposta; disponibilidade e capacidade em GRU ainda não verificadas.
-- `min_machines_running = 1` não limita o máximo de máquinas. O primeiro deploy deve usar `--ha=false`, seguido da conferência de que há exatamente uma máquina em GRU. Não usar autoscaling nesta etapa.
-- Uma máquina não oferece alta disponibilidade. Reinícios e deploys podem interromper conexões; recibos e o mesmo identificador de ação continuam necessários para retomada.
+O `fly.toml` é a configuração versionada: uma CPU compartilhada, 512 MB, região `gru`, health check, TLS/HTTPS e arquivo de certificado. O Dockerfile existente usa Java 21 e o usuário `10001:10001`. O serviço HTTP usa quatro threads e fila limitada; o pool PostgreSQL usa até quatro conexões. **Não existe teste de carga representativo para 10–30 jogadores** nem garantia de capacidade nesse nível.
 
-## Antes de criar recursos
+O banco **não foi migrado**: os dois servidores leem e escrevem no mesmo Supabase. Nunca restaure um backup antigo em cima de gravações legítimas durante um rollback de frontend.
 
-1. Aprovar orçamento e confirmar preços de GRU no painel/tabela oficial. Não usar a tarifa de Virginia como estimativa definitiva para São Paulo.
-2. Criar/acessar a conta Fly pelo responsável, aceitar eventuais termos e configurar cobrança somente após essa decisão. A CLI não foi instalada nesta preparação.
-3. Conferir o commit aprovado e passar pelo fluxo de PR. O arquivo não dispara deploy automático; não foi criado workflow ou token de CI.
-4. Guardar configuração atual do Render e `PUBLIC_API_URL` do Pages sem imprimir senhas/tokens. Validar backup e restauração antes de liberar escrita no novo host.
-5. Revalidar comportamento com o PostgreSQL descartável do CI e build normal. Não apontar a suíte de integração ou testes de carga ao banco dos jogadores.
+## Histórico da implantação e validações
 
-## Provisionamento futuro, após aprovação
+Em 31/10/2026, os deploys iniciais geraram releases que não permaneceram aplicadas à máquina. Os logs antigos mostraram primeiro ausência de `OWNER_USER_ID` e depois uma falha genérica de inicialização PostgreSQL; a configuração de máquina v4 não continha a montagem do certificado. O secret `SUPABASE_CA_CERT` foi novamente preparado a partir do PEM original em Base64, e um deploy posterior aplicou a configuração com `[[files]]`.
 
-Instalar `flyctl` apenas da fonte oficial, autenticar e verificar a organização correta. Confirmar nome disponível; se necessário, ajustar `app` no arquivo antes da criação. Não executar `fly launch` aceitando valores padrão que criem banco, volumes ou máquinas extras.
+A máquina foi iniciada manualmente, aprovou o health check e recebeu IPv4 público **compartilhado**. Em seguida foram validados:
 
-```powershell
-fly auth whoami
-fly config validate --config fly.toml
-fly apps create colheita-feliz-api --org <organizacao-aprovada>
+- `GET /health`: `ok: true`, `development: false`, acessível por HTTPS.
+- `GET /v1/catalog`: retorno completo do catálogo.
+- `GET /v1/me/farm`: HTTP 200 com Bearer válido; login Google também validado pelo Preview no navegador.
+- Ações realizadas no Preview foram persistidas e apareceram posteriormente no site de produção, demonstrando gravação e leitura do **mesmo** banco.
+- CORS e CSP foram validados no Preview; após o corte, o site principal fez requisições autenticadas com HTTP 200 diretamente ao Fly.io.
+- `fly status` após atualização de `ALLOWED_ORIGINS`: máquina **v8 / started / 1 health check passing**.
+- Build e testes locais: `.\gradlew.bat :server:test :server:installDist` — `BUILD SUCCESSFUL`; `git diff --check` — sem problemas; `fly config validate` — configuração válida.
+
+Amostras de latência medidas do mesmo computador: `/v1/catalog` com média de **43 ms no Fly.io** e **800 ms no Render** (10 requisições por ambiente, sem teste de carga). Uma requisição autenticada no Fly.io apresentou cerca de **125 ms**, versus amostras anteriores do Render próximas de **1.600 ms**; essas amostras não constituem comparação controlada de p50/p95. Valores variam com rede, aquecimento e carga.
+
+## Secrets, SSL e CORS
+
+As credenciais ficam no Fly.io, **fora do Git**. Nomes usados:
+
+- `OWNER_USER_ID`, `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`
+- `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `ALLOWED_ORIGINS`
+- `SUPABASE_CA_CERT` (conteúdo PEM do **Supabase Root 2021 CA**, codificado em Base64)
+- `AUTH_MODE=production` vem do `fly.toml` e também pode constar como secret já cadastrado; evite configurações conflitantes.
+
+O `fly.toml` monta `SUPABASE_CA_CERT` em `/etc/secrets/root.crt`. A URL JDBC deve usar `sslmode=verify-full` e apontar `sslrootcert` para esse caminho. **Não** desative verificação de certificado, imprima secrets, registre Bearer tokens nem altere senhas para depurar um erro genérico.
+
+`ALLOWED_ORIGINS` é uma lista de origens HTTPS exatas, separadas por vírgula, **sem wildcard**. No teste de 01/11/2026 foram incluídas:
+
+```text
+https://colheita-feliz-amigos.pages.dev
+https://codex-preparar-fly-gru.colheita-feliz-amigos.pages.dev
+https://48106aea.colheita-feliz-amigos.pages.dev
 ```
 
-Esses comandos são um roteiro, não evidência de execução. A organização, a conta e a disponibilidade do nome continuam pendentes. A criação da conta/recursos exige aprovação posterior; a validação TOML local não substitui a validação do Fly.
+O endereço do servidor `*.fly.dev` não é uma *origem do frontend* e não precisa ser incluído nessa lista. Previews novos têm endereços próprios: se for necessário testá-los, autorize **somente** as origens exatas necessárias, depois remova as temporárias quando não forem mais usadas. O Preview atual no histórico possuía redirecionamentos OAuth autorizados no Supabase; não altere o campo **Site URL** de produção para testes.
 
-### Configuração e certificado
+## Operação e diagnóstico (somente leitura)
 
-Definir no destino, fora do Git: `OWNER_USER_ID`, `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `ALLOWED_ORIGINS` e `SUPABASE_CA_CERT`. `AUTH_MODE`, `HOST` e `PORT` já estão no TOML. Não copiar credenciais para a conversa, argumentos de shell ou arquivos rastreados. Usar o painel ou `fly secrets import --stage` recebendo os valores por entrada padrão segura, sem registrar a entrada em logs.
-
-O certificado é público; converter o arquivo PEM baixado do projeto em base64 para o secret de arquivo. Credenciais SQL permanecem em variáveis separadas. A URL JDBC deve manter `sslmode=verify-full` e `sslrootcert=/etc/secrets/root.crt`. Não usar `require`, trust-all ou desativar SSL.
-
-Começar com o mesmo Session pooler de São Paulo usado pelo Render: muda-se apenas a hospedagem da API. Conexão direta por IPv6 pode ser um ensaio posterior; medir conectividade e latência antes de alterar esse segundo fator.
-
-`ALLOWED_ORIGINS` deve conter a origem exata `https://colheita-feliz-amigos.pages.dev`. O endereço da API `*.fly.dev` não precisa virar uma origem CORS. Não criar wildcard.
+Executar com CLI autenticada e organização correta:
 
 ```powershell
-fly deploy --config fly.toml --ha=false
-fly machine list --app colheita-feliz-api
-fly status --app colheita-feliz-api
-fly checks list --app colheita-feliz-api
+fly status --app colheita-feliz-public
+fly machine status d8946d7c92d7d8 --app colheita-feliz-public --display-config
+fly secrets list --app colheita-feliz-public
+fly ips list --app colheita-feliz-public
+fly logs --app colheita-feliz-public
+Invoke-RestMethod "https://colheita-feliz-public.fly.dev/health"
 ```
 
-Conferir exatamente uma máquina, região GRU, 2 CPUs compartilhadas e 1 GB. No runtime, confirmar que o usuário 10001 lê o certificado. Falha de leitura ou conexão impede a migração; não alterar permissões de autenticação/SSL para contorná-la. Não há volume: fazendas continuam persistidas no PostgreSQL.
+Esperado: uma máquina em GRU, `started`, health check passando, imagem aprovada, `files` com `/etc/secrets/root.crt`, sem secrets pendentes e HTTPS acessível. `/health` apenas confirma que a API responde; para comprovar leitura do banco, validar uma rota autenticada apropriada sem exibir o token.
 
-## Comparação antes de trocar o frontend
+O diagnóstico `DB_DIAGNOSTIC` introduzido em `JdbcOnlineStore.java` imprime SQLSTATE e classes de exceção **sem** mensagem do driver ou credenciais. Em caso de falha, correlacione o log ao horário atual: `fly logs` também pode retornar mensagens de tentativas antigas. Falha de `/health` ou `stopped` não deve desencadear repetição automática de deploys.
 
-1. Confirmar `/health` e `/v1/catalog` em Ohio e GRU, com API acordada. `/health` não consulta banco e não comprova melhora das ações.
-2. Executar as mesmas 24 ações sintéticas com rollback, uma passagem de aquecimento e três amostras, apenas para comparação preliminar. Ativar `LATENCY_BENCHMARK=once` temporariamente e removê-lo após coleta. Essa configuração não é padrão do TOML. Não fazer teste de carga no Supabase dos jogadores.
-3. Para carga com 1, 10 e 30 usuários virtuais, criar ambiente e contas descartáveis separados, sem dados reais, orçamento aprovado e mesma configuração de CPU/threads/pool. Cada usuário precisa de sessão válida própria; cada intenção usa identificador emitido pelo servidor e revisão atual. Repetições de uma intenção mantêm o mesmo ID. Não reduzir controles para viabilizar a carga.
-4. Usar a mesma mistura de ações, taxa por jogador e duração nas duas hospedagens. Registrar número de amostras, p50/p95 do HTTP completo, erros, 429/409, fila, CPU, memória e `Server-Timing` (`auth`, `db_connect`, `db`, `app`). Não somar `app` aos componentes que ele já engloba. Dados sintéticos internos excluem autenticação/rede e não substituem HTTP real.
-5. Validar compra, plantio, rega, colheita, venda, alimentação, produção, temporadas, proteção, furto simultâneo e replay. Confirmar rollback sem fixture persistida e ausência de alterações em fazendas reais durante ensaios internos.
+**Mudanças que exigem aprovação:** `fly deploy`, `fly secrets deploy`, `fly machine start/stop`, alocação de IP, mudanças de plano/recursos e qualquer ação que afete a produção. A atualização de secrets por `--stage` não os aplica até um deploy/update. Para mudanças futuras do código, revisar branch, configuração, testes e orçamento; `fly deploy --config fly.toml --ha=false --app colheita-feliz-public` é um exemplo do comando já utilizado, não uma instrução para executá-lo sem revisão. Não criar aplicações, máquinas ou volumes adicionais por padrão.
 
-O harness de carga 1/10/30 ainda não foi implementado ou executado; este documento define sua aceitação. Aprovar a troca somente com redução de p50 e p95 na carga equivalente, sem regressão de consistência/erros, e custo dentro do teto. Não prometer números antes da medição.
+## Cloudflare Pages: produção e Preview
 
-## Troca e rollback
+O build `web/scripts/build.mjs` gera `web/dist/config.js` usando a variável de build **`PUBLIC_API_URL`**; também gera `_headers` com a CSP. Uma alteração dessa variável só entra em vigor após **nova compilação/publicação**. Não modificar `config.js` publicado manualmente.
 
-A URL é variável de build **`PUBLIC_API_URL`** no Cloudflare Pages, usada por `web/scripts/build.mjs` para gerar `config.js` e a política CSP. Não editar o JavaScript publicado manualmente.
+- **Production:** `PUBLIC_API_URL=https://colheita-feliz-public.fly.dev`, conforme a publicação validada.
+- **Preview da branch `codex/preparar-fly-gru`:** configurado para Fly.io durante os testes.
+- Preservar `PUBLIC_SUPABASE_URL` e `PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 
-Após os testes e autorização para publicação, atualizar essa variável para a origem HTTPS exata do Fly, sem barra final, e reconstruir o Pages. Manter `PUBLIC_SUPABASE_URL` e `PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Não é necessário proxy laranja nem mudança de callback Google/Supabase, pois o endereço do frontend continua igual.
+No momento do corte, a branch de publicação do Cloudflare Pages era `codex/online-core-compartilhado`; a branch de preparação do Fly.io é `codex/preparar-fly-gru`. O merge do PR de consolidação deve ser revisado independentemente da mudança da variável em Cloudflare. Verifique se a CSP gerada no build **de produção** autoriza a URL atual da API: `${config.api}` já inclui Fly.io quando `PUBLIC_API_URL` é Fly.io.
 
-Manter Ohio como contingência durante a validação. Conferir login, CORS, fazendas e pedidos pendentes. Clientes já abertos podem continuar no endpoint antigo; confirmar versões compatíveis antes da troca. Antes de retomar um POST de resultado desconhecido, consultar a fazenda e preservar o ID original. Não criar outra intenção automaticamente por trocar de host.
+## Rollback: retornar o frontend ao Render
 
-Para rollback, restaurar `PUBLIC_API_URL=https://colheita-feliz-api.onrender.com`, reconstruir o Pages e conferir o commit publicado. Como o banco e o protocolo permanecem iguais, não restaurar um backup antigo sobre gravações válidas. Desativar a API Fly apenas após resolver pedidos pendentes e confirmar que os clientes utilizam Ohio. A máquina ligada continua cobrada enquanto existir execução; recursos parados também podem ter custo residual. Conferir faturamento e recursos ao encerrar o teste.
+Se a API Fly apresentar problema grave, manter o Supabase compartilhado intacto e executar uma reversão **controlada**:
 
-## Verificado nesta preparação
+1. Confirmar disponibilidade e compatibilidade do Render (saúde, autenticação e versão do protocolo). A alternativa só funciona enquanto o serviço Render permanecer operacional.
+2. No Cloudflare Pages, ambiente **Production**, restaurar `PUBLIC_API_URL=https://colheita-feliz-api.onrender.com`.
+3. Publicar **um novo build de produção** com esse valor e confirmar `window.COLHEITA_CONFIG.api` no navegador.
+4. Verificar `GET /health`, login Google, `/v1/me/farm` HTTP 200 e uma consulta de leitura da quinta. Monitore erros de escrita antes de liberar uso normal.
+5. Informar jogadores sobre eventual atualização da página: abas já abertas podem manter a configuração anterior. Para POST com resposta incerta, preservar o mesmo identificador de ação e consultar o estado antes de repetir.
 
-Sintaxe TOML e contratos locais de porta, Dockerfile, usuário, certificado e configuração conferidos com parser padrão. Não houve instalação da CLI, criação de conta/app/máquina, deploy, teste de carga ou troca de endpoint. `fly config validate`, permissões reais do arquivo e desempenho em GRU permanecem pendentes.
+Não restaurar bancos a partir de snapshots antigos nem executar ações de escrita duplicadas por trocar de host. **Não parar o Fly automaticamente durante o rollback**: faça isso apenas depois de confirmar que não há clientes/requisições pendentes e com aprovação específica.
 
-Fontes oficiais consultadas em 31/10/2026: [configuração](https://docs.fly.io/reference/configuration), [deploy e redundância padrão](https://docs.fly.io/launch/deploy), [secrets](https://docs.fly.io/apps/secrets), [preços](https://docs.fly.io/about/pricing). Context7 não foi usado para este provedor; configuração conferida na documentação oficial.
+## Custo e limitações
+
+Na calculadora Fly.io consultada em 31/10/2026, uma VM `shared/1 CPU/512 MB` em GRU por 730 horas foi estimada em **US$ 5,97** para computação/memória, **não** como teto de cobrança. Podem existir custos de tráfego, rootfs, impostos e outros serviços; confirmar os valores atuais no painel e na [documentação oficial de preços](https://docs.fly.io/about/pricing). O IPv4 usado é compartilhado, não dedicado.
+
+Como `auto_stop_machines = "off"`, a única máquina fica configurada para operar continuamente, mesmo sem jogadores. Sem redundância, deploys ou falhas podem causar indisponibilidade. Ainda é necessário observar CPU, RAM, filas, erros e latência com uso real, além de planejar teste de carga **em ambiente isolado** com 1, 10 e 30 usuários virtuais antes de afirmar capacidade.
+
+## Referências
+
+- [Configuração do Fly.io](https://docs.fly.io/reference/configuration)
+- [Deploy](https://docs.fly.io/launch/deploy)
+- [Secrets](https://docs.fly.io/apps/secrets)
+- [Preços](https://docs.fly.io/about/pricing)
+- [CLI e opções de deploy](https://docs.fly.io/flyctl/deploy/)
+
+Este documento registra evidências obtidas até **01/11/2026**. Para operações futuras, prevalecem os estados efetivos no Cloudflare Pages, Fly.io, Supabase e Render.
