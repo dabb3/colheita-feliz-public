@@ -66,6 +66,18 @@ test('Google avatar can be selected from the authenticated photo without changin
  assert.equal(descendants(elements.get('wallet')).find(node=>node.className==='avatar').src,'/assets/classic/icons/avatar_masculino.png');
 });
 
+test('avatar picker offers and applies every supplied game avatar without changing the farm',()=>{
+ const {h,elements}=app(),initial=farm('alice');h.set({own:initial});h.avatarSettings();
+ const options=descendants(elements.get('modal-content')).filter(node=>node.tag==='button');
+ assert.equal(options.length,7);
+ for(const {label,file} of avatar.GAME_AVATARS){
+  descendants(elements.get('modal-content')).find(node=>node.textContent===label).onclick();
+  assert.equal(descendants(elements.get('wallet')).find(node=>node.className==='avatar').src,`/assets/classic/icons/${file}`);
+  assert.equal(descendants(elements.get('modal-content')).find(node=>node.textContent===label).getAttribute('aria-pressed'),'true');
+  assert.equal(h.get().own,initial);
+ }
+});
+
 test('out-of-order refresh responses with equal revisions keep the newest projection in the UI',async()=>{
  const {h}=app(),first=deferred(),second=deferred();let reads=0;
  const initial={...farm('alice'),revision:'7',serverTime:'2026-11-01T12:00:00Z'};

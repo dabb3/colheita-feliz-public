@@ -3,7 +3,7 @@ import type {Farm,Catalog,Tile,Reply,CommandFields} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
 import {renderWallet,control} from './ui.ts';
-import {googleAvatar,avatarSource,readAvatar,saveAvatar,type AvatarChoice} from './avatar.ts';
+import {GAME_AVATARS,googleAvatar,avatarSource,readAvatar,saveAvatar,type AvatarChoice} from './avatar.ts';
 import {sceneTransform,worldToScreen,animalPath,animalStatusText,animalActionLabel,animalClickCommand,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,actionRewardModel} from './presentation.ts';
 
 const config=window.COLHEITA_CONFIG;
@@ -72,12 +72,12 @@ function settings(){
 }
 function closeScene(){sceneResize?.disconnect();sceneResize=undefined;scene?.close();health(null,null);}
 function avatarSettings(){
- dialog('Seu avatar');paragraph('Escolha o avatar original ou a foto da sua conta Google. Esta preferência vale neste navegador.');
+ dialog('Seu avatar');paragraph('Escolha um dos seis avatares do jogo ou a foto da sua conta Google. Esta preferência vale neste navegador.');
  const options=document.createElement('div');options.className='avatar-options';content.append(options);
- for(const [choice,label]of [['classic','Avatar do jogo'],['google','Foto do Google']] as const){
+ for(const {id:choice,label}of [...GAME_AVATARS,{id:'google',label:'Foto do Google'}] as const){
   const pick=button(label,()=>{avatarChoice=choice;saveAvatar(avatarStore,avatarUser,choice);render();avatarSettings();},options);
   pick.setAttribute('aria-pressed',String(avatarChoice===choice));pick.disabled=choice==='google'&&!googlePhoto;
-  if(choice==='classic'||googlePhoto){const image=document.createElement('img');image.src=avatarSource(choice,googlePhoto);image.alt='';image.referrerPolicy='no-referrer';pick.prepend(image);}
+  if(choice!=='google'||googlePhoto){const image=document.createElement('img');image.src=avatarSource(choice,googlePhoto);image.alt='';image.referrerPolicy='no-referrer';pick.prepend(image);}
  }
  if(!googlePhoto)paragraph('A foto do Google não está disponível nesta sessão.');
 }

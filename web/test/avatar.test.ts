@@ -22,3 +22,14 @@ test('unavailable browser storage never prevents the game from displaying its av
  assert.equal(avatar.readAvatar(storage,'alice'),'classic');
  assert.doesNotThrow(()=>avatar.saveAvatar(storage,'alice','google'));
 });
+
+test('all six supplied game avatars resolve locally and keep independent saved choices',()=>{
+ assert.equal(avatar.GAME_AVATARS?.length,6);
+ const values=new Map(),storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value)};
+ for(const {id,file}of avatar.GAME_AVATARS){
+  assert.equal(avatar.avatarSource(id),`/assets/classic/icons/${file}`);
+  avatar.saveAvatar(storage,'alice',id);assert.equal(avatar.readAvatar(storage,'alice'),id);
+  assert.equal(avatar.readAvatar(storage,'bob'),'classic');
+ }
+ values.set('colheita:avatar:alice','../../private.png');assert.equal(avatar.readAvatar(storage,'alice'),'classic');
+});
