@@ -12,6 +12,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 public final class ServerMain {
+    static final int PARTICIPANT_LIMIT = 15;
     private ServerMain() {}
     public static void main(String[] args) throws Exception {
         Map<String, String> env = System.getenv();
@@ -40,7 +41,7 @@ public final class ServerMain {
             throw new IllegalArgumentException("Production origins require explicit HTTPS URLs");
         store.initialize(owner);
         var server = new GameHttpServer(new InetSocketAddress(host, Integer.parseInt(env.getOrDefault("PORT", "8080"))),
-                new OnlineGameService(store, Clock.systemUTC(), java.util.concurrent.ThreadLocalRandom.current()::nextInt, 5),
+                new OnlineGameService(store, Clock.systemUTC(), java.util.concurrent.ThreadLocalRandom.current()::nextInt, PARTICIPANT_LIMIT),
                 auth, origins, development, Clock.systemUTC());
         Runtime.getRuntime().addShutdownHook(new Thread(server::close, "server-shutdown"));
         server.start();

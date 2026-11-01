@@ -23,6 +23,25 @@ class OnlineGameIntegrationTest {
 
     @AfterEach void closeStore() { if (store != null) store.close(); }
 
+    @Test void productionLimitAdmitsFifteenActiveParticipantsIncludingOwnerAndRejectsSixteenth() {
+        service = new OnlineGameService(store, clock, bound -> bound - 1, ServerMain.PARTICIPANT_LIMIT);
+        for (int count = 2; count <= 15; count++) {
+            String code = service.createInvitation(alice, requestId()).get("code").getAsString();
+            UUID player = UUID.randomUUID();
+            assertTrue(service.acceptInvitation(player, "Player " + count, code, requestId()).get("success").getAsBoolean());
+            assertEquals(player.toString(), service.farm(player).get("owner").getAsString());
+        }
+        UUID extra = UUID.randomUUID();
+        String code = service.createInvitation(alice, requestId()).get("code").getAsString();
+        ApiFailure failure = assertThrows(ApiFailure.class,
+                () -> service.acceptInvitation(extra, "Sixteenth", code, requestId()));
+        assertEquals(409, failure.status());
+        assertEquals("O grupo de teste atingiu o limite de participantes.", failure.getMessage());
+        assertEquals(15, store.transaction(alice, tx -> tx.query("SELECT count(*) FROM " + testSchema
+                + ".players WHERE active", row -> row.getInt(1)).getFirst()).intValue());
+        assertNull(store.transaction(alice, tx -> tx.player(extra)));
+    }
+
     @Test void farmAndMutationCarryTheNextServerIdAndReplayKeepsTheExactReply() {
         var farm = service.farm(alice);
         var lease = farm.getAsJsonObject("requestLease");
