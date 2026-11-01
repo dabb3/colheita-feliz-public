@@ -6,12 +6,13 @@ import {runInNewContext} from 'node:vm';
 import {ApiError,acceptFarm} from '../src/api.ts';
 import * as presentation from '../src/presentation.ts';
 import * as uiPresentation from '../src/ui-presentation.ts';
+import * as avatar from '../src/avatar.ts';
 
 const farm=owner=>({owner,name:owner,revision:'1',tiles:[],animals:[],seedCounts:{}});
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve};}
 function app(){
  const elements=new Map(),listeners=new Map(),audioClips=[],observers=[];
- const make=(tag='div')=>({tag,value:'',selectedIndex:0,hidden:false,children:[],attributes:{},style:{},scrollTop:0,scrollLeft:0,classList:{add(){},remove(){},toggle(){}},
+ const make=(tag='div')=>({tag,value:'',selectedIndex:0,hidden:false,children:[],attributes:{},style:{setProperty(key,value){this[key]=value;}},scrollTop:0,scrollLeft:0,classList:{add(){},remove(){},toggle(){}},
   replaceChildren(...nodes){if(this.contains(ctx.document.activeElement))ctx.document.activeElement=null;this.children=nodes;},
   append(...nodes){this.children.push(...nodes);},prepend(...nodes){this.children.unshift(...nodes);},insertBefore(node,before){this.children.splice(this.children.indexOf(before),0,node);},
   setAttribute(key,value){this.attributes[key]=String(value);},getAttribute(key){return this.attributes[key]??null;},
@@ -20,15 +21,50 @@ function app(){
   querySelector(selector){return this.querySelectorAll(selector)[0]??null;},focus(){ctx.document.activeElement=this;},
   getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(){},close(){this.open=false;},showModal(){this.open=true;}});
  const storage={getItem:()=>null,setItem(){},removeItem(){}};
- const ctx={...presentation,...uiPresentation,window:{COLHEITA_CONFIG:{development:true},setInterval(){},setTimeout(){},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(){audioClips.push(this);}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
+ const ctx={...presentation,...uiPresentation,...avatar,window:{COLHEITA_CONFIG:{development:true},setInterval(){},setTimeout(){},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(){audioClips.push(this);}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
  const uiSource=readFileSync(new URL('../src/ui.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(uiSource),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={refresh,logout,toggleMusic,shop,missions,friends,receive,dialog,health,connect,pickTool,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
+ source+='\nglobalThis.h={refresh,logout,toggleMusic,shop,missions,friends,receive,dialog,health,connect,pickTool,settings,avatarSettings,notify,notifyAction,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:ctx.h,elements,listeners,audioClips,observers,ctx};
 }
 function text(node){return(node.textContent??'')+(node.children??[]).map(child=>typeof child==='object'?text(child):child).join('');}
 function descendants(node){return[node,...(node.children??[]).flatMap(child=>typeof child==='object'?descendants(child):[])];}
+
+test('action notice is docked above the actual toolbar and reserves room below the item tray',()=>{
+ const {h,elements,ctx}=app();h.set({own:farm('alice')});ctx.window.innerHeight=844;
+ ctx.document.getElementById('game').getBoundingClientRect=()=>({top:0,height:844});
+ ctx.document.getElementById('tools-bar').getBoundingClientRect=()=>({top:734,height:110});
+ ctx.document.getElementById('farm-header').getBoundingClientRect=()=>({top:8,height:132});
+ ctx.document.getElementById('notice').getBoundingClientRect=()=>({height:80});
+ ctx.document.getElementById('app');
+ h.notify('Compre primeiro o próximo lote indicado.');
+ assert.equal(elements.get('app').style['--notice-bottom'],'122px');
+ assert.equal(elements.get('app').style['--tools-top'],'110px');
+ assert.equal(elements.get('app').style['--notice-height'],'80px');
+ assert.equal(elements.get('app').style['--hud-bottom'],'140px');
+ h.notifyAction('Novo nível','HARVEST',undefined,{coins:1,greens:1,xp:1,level:2,leveledUp:true});
+ assert.equal(elements.get('app').style['--notice-bottom'],'122px');
+ assert.equal(elements.get('app').style['--notice-height'],'80px');
+});
+
+test('settings offer avatar selection without a duplicate list of land plots',()=>{
+ const {h,elements}=app();h.set({own:farm('alice')});h.settings();
+ assert.match(text(elements.get('modal-content')),/Trocar avatar/);
+ assert.doesNotMatch(text(elements.get('modal-content')),/Lista de terras/);
+});
+
+test('Google avatar can be selected from the authenticated photo without changing farm data',async()=>{
+ const {h,elements,ctx}=app();ctx.Scene=class{update(){}close(){}};
+ ctx.ApiClient=class{pending=null;get(){return Promise.resolve(farm('alice'));}prepareRequestId(){return Promise.resolve();}};
+ h.set({own:undefined});await h.connect('alice',async()=> 'synthetic-token','https://lh3.googleusercontent.com/a/synthetic');
+ h.avatarSettings();descendants(elements.get('modal-content')).find(node=>node.textContent==='Foto do Google').onclick();
+ const image=descendants(elements.get('wallet')).find(node=>node.className==='avatar');
+ assert.equal(image.src,'https://lh3.googleusercontent.com/a/synthetic');assert.equal(h.get().own.revision,'1');
+ await h.connect('bob',async()=> 'synthetic-token');h.avatarSettings();
+ assert.equal(descendants(elements.get('modal-content')).find(node=>node.textContent==='Foto do Google').disabled,true);
+ assert.equal(descendants(elements.get('wallet')).find(node=>node.className==='avatar').src,'/assets/classic/icons/avatar_masculino.png');
+});
 
 test('out-of-order refresh responses with equal revisions keep the newest projection in the UI',async()=>{
  const {h}=app(),first=deferred(),second=deferred();let reads=0;

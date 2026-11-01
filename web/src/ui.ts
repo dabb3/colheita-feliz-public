@@ -12,9 +12,12 @@ export function control(label:string,action:()=>void) {
  const node=text('button',label) as HTMLButtonElement;node.type='button';node.setAttribute('data-focus-key',label);node.onclick=action;return node;
 }
 
-export function renderWallet(root:HTMLElement,farm:Farm,visitedName?:string) {
+export function renderWallet(root:HTMLElement,farm:Farm,visitedName?:string,avatarSource='/assets/classic/icons/avatar_masculino.png',onAvatar?:()=>void) {
  root.replaceChildren();
  const avatar=image('classic/icons/avatar_masculino.png','avatar');
+ avatar.src=avatarSource;avatar.referrerPolicy='no-referrer';avatar.onerror=()=>{avatar.onerror=null;avatar.src='/assets/classic/icons/avatar_masculino.png';};
+ const picture=onAvatar?control('',onAvatar):avatar;
+ if(onAvatar){picture.className='avatar-picker';picture.setAttribute('aria-label','Trocar avatar');picture.append(avatar);}
  const info=document.createElement('div');info.className='wallet-info';
  const heading=document.createElement('div');heading.className='farm-heading';
  const name=text('strong',visitedName?`Visitando ${visitedName}`:farm.name);name.title=name.textContent??'';
@@ -27,7 +30,7 @@ export function renderWallet(root:HTMLElement,farm:Farm,visitedName?:string) {
   const row=document.createElement('div');row.setAttribute('aria-label',`${value} ${label}`);
   row.append(image(`classic/icons/${icon}.png`),text('strong',value));coins.append(row);
  }
- info.append(heading,progress,xp,coins);root.append(avatar,info);
+ info.append(heading,progress,xp,coins);root.append(picture,info);
 }
 
 export function renderMarket(root:HTMLElement,catalog:Catalog,farm:Farm|undefined,category:string,seedGroup:'common'|'vip',onSeedGroup:(group:'common'|'vip')=>void,onBuy:(fields:CommandFields)=>void) {

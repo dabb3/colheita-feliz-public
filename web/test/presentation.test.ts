@@ -10,9 +10,14 @@ test('all 30 tile centers roundtrip and clear the bottom toolbar',()=>{
  }
  assert.equal(pickTile(0,0),null);
 });
-test('tile art uses the desktop footprint centered on the iso grid',()=>{
- assert.deepEqual(tileArtRect(0,0),{x:491,y:350,width:188,height:100});
- assert.deepEqual(tileArtRect(5,4),{x:576,y:674,width:188,height:100});
+test('terrain variants normalize their opaque body to the same clickable diamond',()=>{
+ const bounds={'grama-default':[71,86,1394,841],'terra-arada':[53,124,1430,791],'terra-molhada':[28,86,1480,852],'terra-seca':[44,93,1451,838],'terra-destaque':[61,83,1425,838]};
+ for(const [terrain,[x,y,w,h]]of Object.entries(bounds))for(const [column,row]of [[0,0],[5,4]]){
+  const art=tileArtRect(column,row,terrain),center=tileCenter(column,row);
+  const actual=[art.x+x/1536*art.width,art.y+y/1024*art.height,w/1536*art.width,h/1024*art.height];
+  const expected=[center.x-85,center.y-36,170,72];
+  actual.forEach((value,i)=>assert.ok(Math.abs(value-expected[i])<1e-8,`${terrain}: ${actual} != ${expected}`));
+ }
 });
 test('background covers the viewport without stretching and stays top aligned',()=>{
  const bounds=backgroundBounds(1600,900,1478,1064);

@@ -18,9 +18,14 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  runInNewContext(stripTypeScriptTypes(source)+'\nglobalThis.Scene=Scene;',environment);
  const scene=new environment.Scene(canvas,{crops:[{id:'nabo',spriteStem:'nabo'}],animals:[{id:'vaca',kind:'PRODUCER'},{id:'abelha',kind:'PROTECTOR'}]},()=>{},id=>selected.push(id),tile=>hovered.push(tile));
  const tile={column:0,row:0,unlocked:true,state:'READY',cropId:'nabo',stage:3,weeds:true,insects:2};
- scene.update({owner:'alice',own:true,nextPlot:{column:1,row:0},tiles:[tile],animals:[{id:'vaca',stage:'ADULT',status:'READY'},{id:'abelha',stage:'ADULT',status:'PRODUCING'}]});
+ const farm={owner:'alice',own:true,nextPlot:{column:1,row:0},tiles:[tile,{column:0,row:1,unlocked:true,state:'GRASS'}],animals:[{id:'vaca',stage:'ADULT',status:'READY'},{id:'abelha',stage:'ADULT',status:'PRODUCING'}]};
+ scene.update(farm);
  while(pending.length){const image=pending.shift();if(image.src.includes('atlas')){image.width=400;image.height=100;}image.onload();}
+ drawn.length=0;scene.update(farm);
  assert.ok(drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('nabo_3.png')&&d.args.at(-1)===80&&d.args.at(-2)===40));
+ const lastTerrain=drawn.findLastIndex(d=>typeof d.path==='string'&&/terrain\/(grama-default|terra-molhada)\.png$/.test(d.path));
+ const firstPlant=drawn.findIndex(d=>typeof d.path==='string'&&d.path.endsWith('nabo_3.png'));
+ assert.ok(firstPlant>lastTerrain,'all terrain must be drawn before any plant');
  assert.ok(drawn.some(d=>typeof d.path==='string'&&/erva_daninha_[1-4]\.png$/.test(d.path)));
  assert.ok(drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('verme_2.png')));
  assert.ok(drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('balde-vaca.png')));

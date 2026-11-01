@@ -122,7 +122,7 @@ export class Scene {
  }for(const [x,y]of points)this.thing('classic/fence/mourao.png',x,903-y,25);}
  private draw(){
   if(document.hidden)return;const ctx=this.ctx,period=periodAt(new Date());
-  if(this.backgroundPeriod!==period){this.backgroundPeriod=period;this.canvas.parentElement?.style.setProperty('--scene-background',`url('/assets/classic/background/background${period==='day'?'':'-'+period}.png')`);}
+  if(this.backgroundPeriod!==period){this.backgroundPeriod=period;const path=`url('/assets/classic/background/background${period==='day'?'':'-'+period}.png')`;this.canvas.parentElement?.style.setProperty('--scene-background',path);this.canvas.parentElement?.parentElement?.style.setProperty('--scene-background',path);}
   ctx.clearRect(0,0,1600,900);ctx.fillStyle=period==='night'?'#15464f':'#84ba30';ctx.fillRect(0,0,1600,900);
   const background=this.sprite(`classic/background/background${period==='day'?'':'-'+period}.png`);
   if(background){const bounds=backgroundBounds(1600,900,background.image.width,background.image.height);ctx.drawImage(background.image,bounds.x,bounds.y,bounds.width,bounds.height);}
@@ -134,12 +134,18 @@ export class Scene {
   for(const animal of this.farm.animals)if(animalInsidePen(animal.id))this.drawAnimal(animal,seconds,sleep);
   this.fence([[986,410],[1072,370],[1160,334],[1250,304],[1342,280],[1434,262],[1526,250],[1618,244]]);
   for(const animal of this.farm.animals)if(animalLayer(animal.id)==='back'&&!animalInsidePen(animal.id))this.drawAnimal(animal,seconds,sleep);
-  for(const tile of [...this.farm.tiles].sort((a,b)=>a.column+a.row-b.column-b.row)){
+  const tiles=[...this.farm.tiles].sort((a,b)=>a.row-b.row||a.column-b.column);
+  for(const tile of tiles){
    const p=tileCenter(tile.column,tile.row);
-   const terrain=!tile.unlocked||tile.state==='GRASS'?'grama-default':tile.dry?'terra-seca':tile.state==='PLOWED'?'terra-arada':'terra-molhada';
+   const terrain=!tile.unlocked||tile.state==='GRASS'?'grama-default':tile.state==='DEAD'||tile.dry&&tile.state!=='READY'?'terra-seca':tile.state==='PLOWED'?'terra-arada':'terra-molhada';
    const s=this.sprite(`classic/terrain/${terrain}.png`);
-   const art=tileArtRect(tile.column,tile.row);
+   const art=tileArtRect(tile.column,tile.row,terrain);
    if(s){ctx.save();if(!tile.unlocked)ctx.globalAlpha=.72;ctx.drawImage(s.image,art.x,art.y,art.width,art.height);ctx.restore();}
+   if(this.hover===tile){const highlight=this.sprite('classic/terrain/terra-destaque.png'),rect=tileArtRect(tile.column,tile.row,'terra-destaque');if(highlight){ctx.save();ctx.globalAlpha=.65+.35*Math.sin(seconds*4.5);ctx.drawImage(highlight.image,rect.x,rect.y,rect.width,rect.height);ctx.restore();}}
+  }
+  for(const tile of tiles){
+   if(!tile.unlocked)continue;
+   const p=tileCenter(tile.column,tile.row);
    const crop=this.catalog.crops.find(c=>c.id===tile.cropId),ready=tile.state==='READY';
    if(ready)this.matureGlow(p.x,p.y-10,seconds,tile.column+tile.row);
    if(tile.weeds)this.thing(`classic/effects/erva_daninha_${animationFrame(seconds,4,.16)+1}.png`,p.x+2,p.y+20,72,true);
@@ -147,7 +153,6 @@ export class Scene {
    else if(crop)this.crop(`classic/crops/plants_phase_one_to_five/${crop.spriteStem}_${tile.stage}.png`,p.x,p.y+10,cropHeight(tile.stage),tile.dry&&!ready);
    if(tile.insects>0)this.thing(`classic/effects/verme_${Math.min(3,tile.insects)}.png`,p.x-4,p.y+21,70,true);
    if(tile.protected){ctx.fillStyle='#90def1';ctx.font='18px sans-serif';ctx.fillText('◆',p.x+58,p.y);}
-   if(this.hover===tile){const highlight=this.sprite('classic/terrain/terra-destaque.png');if(highlight){ctx.save();ctx.globalAlpha=.65+.35*Math.sin(seconds*4.5);ctx.drawImage(highlight.image,p.x-96,p.y-51,192,102);ctx.restore();}}
   }
   for(const animal of this.farm.animals)if(animalLayer(animal.id)==='front')this.drawAnimal(animal,seconds,sleep);
   this.drawTileEffects();

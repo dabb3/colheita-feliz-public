@@ -95,6 +95,8 @@ Pombo e colmeia não passeiam. O pavão permanece no lugar e alterna a cauda fec
 
 Os assets derivados do projeto de referência estão sujeitos à licença **Source Available — Non-Commercial**, reproduzida em [assets/REFERENCE_LICENSE](assets/REFERENCE_LICENSE). Preserve a atribuição. Uso comercial desses assets exige autorização do titular. A proveniência das imagens não foi verificada além da declaração do projeto original de que foram geradas com Google Gemini e ajustadas manualmente.
 
+O ícone Web `web/public/assets/classic/icons/missoes.png` é uma exportação de `HudIcons.clipboard()` do Desktop, em 128 × 128, preservando as formas, cores e contorno do gerador Java. Não é uma nova ilustração nem uma variação gerada por IA.
+
 As fontes **M PLUS Rounded 1c**, **Nunito** e **Lato** estão sob SIL Open Font License 1.1. Suas licenças estão em [OFL-MPLUSRounded1c.txt](assets/fonts/OFL-MPLUSRounded1c.txt), [OFL-Nunito.txt](assets/fonts/OFL-Nunito.txt) e [OFL-Lato.txt](assets/fonts/OFL-Lato.txt).
 
 Os avisos acima documentam os materiais de terceiros; não concedem uma licença geral ao código Java deste repositório.
