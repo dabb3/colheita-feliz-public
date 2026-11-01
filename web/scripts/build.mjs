@@ -15,5 +15,5 @@ await cp(resolve(root,'../assets/sounds'),resolve(dist,'assets/sounds'),{recursi
 await cp(resolve(root,'public'),dist,{recursive:true});
 await cp(resolve(root,'../assets/REFERENCE_LICENSE'),resolve(dist,'assets/REFERENCE_LICENSE'));
 await writeFile(resolve(dist,'config.js'),`window.COLHEITA_CONFIG=${JSON.stringify(config)};\n`);
-await writeFile(resolve(dist,'_headers'),`/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' ${config.api} ${config.supabaseUrl} https://colheita-feliz-public.fly.dev; base-uri 'none'; frame-ancestors 'none'; form-action 'self'\n/config.js\n  Cache-Control: no-store\n/index.html\n  Cache-Control: no-cache\n`);
+await writeFile(resolve(dist,'_headers'),`/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' ${config.api} ${config.supabaseUrl}; base-uri 'none'; frame-ancestors 'none'; form-action 'self'\n/config.js\n  Cache-Control: no-store\n/index.html\n  Cache-Control: no-cache\n`);
 console.log(`Built ${local?'localhost test':'production'} client in web/dist`);
