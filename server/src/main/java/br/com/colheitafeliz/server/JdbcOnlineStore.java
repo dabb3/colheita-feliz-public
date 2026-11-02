@@ -80,8 +80,10 @@ final class JdbcOnlineStore implements AutoCloseable {
                     + ".players(id), b uuid NOT NULL REFERENCES " + schema + ".players(id), PRIMARY KEY(a,b), CHECK(a::text < b::text))");
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".invitations (hash text PRIMARY KEY, owner uuid NOT NULL REFERENCES "
                     + schema + ".players(id), used_by uuid, expires_at timestamptz NOT NULL)");
+            tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".theft_cooldowns (actor uuid PRIMARY KEY REFERENCES "
+                    + schema + ".players(id), last_stolen_at timestamptz NOT NULL)");
             tx.execute("REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
-            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations")) {
+            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns")) {
                 tx.execute("ALTER TABLE " + schema + "." + table + " ENABLE ROW LEVEL SECURITY");
                 tx.execute("REVOKE ALL ON " + schema + "." + table + " FROM PUBLIC");
             }
@@ -157,6 +159,15 @@ final class JdbcOnlineStore implements AutoCloseable {
         }
         void lock(String key) { query("SELECT pg_advisory_xact_lock(hashtextextended(?,0))", r -> 0, key); }
         void lockFarms(UUID... owners) { Arrays.stream(owners).map(UUID::toString).distinct().sorted().forEach(id -> lock("farm:" + id)); }
+        Instant lastTheft(UUID actor) {
+            return first(query("SELECT last_stolen_at FROM " + schema + ".theft_cooldowns WHERE actor=?",
+                    row -> row.getTimestamp(1).toInstant(), actor));
+        }
+        void recordTheft(UUID actor, Instant now) {
+            execute("INSERT INTO " + schema + ".theft_cooldowns (actor,last_stolen_at) VALUES (?,?) "
+                    + "ON CONFLICT(actor) DO UPDATE SET last_stolen_at=EXCLUDED.last_stolen_at",
+                    actor, java.sql.Timestamp.from(now));
+        }
         Player player(UUID id) {
             // FOR SHARE keeps this row stable until the transaction ends; never cache across requests.
             if (!players.containsKey(id)) players.put(id, first(query("SELECT id,name,active FROM " + schema + ".players WHERE id=? FOR SHARE",
