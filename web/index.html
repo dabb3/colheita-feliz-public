@@ -2,8 +2,69 @@
 <html lang="pt-BR">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#376b36"><title>Colheita Feliz</title><link rel="stylesheet" href="/style.css"><script src="/config.js" defer></script><script src="/app.js" defer></script></head>
 <body>
- <main id="app">
-  <div id="welcome"><h1>Colheita Feliz</h1><p>Sua fazenda, seus amigos, uma colheita por vez.</p><div id="login"></div></div>
+ <div id="app">
+  <div id="login-scene" aria-hidden="true">
+   <div class="login-scene-pan">
+    <img class="login-landscape" src="/assets/classic/background/background.png" alt="">
+    <img class="login-scene-house" src="/assets/classic/buildings/main-house.png" alt="">
+    <img class="login-scene-doghouse" src="/assets/classic/buildings/dog-house.png" alt="">
+    <div class="login-garden">
+     <img class="login-field-tile field-one" src="/assets/classic/terrain/grama-default.png" alt="">
+     <img class="login-field-tile field-two" src="/assets/classic/terrain/grama-default.png" alt="">
+     <img class="login-field-tile field-three" src="/assets/classic/terrain/grama-default.png" alt="">
+     <img class="login-field-crop field-crop-one" src="/assets/classic/crops/plants_phase_one_to_five/nabo_5.png" alt="">
+     <img class="login-field-crop field-crop-two" src="/assets/classic/crops/plants_phase_one_to_five/tomate_5.png" alt="">
+    </div>
+    <div class="login-fence">
+     <img class="fence-rail fence-rail-top" src="/assets/classic/fence/trilho.png" alt="">
+     <img class="fence-rail fence-rail-bottom" src="/assets/classic/fence/trilho.png" alt="">
+     <img class="fence-post post-one" src="/assets/classic/fence/mourao.png" alt="">
+     <img class="fence-post post-two" src="/assets/classic/fence/mourao.png" alt="">
+     <img class="fence-post post-three" src="/assets/classic/fence/mourao.png" alt="">
+     <img class="fence-post post-four" src="/assets/classic/fence/mourao.png" alt="">
+    </div>
+    <img class="login-scene-chicken" src="/assets/classic/animals/galinha/galinha.png" alt="">
+   </div>
+  </div>
+  <main id="welcome">
+   <section class="login-card" aria-labelledby="login-title">
+    <div class="login-hero-art" aria-hidden="true">
+     <img class="hero-chicken" src="/assets/classic/animals/galinha/galinha.png" alt="">
+     <img class="hero-turnip" src="/assets/classic/crops/plants_phase_one_to_five/nabo_5.png" alt="">
+     <img class="hero-tomato" src="/assets/classic/crops/plants_phase_one_to_five/tomate_5.png" alt="">
+    </div>
+    <h1 id="login-title">Colheita Feliz</h1>
+    <div class="login-steps">
+     <div id="login-step" class="login-step">
+      <p class="login-subtitle">Sua fazenda, seus amigos, uma colheita por vez.</p>
+      <div id="login"></div>
+      <div id="login-error" class="login-error" role="alert" hidden><span aria-hidden="true">!</span><span>Não foi possível entrar. Tente de novo.</span></div>
+      <p class="login-legal">Ao entrar, você aceita os <a href="#">Termos de uso</a> e a <a href="#">Política de privacidade</a>.</p>
+     </div>
+     <section id="invite-step" class="invite-step" aria-labelledby="invite-greeting" hidden>
+      <h2 id="invite-greeting">Olá!</h2>
+      <p>Esta conta precisa de um convite para começar.</p>
+      <form id="login-invite-form">
+       <label for="login-invite-code">Código de convite</label>
+       <div class="login-invite-controls">
+        <input id="login-invite-code" class="login-invite-input" name="code" type="text" autocomplete="off" placeholder="Cole o código de convite">
+        <button id="login-invite-submit" class="login-invite-submit" type="submit" disabled>
+         <svg class="login-spinner" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle></svg>
+         <span id="login-invite-label">Aceitar convite</span>
+        </button>
+       </div>
+      </form>
+      <div id="login-invite-error" class="login-error" role="alert" hidden><span aria-hidden="true">!</span><span>Convite inválido ou expirado.</span></div>
+      <button id="login-switch-account" class="login-switch-account" type="button">Sair e trocar de conta</button>
+     </section>
+    </div>
+   </section>
+  </main>
+  <footer id="login-footer">
+   <span>Feito por <a href="https://github.com/dabb3" target="_blank" rel="noopener noreferrer">@dabb3</a> e <a href="https://github.com/mrlsouz" target="_blank" rel="noopener noreferrer">@mrlsouz</a></span>
+   <span class="login-footer-separator" aria-hidden="true">·</span>
+   <a href="https://github.com/dabb3/colheita-feliz-public" target="_blank" rel="noopener noreferrer">Repositório ↗</a>
+  </footer>
   <section id="game" hidden aria-label="Fazenda">
    <div id="scene"><canvas id="farm" aria-label="Fazenda. Pressione T para selecionar terras pelo teclado."></canvas></div>
    <header id="farm-header"><div class="player-panel"><div id="wallet" class="panel"></div><aside id="tutorial" class="panel"></aside></div><nav id="farm-menu" aria-label="Menu da fazenda">
@@ -21,6 +82,6 @@
   <div id="connection" class="panel" role="status" hidden></div>
   <div id="pending" class="panel" hidden><span>Uma ação aguarda confirmação.</span><button id="retry">Confirmar ação pendente</button></div>
   <div id="notice" role="status" aria-live="polite"></div>
-  <dialog id="modal" aria-labelledby="modal-title"><div class="dialog-header"><h2 id="modal-title"></h2><button id="close-modal" aria-label="Fechar">×</button></div><div id="modal-content"></div></dialog>
- </main>
+  <dialog id="modal" aria-labelledby="modal-title"><div class="dialog-header"><h2 id="modal-title"></h2><button id="close-modal" aria-label="Fechar">×</button></div><div id="modal-content"></div><div id="modal-footer" hidden></div></dialog>
+ </div>
 </body></html>

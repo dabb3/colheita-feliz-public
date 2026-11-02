@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Protótipo da HUD de plantação</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/dev/crop-tooltip.css">
+    <script src="/dev/crop-tooltip.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header class="page-header">
+        <a href="/">← Voltar para a fazenda</a>
+        <p class="eyebrow">Protótipo local · desenvolvimento</p>
+        <h1>HUD da plantinha</h1>
+        <p>Estados e posicionamento para revisão visual. Os tiles e tempos são exemplos.</p>
+      </header>
+
+      <section class="samples" aria-label="Variações da HUD">
+        <article class="sample">
+          <h2>Comum · crescendo</h2>
+          <div class="mock-scene">
+            <section class="crop-hud" aria-label="Milho crescendo, saudável">
+              <div class="hud-heading">
+                <img class="crop-icon" src="/assets/classic/crops/seeds/semente_milho.png" alt="">
+                <h3>Milho</h3>
+                <span class="state-badge healthy">Saudável</span>
+              </div>
+              <div class="growth-block">
+                <div class="growth-caption"><span>CRESCIMENTO</span><strong data-countdown="15:53">15h 53min</strong></div>
+                <div class="growth-track"><span class="growth-fill" style="width:58%"></span></div>
+                <p class="ready-at">Pronta às <time data-ready></time></p>
+              </div>
+              <div class="season-block">
+                <p class="season-label" aria-label="Temporada 2 de 3">Temporada 2 de 3</p>
+                <div class="season-track" role="img" aria-label="2 de 3 temporadas"><span class="filled"></span><span class="filled"></span><span></span></div>
+              </div>
+              <div class="crop-chips"><span class="crop-chip benefit"><img src="/assets/classic/animals/abelha/abelha.png" alt="">Protegida</span></div>
+            </section>
+            <div class="mock-tile" aria-hidden="true"><img src="/assets/classic/crops/plants_phase_one_to_five/milho_3.png" alt=""></div>
+          </div>
+        </article>
+
+        <article class="sample">
+          <h2>Pronta para colher</h2>
+          <div class="mock-scene">
+            <section class="crop-hud" aria-label="Morango pronto para colher">
+              <div class="hud-heading"><img class="crop-icon" src="/assets/classic/crops/seeds/semente_morango.png" alt=""><h3>Morango</h3><span class="state-badge ready">Pronta</span></div>
+              <div class="growth-block"><div class="growth-caption"><span>CRESCIMENTO</span><strong>Pronta para colher</strong></div><div class="growth-track ready-track"><span class="growth-fill" style="width:100%"></span></div><p class="ready-at">A colheita está disponível</p></div>
+              <div class="season-block"><p class="season-label" aria-label="Temporada 2 de 3">Temporada 2 de 3</p><div class="season-track" role="img" aria-label="2 de 3 temporadas"><span class="filled"></span><span class="filled"></span><span></span></div></div>
+              <div class="action-hint"><img src="/assets/classic/icons/hud/mao-restaurada.png" alt=""><span>Colher com a luvinha</span><kbd>7</kbd></div>
+            </section>
+            <div class="mock-tile ready-tile" aria-hidden="true"><img src="/assets/classic/crops/plants_phase_one_to_five/morango_5.png" alt=""></div>
+          </div>
+        </article>
+
+        <article class="sample">
+          <h2>Planta morta</h2>
+          <div class="mock-scene">
+            <section class="crop-hud" aria-label="Berinjela morta">
+              <div class="hud-heading"><img class="crop-icon" src="/assets/classic/crops/seeds/semente_berinjela.png" alt=""><h3>Berinjela</h3><span class="state-badge dead">Morta</span></div>
+              <div class="growth-block"><div class="growth-caption"><span>CRESCIMENTO</span><strong>Planta morta</strong></div><div class="growth-track dead-track"><span class="growth-fill" style="width:0%"></span></div><p class="ready-at">Remova para liberar a terra</p></div>
+              <div class="season-block"><p class="season-label" aria-label="Temporada 1 de 1">Temporada 1 de 1</p><div class="season-track" role="img" aria-label="1 de 1 temporadas"><span class="filled"></span></div></div>
+              <div class="action-hint"><img src="/assets/classic/icons/hud/pa-ui.png" alt=""><span>Remover com a pá</span><kbd>2</kbd></div>
+            </section>
+            <div class="mock-tile dead-tile" aria-hidden="true"><img src="/assets/classic/terrain/planta-morta.png" alt=""></div>
+          </div>
+        </article>
+
+        <article class="sample">
+          <h2>VIP · sem assinatura</h2>
+          <div class="mock-scene">
+            <section class="crop-hud" aria-label="Batata-doce VIP, sem assinatura">
+              <div class="hud-heading"><img class="crop-icon" src="/assets/classic/crops/seeds/semente_batata-doce.png" alt=""><h3>Batata-doce</h3><span class="vip-badge">VIP</span><span class="state-badge healthy">Saudável</span></div>
+              <div class="growth-block"><div class="growth-caption"><span>CRESCIMENTO</span><strong data-countdown="7:20">7h 20min</strong></div><div class="growth-track"><span class="growth-fill" style="width:32%"></span></div><p class="ready-at">Pronta às <time data-ready></time></p></div>
+              <div class="season-block"><p class="season-label" aria-label="Temporada 1 de 2">Temporada 1 de 2</p><div class="season-track" role="img" aria-label="1 de 2 temporadas"><span class="filled"></span><span></span></div></div>
+              <p class="vip-note"><img src="/assets/classic/icons/cartao-vip.png" alt="">Venda exige VIP</p>
+            </section>
+            <div class="mock-tile" aria-hidden="true"><img src="/assets/classic/crops/plants_phase_one_to_five/batata-doce_2.png" alt=""></div>
+          </div>
+        </article>
+
+        <article class="sample">
+          <h2>VIP · assinatura ativa</h2>
+          <div class="mock-scene">
+            <section class="crop-hud" aria-label="Amendoim VIP com assinatura ativa">
+              <div class="hud-heading"><img class="crop-icon" src="/assets/classic/crops/seeds/semente_amendoim.png" alt=""><h3>Amendoim</h3><span class="vip-badge">VIP</span><span class="state-badge healthy">Saudável</span></div>
+              <div class="growth-block"><div class="growth-caption"><span>CRESCIMENTO</span><strong data-countdown="2:41">2h 41min</strong></div><div class="growth-track"><span class="growth-fill" style="width:76%"></span></div><p class="ready-at">Pronta às <time data-ready></time></p></div>
+              <div class="season-block"><p class="season-label" aria-label="Temporada 2 de 3">Temporada 2 de 3</p><div class="season-track" role="img" aria-label="2 de 3 temporadas"><span class="filled"></span><span class="filled"></span><span></span></div></div>
+              <p class="vip-note active">VIP ativo · venda liberada</p>
+            </section>
+            <div class="mock-tile" aria-hidden="true"><img src="/assets/classic/crops/plants_phase_one_to_five/amendoim_4.png" alt=""></div>
+          </div>
+        </article>
+
+        <article class="sample">
+          <h2>Problemas + benefício</h2>
+          <div class="mock-scene">
+            <section class="crop-hud" aria-label="Laranja com pragas e proteção">
+              <div class="hud-heading"><img class="crop-icon" src="/assets/classic/crops/seeds/semente_laranja.png" alt=""><h3>Laranja</h3><span class="state-badge problem-state">Parada</span></div>
+              <div class="growth-block"><div class="growth-caption"><span>CRESCIMENTO</span><strong>Crescimento pausado</strong></div><div class="growth-track"><span class="growth-fill" style="width:46%"></span></div><p class="ready-at">Remova as pragas para continuar</p></div>
+              <div class="season-block"><p class="season-label" aria-label="Temporada 1 de 3">Temporada 1 de 3</p><div class="season-track" role="img" aria-label="1 de 3 temporadas"><span class="filled"></span><span></span><span></span></div></div>
+              <div class="crop-chips"><span class="crop-chip problem"><img src="/assets/classic/icons/hud/herbicida-ui.png" alt="">Ervas</span><span class="crop-chip problem"><img src="/assets/classic/icons/hud/pesticida-ui.png" alt="">Insetos</span><span class="crop-chip problem"><img src="/assets/classic/icons/hud/regador-ui.png" alt="">Seca</span><span class="crop-chip benefit"><img src="/assets/classic/animals/abelha/abelha.png" alt="">Protegida</span></div>
+              <div class="action-hint"><img src="/assets/classic/icons/hud/herbicida-ui.png" alt=""><span>Tirar ervas</span><kbd>5</kbd></div>
+            </section>
+            <div class="mock-tile"><img src="/assets/classic/crops/plants_phase_one_to_five/laranja_3.png" alt=""></div>
+          </div>
+          <p class="sample-note">A ferramenta sugerida remove uma praga por vez. Adubo não aparece: o jogo não permite aplicá-lo com a planta seca ou pausada.</p>
+        </article>
+
+        <article class="sample edge-sample">
+          <h2>Perto da borda</h2>
+          <div class="edge-scene">
+            <section class="crop-hud edge-hud" aria-label="Cenoura perto da borda da tela">
+              <div class="hud-heading"><img class="crop-icon" src="/assets/classic/crops/seeds/semente_cenoura.png" alt=""><h3>Cenoura</h3><span class="state-badge healthy">Saudável</span></div>
+              <div class="growth-block"><div class="growth-caption"><span>CRESCIMENTO</span><strong data-countdown="0:42">42min</strong></div><div class="growth-track"><span class="growth-fill" style="width:92%"></span></div><p class="ready-at">Pronta às <time data-ready></time></p></div>
+              <div class="season-block"><p class="season-label" aria-label="Temporada 1 de 1">Temporada 1 de 1</p><div class="season-track" role="img" aria-label="1 de 1 temporadas"><span class="filled"></span></div></div>
+              <div class="crop-chips"><span class="crop-chip benefit"><img src="/assets/classic/icons/adubo-comum.png" alt="">Adubada</span></div>
+            </section>
+            <div class="mock-tile edge-tile" aria-hidden="true"><img src="/assets/classic/crops/plants_phase_one_to_five/cenoura_4.png" alt=""></div>
+          </div>
+          <p class="sample-note">O card vira para o lado livre, sem cobrir o tile em foco.</p>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

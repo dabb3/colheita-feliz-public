@@ -1,0 +1,71 @@
+:root { color-scheme: light; font-family: system-ui, sans-serif; color: #253b35; background: #153e39; }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px; }
+main { width: min(1440px, 100%); margin: 0 auto; }
+.page-header { margin-bottom: 24px; padding: 24px; border: 1px solid #d8c279; border-radius: 14px; background: #fff8df; }
+.page-header a { color: #426b36; font-weight: 700; }
+.eyebrow { margin: 16px 0 8px; color: #705719; font-size: 12px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+h1, h2, h3, p { margin-top: 0; }
+h1 { margin-bottom: 8px; color: #396d31; font: 700 30px Georgia, serif; }
+.page-header > p:last-child { margin: 0; color: #526353; }
+.samples { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.sample { min-width: 0; padding: 16px; border: 1px solid #d8c279; border-radius: 12px; background: #fff8df; box-shadow: 0 4px 14px #654a1720; }
+.sample h2 { margin: 0 0 16px; color: #705719; font: 700 17px Georgia, serif; }
+.mock-scene, .edge-scene { position: relative; display: flex; min-height: 280px; align-items: flex-start; justify-content: center; padding: 16px 8px 84px; }
+.crop-hud { position: relative; z-index: 1; width: min(100%, 340px); min-width: 280px; padding: 12px; border: 1px solid #a99055; border-radius: 12px; background: #fff8dfed; box-shadow: 0 8px 22px #16361d33, inset 0 1px #fffdf4; animation: hud-in 120ms ease-out both; }
+.crop-hud::after { position: absolute; left: 50%; bottom: -8px; width: 14px; height: 14px; border-right: 1px solid #a99055; border-bottom: 1px solid #a99055; background: #fff8dfed; content: ''; transform: translateX(-50%) rotate(45deg); }
+.hud-heading { display: flex; min-height: 36px; align-items: center; gap: 8px; margin-bottom: 12px; }
+.crop-icon { width: 32px; height: 32px; flex: none; object-fit: contain; }
+.hud-heading h3 { min-width: 0; margin: 0 auto 0 0; color: #396d31; font: 700 17px Georgia, serif; }
+.state-badge, .vip-badge { flex: none; padding: 4px 8px; border: 1px solid #cbd9ae; border-radius: 999px; background: #f0f5dc; color: #426b36; font-size: 11px; font-weight: 750; }
+.state-badge.ready { border-color: #d8c279; background: #fff3c8; color: #705719; }
+.state-badge.dead, .state-badge.problem-state { border-color: #c8a397; background: #fff0ec; color: #8a3f35; }
+.vip-badge { border-color: #d5b44c; background: #fff3c8; color: #705719; }
+.growth-block { margin-bottom: 12px; }
+.growth-caption { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.growth-caption span { color: #526353; font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.growth-caption strong { color: #3c602d; font-size: 14px; font-variant-numeric: tabular-nums; text-align: right; }
+.growth-track { height: 10px; overflow: hidden; border-radius: 999px; background: #fffdf4; box-shadow: inset 0 1px 3px #755b1b12; }
+.growth-fill { display: block; height: 100%; border-radius: inherit; background: linear-gradient(180deg, #88a36f 0%, #75a93c 45%, #5a8d35 100%); box-shadow: inset 0 1px #d9edbf; transition: width 300ms ease; }
+.growth-track.ready-track .growth-fill { animation: ready-glow 1.8s ease-in-out infinite alternate; }
+.dead-track { opacity: .55; }
+.ready-at { margin: 6px 0 0; color: #526353; font-size: 11px; text-align: right; }
+.season-block { margin-bottom: 12px; }
+.season-label { margin: 0 0 6px; color: #526353; font-size: 11px; }
+.season-track { display: flex; gap: 4px; height: 6px; }
+.season-track span { flex: 1; border-radius: 999px; background: #fffdf4; box-shadow: inset 0 1px 2px #755b1b12; }
+.season-track span.filled { background: linear-gradient(180deg, #88a36f, #75a93c); box-shadow: inset 0 1px #d9edbf; }
+.growth-track, .season-track span { background: #ded6ba; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .12); }
+.growth-fill, .season-track span.filled { background: linear-gradient(180deg, #75a93c, #5a8d35); box-shadow: inset 0 1px rgba(255, 255, 255, .35); }
+.season-track span.filled { opacity: .55; }
+.crop-hud { background: rgba(255, 248, 223, .95); backdrop-filter: blur(8px); }
+.crop-hud::after { background: rgba(255, 248, 223, .95); }
+.season-label, .growth-caption > span { color: #66735d; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.vip-note { display: flex; align-items: center; gap: 6px; margin: -2px 0 10px; color: #705719; font-size: 11px; font-weight: 700; }
+.vip-note img { width: 18px; height: 18px; object-fit: contain; }
+.vip-note.active { color: #426b36; }
+.crop-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.crop-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 7px; border: 1px solid #d2d4b8; border-radius: 999px; color: #526353; font-size: 10px; font-weight: 700; }
+.crop-chip img { width: 16px; height: 16px; object-fit: contain; }
+.crop-chip.problem { border-color: #d8c279; color: #705719; }
+.crop-chip.benefit { border-color: #cbd9ae; color: #426b36; }
+.action-hint { display: flex; min-height: 32px; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px solid #d8c279; color: #3e331a; font-size: 12px; font-weight: 700; }
+.action-hint img { width: 24px; height: 24px; object-fit: contain; }
+.action-hint kbd { margin-left: auto; padding: 2px 7px; border: 1px solid #a99055; border-radius: 5px; background: #fffdf4; box-shadow: 0 1px 0 #755b1b12; font: 700 11px system-ui, sans-serif; }
+.mock-tile { position: absolute; bottom: 8px; left: 50%; display: grid; width: 84px; height: 48px; place-items: center; background: url('/assets/classic/terrain/terra-molhada.png') center / 100% 100% no-repeat; transform: translateX(-50%); }
+.mock-tile::after { position: absolute; inset: 0; background: url('/assets/classic/terrain/terra-destaque.png') center / 100% 100% no-repeat; content: ''; opacity: .55; }
+.mock-tile img { position: relative; z-index: 1; width: 52px; height: 70px; object-fit: contain; transform: translateY(-18px); filter: drop-shadow(0 2px 2px #755b1b12); }
+.ready-tile { background-image: url('/assets/classic/terrain/terra-destaque.png'); }
+.dead-tile { background-image: url('/assets/classic/terrain/terra-seca.png'); }
+.dead-tile img { width: 44px; height: 46px; transform: translateY(-6px); }
+.sample-note { margin: 8px 0 0; color: #526353; font-size: 11px; }
+.edge-scene { min-height: 280px; align-items: center; justify-content: flex-start; padding: 8px 0; }
+.edge-hud { width: min(72%, 340px); min-width: 270px; }
+.edge-hud::after { top: 50%; right: -8px; bottom: auto; left: auto; border: 0; border-top: 1px solid #a99055; border-right: 1px solid #a99055; transform: translateY(-50%) rotate(45deg); }
+.edge-tile { right: 0; bottom: 50%; left: auto; transform: translateY(50%); }
+.edge-tile img { width: 48px; height: 62px; }
+@keyframes hud-in { from { opacity: 0; translate: 0 4px; } to { opacity: 1; translate: 0 0; } }
+@keyframes ready-glow { from { filter: brightness(1); } to { filter: brightness(1.18); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; } }
+@media (max-width: 1000px) { body { padding: 24px; } .samples { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { body { padding: 16px; } .samples { grid-template-columns: 1fr; } .sample { padding: 16px; } .crop-hud { min-width: 0; } .edge-hud { width: calc(100% - 72px); } .edge-tile { width: 60px; } .growth-caption { gap: 6px; } .growth-caption strong { font-size: 12px; } }
