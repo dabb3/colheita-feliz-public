@@ -331,6 +331,100 @@ class OnlineGameIntegrationTest {
         assertEquals("200", service.farm(alice).get("coins").getAsString());
     }
 
+    @Test void theftCooldownIsGlobalSurvivesRestartAndExpiresAtExactlyTwentyFourHours() {
+        UUID carol = prepareTheftFriends();
+        var first = theftCommand(bob, alice);
+        var success = service.visitAction(bob, alice, first);
+        assertTrue(success.getAsJsonObject("result").get("success").getAsBoolean());
+        clock.advanceSeconds(3600);
+        assertEquals(success, service.visitAction(bob, alice, first));
+        store.close();
+        store = new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"), "postgres", "", testSchema);
+        store.initialize(alice);
+        service = new OnlineGameService(store, clock, bound -> bound - 1, 5);
+        var before = service.farm(bob);
+        var ownerBefore = service.farm(carol);
+        var refused = service.visitAction(bob, carol, theftCommand(bob, carol));
+        assertFalse(refused.getAsJsonObject("result").get("success").getAsBoolean());
+        assertTrue(refused.getAsJsonObject("result").get("message").getAsString().contains("23h 0min 0s"));
+        assertEquals(before.get("revision"), service.farm(bob).get("revision"));
+        assertEquals(ownerBefore.get("revision"), service.farm(carol).get("revision"));
+        clock.advanceSeconds(82799);
+        assertFalse(service.visitAction(bob, carol, theftCommand(bob, carol)).getAsJsonObject("result").get("success").getAsBoolean());
+        clock.advanceSeconds(1);
+        assertTrue(service.visitAction(bob, carol, theftCommand(bob, carol)).getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(2, quantity(service.farm(bob)));
+    }
+
+    @Test void refusedTheftDoesNotSpendCooldownAndLoveRemainsAvailable() {
+        connectFriends();
+        prepare(bob, null, false, false);
+        assertFalse(service.visitAction(bob, alice, theftCommand(bob, alice)).getAsJsonObject("result").get("success").getAsBoolean());
+        prepare(alice, "morango", true, false);
+        assertTrue(service.visitAction(bob, alice, theftCommand(bob, alice)).getAsJsonObject("result").get("success").getAsBoolean());
+        var visit = service.visit(bob, alice);
+        assertTrue(service.command(alice, new Command(requestId(), visit.get("revision").getAsString(), "WATER", null, null, 0, 0, null))
+                .getAsJsonObject("result").get("success").getAsBoolean());
+        var love = theftCommand(bob, alice);
+        assertTrue(service.visitAction(bob, alice, new Command(love.requestId(), love.expectedRevision(), "LOVE", "amor", null, 0, 0, love.harvestRevision()))
+                .getAsJsonObject("result").get("success").getAsBoolean());
+    }
+
+    @Test void concurrentTheftsInDifferentFarmsTransferOnlyOneUnit() throws Exception {
+        UUID carol = prepareTheftFriends();
+        var one = theftCommand(bob, alice);
+        var two = theftCommand(bob, carol);
+        var start = new java.util.concurrent.CyclicBarrier(2);
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> {
+                start.await(5, java.util.concurrent.TimeUnit.SECONDS);
+                return confirmed(() -> service.visitAction(bob, alice, one));
+            });
+            var second = executor.submit(() -> {
+                start.await(5, java.util.concurrent.TimeUnit.SECONDS);
+                return confirmed(() -> service.visitAction(bob, carol, two));
+            });
+            assertEquals(1, (first.get() ? 1 : 0) + (second.get() ? 1 : 0));
+        }
+        assertEquals(1, quantity(service.farm(bob)));
+    }
+
+    @Test void rollbackAfterSuccessfulTheftDoesNotSpendCooldownOrTransferProduct() {
+        prepareTheftFriends();
+        var command = theftCommand(bob, alice);
+        assertThrows(IllegalStateException.class, () -> store.transaction(bob, tx -> {
+            assertTrue(service.visitAction(tx, bob, alice, command).getAsJsonObject("result").get("success").getAsBoolean());
+            throw new IllegalStateException("rollback after theft");
+        }));
+        assertEquals(0, quantity(service.farm(bob)));
+        assertTrue(service.visitAction(bob, alice, command).getAsJsonObject("result").get("success").getAsBoolean());
+    }
+
+    @Test void theftCooldownBelongsToTheThiefRatherThanTheVictimOrOtherPlayers() {
+        UUID carol = prepareTheftFriends();
+        prepare(bob, "morango", true, false);
+        assertTrue(service.visitAction(bob, carol, theftCommand(bob, carol)).getAsJsonObject("result").get("success").getAsBoolean());
+        assertTrue(service.visitAction(alice, bob, theftCommand(alice, bob)).getAsJsonObject("result").get("success").getAsBoolean());
+        assertFalse(service.visitAction(bob, alice, theftCommand(bob, alice)).getAsJsonObject("result").get("success").getAsBoolean());
+    }
+
+    private UUID prepareTheftFriends() {
+        connectFriends();
+        UUID carol = UUID.randomUUID();
+        String code = service.createInvitation(bob, requestId()).get("code").getAsString();
+        service.acceptInvitation(carol, "Carol", code, requestId());
+        service.farm(carol);
+        prepare(alice, "morango", true, false);
+        prepare(carol, "morango", true, false);
+        return carol;
+    }
+
+    private Command theftCommand(UUID actor, UUID owner) {
+        var visit = service.visit(actor, owner);
+        return new Command(requestId(), visit.get("revision").getAsString(), "STEAL", null, null, 0, 0,
+                visit.getAsJsonArray("tiles").get(0).getAsJsonObject().get("harvestRevision").getAsString());
+    }
+
     private UUID requestId() { return UUID.fromString(service.requestId().get("requestId").getAsString()); }
 
     private void connectFriends() {

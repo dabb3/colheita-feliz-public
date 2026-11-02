@@ -160,9 +160,24 @@ final class OnlineGameService implements AutoCloseable {
                 checkRevision(destination, command);
                 long season = Command.revision(command.harvestRevision());
                 var visits = new VisitService();
-                var result = command.action().equals("STEAL")
-                        ? visits.steal(destination.game(), visitor.game(), command.column(), command.row(), season)
-                        : visits.fertilizeVisit(destination.game(), visitor.game(), command.column(), command.row(), "amor", season);
+                ActionResult result;
+                if (command.action().equals("STEAL")) {
+                    // The enclosing transaction holds the actor lock across cooldown, transfer and receipt.
+                    Instant now = clock.instant();
+                    Instant lastTheft = tx.lastTheft(actor);
+                    Instant availableAt = lastTheft == null ? now : lastTheft.plus(Duration.ofHours(24));
+                    if (now.isBefore(availableAt)) {
+                        Duration remaining = Duration.between(now, availableAt);
+                        long seconds = remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);
+                        result = ActionResult.fail("Você já furtou nas últimas 24 horas. Novo furto em "
+                                + seconds / 3600 + "h " + seconds % 3600 / 60 + "min " + seconds % 60 + "s.");
+                    } else {
+                        result = visits.steal(destination.game(), visitor.game(), command.column(), command.row(), season);
+                        if (result.success()) tx.recordTheft(actor, now);
+                    }
+                } else {
+                    result = visits.fertilizeVisit(destination.game(), visitor.game(), command.column(), command.row(), "amor", season);
+                }
                 return object("result", result, "farm", persist(tx, visitor, false, true),
                         "visitedFarm", persist(tx, destination, false, false));
             });

@@ -339,6 +339,8 @@ As tarefas já contam durante o tutorial, não exigem gastar mais que o saldo in
 
 ## 13. Furto de temporadas
 
+Cada jogador pode realizar um único furto bem-sucedido a cada 24 horas, somando todas as fazendas visitadas. A janela começa no último furto bem-sucedido, pelo relógio real do servidor; não renova à meia-noite. Tentativas recusadas não consomem o limite. O horário persiste após logout e reinício da API. Pedidos simultâneos só podem produzir um sucesso, e repetir o mesmo pedido não transfere outro produto nem reinicia a janela. Ao recusar pelo limite, informar o tempo restante. Ajuda com amor não consome esse limite.
+
 Uma visita só pode furtar planta cujo ciclo da temporada atual esteja completo e cujo terreno não esteja protegido. Não existe piso de produção garantido ao dono nem janela exclusiva inicial de colheita.
 
 Um furto bem-sucedido transfere a única unidade daquela temporada para o visitante e consome a temporada do dono. O dono não recebe produto nem XP por essa perda; o visitante recebe o produto sem XP. O produto preserva cultura, moeda e custo-base da semente que o originou; o VIP aplicado à venda é o do vendedor no momento da venda.
