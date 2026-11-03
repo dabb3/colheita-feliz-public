@@ -172,7 +172,7 @@ final class OnlineGameService implements AutoCloseable {
                         result = ActionResult.fail("Você já furtou nas últimas 24 horas. Novo furto em "
                                 + seconds / 3600 + "h " + seconds % 3600 / 60 + "min " + seconds % 60 + "s.");
                     } else {
-                        result = visits.steal(destination.game(), visitor.game(), command.column(), command.row(), season);
+                        result = stealAfterOwnerWindow(visits, destination, visitor, command, season, now);
                         if (result.success()) tx.recordTheft(actor, now);
                     }
                 } else {
@@ -181,6 +181,21 @@ final class OnlineGameService implements AutoCloseable {
                 return object("result", result, "farm", persist(tx, visitor, false, true),
                         "visitedFarm", persist(tx, destination, false, false));
             });
+    }
+
+    private static ActionResult stealAfterOwnerWindow(VisitService visits, Loaded destination, Loaded visitor,
+                                                       Command command, long season, Instant now) {
+        var crop = destination.game().farm().tile(command.column(), command.row()).crop();
+        Instant matured = crop == null ? null : crop.maturedAt(destination.game().now());
+        if (matured != null) {
+            Instant availableAt = matured.plus(Duration.ofMinutes(5));
+            if (now.isBefore(availableAt)) {
+                Duration remaining = Duration.between(now, availableAt);
+                long seconds = remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);
+                return ActionResult.fail("Colheita reservada ao dono por mais " + seconds / 60 + "min " + seconds % 60 + "s.");
+            }
+        }
+        return visits.steal(destination.game(), visitor.game(), command.column(), command.row(), season);
     }
 
     private Loaded load(JdbcOnlineStore.Tx tx, UUID owner) {

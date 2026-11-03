@@ -112,4 +112,13 @@ public record Crop(CropType type, Instant plantedAt, Instant wateredAt, Instant 
     public boolean matureAt(Instant now) {
         return watered() && grownMillisAt(now) >= currentDuration().toMillis();
     }
+
+    /** Instante em que esta temporada amadureceu, ou null se ainda não amadureceu. Independe de consultas anteriores. */
+    public Instant maturedAt(Instant now) {
+        if (!matureAt(now)) return null;
+        long left = currentDuration().toMillis() - grownAtAnchorMillis;
+        if (left <= 0) return growthAnchorAt; // Fertilizante completou o ciclo nesta âncora.
+        long moist = Math.max(0, Duration.between(growthAnchorAt, wateredAt.plus(moistDuration())).toMillis());
+        return growthAnchorAt.plusMillis(left <= moist ? left : moist + (left - moist) * 2);
+    }
 }

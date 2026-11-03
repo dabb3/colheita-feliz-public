@@ -1,5 +1,6 @@
 package br.com.colheitafeliz.domain;
 
+import br.com.colheitafeliz.domain.crop.Crop;
 import br.com.colheitafeliz.domain.crop.CropCatalog;
 import br.com.colheitafeliz.domain.crop.CropType;
 import br.com.colheitafeliz.domain.farm.FarmTile;
@@ -18,6 +19,35 @@ class CropAndTileTest {
     private final CropCatalog catalog = CropCatalogLoader.load();
     private final CropType corn = catalog.get("milho");
     private final Instant start = Instant.parse("2026-01-01T12:00:00Z");
+
+    @Test void maturityTimestampAccountsForDrySoilAndDoesNotDependOnObservationTime() {
+        var crop = new Crop(corn, start, TestCrops.origin(corn)).water(start);
+        assertNull(crop.maturedAt(start.plusSeconds(119999)));
+        assertEquals(start.plusSeconds(120000), crop.maturedAt(start.plusSeconds(120000)));
+        assertEquals(start.plusSeconds(120000), crop.maturedAt(start.plusSeconds(200000)));
+        var watered = crop.water(start.plusSeconds(50000));
+        assertEquals(start.plusSeconds(96000), watered.maturedAt(start.plusSeconds(200000)));
+    }
+
+    @Test void maturityTimestampFollowsPausesAndInstantCompletionByFertilizer() {
+        var crop = new Crop(corn, start, TestCrops.origin(corn)).water(start).pause(start.plusSeconds(1000));
+        assertNull(crop.maturedAt(start.plusSeconds(200000)));
+        var resumed = crop.resume(start.plusSeconds(4600));
+        assertEquals(start.plusSeconds(127200), resumed.maturedAt(start.plusSeconds(200000)));
+        var fertilized = new Crop(corn, start, TestCrops.origin(corn)).water(start).advance(start.plusSeconds(1000), corn.growthTime(1).toMillis());
+        assertEquals(start.plusSeconds(1000), fertilized.maturedAt(start.plusSeconds(5000)));
+    }
+
+    @Test void maturityTimestampUsesCurrentSeasonAndMoistCompletion() {
+        var type = TestCrops.strawberry();
+        var secondSeason = new Crop(type, start, TestCrops.origin(type), 2).water(start);
+        assertEquals(start.plusSeconds(72000), secondSeason.maturedAt(start.plusSeconds(200000)));
+        var nearlyReady = secondSeason.advance(start.plusSeconds(1000), type.growthTime(2).minusSeconds(2000).toMillis());
+        assertNull(nearlyReady.maturedAt(start.plusSeconds(1999)));
+        assertEquals(start.plusSeconds(2000), nearlyReady.maturedAt(start.plusSeconds(2000)));
+        var unwatered = new Crop(type, start, TestCrops.origin(type));
+        assertNull(unwatered.maturedAt(start.plusSeconds(999999)));
+    }
 
     @Test void plantingNeedsPlowedSoilAndWateringStartsGrowth() {
         FarmTile tile = new FarmTile();

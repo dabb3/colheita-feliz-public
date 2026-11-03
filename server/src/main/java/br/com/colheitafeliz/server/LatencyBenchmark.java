@@ -128,7 +128,8 @@ final class LatencyBenchmark {
                     case "WEED" -> tile.checkPest(NOW, true);
                     case "PESTICIDE" -> tile.checkInsects(NOW, true);
                     case "HARVEST", "STEAL" -> tile.restore(TileState.READY,
-                            new Crop(crop, NOW, NOW, null, NOW, crop.growthTime(1).toMillis(), tile.crop().origin(), 1),
+                            new Crop(crop, NOW.minusSeconds(300), NOW.minusSeconds(300), null, NOW.minusSeconds(300),
+                                    crop.growthTime(1).toMillis(), tile.crop().origin(), 1),
                             PestState.NONE, NOW.plusSeconds(600), 0, NOW.plusSeconds(600), null, false, 1);
                     default -> { }
                 }
