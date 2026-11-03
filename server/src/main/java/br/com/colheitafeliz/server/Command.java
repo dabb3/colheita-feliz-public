@@ -8,7 +8,8 @@ record Command(UUID requestId, String expectedRevision, String action, String it
                Integer column, Integer row, String harvestRevision) {
     private static final Set<String> ACTIONS = Set.of("BUY_SEED", "BUY_ANIMAL", "BUY_FEED", "BUY_FERTILIZER",
             "BUY_VIP", "BUY_PLOT", "SELL_ALL", "SELL_ITEM", "SELL_ITEM_ALL", "SELL_ANIMAL", "TEND_ANIMAL",
-            "PLOW", "PLANT", "WATER", "HARVEST", "WEED", "PESTICIDE", "FERTILIZE", "STEAL", "LOVE");
+            "PLOW", "PLANT", "WATER", "HARVEST", "WEED", "PESTICIDE", "FERTILIZE", "STEAL", "LOVE",
+            "SPREAD_INSECTS", "SPREAD_WEEDS");
     Command {
         Objects.requireNonNull(requestId);
         if (!ACTIONS.contains(action)) throw new ApiFailure(400, "Ação desconhecida.");

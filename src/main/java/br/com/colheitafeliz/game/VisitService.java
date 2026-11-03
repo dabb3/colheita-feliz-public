@@ -39,6 +39,28 @@ public final class VisitService {
         }
     }
 
+    public ActionResult spreadInsects(GameState owner, GameState visitor, int col, int row, long expectedRevision) {
+        return spreadPest(owner, visitor, col, row, expectedRevision, true);
+    }
+
+    public ActionResult spreadWeeds(GameState owner, GameState visitor, int col, int row, long expectedRevision) {
+        return spreadPest(owner, visitor, col, row, expectedRevision, false);
+    }
+
+    private static ActionResult spreadPest(GameState owner, GameState visitor, int col, int row, long revision, boolean insects) {
+        synchronized (GameState.class) {
+            FarmTile tile = eligibleTile(owner, visitor, col, row, revision);
+            if (tile == null || tile.state() != TileState.GROWING || tile.crop() == null
+                    || !tile.crop().watered() || tile.crop().matureAt(owner.now()))
+                return ActionResult.fail("Praga indisponível: escolha uma planta em crescimento, já regada e sem proteção.");
+            if (insects ? tile.insects() > 0 : tile.pest() != br.com.colheitafeliz.domain.farm.PestState.NONE)
+                return ActionResult.fail("Esta planta já tem esse tipo de praga.");
+            if (insects) tile.checkInsects(owner.now(), true);
+            else tile.checkPest(owner.now(), true);
+            return ActionResult.ok(insects ? "Uma minhoca lançada. O crescimento foi pausado." : "Uma erva daninha lançada. O crescimento foi pausado.");
+        }
+    }
+
     private static FarmTile eligibleTile(GameState owner, GameState visitor, int col, int row, long revision) {
         if (owner == null || visitor == null || owner == visitor || !owner.farm().contains(col, row)
                 || !owner.land().isUnlocked(col, row)) return null;

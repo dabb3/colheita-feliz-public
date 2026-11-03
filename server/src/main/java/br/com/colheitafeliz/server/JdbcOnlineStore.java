@@ -82,8 +82,11 @@ final class JdbcOnlineStore implements AutoCloseable {
                     + schema + ".players(id), used_by uuid, expires_at timestamptz NOT NULL)");
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".theft_cooldowns (actor uuid PRIMARY KEY REFERENCES "
                     + schema + ".players(id), last_stolen_at timestamptz NOT NULL)");
+            tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".pest_cooldowns (actor uuid NOT NULL REFERENCES "
+                    + schema + ".players(id), kind text NOT NULL CHECK(kind IN ('SPREAD_INSECTS','SPREAD_WEEDS')), "
+                    + "last_applied_at timestamptz NOT NULL, PRIMARY KEY(actor,kind))");
             tx.execute("REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
-            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns")) {
+            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns")) {
                 tx.execute("ALTER TABLE " + schema + "." + table + " ENABLE ROW LEVEL SECURITY");
                 tx.execute("REVOKE ALL ON " + schema + "." + table + " FROM PUBLIC");
             }
@@ -162,6 +165,15 @@ final class JdbcOnlineStore implements AutoCloseable {
         Instant lastTheft(UUID actor) {
             return first(query("SELECT last_stolen_at FROM " + schema + ".theft_cooldowns WHERE actor=?",
                     row -> row.getTimestamp(1).toInstant(), actor));
+        }
+        Instant lastPest(UUID actor, String kind) {
+            return first(query("SELECT last_applied_at FROM " + schema + ".pest_cooldowns WHERE actor=? AND kind=?",
+                    row -> row.getTimestamp(1).toInstant(), actor, kind));
+        }
+        void recordPest(UUID actor, String kind, Instant now) {
+            execute("INSERT INTO " + schema + ".pest_cooldowns (actor,kind,last_applied_at) VALUES (?,?,?) "
+                    + "ON CONFLICT(actor,kind) DO UPDATE SET last_applied_at=EXCLUDED.last_applied_at",
+                    actor, kind, java.sql.Timestamp.from(now));
         }
         void recordTheft(UUID actor, Instant now) {
             execute("INSERT INTO " + schema + ".theft_cooldowns (actor,last_stolen_at) VALUES (?,?) "
