@@ -56,6 +56,25 @@ test('missions claims the own daily allowance explicitly once, including while v
  assert.equal(h.get().own.coins,'600');assert.equal(descendants(elements.get('modal-content')).find(node=>node.textContent==='Já resgatado').disabled,true);
 });
 
+test('visit defaults to inspection and a touch or cursor click never sends a social action',async()=>{
+ const {h,ctx,elements}=app();let tap,client;const sent=[];
+ ctx.Scene=class{constructor(_canvas,_catalog,onTile){tap=onTile;}update(){}close(){}};
+ ctx.ApiClient=class{pending=null;constructor(){client=this;}get(){return Promise.resolve(farm('alice'));}prepareRequestId(){return Promise.resolve();}mutate(path,command){sent.push({path,command});return Promise.resolve({});}};
+ h.set({own:undefined});await h.connect('alice',async()=> 'synthetic-token');
+ client.get=path=>Promise.resolve(path==='/v1/friends'?[{id:'bob',name:'Bob'}]:{...farm('bob'),serverTime:'2026-11-03T12:00:00Z'});
+ h.set({own:farm('alice'),api:client,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:36000}],animals:[],fertilizers:[],vip:{greenPrice:20}}});
+ await h.friends();await descendants(elements.get('modal-content')).find(node=>node.textContent==='Visitar fazenda').onclick();
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(elements.get('tools').children[0].getAttribute('aria-label'),'Inspecionar plantas');
+ assert.equal(elements.get('tools').children[0].getAttribute('aria-pressed'),'true');
+ const bounds={left:0,top:0,width:390,height:844};elements.get('game').getBoundingClientRect=()=>bounds;elements.get('farm').getBoundingClientRect=()=>bounds;
+ const panel=elements.get('plant-health');panel.getBoundingClientRect=()=>({width:360,height:300});
+ const tile={column:0,row:0,cropId:'nabo',state:'GROWING',watered:true,season:1,seasons:1,remainingSeconds:3600,nominalRemainingSeconds:3600};
+ tap(tile,'touch');assert.equal(panel.hidden,false);assert.match(text(panel),/Nabo/);assert.equal(sent.length,0);
+ await h.tileAction({...tile,state:'READY',remainingSeconds:0,nominalRemainingSeconds:0});assert.equal(sent.length,0);assert.ok(!text(panel).includes('Furtar colheita'));
+ h.pickTool('STEAL');await h.tileAction(tile);assert.equal(sent.length,1);assert.equal(sent[0].command.action,'STEAL');
+});
+
 test('pest tools exist only in visits and send the selected plot with its revisions',async()=>{
  const {h,elements}=app(),own=farm('alice'),visited={...farm('bob'),revision:'42'},sent=[];
  const api={pending:null,mutate:async(path,command)=>{sent.push({path,command});return{result:{success:false,message:'Disponível em 1h 0min 0s.'}};},prepareRequestId:()=>Promise.resolve()};
@@ -287,7 +306,7 @@ test('scene pointer follows tools and selected fertilizer across visits and retu
  }
  h.pickTool('FERTILIZE');descendants(elements.get('tool-tray')).find(node=>node.getAttribute('aria-label')==='Rápido, 3 no estoque').onclick();
  assert.match(elements.get('farm').style.cursor,/adubo-rapido.png/);
- h.set({own:initial,visited:farm('bob')});h.receive({});assert.match(elements.get('farm').style.cursor,/mao-restaurada.png/);
+ h.set({own:initial,visited:farm('bob')});h.receive({});assert.match(elements.get('farm').style.cursor,/cursor-action.png/);
  h.pickTool('LOVE');assert.match(elements.get('farm').style.cursor,/adubo-amor.png/);
  h.set({own:initial});h.receive({});assert.equal(elements.get('farm').style.cursor,'url("/assets/classic/icons/cursor-action.png") 1 1, auto');
  assert.equal(elements.get('tools').children[0].children[0].src,'/assets/classic/icons/hud/cursor-ui.png');
