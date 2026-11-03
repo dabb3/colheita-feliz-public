@@ -100,6 +100,7 @@ async function fadeSoldDepositRows(fields:CommandFields,farm:Farm){
  await new Promise(resolve=>window.setTimeout(resolve,matchMedia('(prefers-reduced-motion: reduce)').matches?0:180));
 }
 let missionsTimer:number|undefined;
+let allowanceResetTimer:number|undefined;
 function dialog(title:string){dialogGeneration++;refreshDialog=undefined;closeHealth();element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');modal.classList.toggle('missions-dialog',title==='Missões');if(title!=='Missões'){window.clearInterval(missionsTimer);missionsTimer=undefined;}content.replaceChildren();content.scrollTop=0;modalFooter.replaceChildren();modalFooter.hidden=true;if(!modal.open)modal.showModal();}
 function settings(){
  dialog('Ajustes');
@@ -436,6 +437,15 @@ function missions(){
  dialog('Missões');
  refreshDialog=missions;
  renderDailyAllowance(content,own?.dailyAllowance,()=>void action({action:'CLAIM_DAILY_ALLOWANCE'}));
+ window.clearTimeout(allowanceResetTimer);
+ const allowance=own?.dailyAllowance;
+ const delay=Date.parse(allowance?.nextResetAt??'')-Date.parse(own?.serverTime??'');
+ if(allowance&&!allowance.available&&delay>0&&delay<=2_147_483_647){
+  const generation=dialogGeneration;
+  allowanceResetTimer=window.setTimeout(()=>{
+   if(modal.open&&dialogGeneration===generation&&!document.hidden)void refresh();
+  },delay);
+ }
  const daily=own?.missions??[],active=daily.filter(mission=>!mission.done),completed=daily.filter(mission=>mission.done),hasTutorial=!!own?.tutorial,activeCount=active.length+(hasTutorial?1:0);
  const activeSection=document.createElement('section');activeSection.className='mission-section';activeSection.append(sectionHeading('Em andamento'));
  if(own?.tutorial){const total=Math.max(1,own.tutorialTotal??6),progress=Math.min(own.tutorialStep??0,total);activeSection.append(missionCard('Tutorial',own.tutorial.title??'',own.tutorial.hint??'',progress,total));}

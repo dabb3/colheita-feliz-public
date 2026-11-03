@@ -32,6 +32,16 @@ function app(){
 function text(node){return(node.textContent??'')+(node.children??[]).map(child=>typeof child==='object'?text(child):child).join('');}
 function descendants(node){return[node,...(node.children??[]).flatMap(child=>typeof child==='object'?descendants(child):[])];}
 
+test('open missions refreshes the claimed allowance at UTC rollover',async()=>{
+ const {h,elements}=app(),status={amount:'100',available:false,nextResetAt:'2026-11-04T00:00:00Z'};
+ const own={...farm('alice'),serverTime:'2026-11-03T23:59:59Z',dailyAllowance:status};let reads=0;
+ h.set({own,api:{pending:null,get:async path=>{assert.equal(path,'/v1/me/farm');reads++;return {...own,serverTime:'2026-11-04T00:00:00Z',dailyAllowance:{...status,available:true}};},prepareRequestId:async()=>{}}});
+ h.missions();assert.equal(reads,0);assert.match(text(elements.get('modal-content')),/Já resgatado/);
+ h.runTimeouts();await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(reads,1);assert.match(text(elements.get('modal-content')),/Resgatar 100 ouro/);
+ h.runTimeouts();assert.equal(reads,1);
+});
+
 test('missions claims the own daily allowance explicitly once, including while visiting',async()=>{
  const {h,elements}=app(),reply=deferred(),sent=[];
  const allowance={amount:'100',available:true,nextResetAt:'2026-11-04T00:00:00Z'};
