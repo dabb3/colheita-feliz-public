@@ -18,7 +18,7 @@ function app(){
   setAttribute(key,value){this.attributes[key]=String(value);},getAttribute(key){return this.attributes[key]??null;},
   contains(target){return !!target&&(target===this||this.children.some(child=>child?.contains?.(target)));},
   get firstElementChild(){return this.children[0]??null;},get lastElementChild(){return this.children.at(-1)??null;},
-  querySelectorAll(selector){return descendants(this).slice(1).filter(node=>selector==='[data-focus-key]'?node.getAttribute('data-focus-key')!==null:selector.startsWith('.')?node.className===selector.slice(1):false);},
+  querySelectorAll(selector){return descendants(this).slice(1).filter(node=>selector==='[data-focus-key]'?node.getAttribute('data-focus-key')!==null:selector.startsWith('.')?(node.className??'').split(/\s+/).includes(selector.slice(1)):false);},
   querySelector(selector){return this.querySelectorAll(selector)[0]??null;},focus(){ctx.document.activeElement=this;},
   getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(){},close(){this.open=false;},showModal(){this.open=true;}});
  const storage={getItem:()=>null,setItem(){},removeItem(){}};
@@ -46,12 +46,18 @@ test('live shop explains nominal duration and the live popup qualifies its forec
  assert.match(text(panel),/Sem nova rega e sem pragas: 16 h 40 min restantes/);
  assert.ok(text(panel).includes(new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(Date.parse('2026-11-03T17:40:00Z'))));
  const estimate=panel.querySelector('.crop-growth-estimate').textContent;
+ const nominal=panel.querySelector('.crop-growth-nominal').textContent;
+ assert.ok(nominal.includes(new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(Date.parse('2026-11-03T11:00:00Z'))));
  clientNow+=60000;h.runTimeouts();
  assert.ok(panel.querySelector('.crop-growth-estimate').textContent.endsWith(estimate.slice(estimate.indexOf('Previsão:'))));
  assert.match(text(panel),/Com rega em dia e sem pragas: 9 h 59 min restantes/);
+ assert.ok(panel.querySelector('.crop-growth-nominal').textContent.endsWith(nominal.slice(nominal.indexOf('Previsão:'))));
  h.set({own:{...farm('alice'),level:1,serverTime:'2026-11-03T01:02:00Z'},catalog:{crops:[crop],animals:[],fertilizers:[],vip:{greenPrice:20}}});
  h.health(tile,{x:585,y:400},'refresh');
  assert.ok(text(panel).includes(new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(Date.parse('2026-11-03T17:42:00Z'))));
+ h.health({...tile,dry:true},{x:585,y:400},'refresh');
+ clientNow+=120000;h.runTimeouts();
+ assert.ok(panel.querySelector('.crop-growth-nominal').textContent.includes(new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(Date.parse('2026-11-03T11:03:00Z'))));
 });
 
 test('login can return to its first step before the invitation fade completes',()=>{

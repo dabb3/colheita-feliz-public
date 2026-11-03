@@ -279,7 +279,8 @@ function updateHealthDisplay(tile:Tile,remaining=healthRemaining(tile),ready=til
  value.textContent=dead?'Planta morta':ready?'Pronta para colher':tile.paused?'Crescimento pausado':unwatered?'Regue para começar':formatRemaining(remaining);
  track.setAttribute('aria-valuenow',String(Math.round(progress*100)));fill.style.width=progress*100+'%';track.classList.toggle('is-ready',ready);track.classList.toggle('is-dead',dead);
  const elapsed=(Date.now()-healthAnchorAt)/1000;
- const timing=cropTimingText({...tile,state:ready?'READY':tile.state,remainingSeconds:remaining,nominalRemainingSeconds:cropNominalRemainingAfter(tile,healthBaseNominal,elapsed)},Date.parse(display()?.serverTime??'')+tile.remainingSeconds*1000);
+ const nominalRemaining=cropNominalRemainingAfter(tile,healthBaseNominal,elapsed),serverAt=Date.parse(display()?.serverTime??'');
+ const timing=cropTimingText({...tile,state:ready?'READY':tile.state,remainingSeconds:remaining,nominalRemainingSeconds:nominalRemaining},serverAt+tile.remainingSeconds*1000,serverAt+(elapsed+nominalRemaining)*1000);
  nominal.textContent=timing.nominal;nominal.hidden=!timing.nominal;condition.textContent=timing.condition;condition.hidden=!timing.condition;estimate.textContent=timing.estimate;estimate.hidden=!timing.estimate;
  badge.textContent=dead?'Morta':ready?'Pronta':tile.paused?'Parada':tile.dry?'Seca':'Saudável';badge.classList.toggle('is-ready',ready);badge.classList.toggle('is-dead',dead);badge.classList.toggle('is-problem',!ready&&!dead&&(tile.paused||tile.dry));
 }
