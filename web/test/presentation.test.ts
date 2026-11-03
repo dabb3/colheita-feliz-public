@@ -137,6 +137,8 @@ test('each toolbar tool sends the selected seed, fertilizer, and visit revision'
  assert.deepEqual(tileCommand('WATER',tile,'nabo','super'),{action:'WATER',column:2,row:1});
  assert.deepEqual(tileCommand('STEAL',tile,'nabo','amor',true),{action:'STEAL',column:2,row:1,harvestRevision:'17'});
  assert.deepEqual(tileCommand('LOVE',tile,'nabo','amor',true),{action:'LOVE',column:2,row:1,harvestRevision:'17',itemId:'amor'});
+ for(const action of ['SPREAD_INSECTS','SPREAD_WEEDS'])
+  assert.deepEqual(tileCommand(action,tile,'nabo','amor',true),{action,column:2,row:1,harvestRevision:'17'});
 });
 test('crop tooltip uses total nominal duration for growth and rounds remaining time down to elapsed hours',()=>{
  const tile={state:'GROWING',season:2,seasons:4,nominalRemainingSeconds:3600,remainingSeconds:900,dry:true,paused:true,weeds:true,insects:2,protected:true} as import('../src/types.ts').Tile;

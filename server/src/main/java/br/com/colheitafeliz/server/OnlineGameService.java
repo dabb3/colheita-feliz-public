@@ -21,11 +21,14 @@ import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.UUID;
+import java.util.Set;
 import java.util.function.Supplier;
 import static br.com.colheitafeliz.server.OnlineViews.JSON;
 import static br.com.colheitafeliz.server.OnlineViews.object;
 
 final class OnlineGameService implements AutoCloseable {
+    private static final Set<String> PEST_ACTIONS = Set.of("SPREAD_INSECTS", "SPREAD_WEEDS");
+    private static final Set<String> VISIT_ACTIONS = Set.of("STEAL", "LOVE", "SPREAD_INSECTS", "SPREAD_WEEDS");
     private record Loaded(UUID owner, String name, GameState game, long revision, GameSnapshot before) {}
     private final JdbcOnlineStore store;
     private final Clock clock;
@@ -145,14 +148,14 @@ final class OnlineGameService implements AutoCloseable {
     JsonObject visitAction(UUID actor, UUID owner, Command command) {
         command.requireTile();
         if (command.harvestRevision() == null) throw new ApiFailure(400, "Falta a revisão da temporada.");
-        if (!command.action().equals("STEAL") && !command.action().equals("LOVE")) throw new ApiFailure(400, "Ação de visita inválida.");
+        if (!VISIT_ACTIONS.contains(command.action())) throw new ApiFailure(400, "Ação de visita inválida.");
         return store.transaction(actor, tx -> visitAction(tx, actor, owner, command));
     }
 
     JsonObject visitAction(JdbcOnlineStore.Tx tx, UUID actor, UUID owner, Command command) {
         command.requireTile();
         if (command.harvestRevision() == null) throw new ApiFailure(400, "Falta a revisão da temporada.");
-        if (!command.action().equals("STEAL") && !command.action().equals("LOVE")) throw new ApiFailure(400, "Ação de visita inválida.");
+        if (!VISIT_ACTIONS.contains(command.action())) throw new ApiFailure(400, "Ação de visita inválida.");
             authorizeVisit(tx, actor, owner);
             return receipt(tx, actor, command.requestId(), hash("VISIT:" + owner + ":" + JSON.toJson(command)), () -> {
                 tx.lockFarms(actor, owner);
@@ -174,6 +177,21 @@ final class OnlineGameService implements AutoCloseable {
                     } else {
                         result = stealAfterOwnerWindow(visits, destination, visitor, command, season, now);
                         if (result.success()) tx.recordTheft(actor, now);
+                    }
+                } else if (PEST_ACTIONS.contains(command.action())) {
+                    Instant now = clock.instant();
+                    Instant last = tx.lastPest(actor, command.action());
+                    Instant availableAt = last == null ? now : last.plus(Duration.ofHours(24));
+                    if (now.isBefore(availableAt)) {
+                        Duration remaining = Duration.between(now, availableAt);
+                        long seconds = remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);
+                        result = ActionResult.fail("Você já lançou esse tipo de praga nas últimas 24 horas. Disponível em "
+                                + seconds / 3600 + "h " + seconds % 3600 / 60 + "min " + seconds % 60 + "s.");
+                    } else {
+                        result = command.action().equals("SPREAD_INSECTS")
+                                ? visits.spreadInsects(destination.game(), visitor.game(), command.column(), command.row(), season)
+                                : visits.spreadWeeds(destination.game(), visitor.game(), command.column(), command.row(), season);
+                        if (result.success()) tx.recordPest(actor, command.action(), now);
                     }
                 } else {
                     result = visits.fertilizeVisit(destination.game(), visitor.game(), command.column(), command.row(), "amor", season);

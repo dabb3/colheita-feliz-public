@@ -26,11 +26,36 @@ function app(){
  const uiSource=readFileSync(new URL('../src/ui.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(uiSource),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={refresh,logout,syncMusic,toggleMusic,shop,missions,friends,receive,dialog,health,connect,setLoginStep,pickTool,settings,avatarSettings,notify,notifyAction,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
+ source+='\nglobalThis.h={refresh,logout,syncMusic,toggleMusic,shop,missions,friends,receive,dialog,health,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:{...ctx.h,runTimeouts(){for(const [id,callback]of [...timeouts]){timeouts.delete(id);callback();}}},elements,listeners,audioClips,observers,ctx};
 }
 function text(node){return(node.textContent??'')+(node.children??[]).map(child=>typeof child==='object'?text(child):child).join('');}
 function descendants(node){return[node,...(node.children??[]).flatMap(child=>typeof child==='object'?descendants(child):[])];}
+
+test('pest tools exist only in visits and send the selected plot with its revisions',async()=>{
+ const {h,elements}=app(),own=farm('alice'),visited={...farm('bob'),revision:'42'},sent=[];
+ const api={pending:null,mutate:async(path,command)=>{sent.push({path,command});return{result:{success:false,message:'Disponível em 1h 0min 0s.'}};},prepareRequestId:()=>Promise.resolve()};
+ h.set({own,api});h.receive({});assert.ok(!text(elements.get('tools')).includes('1/24h'));
+ h.set({own,visited,api});h.receive({});
+ for(const [action,label,asset]of [['SPREAD_INSECTS','Lançar inseto · 1/24h','verme_1'],['SPREAD_WEEDS','Lançar erva · 1/24h','erva_daninha_1']]){
+  const choice=descendants(elements.get('tools')).find(n=>n.getAttribute?.('aria-label')===label);assert.ok(choice);assert.ok(choice.children.some(n=>n.src===`/assets/classic/effects/${asset}.png`));
+  choice.onclick();await h.tileAction({column:2,row:1,harvestRevision:'9'});
+  assert.equal(text(elements.get('notice')),'Disponível em 1h 0min 0s.');
+  const last=sent.at(-1);assert.equal(last.path,'/v1/farms/bob/visit-actions');assert.equal(JSON.stringify(last.command),JSON.stringify({action,column:2,row:1,harvestRevision:'9',expectedRevision:'42'}));
+ }
+ h.set({own,api});h.receive({});assert.ok(!descendants(elements.get('tools')).some(n=>n.getAttribute?.('aria-label')?.startsWith('Lançar')));
+});
+
+test('pinned pest hint follows tool selection without restarting the growth counter',()=>{
+ const {h,ctx}=app();let clientNow=Date.parse('2026-11-03T12:00:00Z');ctx.Date=class extends Date{static now(){return clientNow;}};
+ h.set({own:farm('alice'),visited:{...farm('bob'),serverTime:'2026-11-03T12:00:00Z'},catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:36000}],animals:[],fertilizers:[],vip:{greenPrice:20}}});h.receive({});
+ const bounds={left:0,top:0,width:1280,height:720};ctx.document.getElementById('game').getBoundingClientRect=()=>bounds;ctx.document.getElementById('farm').getBoundingClientRect=()=>bounds;
+ const panel=ctx.document.getElementById('plant-health');panel.getBoundingClientRect=()=>({width:360,height:280});
+ const tile={column:0,row:0,cropId:'nabo',state:'GROWING',watered:true,season:1,seasons:1,remainingSeconds:3600,nominalRemainingSeconds:3600};
+ h.pickTool('SPREAD_INSECTS');h.health(tile,{x:585,y:400},'tap');assert.match(text(panel),/Lançar inseto nesta planta/);
+ clientNow+=60000;h.pickTool('SPREAD_WEEDS');assert.match(text(panel),/Lançar erva nesta planta/);assert.ok(!text(panel).includes('Lançar inseto nesta planta'));
+ assert.equal(panel.querySelector('.crop-growth-value').textContent,'59min');
+});
 
 test('live shop explains nominal duration and the live popup qualifies its forecast',()=>{
  const {h,ctx}=app(),crop={id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:36000,regrowthSeconds:0,seasons:1,requiredLevel:1,seedPrices:{GOLD:300},vipOnly:false};

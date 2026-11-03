@@ -30,6 +30,40 @@ class VisitServiceTest {
     private void level(GameState state, int level) {
         while (state.progress().level() < level) state.progress().award(state.progress().xpToNext());
     }
+
+    @Test void visitorPestsPauseOnlyTheSelectedPlantAndOwnerToolsRemoveThemWithoutRewards() {
+        var tile = plant("morango", false);
+        tile.water(clock.instant());
+        var before = visitor.snapshot();
+        assertTrue(visits.spreadInsects(owner, visitor, 0, 0, tile.harvestRevision()).success());
+        assertTrue(visits.spreadWeeds(owner, visitor, 0, 0, tile.harvestRevision()).success());
+        assertEquals(1, tile.insects());
+        assertEquals(br.com.colheitafeliz.domain.farm.PestState.WEEDS, tile.pest());
+        assertFalse(visits.spreadInsects(owner, visitor, 0, 0, tile.harvestRevision()).success());
+        assertFalse(visits.spreadWeeds(owner, visitor, 0, 0, tile.harvestRevision()).success());
+        long grown = tile.crop().grownMillisAt(clock.instant());
+        clock.advanceSeconds(60);
+        assertEquals(grown, tile.crop().grownMillisAt(clock.instant()));
+        owner.selectTool(Tool.WEEDER); assertTrue(owner.act(0, 0).success());
+        assertTrue(tile.crop().paused());
+        owner.selectTool(Tool.PESTICIDE); assertTrue(owner.act(0, 0).success());
+        assertFalse(tile.crop().paused());
+        assertEquals(before, visitor.snapshot());
+        assertEquals(TileState.GRASS, owner.farm().tile(1, 0).state());
+    }
+
+    @Test void visitorPestsRejectEmptyUnwateredMatureAndStaleTargets() {
+        assertFalse(visits.spreadInsects(owner, visitor, 0, 0, 0).success());
+        var tile = plant("nabo", false);
+        assertFalse(visits.spreadWeeds(owner, visitor, 0, 0, tile.harvestRevision()).success());
+        tile.water(clock.instant());
+        assertFalse(visits.spreadInsects(owner, visitor, 0, 0, tile.harvestRevision() + 1).success());
+        assertFalse(visits.spreadWeeds(owner, owner, 0, 0, tile.harvestRevision()).success());
+        var ready = TestCrops.growUntilReady(tile, clock.instant());
+        clock.advanceSeconds(Duration.between(clock.instant(), ready).toSeconds());
+        assertFalse(visits.spreadInsects(owner, visitor, 0, 0, tile.harvestRevision()).success());
+        assertFalse(visits.spreadWeeds(owner, visitor, 0, 0, tile.harvestRevision()).success());
+    }
     @Test void theftTransfersOriginWithoutRewardsAndLeavesOnlyTwoStrawberrySeasons() {
         var tile = plant("morango", true);
         var origin = tile.crop().origin();
