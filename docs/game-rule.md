@@ -122,7 +122,7 @@ Na coluna de crescimento, os tempos representam bebê → jovem e jovem → adul
 
 Todos os protetores são comprados adultos e duram 30 dias. Após esse prazo, o animal é removido e o jogador precisa comprá-lo novamente. A falta de alimento pausa a proteção, sem estender a duração de 30 dias. Protetores não podem ser revendidos.
 
-Os protetores não concedem XP por nenhuma ação. Sua única função é bloquear ações de outros jogadores na fazenda, incluindo roubos de plantações, em uma futura implementação multiplayer. Essa definição não indica que o roubo ou o multiplayer já estejam implementados.
+Os protetores não concedem XP por nenhuma ação. Sua função é bloquear ações de visitantes nas terras protegidas, incluindo furto, ajuda com amor e lançamento de pragas. O estado de entrega online é registrado em `ONLINE.md`.
 
 Existem exatamente cinco tipos de protetores: Cão Robô, Cão Mastiff, Avestruz, Cabra e Cavalo, com os preços, níveis e limites da tabela 4.1. O cão normal não integra o catálogo jogável. Cada protetor alimentado e dentro dos 30 dias de validade protege 20% das terras plantáveis do dono. Cinco protetores ativos dão 100% de proteção e impedem qualquer furto. Animais com fome ou expirados não contribuem. A cobertura máxima é 100%; não há mordida, multa ou transferência de ouro como regra substituta.
 
@@ -348,6 +348,14 @@ Um furto bem-sucedido transfere a única unidade daquela temporada para o visita
 Se restarem temporadas, a planta volta ao estágio 1 da temporada seguinte, com relógio zerado, primeira rega pendente e limite de fertilizante renovado. Se era a última temporada, vira planta morta. O furto não remove o terreno nem as próximas temporadas. Exemplo: uma planta de três temporadas furtada uma vez deixa apenas duas temporadas possíveis ao dono, se não houver novos furtos.
 
 Só uma coleta ou furto pode consumir cada temporada. A implementação social deverá resolver concorrência e duplicação de pedidos na autoridade responsável pelo estado, sem confiar em pedidos do cliente. Proteção segue 4.3. Não estender automaticamente essa regra aos produtos de animais: o escopo confirmado aqui é a plantação.
+
+### 13.1. Pragas lançadas por visitantes
+
+Durante a visita a um amigo, o jogador pode escolher uma planta e lançar uma minhoca ou uma erva daninha. Cada tipo possui um limite independente de uma aplicação bem-sucedida por jogador a cada 24 horas reais, somando todas as fazendas visitadas. O prazo começa no sucesso daquele tipo, pelo relógio do servidor, e persiste após logout e reinício. Recusas não gastam a vez; repetir um pedido não aplica outra praga nem renova o prazo. Pedidos simultâneos são resolvidos pela autoridade online.
+
+A planta precisa estar em crescimento, já ter recebido a primeira rega e ocupar terreno sem proteção. Plantas prontas, mortas, terras vazias, fazenda própria e terrenos protegidos recusam a ação. Cinco protetores ativos bloqueiam todas as aplicações, conforme 4.3. Solo seco não impede a aplicação após o início do crescimento. Erva e minhoca podem coexistir; não se pode reaplicar um tipo que a planta já tem. Uma aplicação de inseto começa com uma minhoca, sujeita à multiplicação normal até o limite existente.
+
+As pragas pausam o crescimento sem apagar o progresso. O dono usa herbicida para remover ervas e pesticida para remover insetos; se os dois tipos estiverem presentes, só retoma após remover ambos. A limpeza não renova o limite do visitante. Lançar praga não custa moedas ou itens, não concede XP, moedas, tarefas ou produtos e não consome o limite de furto. A janela de cinco minutos da colheita permanece: planta pronta não recebe pragas.
 
 ## 14. Assets e estado de entrega
 

@@ -495,6 +495,126 @@ class OnlineGameIntegrationTest {
         });
     }
 
+    @Test void pestLimitsAreIndependentGlobalPersistedAndExpireAfterExactlyTwentyFourHours() {
+        UUID carol = preparePestFriends(false);
+        var before = service.farm(bob);
+        var insect = pestCommand(bob, alice, "SPREAD_INSECTS");
+        var first = service.visitAction(bob, alice, insect);
+        assertTrue(first.getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(first, service.visitAction(bob, alice, insect));
+        assertTrue(service.visitAction(bob, alice, pestCommand(bob, alice, "SPREAD_WEEDS")).getAsJsonObject("result").get("success").getAsBoolean());
+        var after = service.farm(bob);
+        for (String field : java.util.List.of("coins", "greenCoins", "currentXp", "level", "seedCounts", "produceLots", "fertilizers", "missions"))
+            assertEquals(before.get(field), after.get(field), field);
+        assertNull(store.transaction(bob, tx -> tx.lastTheft(bob)));
+        store.close();
+        store = new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"), "postgres", "", testSchema);
+        store.initialize(alice);
+        service = new OnlineGameService(store, clock, bound -> bound - 1, 5);
+        clock.advanceSeconds(86399);
+        for (String kind : java.util.List.of("SPREAD_INSECTS", "SPREAD_WEEDS")) {
+            var refused = service.visitAction(bob, carol, pestCommand(bob, carol, kind));
+            assertFalse(refused.getAsJsonObject("result").get("success").getAsBoolean());
+            assertTrue(refused.getAsJsonObject("result").get("message").getAsString().contains("0h 0min 1s"));
+        }
+        clock.advanceSeconds(1);
+        for (String kind : java.util.List.of("SPREAD_INSECTS", "SPREAD_WEEDS"))
+            assertTrue(service.visitAction(bob, carol, pestCommand(bob, carol, kind)).getAsJsonObject("result").get("success").getAsBoolean());
+        var tile = service.farm(carol).getAsJsonArray("tiles").get(0).getAsJsonObject();
+        assertEquals(1, tile.get("insects").getAsInt());
+        assertTrue(tile.get("weeds").getAsBoolean());
+        assertTrue(tile.get("paused").getAsBoolean());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"SPREAD_INSECTS", "SPREAD_WEEDS"})
+    void protectedPestRefusalPreservesStateAndDoesNotSpendTheVisitorsTurn(String kind) {
+        UUID carol = preparePestFriends(true);
+        var ownerBefore = service.farm(alice);
+        var visitorBefore = service.farm(bob);
+        assertFalse(service.visitAction(bob, alice, pestCommand(bob, alice, kind)).getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(ownerBefore.get("revision"), service.farm(alice).get("revision"));
+        assertEquals(visitorBefore.get("revision"), service.farm(bob).get("revision"));
+        assertTrue(service.visitAction(bob, carol, pestCommand(bob, carol, kind)).getAsJsonObject("result").get("success").getAsBoolean());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"SPREAD_INSECTS", "SPREAD_WEEDS"})
+    void concurrentPestAttacksInDifferentFarmsAllowOnlyOneSuccessPerType(String kind) throws Exception {
+        UUID carol = preparePestFriends(false);
+        var one = pestCommand(bob, alice, kind); var two = pestCommand(bob, carol, kind);
+        var start = new java.util.concurrent.CyclicBarrier(2);
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> { start.await(5, java.util.concurrent.TimeUnit.SECONDS); return confirmed(() -> service.visitAction(bob, alice, one)); });
+            var second = executor.submit(() -> { start.await(5, java.util.concurrent.TimeUnit.SECONDS); return confirmed(() -> service.visitAction(bob, carol, two)); });
+            assertEquals(1, (first.get() ? 1 : 0) + (second.get() ? 1 : 0));
+        }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"SPREAD_INSECTS", "SPREAD_WEEDS"})
+    void concurrentVisitorsCannotSpendTwoAllowancesOnTheSamePest(String kind) throws Exception {
+        UUID carol = preparePestFriends(false);
+        var invitation = service.createInvitation(alice, requestId());
+        service.acceptInvitation(carol, "Carol", invitation.get("code").getAsString(), requestId());
+        var one = pestCommand(bob, alice, kind); var two = pestCommand(carol, alice, kind);
+        var start = new java.util.concurrent.CyclicBarrier(2);
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> { start.await(5, java.util.concurrent.TimeUnit.SECONDS); return confirmed(() -> service.visitAction(bob, alice, one)); });
+            var second = executor.submit(() -> { start.await(5, java.util.concurrent.TimeUnit.SECONDS); return confirmed(() -> service.visitAction(carol, alice, two)); });
+            assertEquals(1, (first.get() ? 1 : 0) + (second.get() ? 1 : 0));
+        }
+        assertEquals(1, store.transaction(alice, tx -> tx.query("SELECT count(*) FROM " + testSchema + ".pest_cooldowns", r -> r.getInt(1)).getFirst()).intValue());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"SPREAD_INSECTS", "SPREAD_WEEDS"})
+    void pestRollbackRestoresPlantAndAllowanceAndCleanupDoesNotRenewAttack(String kind) {
+        preparePestFriends(false);
+        var command = pestCommand(bob, alice, kind);
+        assertThrows(IllegalStateException.class, () -> store.transaction(bob, tx -> {
+            assertTrue(service.visitAction(tx, bob, alice, command).getAsJsonObject("result").get("success").getAsBoolean());
+            throw new IllegalStateException("rollback pest");
+        }));
+        var before = service.farm(alice).getAsJsonArray("tiles").get(0).getAsJsonObject();
+        assertEquals(0, before.get("insects").getAsInt()); assertFalse(before.get("weeds").getAsBoolean());
+        assertTrue(service.visitAction(bob, alice, command).getAsJsonObject("result").get("success").getAsBoolean());
+        var ownerFarm = service.farm(alice);
+        var cure = kind.equals("SPREAD_INSECTS") ? "PESTICIDE" : "WEED";
+        assertTrue(service.command(alice, new Command(requestId(), ownerFarm.get("revision").getAsString(), cure, null, null, 0, 0, null))
+                .getAsJsonObject("result").get("success").getAsBoolean());
+        assertFalse(service.visitAction(bob, alice, pestCommand(bob, alice, kind)).getAsJsonObject("result").get("success").getAsBoolean());
+    }
+
+    @Test void pestRoutesRequireFriendshipAndCannotBeUsedAsOwnFarmCommands() {
+        UUID carol = preparePestFriends(false);
+        for (String kind : java.util.List.of("SPREAD_INSECTS", "SPREAD_WEEDS")) {
+            var own = service.farm(bob);
+            var command = new Command(requestId(), own.get("revision").getAsString(), kind, null, null, 0, 0, "0");
+            assertEquals(400, assertThrows(ApiFailure.class, () -> service.command(bob, command)).status());
+            assertEquals(404, assertThrows(ApiFailure.class, () -> service.visitAction(bob, bob, command)).status());
+            assertEquals(404, assertThrows(ApiFailure.class, () -> service.visitAction(carol, alice, command)).status());
+        }
+        assertTrue(service.visitAction(bob, alice, pestCommand(bob, alice, "SPREAD_INSECTS")).getAsJsonObject("result").get("success").getAsBoolean());
+        prepare(bob, "morango", false, false);
+        assertTrue(service.visitAction(carol, bob, pestCommand(carol, bob, "SPREAD_INSECTS")).getAsJsonObject("result").get("success").getAsBoolean());
+    }
+
+    private UUID preparePestFriends(boolean protectors) {
+        connectFriends();
+        UUID carol = UUID.randomUUID();
+        String code = service.createInvitation(bob, requestId()).get("code").getAsString();
+        service.acceptInvitation(carol, "Carol", code, requestId()); service.farm(carol);
+        prepare(alice, "morango", false, protectors);
+        prepare(carol, "morango", false, false);
+        return carol;
+    }
+
+    private Command pestCommand(UUID actor, UUID owner, String kind) {
+        var base = theftCommand(actor, owner);
+        return new Command(base.requestId(), base.expectedRevision(), kind, null, null, base.column(), base.row(), base.harvestRevision());
+    }
+
     private UUID prepareTheftFriends() {
         connectFriends();
         UUID carol = UUID.randomUUID();
