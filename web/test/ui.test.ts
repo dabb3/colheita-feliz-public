@@ -38,6 +38,8 @@ test('market scrolls through all common crops, keeps VIP separate and preserves 
  const farm={level:2,animals:[],vipActive:false};
  renderMarket(root,catalog,farm,'crops','common',group=>pages.push(group),command=>commands.push(command));
  let all=nodes(root);assert.equal(all.filter(n=>n.tag==='article').length,12);
+ assert.ok(all.some(n=>n.textContent==='20 h com rega em dia · 1 temporada(s)'));
+ assert.ok(all.some(n=>n.textContent.includes('Tempo nominal:')&&n.textContent.includes('minhocas pausam')));
  const lock=all.find(n=>n.textContent==='Nível 3');assert.ok(lock);
  assert.equal(all.find(n=>n.tag==='button'&&n.disabled)?.disabled,true);
  assert.equal(all.find(n=>n.className==='market-scroll')!==undefined,true);

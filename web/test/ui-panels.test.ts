@@ -28,9 +28,12 @@ test('deposit preserves mixed currency quantities and skips VIP without blocking
 
 test('plant health separates nominal and unwatered times and hides stale content',()=>{
  const {root,renderPlantHealth}=panels();
- renderPlantHealth(root,catalog,{cropId:'milho',state:'GROWING',stage:1,season:1,seasons:1,nominalRemainingSeconds:72000,remainingSeconds:115200});
- let all=nodes(root);assert.ok(all.some(n=>n.textContent==='Com rega contínua: 20 h'));
- assert.ok(all.some(n=>n.textContent==='Sem nova rega: 1 d 8 h'));
+ renderPlantHealth(root,catalog,{cropId:'milho',state:'GROWING',watered:true,dry:true,stage:1,season:1,seasons:1,nominalRemainingSeconds:72000,remainingSeconds:115200},'2026-11-03T01:00:00Z');
+ let all=nodes(root);assert.ok(all.some(n=>n.textContent==='Com rega em dia e sem pragas: 20 h restantes'));
+ assert.ok(all.some(n=>n.textContent.startsWith('Sem nova rega e sem pragas: 1 d 8 h restantes. Previsão:')));
+ assert.ok(all.some(n=>n.textContent.includes('Solo seco: crescimento à metade')));
+ renderPlantHealth(root,catalog,{cropId:'milho',state:'GROWING',watered:true,paused:true,weeds:true,nominalRemainingSeconds:3600,remainingSeconds:7200},'2026-11-03T01:00:00Z');
+ all=nodes(root);assert.ok(all.some(n=>n.textContent.includes('Crescimento pausado')));assert.ok(!all.some(n=>n.textContent.includes('Previsão:')));
  renderPlantHealth(root,catalog,{cropId:'milho',state:'DEAD'});all=nodes(root);assert.ok(all.some(n=>n.textContent==='Planta morta'));assert.ok(!all.some(n=>n.textContent.startsWith('Com rega')));
  renderPlantHealth(root,catalog,null);assert.equal(root.hidden,true);assert.equal(root.children.length,0);
 });

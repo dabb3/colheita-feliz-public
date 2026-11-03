@@ -163,7 +163,7 @@ function deposit(category = "products") {
 }
 function health(tile: Tile | null) {
   const panel = document.getElementById("plant-health")!;
-  renderPlantHealth(panel, catalog, modal.open ? null : tile);
+  renderPlantHealth(panel, catalog, modal.open ? null : tile, farm.serverTime);
   if (tile) {
     const p = tileCenter(tile.column, tile.row);
     panel.style.setProperty(

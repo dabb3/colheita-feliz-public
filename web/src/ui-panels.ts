@@ -1,7 +1,7 @@
 import type { Farm, Catalog, Tile, CommandFields } from "./types.ts";
 import { text, image, control } from "./ui.ts";
 import { animalPath, productPath } from "./presentation.ts";
-import { durationLabel, animalCare } from "./ui-presentation.ts";
+import { durationLabel, animalCare, cropTimingText } from "./ui-presentation.ts";
 
 function inventoryCard(name: string, path: string, count: number) {
   const card = document.createElement("article");
@@ -224,6 +224,7 @@ export function renderPlantHealth(
   root: HTMLElement,
   catalog: Catalog,
   tile: Tile | null,
+  serverTime?: string,
 ) {
   root.replaceChildren();
   root.hidden = !tile?.cropId;
@@ -244,20 +245,9 @@ export function renderPlantHealth(
   if (tile.state === "READY")
     root.append(text("p", "Pronta para colher", "health-state"));
   else {
-    root.append(
-      text(
-        "p",
-        `Com rega contínua: ${durationLabel(tile.nominalRemainingSeconds)}`,
-      ),
-    );
-    if (!tile.dry)
-      root.append(
-        text(
-          "p",
-          `Sem nova rega: ${durationLabel(tile.remainingSeconds)}`,
-          "muted",
-        ),
-      );
+    const timing = cropTimingText(tile, Date.parse(serverTime ?? "") + tile.remainingSeconds * 1000);
+    for (const line of [timing.nominal, timing.condition, timing.estimate])
+      if (line) root.append(text("p", line, "muted"));
   }
   const conditions = [
     tile.dry ? "Precisa de água" : "",
