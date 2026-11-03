@@ -73,7 +73,7 @@ class LatencyBenchmarkIntegrationTest {
             }
             store.transaction(sentinel, tx -> {
                 assertEquals(1, tx.query("SELECT count(*) FROM " + schema + ".players", row -> row.getInt(1)).getFirst());
-                for (String table : List.of("farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns"))
+                for (String table : List.of("farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "daily_allowances"))
                     assertEquals(0, tx.query("SELECT count(*) FROM " + schema + "." + table, row -> row.getInt(1)).getFirst());
                 tx.execute("DROP SCHEMA " + schema + " CASCADE");
                 return null;

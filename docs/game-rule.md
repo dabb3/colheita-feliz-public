@@ -337,6 +337,14 @@ Não concedem ouro, XP adicional, sementes ou itens. A primeira ação elegível
 
 As tarefas já contam durante o tutorial, não exigem gastar mais que o saldo inicial e não dependem de colher diariamente culturas longas. Renovam à meia-noite UTC, persistindo dia, progresso e pagamentos para impedir recompensa duplicada. A troca de dia não gera recompensa automática por dias ausentes.
 
+### 12.1. Ajuda diária em ouro
+
+No online, cada jogador pode resgatar manualmente **100 moedas de ouro por dia UTC**, na tela de Missões. A disponibilidade renova à meia-noite UTC, no mesmo calendário das tarefas; não é um prazo móvel de 24 horas. A interface mostra a próxima virada no horário local. O valor não depende de saldo, nível ou VIP.
+
+Abrir o jogo, visitar, concluir tutorial ou consultar a fazenda não paga a ajuda. Dias não resgatados não acumulam: após qualquer ausência, somente 100 ouro ficam disponíveis para o dia atual. O resgate não concede moedas verdes, XP, itens, progresso de tutorial ou tarefas e não consome os limites de furto ou pragas. É uma fonte adicional explícita de ouro; não altera o saldo inicial de 500 ouro e 5 verdes.
+
+O servidor persiste o último dia pago junto com o crédito, sem confiar no relógio ou em valores enviados pelo cliente. Repetição, pedidos simultâneos, logout e reinício não pagam novamente. Retrocesso do relógio não reabre dia já resgatado. Uma transação revertida preserva o saldo e a disponibilidade.
+
 ## 13. Furto de temporadas
 
 Cada jogador pode realizar um único furto bem-sucedido a cada 24 horas, somando todas as fazendas visitadas. A janela começa no último furto bem-sucedido, pelo relógio real do servidor; não renova à meia-noite. Tentativas recusadas não consomem o limite. O horário persiste após logout e reinício da API. Pedidos simultâneos só podem produzir um sucesso, e repetir o mesmo pedido não transfere outro produto nem reinicia a janela. Ao recusar pelo limite, informar o tempo restante. Ajuda com amor não consome esse limite.

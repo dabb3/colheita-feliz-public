@@ -32,6 +32,20 @@ function app(){
 function text(node){return(node.textContent??'')+(node.children??[]).map(child=>typeof child==='object'?text(child):child).join('');}
 function descendants(node){return[node,...(node.children??[]).flatMap(child=>typeof child==='object'?descendants(child):[])];}
 
+test('missions claims the own daily allowance explicitly once, including while visiting',async()=>{
+ const {h,elements}=app(),reply=deferred(),sent=[];
+ const allowance={amount:'100',available:true,nextResetAt:'2026-11-04T00:00:00Z'};
+ const own={...farm('alice'),coins:'500',greenCoins:'5',level:1,currentXp:'0',dailyAllowance:allowance};
+ h.set({own,visited:{...farm('bob'),revision:'88'},api:{pending:null,mutate:(path,command)=>{sent.push({path,command});return reply.promise;},prepareRequestId:()=>Promise.resolve()}});
+ h.missions();assert.equal(sent.length,0);
+ const claim=descendants(elements.get('modal-content')).find(node=>node.textContent==='Resgatar 100 ouro');assert.ok(claim);assert.equal(claim.disabled,false);
+ claim.onclick();claim.onclick();assert.equal(sent.length,1);
+ assert.equal(sent[0].path,'/v1/me/actions');assert.equal(JSON.stringify(sent[0].command),JSON.stringify({action:'CLAIM_DAILY_ALLOWANCE',expectedRevision:'1'}));
+ reply.resolve({farm:{...own,revision:'2',coins:'600',dailyAllowance:{...allowance,available:false}},result:{success:true,message:'Ajuda diária resgatada: +100 ouro.'}});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(h.get().own.coins,'600');assert.equal(descendants(elements.get('modal-content')).find(node=>node.textContent==='Já resgatado').disabled,true);
+});
+
 test('pest tools exist only in visits and send the selected plot with its revisions',async()=>{
  const {h,elements}=app(),own=farm('alice'),visited={...farm('bob'),revision:'42'},sent=[];
  const api={pending:null,mutate:async(path,command)=>{sent.push({path,command});return{result:{success:false,message:'Disponível em 1h 0min 0s.'}};},prepareRequestId:()=>Promise.resolve()};

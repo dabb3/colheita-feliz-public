@@ -1,6 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {xpPercent,pageItems,purchaseLock,durationLabel,animalCare,seedGrowthLabel,cropTimingText} from '../src/ui-presentation.ts';
+import {xpPercent,pageItems,purchaseLock,durationLabel,animalCare,seedGrowthLabel,cropTimingText,dailyAllowanceText} from '../src/ui-presentation.ts';
+
+test('daily allowance explains manual claim, no accumulation and the UTC reset in local time',()=>{
+ const status={amount:'100',available:true,nextResetAt:'2026-11-04T00:00:00Z'};
+ const view=dailyAllowanceText(status);assert.equal(view.button,'Resgatar 100 ouro');assert.equal(view.disabled,false);
+ assert.match(view.description,/não acumulam/);assert.match(view.reset,/UTC/);
+ assert.ok(view.reset.includes(new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(Date.parse(status.nextResetAt))));
+ const claimed=dailyAllowanceText({...status,available:false});assert.equal(claimed.button,'Já resgatado');assert.equal(claimed.disabled,true);
+ assert.equal(dailyAllowanceText(undefined),undefined);assert.ok(!dailyAllowanceText({...status,nextResetAt:'invalid'}).reset.includes('Invalid'));
+});
 
 test('seed duration states the conditions behind nominal growth',()=>{
  assert.equal(seedGrowthLabel({growthSeconds:36000,seasons:1}),'10 h com rega em dia · 1 temporada(s)');

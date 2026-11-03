@@ -1,6 +1,6 @@
 import type { Farm, Catalog, CommandFields } from "./types.ts";
 import { animalPath } from "./presentation.ts";
-import { xpPercent, purchaseLock, seedGrowthLabel, CROP_TIME_NOTICE } from "./ui-presentation.ts";
+import { xpPercent, purchaseLock, seedGrowthLabel, CROP_TIME_NOTICE, dailyAllowanceText } from "./ui-presentation.ts";
 
 export function text(tag: string, value: string, className = "") {
   const node = document.createElement(tag);
@@ -21,6 +21,16 @@ export function control(label: string, action: () => void) {
   node.setAttribute("data-focus-key", label);
   node.onclick = action;
   return node;
+}
+
+export function renderDailyAllowance(root: HTMLElement, status: Farm['dailyAllowance'], onClaim: () => void) {
+  const model = dailyAllowanceText(status);
+  if (!model) return;
+  const card = document.createElement('section'); card.className = 'daily-allowance';
+  const title = text('h3', model.title); title.prepend(image('classic/icons/moeda-comum.png'));
+  const claim = control(model.button, onClaim); claim.disabled = model.disabled;
+  card.append(title, text('p', model.description), claim, text('p', model.reset, 'muted'));
+  root.append(card);
 }
 
 export function renderWallet(

@@ -50,6 +50,7 @@ export interface Farm {
   }[];
   feed?: Record<string, number>;
   fertilizers?: Record<string, number>;
+  dailyAllowance?: { amount: string; available: boolean; nextResetAt: string };
   tutorial?: { title?: string; hint?: string };
   tutorialStep?: number;
   tutorialTotal?: number;

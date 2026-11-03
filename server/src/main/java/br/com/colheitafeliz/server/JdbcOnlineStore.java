@@ -11,6 +11,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -25,7 +26,7 @@ import java.util.function.Function;
 final class JdbcOnlineStore implements AutoCloseable {
     static final int RECEIPTS_PER_ACTOR = 1000;
     record Player(UUID id, String name, boolean active) {}
-    record Farm(GameSnapshot snapshot, long revision, Instant time) {}
+    record Farm(GameSnapshot snapshot, long revision, Instant time, LocalDate allowanceDay) {}
     record Receipt(String hash, JsonObject response) {}
     record Invitation(UUID owner, UUID usedBy, Instant expiresAt) {}
     private record FarmWrite(UUID owner, GameSnapshot snapshot, long revision, Instant time) {}
@@ -85,8 +86,10 @@ final class JdbcOnlineStore implements AutoCloseable {
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".pest_cooldowns (actor uuid NOT NULL REFERENCES "
                     + schema + ".players(id), kind text NOT NULL CHECK(kind IN ('SPREAD_INSECTS','SPREAD_WEEDS')), "
                     + "last_applied_at timestamptz NOT NULL, PRIMARY KEY(actor,kind))");
+            tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".daily_allowances (actor uuid PRIMARY KEY REFERENCES "
+                    + schema + ".players(id), last_claimed_day date NOT NULL)");
             tx.execute("REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
-            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns")) {
+            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "daily_allowances")) {
                 tx.execute("ALTER TABLE " + schema + "." + table + " ENABLE ROW LEVEL SECURITY");
                 tx.execute("REVOKE ALL ON " + schema + "." + table + " FROM PUBLIC");
             }
@@ -203,10 +206,15 @@ final class JdbcOnlineStore implements AutoCloseable {
             players.remove(id);
         }
         Farm farm(UUID owner) {
-            return first(query("SELECT snapshot,revision,game_time,ruleset FROM " + schema + ".farms WHERE owner=? FOR UPDATE", r -> {
+            return first(query("SELECT f.snapshot,f.revision,f.game_time,f.ruleset,a.last_claimed_day FROM " + schema
+                    + ".farms f LEFT JOIN " + schema + ".daily_allowances a ON a.actor=f.owner WHERE f.owner=? FOR UPDATE OF f", r -> {
                 if (!GameSave.RULESET.equals(r.getString(4))) throw new ApiFailure(503, "Versão da fazenda online incompatível.");
-                return new Farm(JSON.fromJson(r.getString(1), GameSnapshot.class), r.getLong(2), r.getTimestamp(3).toInstant());
+                return new Farm(JSON.fromJson(r.getString(1), GameSnapshot.class), r.getLong(2), r.getTimestamp(3).toInstant(), r.getObject(5, LocalDate.class));
             }, owner));
+        }
+        void recordAllowance(UUID actor, LocalDate day) {
+            execute("INSERT INTO " + schema + ".daily_allowances (actor,last_claimed_day) VALUES (?,?) "
+                    + "ON CONFLICT(actor) DO UPDATE SET last_claimed_day=EXCLUDED.last_claimed_day", actor, day);
         }
         void save(UUID owner, GameSnapshot snapshot, long revision, Instant now) {
             if (pendingSaves != null) {
