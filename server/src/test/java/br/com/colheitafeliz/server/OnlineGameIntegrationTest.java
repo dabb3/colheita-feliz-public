@@ -408,6 +408,93 @@ class OnlineGameIntegrationTest {
         assertFalse(service.visitAction(bob, alice, theftCommand(bob, alice)).getAsJsonObject("result").get("success").getAsBoolean());
     }
 
+    @Test void ownerHasFiveMinutesBeforeTheftAndRefusalDoesNotSpendDailyLimit() {
+        connectFriends();
+        prepareMatureNow(alice, "morango", 1);
+        var before = service.farm(bob);
+        var refused = service.visitAction(bob, alice, theftCommand(bob, alice));
+        assertFalse(refused.getAsJsonObject("result").get("success").getAsBoolean());
+        assertTrue(refused.getAsJsonObject("result").get("message").getAsString().contains("5min 0s"));
+        assertNull(store.transaction(bob, tx -> tx.lastTheft(bob)));
+        assertEquals(before.get("revision"), service.farm(bob).get("revision"));
+        assertEquals(0, quantity(service.farm(bob)));
+        clock.advanceSeconds(299);
+        clock.now = clock.now.plusNanos(999_000_000);
+        assertFalse(service.visitAction(bob, alice, theftCommand(bob, alice)).getAsJsonObject("result").get("success").getAsBoolean());
+        clock.now = clock.now.plusNanos(1_000_000);
+        assertTrue(service.visitAction(bob, alice, theftCommand(bob, alice)).getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(1, quantity(service.farm(bob)));
+        assertFalse(service.visitAction(bob, alice, theftCommand(bob, alice)).getAsJsonObject("result").get("success").getAsBoolean());
+    }
+
+    @Test void ownerCanHarvestImmediatelyDuringExclusiveWindow() {
+        connectFriends();
+        prepareMatureNow(alice, "morango", 1);
+        var farm = service.farm(alice);
+        assertTrue(service.command(alice, new Command(requestId(), farm.get("revision").getAsString(), "HARVEST", null, null, 0, 0, null))
+                .getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(1, quantity(service.farm(alice)));
+        assertEquals(0, quantity(service.farm(bob)));
+    }
+
+    @Test void realFertilizerActionStartsTheOwnerWindowWhenItCompletesGrowth() {
+        connectFriends();
+        prepare(alice, "nabo", false, false);
+        clock.advanceSeconds(58200); // 15min of growth left; water before applying fertilizer.
+        var farm = service.farm(alice);
+        var watered = service.command(alice, new Command(requestId(), farm.get("revision").getAsString(), "WATER", null, null, 0, 0, null));
+        assertTrue(watered.getAsJsonObject("result").get("success").getAsBoolean());
+        var completed = service.command(alice, new Command(requestId(), watered.getAsJsonObject("farm").get("revision").getAsString(),
+                "FERTILIZE", "comum", null, 0, 0, null));
+        assertTrue(completed.getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals("READY", completed.getAsJsonObject("farm").getAsJsonArray("tiles").get(0).getAsJsonObject().get("state").getAsString());
+        assertFalse(service.visitAction(bob, alice, theftCommand(bob, alice)).getAsJsonObject("result").get("success").getAsBoolean());
+        clock.advanceSeconds(300);
+        assertTrue(service.visitAction(bob, alice, theftCommand(bob, alice)).getAsJsonObject("result").get("success").getAsBoolean());
+    }
+
+    @Test void offlineMaturityAndRestartDoNotRestartOwnerWindow() {
+        connectFriends();
+        prepare(alice, "nabo", false, false);
+        // No reads while growing: 10h crop, 3h20 moist + 13h20 dry, then the 5min window.
+        clock.advanceSeconds(60301);
+        store.close();
+        store = new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"), "postgres", "", testSchema);
+        service = new OnlineGameService(store, clock, bound -> bound - 1, 5);
+        assertTrue(service.visitAction(bob, alice, theftCommand(bob, alice)).getAsJsonObject("result").get("success").getAsBoolean());
+    }
+
+    @Test void eachNewSeasonGetsItsOwnExclusiveWindow() {
+        connectFriends();
+        prepareMatureNow(alice, "morango", 1);
+        var farm = service.farm(alice);
+        service.command(alice, new Command(requestId(), farm.get("revision").getAsString(), "HARVEST", null, null, 0, 0, null));
+        prepareMatureNow(alice, "morango", 2);
+        assertFalse(service.visitAction(bob, alice, theftCommand(bob, alice)).getAsJsonObject("result").get("success").getAsBoolean());
+        clock.advanceSeconds(300);
+        assertTrue(service.visitAction(bob, alice, theftCommand(bob, alice)).getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(3, service.farm(alice).getAsJsonArray("tiles").get(0).getAsJsonObject().get("season").getAsInt());
+    }
+
+    private void prepareMatureNow(UUID owner, String cropId, int season) {
+        store.transaction(owner, tx -> {
+            tx.lockFarms(owner);
+            var saved = tx.farm(owner);
+            var game = br.com.colheitafeliz.game.GameState.restore(clock::instant, clock,
+                    br.com.colheitafeliz.game.CropCatalogLoader.load(), saved.snapshot(), bound -> bound - 1);
+            var type = game.catalog().get(cropId);
+            var origin = new br.com.colheitafeliz.domain.inventory.ItemLot(type.id(), br.com.colheitafeliz.domain.economy.Currency.GOLD,
+                    type.seedPrices().get(br.com.colheitafeliz.domain.economy.Currency.GOLD), 1, false);
+            var crop = new br.com.colheitafeliz.domain.crop.Crop(type, clock.instant(), origin, season).water(clock.instant())
+                    .advance(clock.instant(), type.growthTime(season).toMillis());
+            var tile = game.farm().tile(0, 0);
+            tile.restore(br.com.colheitafeliz.domain.farm.TileState.READY, crop, br.com.colheitafeliz.domain.farm.PestState.NONE,
+                    null, 0, null, null, false, tile.harvestRevision() + 1);
+            tx.save(owner, game.snapshot(), saved.revision() + 1, clock.instant());
+            return null;
+        });
+    }
+
     private UUID prepareTheftFriends() {
         connectFriends();
         UUID carol = UUID.randomUUID();
