@@ -2,7 +2,7 @@ import {createClient} from '@supabase/supabase-js';
 import type {Farm,Catalog,Tile,Reply,CommandFields} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
-import {renderWallet,control,text} from './ui.ts';
+import {renderWallet,control,text,renderDailyAllowance} from './ui.ts';
 import {durationLabel,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText} from './ui-presentation.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,readAvatar,saveAvatar,type AvatarChoice} from './avatar.ts';
 import {periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalStatusText,animalActionLabel,animalClickCommand,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
@@ -58,6 +58,7 @@ function syncMusic(period=periodAt(new Date())){
 function toggleMusic(){musicEnabled=!musicEnabled;saveAudioSettings();syncAudioRow('music');syncMusic();}
 function shortcutPanel(title:string,open:()=>void){if(shortcutPanelState(modal.open,element('modal-title').textContent,title)==='close')modal.close();else open();}
 function actionIcon(action:string,itemId?:string){
+ if(action==='CLAIM_DAILY_ALLOWANCE')return 'classic/icons/moeda-comum.png';
  if(action==='SPREAD_INSECTS')return 'classic/effects/verme_1.png';
  if(action==='SPREAD_WEEDS')return 'classic/effects/erva_daninha_1.png';
  const icon:Record<string,string>={PLOW:'hud/pa-ui',PLANT:'hud/saco-ui',WATER:'hud/regador-ui',WEED:'hud/herbicida-ui',PESTICIDE:'hud/pesticida-ui',HARVEST:'hud/mao-restaurada',STEAL:'hud/mao-restaurada',FERTILIZE:'adubo-comum',LOVE:'adubo-amor'};
@@ -435,6 +436,7 @@ function deposit(){
 function missions(){
  dialog('Missões');
  refreshDialog=missions;
+ renderDailyAllowance(content,own?.dailyAllowance,()=>void action({action:'CLAIM_DAILY_ALLOWANCE'}));
  const daily=own?.missions??[],active=daily.filter(mission=>!mission.done),completed=daily.filter(mission=>mission.done),hasTutorial=!!own?.tutorial,activeCount=active.length+(hasTutorial?1:0);
  const activeSection=document.createElement('section');activeSection.className='mission-section';activeSection.append(sectionHeading('Em andamento'));
  if(own?.tutorial){const total=Math.max(1,own.tutorialTotal??6),progress=Math.min(own.tutorialStep??0,total);activeSection.append(missionCard('Tutorial',own.tutorial.title??'',own.tutorial.hint??'',progress,total));}

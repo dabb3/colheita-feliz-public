@@ -615,6 +615,105 @@ class OnlineGameIntegrationTest {
         return new Command(base.requestId(), base.expectedRevision(), kind, null, null, base.column(), base.row(), base.harvestRevision());
     }
 
+    @Test void dailyAllowanceRequiresExplicitClaimPaysOnlyGoldAndReplaysExactly() {
+        var before = service.farm(alice);
+        assertTrue(before.getAsJsonObject("dailyAllowance").get("available").getAsBoolean());
+        assertEquals("100", before.getAsJsonObject("dailyAllowance").get("amount").getAsString());
+        assertEquals("500", service.farm(alice).get("coins").getAsString());
+        var command = allowanceCommand(alice);
+        var reply = service.command(alice, command);
+        assertTrue(reply.getAsJsonObject("result").get("success").getAsBoolean());
+        var paid = reply.getAsJsonObject("farm");
+        assertEquals("600", paid.get("coins").getAsString());
+        assertFalse(paid.getAsJsonObject("dailyAllowance").get("available").getAsBoolean());
+        for (String field : java.util.List.of("greenCoins", "currentXp", "level", "seedCounts", "produceLots", "fertilizers", "missions", "tutorialStep"))
+            assertEquals(before.get(field), paid.get(field), field);
+        assertEquals(reply, service.command(alice, command));
+        assertFalse(service.command(alice, allowanceCommand(alice)).getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals("600", service.farm(alice).get("coins").getAsString());
+    }
+
+    @Test void allowanceRenewsAtUtcMidnightWithoutAccumulatingAbsencesOrAllowingClockRollback() {
+        service.command(alice, allowanceCommand(alice));
+        clock.advanceSeconds(43199);
+        assertFalse(service.farm(alice).getAsJsonObject("dailyAllowance").get("available").getAsBoolean());
+        clock.advanceSeconds(1);
+        assertTrue(service.farm(alice).getAsJsonObject("dailyAllowance").get("available").getAsBoolean());
+        service.command(alice, allowanceCommand(alice));
+        assertEquals("700", service.farm(alice).get("coins").getAsString());
+        clock.advanceSeconds(4 * 86400);
+        service.command(alice, allowanceCommand(alice));
+        assertEquals("800", service.farm(alice).get("coins").getAsString());
+        clock.advanceSeconds(-86400);
+        assertFalse(service.command(alice, allowanceCommand(alice)).getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals("800", service.farm(alice).get("coins").getAsString());
+    }
+
+    @Test void dailyAllowanceSurvivesRestartAndIsPrivateAndIndependentPerPlayer() {
+        connectFriends();
+        service.command(alice, allowanceCommand(alice));
+        assertFalse(service.visit(bob, alice).has("dailyAllowance"));
+        assertTrue(service.command(bob, allowanceCommand(bob)).getAsJsonObject("result").get("success").getAsBoolean());
+        store.close();
+        store = new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"), "postgres", "", testSchema);
+        store.initialize(alice);
+        service = new OnlineGameService(store, clock, bound -> bound - 1, 5);
+        assertFalse(service.farm(alice).getAsJsonObject("dailyAllowance").get("available").getAsBoolean());
+        assertEquals("600", service.farm(alice).get("coins").getAsString());
+        assertFalse(service.command(bob, allowanceCommand(bob)).getAsJsonObject("result").get("success").getAsBoolean());
+        var other = allowanceCommand(alice);
+        assertEquals(400, assertThrows(ApiFailure.class, () -> service.visitAction(alice, bob, other)).status());
+        var revoked = allowanceCommand(bob);
+        store.transaction(alice, tx -> { tx.setActive(bob, false); return null; });
+        assertEquals(403, assertThrows(ApiFailure.class, () -> service.command(bob, revoked)).status());
+    }
+
+    @Test void concurrentDailyClaimsCreditOneHundredOnlyOnce() throws Exception {
+        var one = allowanceCommand(alice); var two = allowanceCommand(alice);
+        var start = new java.util.concurrent.CyclicBarrier(2);
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> { start.await(5, java.util.concurrent.TimeUnit.SECONDS); return confirmed(() -> service.command(alice, one)); });
+            var second = executor.submit(() -> { start.await(5, java.util.concurrent.TimeUnit.SECONDS); return confirmed(() -> service.command(alice, two)); });
+            assertEquals(1, (first.get() ? 1 : 0) + (second.get() ? 1 : 0));
+        }
+        assertEquals("600", service.farm(alice).get("coins").getAsString());
+    }
+
+    @Test void allowanceAndReceiptRollBackTogether() {
+        var claim = allowanceCommand(alice);
+        assertThrows(IllegalStateException.class, () -> store.transaction(alice, tx -> {
+            assertTrue(service.command(tx, alice, claim).getAsJsonObject("result").get("success").getAsBoolean());
+            throw new IllegalStateException("rollback allowance");
+        }));
+        assertEquals("500", service.farm(alice).get("coins").getAsString());
+        assertTrue(service.farm(alice).getAsJsonObject("dailyAllowance").get("available").getAsBoolean());
+        assertTrue(service.command(alice, claim).getAsJsonObject("result").get("success").getAsBoolean());
+    }
+
+    @Test void allowanceHttpRejectsAClientSuppliedAmountAndAcceptsOnlyTheFixedReward() throws Exception {
+        var claim = allowanceCommand(alice);
+        Authenticator auth = header -> new Authenticator.Identity(alice, "Alice");
+        try (var http = new GameHttpServer(new java.net.InetSocketAddress("127.0.0.1", 0), service, auth,
+                java.util.Set.of("http://localhost:5173"), true, clock);
+             var client = java.net.http.HttpClient.newHttpClient()) {
+            http.start();
+            var uri = java.net.URI.create("http://127.0.0.1:" + http.port() + "/v1/me/actions");
+            var forged = OnlineViews.JSON.toJsonTree(claim).getAsJsonObject(); forged.addProperty("amount", 9999);
+            var bad = java.net.http.HttpRequest.newBuilder(uri).header("Content-Type", "application/json")
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(forged.toString())).build();
+            assertEquals(400, client.send(bad, java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode());
+            var valid = java.net.http.HttpRequest.newBuilder(uri).header("Content-Type", "application/json")
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(OnlineViews.JSON.toJson(claim))).build();
+            var response = client.send(valid, java.net.http.HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, response.statusCode());
+            assertEquals("600", com.google.gson.JsonParser.parseString(response.body()).getAsJsonObject().getAsJsonObject("farm").get("coins").getAsString());
+        }
+    }
+
+    private Command allowanceCommand(UUID actor) {
+        return new Command(requestId(), service.farm(actor).get("revision").getAsString(), "CLAIM_DAILY_ALLOWANCE", null, null, null, null, null);
+    }
+
     private UUID prepareTheftFriends() {
         connectFriends();
         UUID carol = UUID.randomUUID();

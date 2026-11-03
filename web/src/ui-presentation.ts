@@ -1,4 +1,11 @@
-import type {Crop,Tile} from './types.ts';
+import type {Crop,Tile,Farm} from './types.ts';
+
+export function dailyAllowanceText(status?:Farm['dailyAllowance']) {
+ if(!status)return undefined;
+ const resetAt=Date.parse(status.nextResetAt);
+ const reset=Number.isFinite(resetAt)?`Próxima virada: ${new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(resetAt)} (horário local; dia UTC).`:'Renova à meia-noite UTC.';
+ return {title:`Ajuda diária · ${status.amount} ouro`,description:'Resgate uma vez por dia. Valores não resgatados não acumulam.',button:status.available?`Resgatar ${status.amount} ouro`:'Já resgatado',disabled:!status.available,reset};
+}
 
 export const CROP_TIME_NOTICE='Tempo nominal: mantenha a rega em dia e a planta sem pragas. Solo seco cresce à metade da velocidade; ervas e minhocas pausam o crescimento.';
 

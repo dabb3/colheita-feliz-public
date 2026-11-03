@@ -1,5 +1,5 @@
 import type { Farm, Catalog, Tile, CommandFields } from "./types.ts";
-import { text, image, control } from "./ui.ts";
+import { text, image, control, renderDailyAllowance } from "./ui.ts";
 import { animalPath, productPath } from "./presentation.ts";
 import { durationLabel, animalCare, cropTimingText } from "./ui-presentation.ts";
 
@@ -342,6 +342,7 @@ export function renderAnimal(
 
 export function renderMissions(root: HTMLElement, farm: Farm) {
   root.replaceChildren();
+  renderDailyAllowance(root, farm.dailyAllowance, () => {});
   const missions = farm.missions ?? [];
   root.append(
     text(

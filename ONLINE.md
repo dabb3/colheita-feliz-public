@@ -288,6 +288,14 @@ precisam de ensaio; testes automatizados não comprovam esses resultados.
 
 A loja identifica o tempo nominal como duração com rega em dia e sem pragas. Solo seco cresce à metade da velocidade; ervas e minhocas pausam o crescimento. O popup separa o restante com rega em dia do restante sem nova rega. Cada cenário mostra sua própria previsão com data e hora locais, calculadas a partir do horário retornado pela API: uma mantendo a rega em dia e sem pragas; outra sem nova rega e sem novas pragas. O contador atualiza a previsão ideal conforme o crescimento real: ela permanece estável com solo úmido e acompanha o atraso enquanto a planta continuar seca. Pragas e plantas sem a primeira rega não exibem previsão de conclusão. Os textos usam os dados existentes da API; não alteram regras, preços, duração, relógio autoritativo ou saves.
 
+## Ajuda diária de 100 ouro
+
+Missões oferece resgate manual de 100 ouro por dia UTC, sem acumular valores de dias ausentes e sem depender de saldo, nível ou VIP. O botão só aparece quando a API informa dailyAllowance; após o resgate fica bloqueado e mostra a próxima virada em data/hora local. Não há pagamento por GET, login ou tutorial, nem XP, verdes, itens ou progresso de tarefas. A regra fonte é a seção 12.1 de docs/game-rule.md.
+
+CLAIM_DAILY_ALLOWANCE usa POST /v1/me/actions e os identificadores/revisões existentes. O backend define o valor; campos extras como amount são recusados. A tabela privada colheita.daily_allowances guarda somente actor e last_claimed_day, com RLS/revogação como as demais tabelas, criada aditivamente na inicialização. Crédito, último dia e recibo são confirmados na mesma transação, sob lock por ator e fazenda; replay não paga novamente e rollback desfaz tudo. A data usa UTC explícito e retrocessos não reabrem dias já pagos.
+
+A consulta existente de fazenda usa LEFT JOIN para carregar o último dia, sem novo roundtrip SQL por ação. dailyAllowance (amount, available, nextResetAt) aparece somente na projeção própria. Não muda snapshot, save desktop v20 ou credenciais. Incluir daily_allowances e fazendas no mesmo backup/restauração; não apagar os registros ao limpar recibos ou fazer rollback. Jogadores sem registro começam com o resgate do dia disponível, sem pagamentos retroativos. Publicar API antes do frontend e evitar versões divergentes atendendo simultaneamente; a implantação cria estrutura, mas não distribui ouro.
+
 ## Inspeção por toque nas visitas
 
 A visita começa com o cursor Inspecionar plantas. Tocar numa planta abre e fixa o popup de crescimento, inclusive em celular; clicar com o cursor também inspeciona. A inspeção não envia ações sociais, mesmo em plantas prontas. Furto, amor e pragas exigem selecionar a ferramenta correspondente. As restrições continuam verificadas pelo servidor.

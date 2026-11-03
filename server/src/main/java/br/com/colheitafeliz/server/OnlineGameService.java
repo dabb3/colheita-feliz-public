@@ -17,6 +17,8 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.HexFormat;
@@ -27,9 +29,10 @@ import static br.com.colheitafeliz.server.OnlineViews.JSON;
 import static br.com.colheitafeliz.server.OnlineViews.object;
 
 final class OnlineGameService implements AutoCloseable {
+    private static final BigDecimal DAILY_ALLOWANCE = BigDecimal.valueOf(100);
     private static final Set<String> PEST_ACTIONS = Set.of("SPREAD_INSECTS", "SPREAD_WEEDS");
     private static final Set<String> VISIT_ACTIONS = Set.of("STEAL", "LOVE", "SPREAD_INSECTS", "SPREAD_WEEDS");
-    private record Loaded(UUID owner, String name, GameState game, long revision, GameSnapshot before) {}
+    private record Loaded(UUID owner, String name, GameState game, long revision, GameSnapshot before, LocalDate allowanceDay) {}
     private final JdbcOnlineStore store;
     private final Clock clock;
     private final RandomSource random;
@@ -86,7 +89,18 @@ final class OnlineGameService implements AutoCloseable {
                 tx.lockFarms(actor);
                 var farm = load(tx, actor);
                 checkRevision(farm, command);
-                var result = act(farm.game(), command);
+                ActionResult result;
+                if (command.action().equals("CLAIM_DAILY_ALLOWANCE")) {
+                    LocalDate today = LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC);
+                    if (farm.allowanceDay() != null && !today.isAfter(farm.allowanceDay())) {
+                        result = ActionResult.fail("A ajuda diária já foi resgatada. Aguarde a próxima virada do dia UTC.");
+                    } else {
+                        farm.game().wallet().credit(Currency.GOLD, DAILY_ALLOWANCE);
+                        tx.recordAllowance(actor, today);
+                        farm = new Loaded(farm.owner(), farm.name(), farm.game(), farm.revision(), farm.before(), today);
+                        result = ActionResult.ok("Ajuda diária resgatada: +100 ouro.");
+                    }
+                } else result = act(farm.game(), command);
                 return object("result", result, "farm", persist(tx, farm, true, true));
             });
     }
@@ -225,14 +239,22 @@ final class OnlineGameService implements AutoCloseable {
                 : GameState.restore(fixed::instant, fixed, catalog, saved.snapshot(), random);
         if (saved == null) game.startNewFarm();
         game.refresh(); game.protectedPlots();
-        return new Loaded(owner, participant.name(), game, saved == null ? 0 : saved.revision(), saved == null ? null : saved.snapshot());
+        return new Loaded(owner, participant.name(), game, saved == null ? 0 : saved.revision(), saved == null ? null : saved.snapshot(), saved == null ? null : saved.allowanceDay());
     }
 
     private JsonObject persist(JdbcOnlineStore.Tx tx, Loaded loaded, boolean force, boolean own) {
         var snapshot = loaded.game().snapshot();
         long revision = force || !snapshot.equals(loaded.before()) ? Math.incrementExact(loaded.revision()) : loaded.revision();
         tx.save(loaded.owner(), snapshot, revision, loaded.game().now());
-        return OnlineViews.farm(loaded.owner(), loaded.name(), loaded.game(), revision, own);
+        var view = OnlineViews.farm(loaded.owner(), loaded.name(), loaded.game(), revision, own);
+        if (own) {
+            LocalDate today = LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC);
+            boolean available = loaded.allowanceDay() == null || today.isAfter(loaded.allowanceDay());
+            LocalDate resetDay = (available ? today : loaded.allowanceDay()).plusDays(1);
+            view.add("dailyAllowance", object("amount", DAILY_ALLOWANCE.toPlainString(), "available", available,
+                    "nextResetAt", resetDay.atStartOfDay(ZoneOffset.UTC).toInstant().toString()));
+        }
+        return view;
     }
 
     private static JdbcOnlineStore.Player active(JdbcOnlineStore.Tx tx, UUID actor) {
