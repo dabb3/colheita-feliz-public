@@ -1,6 +1,6 @@
 import type { Farm, Catalog, CommandFields } from "./types.ts";
 import { animalPath } from "./presentation.ts";
-import { xpPercent, purchaseLock } from "./ui-presentation.ts";
+import { xpPercent, purchaseLock, seedGrowthLabel, CROP_TIME_NOTICE } from "./ui-presentation.ts";
 
 export function text(tag: string, value: string, className = "") {
   const node = document.createElement(tag);
@@ -103,7 +103,7 @@ export function renderMarket(
       tab.setAttribute("aria-pressed", String(id === seedGroup));
       subtabs.append(tab);
     }
-    root.append(subtabs);
+    root.append(subtabs, text("p", CROP_TIME_NOTICE, "muted crop-time-notice"));
   }
   const entries =
     category === "crops"
@@ -113,7 +113,7 @@ export function renderMarket(
             id: c.id,
             name: c.name,
             image: `classic/crops/plants_phase_one_to_five/${c.spriteStem}_5.png`,
-            details: `${c.growthSeconds / 3600} h · ${c.seasons} temporada(s)`,
+            details: seedGrowthLabel(c),
             prices: c.seedPrices,
             level: c.requiredLevel,
             vip: c.vipOnly,

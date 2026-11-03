@@ -1,6 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {xpPercent,pageItems,purchaseLock,durationLabel,animalCare} from '../src/ui-presentation.ts';
+import {xpPercent,pageItems,purchaseLock,durationLabel,animalCare,seedGrowthLabel,cropTimingText} from '../src/ui-presentation.ts';
+
+test('seed duration states the conditions behind nominal growth',()=>{
+ assert.equal(seedGrowthLabel({growthSeconds:36000,seasons:1}),'10 h com rega em dia · 1 temporada(s)');
+});
+
+test('crop timing separates ideal remaining growth from the forecast without further watering',()=>{
+ const tile={state:'GROWING',watered:true,dry:true,paused:false,weeds:false,insects:0,nominalRemainingSeconds:36000,remainingSeconds:60000};
+ const forecast=Date.parse('2026-11-04T03:25:00Z'),view=cropTimingText(tile,forecast);
+ assert.equal(view.nominal,'Com rega em dia e sem pragas: 10 h restantes');
+ assert.equal(view.condition,'Solo seco: crescimento à metade da velocidade. Regue para acelerar.');
+ assert.ok(view.estimate.startsWith('Sem nova rega e sem pragas: 16 h 40 min restantes. Previsão: '));
+ assert.ok(view.estimate.includes(new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(forecast)));
+ assert.equal(cropTimingText({...tile,dry:false},forecast).condition,'Mantenha a rega em dia para evitar atrasos.');
+ assert.ok(!cropTimingText(tile,NaN).estimate.includes('Previsão:'));
+});
+
+test('paused and never-watered plants cannot promise a harvest timestamp',()=>{
+ const tile={state:'GROWING',watered:true,dry:false,paused:true,weeds:true,insects:1,nominalRemainingSeconds:3600,remainingSeconds:7200};
+ const paused=cropTimingText(tile,Date.now());
+ assert.equal(paused.estimate,'');assert.match(paused.condition,/Crescimento pausado/);assert.match(paused.nominal,/Após remover as pragas/);
+ assert.equal(cropTimingText({...tile,paused:false},Date.now()).estimate,'');
+ const unwatered=cropTimingText({...tile,paused:false,weeds:false,insects:0,watered:false,dry:true},Date.now());
+ assert.equal(unwatered.estimate,'');assert.equal(unwatered.condition,'Regue para iniciar o crescimento.');
+ for(const state of ['READY','DEAD'])assert.deepEqual(cropTimingText({...tile,state},Date.now()),{nominal:'',condition:'',estimate:''});
+});
 
 test('XP progress keeps integer precision beyond the safe Number range',()=>{
  assert.equal(xpPercent('900719925474099300','1801439850948198600'),50);

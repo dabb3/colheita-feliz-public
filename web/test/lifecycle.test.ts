@@ -32,6 +32,28 @@ function app(){
 function text(node){return(node.textContent??'')+(node.children??[]).map(child=>typeof child==='object'?text(child):child).join('');}
 function descendants(node){return[node,...(node.children??[]).flatMap(child=>typeof child==='object'?descendants(child):[])];}
 
+test('live shop explains nominal duration and the live popup qualifies its forecast',()=>{
+ const {h,ctx}=app(),crop={id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:36000,regrowthSeconds:0,seasons:1,requiredLevel:1,seedPrices:{GOLD:300},vipOnly:false};
+ h.set({own:{...farm('alice'),level:1,serverTime:'2026-11-03T01:00:00Z'},catalog:{crops:[crop],animals:[],fertilizers:[],vip:{greenPrice:20}}});
+ h.shop();assert.match(text(ctx.document.getElementById('modal-content')),/10 h com rega em dia/);assert.match(text(ctx.document.getElementById('modal-content')),/Tempo nominal:/);
+ ctx.document.getElementById('modal').close();
+ const bounds={left:0,top:0,width:1280,height:720};ctx.document.getElementById('game').getBoundingClientRect=()=>bounds;ctx.document.getElementById('farm').getBoundingClientRect=()=>bounds;
+ const panel=ctx.document.getElementById('plant-health');panel.getBoundingClientRect=()=>({width:360,height:300});
+ let clientNow=Date.parse('2030-01-01T12:00:00Z');ctx.Date=class extends Date{static now(){return clientNow;}};
+ const tile={cropId:'nabo',state:'GROWING',watered:true,season:1,seasons:1,dry:false,paused:false,weeds:false,insects:0,remainingSeconds:60000,nominalRemainingSeconds:36000};
+ h.health(tile,{x:585,y:400},'tap');
+ assert.match(text(panel),/Com rega em dia e sem pragas: 10 h restantes/);
+ assert.match(text(panel),/Sem nova rega e sem pragas: 16 h 40 min restantes/);
+ assert.ok(text(panel).includes(new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(Date.parse('2026-11-03T17:40:00Z'))));
+ const estimate=panel.querySelector('.crop-growth-estimate').textContent;
+ clientNow+=60000;h.runTimeouts();
+ assert.ok(panel.querySelector('.crop-growth-estimate').textContent.endsWith(estimate.slice(estimate.indexOf('Previsão:'))));
+ assert.match(text(panel),/Com rega em dia e sem pragas: 9 h 59 min restantes/);
+ h.set({own:{...farm('alice'),level:1,serverTime:'2026-11-03T01:02:00Z'},catalog:{crops:[crop],animals:[],fertilizers:[],vip:{greenPrice:20}}});
+ h.health(tile,{x:585,y:400},'refresh');
+ assert.ok(text(panel).includes(new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(Date.parse('2026-11-03T17:42:00Z'))));
+});
+
 test('login can return to its first step before the invitation fade completes',()=>{
  const {h,ctx}=app(),login=ctx.document.getElementById('login-step'),invite=ctx.document.getElementById('invite-step');invite.hidden=true;
  h.setLoginStep('invite','Bob');assert.equal(invite.hidden,false);

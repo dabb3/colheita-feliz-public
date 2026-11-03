@@ -455,3 +455,5 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
  #game #tools button{width:38px;height:38px;padding:2px}
  #game #tools img:not(.tool-selected-item){width:30px;height:30px}
 }
+
+.crop-growth-nominal,.crop-growth-condition{margin:6px 0 0;font-size:11px;line-height:1.4;color:#526353}.crop-growth-condition{color:#705719}.crop-growth-estimate{text-align:left;line-height:1.4}.crop-time-notice{font-size:12px;line-height:1.4}

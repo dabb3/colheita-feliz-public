@@ -277,3 +277,7 @@ nos Ajustes antes de usar os botões. Sons novos de animais permanecem pendentes
 nesta entrega não há novos arquivos sonoros nem geração paga. Audição subjetiva,
 autoplay em Firefox/Safari e medição de fluidez em diferentes máquinas ainda
 precisam de ensaio; testes automatizados não comprovam esses resultados.
+
+## Tempos exibidos no cultivo
+
+A loja identifica o tempo nominal como duração com rega em dia e sem pragas. Solo seco cresce à metade da velocidade; ervas e minhocas pausam o crescimento. O popup separa o restante com rega em dia do restante sem nova rega. A previsão inclui data e hora locais, calculadas a partir do horário retornado pela API, e declara que pressupõe ausência de novas pragas e de nova rega. Pragas e plantas sem a primeira rega não exibem previsão de conclusão. Os textos usam os dados existentes da API; não alteram regras, preços, duração, relógio autoritativo ou saves.
