@@ -245,7 +245,8 @@ export function renderPlantHealth(
   if (tile.state === "READY")
     root.append(text("p", "Pronta para colher", "health-state"));
   else {
-    const timing = cropTimingText(tile, Date.parse(serverTime ?? "") + tile.remainingSeconds * 1000);
+    const serverAt = Date.parse(serverTime ?? "");
+    const timing = cropTimingText(tile, serverAt + tile.remainingSeconds * 1000, serverAt + tile.nominalRemainingSeconds * 1000);
     for (const line of [timing.nominal, timing.condition, timing.estimate])
       if (line) root.append(text("p", line, "muted"));
   }

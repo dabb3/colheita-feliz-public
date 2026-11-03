@@ -29,7 +29,7 @@ test('deposit preserves mixed currency quantities and skips VIP without blocking
 test('plant health separates nominal and unwatered times and hides stale content',()=>{
  const {root,renderPlantHealth}=panels();
  renderPlantHealth(root,catalog,{cropId:'milho',state:'GROWING',watered:true,dry:true,stage:1,season:1,seasons:1,nominalRemainingSeconds:72000,remainingSeconds:115200},'2026-11-03T01:00:00Z');
- let all=nodes(root);assert.ok(all.some(n=>n.textContent==='Com rega em dia e sem pragas: 20 h restantes'));
+ let all=nodes(root);assert.ok(all.some(n=>n.textContent.startsWith('Com rega em dia e sem pragas: 20 h restantes. Previsão:')));
  assert.ok(all.some(n=>n.textContent.startsWith('Sem nova rega e sem pragas: 1 d 8 h restantes. Previsão:')));
  assert.ok(all.some(n=>n.textContent.includes('Solo seco: crescimento à metade')));
  renderPlantHealth(root,catalog,{cropId:'milho',state:'GROWING',watered:true,paused:true,weeds:true,nominalRemainingSeconds:3600,remainingSeconds:7200},'2026-11-03T01:00:00Z');

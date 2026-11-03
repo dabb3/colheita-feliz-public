@@ -6,14 +6,19 @@ export function seedGrowthLabel(crop:Pick<Crop,'growthSeconds'|'seasons'>) {
  return `${durationLabel(crop.growthSeconds)} com rega em dia · ${crop.seasons} temporada(s)`;
 }
 
-export function cropTimingText(tile:Pick<Tile,'state'|'watered'|'dry'|'paused'|'weeds'|'insects'|'nominalRemainingSeconds'|'remainingSeconds'>,estimatedReadyAt?:number) {
+function forecastSuffix(timestamp?:number) {
+ if(timestamp===undefined||!Number.isFinite(timestamp)||Math.abs(timestamp)>8.64e15)return '';
+ return ` Previsão: ${new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(timestamp)}.`;
+}
+
+export function cropTimingText(tile:Pick<Tile,'state'|'watered'|'dry'|'paused'|'weeds'|'insects'|'nominalRemainingSeconds'|'remainingSeconds'>,estimatedReadyAt?:number,estimatedNominalReadyAt?:number) {
  if(tile.state==='READY'||tile.state==='DEAD')return {nominal:'',condition:'',estimate:''};
  const paused=tile.paused||tile.weeds||tile.insects>0,unwatered=tile.watered===false;
  const nominal=`${paused?'Após remover as pragas, com rega em dia':'Com rega em dia e sem pragas'}: ${durationLabel(Math.max(1,tile.nominalRemainingSeconds))} restantes`;
  const condition=paused?'Crescimento pausado. Remova as pragas para continuar.':unwatered?'Regue para iniciar o crescimento.':tile.dry?'Solo seco: crescimento à metade da velocidade. Regue para acelerar.':'Mantenha a rega em dia para evitar atrasos.';
  if(paused||unwatered)return {nominal,condition,estimate:''};
- const forecast=Number.isFinite(estimatedReadyAt)&&Math.abs(estimatedReadyAt!)<=8.64e15?` Previsão: ${new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(estimatedReadyAt)}.`:'';
- return {nominal,condition,estimate:`Sem nova rega e sem pragas: ${durationLabel(Math.max(1,tile.remainingSeconds))} restantes.${forecast}`};
+ const nominalForecast=forecastSuffix(estimatedNominalReadyAt);
+ return {nominal:nominal+(nominalForecast?'.'+nominalForecast:''),condition,estimate:`Sem nova rega e sem pragas: ${durationLabel(Math.max(1,tile.remainingSeconds))} restantes.${forecastSuffix(estimatedReadyAt)}`};
 }
 
 export function xpPercent(current?:string,threshold?:string):number {

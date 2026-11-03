@@ -6,6 +6,17 @@ test('seed duration states the conditions behind nominal growth',()=>{
  assert.equal(seedGrowthLabel({growthSeconds:36000,seasons:1}),'10 h com rega em dia · 1 temporada(s)');
 });
 
+test('nominal remaining time includes its own date and time forecast',()=>{
+ const tile={state:'GROWING',watered:true,dry:true,paused:false,weeds:false,insects:0,nominalRemainingSeconds:36000,remainingSeconds:60000};
+ const nominalAt=Date.parse('2026-11-03T23:00:00Z'),withoutWaterAt=Date.parse('2026-11-04T05:40:00Z');
+ const format=value=>new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(value);
+ const view=cropTimingText(tile,withoutWaterAt,nominalAt);
+ assert.equal(view.nominal,`Com rega em dia e sem pragas: 10 h restantes. Previsão: ${format(nominalAt)}.`);
+ assert.ok(view.estimate.includes(format(withoutWaterAt)));
+ for(const patch of [{paused:true},{watered:false}])assert.ok(!cropTimingText({...tile,...patch},withoutWaterAt,nominalAt).nominal.includes('Previsão:'));
+ assert.ok(!cropTimingText(tile,NaN,NaN).nominal.includes('Previsão:'));
+});
+
 test('crop timing separates ideal remaining growth from the forecast without further watering',()=>{
  const tile={state:'GROWING',watered:true,dry:true,paused:false,weeds:false,insects:0,nominalRemainingSeconds:36000,remainingSeconds:60000};
  const forecast=Date.parse('2026-11-04T03:25:00Z'),view=cropTimingText(tile,forecast);
