@@ -137,17 +137,20 @@ export class Scene {
       (e) => {
         if (!this.farm) return;
         const p = this.point(e);
-        if (!p) return;
+        if (!p) {
+          this.onEmptyTap();
+          return;
+        }
         const pick = pickTile(p.x, p.y);
         if (pick) {
           const tile = this.farm.tiles.find(
             (t) => t.column === pick.column && t.row === pick.row,
           );
           if (tile) this.onTile(tile, "pointerType" in e ? String(e.pointerType) : "mouse");
-          else if ("pointerType" in e && e.pointerType === "touch") this.onEmptyTap();
+          else this.onEmptyTap();
           return;
         }
-        if ("pointerType" in e && e.pointerType === "touch") this.onEmptyTap();
+        this.onEmptyTap();
         const animal = this.animalAt(p);
         if (animal) {
           const pointerType = "pointerType" in e && e.pointerType ? String(e.pointerType) : this.pointerType;
