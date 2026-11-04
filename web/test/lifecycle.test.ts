@@ -62,7 +62,8 @@ test('visit defaults to inspection and a touch or cursor click never sends a soc
  ctx.ApiClient=class{pending=null;constructor(){client=this;}get(){return Promise.resolve(farm('alice'));}prepareRequestId(){return Promise.resolve();}mutate(path,command){sent.push({path,command});return Promise.resolve({});}};
  h.set({own:undefined});await h.connect('alice',async()=> 'synthetic-token');
  client.get=path=>Promise.resolve(path==='/v1/friends'?[{id:'bob',name:'Bob'}]:{...farm('bob'),serverTime:'2026-11-03T12:00:00Z'});
- h.set({own:farm('alice'),api:client,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:36000}],animals:[],fertilizers:[],vip:{greenPrice:20}}});
+  const catalog={crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:36000}],animals:[],fertilizers:[],vip:{greenPrice:20}};
+  h.set({own:farm('alice'),api:client,catalog});
  await h.friends();await descendants(elements.get('modal-content')).find(node=>node.textContent==='Visitar fazenda').onclick();
  await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(elements.get('tools').children[0].getAttribute('aria-label'),'Inspecionar plantas');
@@ -73,6 +74,9 @@ test('visit defaults to inspection and a touch or cursor click never sends a soc
  tap(tile,'touch');assert.equal(panel.hidden,false);assert.match(text(panel),/Nabo/);assert.equal(sent.length,0);
  await h.tileAction({...tile,state:'READY',remainingSeconds:0,nominalRemainingSeconds:0});assert.equal(sent.length,0);assert.ok(!text(panel).includes('Furtar colheita'));
  h.pickTool('STEAL');await h.tileAction(tile);assert.equal(sent.length,1);assert.equal(sent[0].command.action,'STEAL');
+  h.set({own:farm('alice'),api:client,catalog});h.pickTool('CURSOR');
+  tap(tile,'mouse'); // A touch-generated click can arrive as a MouseEvent.
+  assert.equal(panel.hidden,false);assert.match(text(panel),/Nabo/);assert.equal(sent.length,1);
 });
 
 test('pest tools exist only in visits and send the selected plot with its revisions',async()=>{

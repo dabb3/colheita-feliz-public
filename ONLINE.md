@@ -296,6 +296,8 @@ CLAIM_DAILY_ALLOWANCE usa POST /v1/me/actions e os identificadores/revisões exi
 
 A consulta existente de fazenda usa LEFT JOIN para carregar o último dia, sem novo roundtrip SQL por ação. dailyAllowance (amount, available, nextResetAt) aparece somente na projeção própria. Não muda snapshot, save desktop v20 ou credenciais. Incluir daily_allowances e fazendas no mesmo backup/restauração; não apagar os registros ao limpar recibos ou fazer rollback. Jogadores sem registro começam com o resgate do dia disponível, sem pagamentos retroativos. Publicar API antes do frontend e evitar versões divergentes atendendo simultaneamente; a implantação cria estrutura, mas não distribui ouro.
 
-## Inspeção por toque nas visitas
+## Inspeção de plantas com o cursor
+
+Na própria fazenda e nas visitas, toque ou clique numa planta com o cursor selecionado para fixar o popup de crescimento.
 
 A visita começa com o cursor Inspecionar plantas. Tocar numa planta abre e fixa o popup de crescimento, inclusive em celular; clicar com o cursor também inspeciona. A inspeção não envia ações sociais, mesmo em plantas prontas. Furto, amor e pragas exigem selecionar a ferramenta correspondente. As restrições continuam verificadas pelo servidor.

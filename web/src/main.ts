@@ -236,7 +236,8 @@ async function action(fields:CommandFields,path='/v1/me/actions'){
 }
 function playEffect(file:string){if(!effectsEnabled)return;const audio=new Audio(`/assets/sounds/${file}.wav`);audio.volume=effectsVolume;void audio.play().catch(()=>{});}
 async function tileAction(tile:Tile){
- if(visited&&tool==='CURSOR'){if(tile.cropId)health(tile,tileCenter(tile.column,tile.row),'tap');return;}
+ if(tool==='CURSOR'&&tile.cropId){health(tile,tileCenter(tile.column,tile.row),'tap');return;}
+ if(visited&&tool==='CURSOR')return;
  if(visited){await action(tileCommand(tool,tile,selectedSeed,selectedFertilizer,true),`/v1/farms/${visited.owner}/visit-actions`);return;}
  if(!tile.unlocked){await action({action:'BUY_PLOT',column:tile.column,row:tile.row});return;}
  if(tool==='CURSOR')return;
@@ -501,7 +502,7 @@ async function connect(user:string,token:()=>Promise<string>,photo?:unknown,disp
  sessionGeneration++;navigationGeneration++;busy=false;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;closeScene();const generation=sessionGeneration;
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
  avatarUser=`${config.api}:${user}`;googlePhoto=googleAvatar(photo);avatarChoice=readAvatar(avatarStore,avatarUser);loadAudioSettings();
- scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,(tile,pointerType)=>{if(pointerType==='touch'&&tool==='CURSOR'&&tile.cropId){health(tile,tileCenter(tile.column,tile.row),'tap');return;}if(pointerType==='touch')closeHealth();void tileAction(tile);},id=>{const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health,syncMusic,()=>{if(healthPinned)closeHealth();});
+ scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,(tile,pointerType)=>{if(pointerType==='touch'&&!(tool==='CURSOR'&&tile.cropId))closeHealth();void tileAction(tile);},id=>{const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health,syncMusic,()=>{if(healthPinned)closeHealth();});
 sceneResize=new ResizeObserver(()=>{layoutHud();health(healthTile,healthPoint,'resize');});for(const id of ['farm','farm-header','tools-bar','notice'])sceneResize.observe(element(id));
  try{await refresh();if(generation===sessionGeneration&&!own)setLoginStep('invite',displayName||user);}
  catch(error){handleError(error);}
