@@ -148,4 +148,15 @@ class HttpCapacityTest {
             assertTrue(status.startsWith("HTTP/1.1 400"), status);
         } finally { stop(server); }
     }
+
+    @Test void postWithoutContentLengthIsReadAsEmptyBodyAndRejected() throws Exception {
+        var server = start(ALLOW);
+        try (var socket = new Socket("127.0.0.1", server.port())) {
+            socket.setSoTimeout(5000);
+            socket.getOutputStream().write(("POST /v1/me/actions HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer t\r\n"
+                    + "Content-Type: application/json\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+            String status = new String(socket.getInputStream().readNBytes(12), StandardCharsets.US_ASCII);
+            assertTrue(status.startsWith("HTTP/1.1 400"), status);
+        } finally { stop(server); }
+    }
 }

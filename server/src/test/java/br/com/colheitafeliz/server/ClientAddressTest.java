@@ -25,13 +25,13 @@ class ClientAddressTest {
         assertEquals("2001:db8:0:0:0:0:0:1", GameHttpServer.clientAddress("2001:DB8::1", peer(), true));
     }
     @Test void malformedFallsBackToPeer() throws Exception {
-        for (String value : new String[] {"evil.example", "", "1.2.3.4, 5.6.7.8", " 1.2.3.4", null, "1234", "::::::::::::", "1.2.3", "dead.beef", "999.1.1.1"})
+        for (String value : new String[] {"evil.example", "", "1.2.3.4, 5.6.7.8", " 1.2.3.4", null, "1234", "::::::::::::", "1.2.3", "dead.beef", "999.1.1.1", "g::1"})
             assertEquals("10.0.0.1", GameHttpServer.clientAddress(value, peer(), true), String.valueOf(value));
     }
 
     @Test void rateLimitIsPerFlyClient() throws Exception {
         Authenticator deny = token -> { throw new ApiFailure(401, "x"); };
-        var server = new GameHttpServer(new InetSocketAddress("127.0.0.1", 0), null, deny, Set.of(), false, Clock.systemUTC(), true);
+        var server = new GameHttpServer(new InetSocketAddress("127.0.0.1", 0), null, deny, Set.of(), false, Clock.fixed(java.time.Instant.parse("2026-11-04T12:00:00Z"), java.time.ZoneOffset.UTC), true);
         server.start();
         try {
             var client = HttpClient.newHttpClient();

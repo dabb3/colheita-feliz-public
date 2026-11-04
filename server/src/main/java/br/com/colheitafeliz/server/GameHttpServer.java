@@ -120,18 +120,17 @@ final class GameHttpServer implements AutoCloseable {
         }
     }
 
-    /** Lê o corpo antes de ocupar um worker; um cliente lento só segura uma thread de I/O. Null quando read() vai recusar o pedido. */
+    /** Lê o corpo antes de ocupar um worker; um cliente lento só segura uma thread de I/O. Null quando read() vai recusar o pedido (413). */
     private static byte[] preRead(HttpExchange exchange) throws IOException {
         String length = exchange.getRequestHeaders().getFirst("Content-Length");
-        try { if (length != null && Long.parseLong(length) > 16_384) return null; }
-        catch (NumberFormatException e) { return null; }
+        if (length != null && Long.parseLong(length) > 16_384) return null;
         return exchange.getRequestBody().readNBytes(16_385);
     }
 
     private static final Set<String> LOOPBACK_HOSTS = Set.of("127.0.0.1", "localhost", "[::1]");
     /** Host sem a porta; vazio quando ausente, para nunca casar com a lista. */
     private static String hostName(String host) {
-        if (host == null) return "";
+        host = java.util.Objects.requireNonNullElse(host, "");
         int end = host.startsWith("[") ? host.indexOf(']') + 1 : host.lastIndexOf(':');
         return end > 0 ? host.substring(0, end) : host;
     }
@@ -141,8 +140,7 @@ final class GameHttpServer implements AutoCloseable {
     /** IP usado no limite por IP. Atrás do Fly vale o Fly-Client-IP, mas só literais IP: nunca hostname, então nunca DNS. */
     static String clientAddress(String flyClientIp, java.net.InetAddress peer, boolean trust) {
         if (trust && flyClientIp != null) {
-            boolean v4 = IPV4.matcher(flyClientIp).matches();
-            if (v4 || (flyClientIp.indexOf(':') >= 0 && IPV6.matcher(flyClientIp).matches())) {
+            if (IPV4.matcher(flyClientIp).matches() || (flyClientIp.indexOf(':') >= 0 && IPV6.matcher(flyClientIp).matches())) {
                 try { return java.net.InetAddress.getByName(flyClientIp).getHostAddress(); }
                 catch (java.net.UnknownHostException e) { /* literal inválido: cai no peer */ }
             }
