@@ -2,6 +2,7 @@ import {createClient} from '@supabase/supabase-js';
 import type {Farm,Catalog,Tile,Reply,CommandFields} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
+import {takeInvite} from './invite-url.ts';
 import {renderWallet,control,text,renderDailyAllowance} from './ui.ts';
 import {durationLabel,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText} from './ui-presentation.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,readAvatar,saveAvatar,type AvatarChoice} from './avatar.ts';
@@ -21,8 +22,8 @@ let goldAnimationFrame=0;
 const depositNumber=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1});
 const depositPriceNumber=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2});
 const login=element('login');
-const inviteFromUrl=new URL(location.href).searchParams.get('invite');
-if(inviteFromUrl)sessionStorage.setItem('colheita:invitation',inviteFromUrl);
+const {invite:inviteFromUrl,cleaned:cleanedUrl}=takeInvite(location.href);
+if(inviteFromUrl&&cleanedUrl){sessionStorage.setItem('colheita:invitation',inviteFromUrl);history.replaceState(history.state,'',cleanedUrl);}
 const supabase=config.development?undefined:createClient(config.supabaseUrl,config.supabaseKey,{auth:{flowType:'pkce',detectSessionInUrl:true}});
 const toolDefinitions=[['CURSOR','Selecionar','cursor-ui'],['PLOW','Arar / limpar','pa-ui'],['PLANT','Plantar','saco-ui'],['WATER','Regar','regador-ui'],['WEED','Remover ervas','herbicida-ui'],['PESTICIDE','Remover insetos','pesticida-ui'],['HARVEST','Colher','mao-restaurada'],['FERTILIZE','Adubar','adubo-comum']];
 function button(label:string,action:()=>void|Promise<void>,parent:HTMLElement=content,focusKey?:string){const b=control(label,()=>void action());if(focusKey)b.setAttribute('data-focus-key',focusKey);parent.append(b);return b;}
