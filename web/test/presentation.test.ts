@@ -158,12 +158,16 @@ test('seed catalog separates common and VIP crops in desktop order',()=>{
  assert.deepEqual(groups,{common:[{id:'b',vipOnly:false}],vip:[{id:'a',vipOnly:true},{id:'c',vipOnly:true}]});
 });
 test('web action sounds map to desktop cues',()=>{
- assert.equal(soundForAction('PLOW'),'click_button');
- assert.equal(soundForAction('WATER'),'water');
- assert.equal(soundForAction('FERTILIZE'),'plant');
+ assert.equal(soundForAction('PLOW'),'pa-cavando-terra');
+ assert.equal(soundForAction('WATER'),'regador');
+ assert.equal(soundForAction('FERTILIZE'),'adubo-caindo');
+ assert.equal(soundForAction('LOVE'),'adubo-amor');
+ assert.equal(soundForAction('WEED'),'borrifada');
+ assert.equal(soundForAction('PESTICIDE'),'borrifada');
+ assert.equal(soundForAction('CLAIM_DAILY_ALLOWANCE'),'resgatar-recompensa');
  assert.equal(soundForAction('TEND_ANIMAL',true),'harvest');
  assert.equal(soundForAction('TEND_ANIMAL',false),'plant');
- assert.equal(soundForAction('STEAL'),'harvest');
+ assert.equal(soundForAction('STEAL'),'furto');
  assert.equal(soundForAction('BUY_PLOT'),'buy');
  assert.equal(soundForAction('SELL_ITEM'),'sell');
  assert.equal(soundForAction('UNKNOWN'),undefined);

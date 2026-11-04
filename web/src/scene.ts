@@ -52,7 +52,9 @@ export class Scene {
   private onPeriodChange: (period: ReturnType<typeof periodAt>) => void;
   private onTile: (tile: Tile, pointerType?: string) => void;
   private onEmptyTap: () => void;
-  private onAnimal: (id: string) => void;
+  private animalHoverTimer?: number;
+  private hoveredAnimal?: string;
+  private pointerType = "mouse";
   private onHover: (
     tile: Tile | null,
     point: { x: number; y: number } | null,
@@ -72,29 +74,42 @@ export class Scene {
     canvas: HTMLCanvasElement,
     catalog: Catalog,
     onTile: (tile: Tile, pointerType?: string) => void,
-    onAnimal: (id: string) => void,
+    onAnimal: (id: string, pointerType: string) => void,
     onHover: (
       tile: Tile | null,
       point: { x: number; y: number } | null,
     ) => void,
     onPeriodChange: (period: ReturnType<typeof periodAt>) => void = () => {},
     onEmptyTap: () => void = () => {},
+    onAnimalHover: (id: string) => void = () => {},
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
     this.catalog = catalog;
     this.onTile = onTile;
     this.onEmptyTap = onEmptyTap;
-    this.onAnimal = onAnimal;
     this.onHover = onHover;
     this.onPeriodChange = onPeriodChange;
     canvas.width = 1600;
     canvas.height = 900;
     canvas.addEventListener(
+      "pointerdown",
+      (e) => { this.pointerType = e.pointerType; },
+      { signal: this.events.signal },
+    );
+    canvas.addEventListener(
       "pointermove",
       (e) => {
         const p = this.point(e);
         const pick = p ? pickTile(p.x, p.y) : null;
+        const animal = e.pointerType === "mouse" && !pick && p ? this.animalAt(p) : undefined;
+        if (animal !== this.hoveredAnimal) {
+          this.clearAnimalHover();
+          this.hoveredAnimal = animal;
+          if (animal && p) this.animalHoverTimer = window.setTimeout(() => {
+            if (this.animalAt(p) === animal) onAnimalHover(animal);
+          }, 500);
+        }
         this.hover = pick
           ? (this.farm?.tiles.find(
               (t) => t.column === pick.column && t.row === pick.row,
@@ -111,6 +126,7 @@ export class Scene {
     canvas.addEventListener(
       "pointerleave",
       () => {
+        this.clearAnimalHover();
         this.hover = null;
         this.onHover(null, null);
       },
@@ -132,17 +148,10 @@ export class Scene {
           return;
         }
         if ("pointerType" in e && e.pointerType === "touch") this.onEmptyTap();
-        const seconds = performance.now() / 1000,
-          sleep = periodAt(new Date()) === "night";
-        for (const animal of this.farm.animals) {
-          const [x, y, w] = animalLayout[animal.id] ?? [0, 0, 0],
-            motion = animalMotion(animal.id, seconds, sleep);
-          if (
-            Math.abs(p.x - x - motion.dx) < w / 2 &&
-            p.y < 900 - y + motion.dy &&
-            p.y > 900 - y + motion.dy - w
-          )
-            this.onAnimal(animal.id);
+        const animal = this.animalAt(p);
+        if (animal) {
+          const pointerType = "pointerType" in e && e.pointerType ? String(e.pointerType) : this.pointerType;
+          onAnimal(animal, e.detail === 0 ? "mouse" : pointerType);
         }
       },
       { signal: this.events.signal },
@@ -150,7 +159,23 @@ export class Scene {
     // Cap redraws at 30 fps; requestAnimationFrame pauses naturally in hidden tabs.
     this.animation = window.requestAnimationFrame(this.animate);
   }
+  private clearAnimalHover() {
+    if (this.animalHoverTimer !== undefined) window.clearTimeout(this.animalHoverTimer);
+    this.animalHoverTimer = undefined;
+    this.hoveredAnimal = undefined;
+  }
+  private animalAt(point: { x: number; y: number }) {
+    const seconds = performance.now() / 1000;
+    const sleep = periodAt(new Date()) === "night";
+    return this.farm?.animals.find(({ id }) => {
+      const [x, y, width] = animalLayout[id] ?? [0, 0, 0];
+      const motion = animalMotion(id, seconds, sleep);
+      const bottom = 900 - y + motion.dy;
+      return Math.abs(point.x - x - motion.dx) < width / 2 && point.y < bottom && point.y > bottom - width;
+    })?.id;
+  }
   close() {
+    this.clearAnimalHover();
     window.cancelAnimationFrame(this.animation);
     this.events.abort();
   }
