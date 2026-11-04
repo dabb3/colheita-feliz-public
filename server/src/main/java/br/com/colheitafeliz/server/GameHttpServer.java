@@ -14,20 +14,28 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 import static br.com.colheitafeliz.server.OnlineViews.object;
 
 final class GameHttpServer implements AutoCloseable {
+    static final int WORKERS = 4, QUEUE = 32, IO_THREADS = 64;
     private static final Set<String> COMMAND_FIELDS = Set.of("requestId", "expectedRevision", "action", "itemId", "currency", "column", "row", "harvestRevision");
     private final HttpServer http;
     private final OnlineGameService service;
     private final Authenticator auth;
     private final Set<String> origins;
     private final boolean development;
-    private final ExecutorService threads = new ThreadPoolExecutor(4, 4, 0, TimeUnit.SECONDS,
-            new ArrayBlockingQueue<>(32), new ThreadPoolExecutor.AbortPolicy());
+    // Threads de plataforma de propósito: o HttpServer do JDK fixa a thread virtual (pinning) em leituras lentas de socket,
+    // e com ActiveProcessorCount=2 bastariam 2 conexões lentas para travar tudo. Estas threads só esperam I/O; o trabalho
+    // de verdade fica limitado por `workers`.
+    private final ExecutorService threads = new ThreadPoolExecutor(IO_THREADS, IO_THREADS, 0, TimeUnit.SECONDS,
+            new ArrayBlockingQueue<>(QUEUE), new ThreadPoolExecutor.AbortPolicy());
+    private final Semaphore workers = new Semaphore(WORKERS, true);
+    private final AtomicInteger admitted = new AtomicInteger();
     private final Map<String, Rate> rates = new LinkedHashMap<>();
     private final Clock clock;
     private record Rate(long minute, int count) {}
@@ -44,6 +52,7 @@ final class GameHttpServer implements AutoCloseable {
     int port() { return http.getAddress().getPort(); }
 
     private void handle(HttpExchange exchange) throws IOException {
+        boolean counted = false, held = false;
         try (var timing = RequestTimings.start()) {
             java.util.Objects.requireNonNull(timing);
             var headers = exchange.getResponseHeaders();
@@ -60,6 +69,10 @@ final class GameHttpServer implements AutoCloseable {
             if (exchange.getRequestMethod().equals("OPTIONS")) { exchange.sendResponseHeaders(204, -1); return; }
             String path = exchange.getRequestURI().getPath(), method = exchange.getRequestMethod();
             if (method.equals("GET") && path.equals("/health")) { send(exchange, 200, object("ok", true, "development", development)); return; }
+            byte[] raw = method.equals("POST") ? preRead(exchange) : null;
+            if (admitted.incrementAndGet() > WORKERS + QUEUE) { admitted.decrementAndGet(); throw new ApiFailure(503, "Servidor ocupado. Tente novamente em instantes."); }
+            counted = true;
+            workers.acquireUninterruptibly(); held = true;
             rate("ip:" + exchange.getRemoteAddress().getAddress().getHostAddress(), 300);
             if (method.equals("GET") && path.equals("/v1/catalog")) { send(exchange, 200, service.catalog()); return; }
             Authenticator.Identity identity;
@@ -71,36 +84,49 @@ final class GameHttpServer implements AutoCloseable {
             if (method.equals("GET") && path.equals("/v1/request-id")) response = service.requestId();
             else if (method.equals("GET") && path.equals("/v1/me/farm")) response = service.farm(actor, identity.name());
             else if (method.equals("GET") && path.equals("/v1/friends")) response = service.friends(actor);
-            else if (method.equals("POST") && path.equals("/v1/me/actions")) response = service.command(actor, command(read(exchange, COMMAND_FIELDS)));
+            else if (method.equals("POST") && path.equals("/v1/me/actions")) response = service.command(actor, command(read(exchange, raw, COMMAND_FIELDS)));
             else if (method.equals("POST") && path.equals("/v1/friend-invitations")) response = service.createInvitation(actor,
-                    UUID.fromString(string(read(exchange, Set.of("requestId")), "requestId", true)));
+                    UUID.fromString(string(read(exchange, raw, Set.of("requestId")), "requestId", true)));
             else if (method.equals("POST") && path.equals("/v1/friend-invitations/accept")) {
-                var body = read(exchange, Set.of("requestId", "code"));
+                var body = read(exchange, raw, Set.of("requestId", "code"));
                 response = service.acceptInvitation(actor, identity.name(), string(body, "code", true), UUID.fromString(string(body, "requestId", true)));
             } else if (path.matches("/v1/farms/[0-9a-fA-F-]{36}/visit(-actions)?")) {
                 UUID owner = UUID.fromString(path.split("/")[3]);
                 if (method.equals("GET") && path.endsWith("/visit")) response = service.visit(actor, owner);
-                else if (method.equals("POST") && path.endsWith("/visit-actions")) response = service.visitAction(actor, owner, command(read(exchange, COMMAND_FIELDS)));
+                else if (method.equals("POST") && path.endsWith("/visit-actions")) response = service.visitAction(actor, owner, command(read(exchange, raw, COMMAND_FIELDS)));
                 else throw new ApiFailure(405, "Método não permitido.");
             } else throw new ApiFailure(404, "Rota indisponível.");
             send(exchange, 200, response);
         } catch (ApiFailure e) {
             if (e.status() == 429) exchange.getResponseHeaders().set("Retry-After", "60");
+            if (e.status() == 503) exchange.getResponseHeaders().set("Retry-After", "5");
             send(exchange, e.status(), object("error", e.getMessage()));
         } catch (IllegalArgumentException | IllegalStateException | com.google.gson.JsonParseException e) {
             send(exchange, 400, object("error", "Pedido inválido."));
         } catch (RuntimeException e) {
             System.err.println("API request failed: " + e.getClass().getSimpleName());
             send(exchange, 500, object("error", "Não foi possível concluir o pedido."));
-        } finally { exchange.close(); }
+        } finally {
+            if (held) workers.release();
+            if (counted) admitted.decrementAndGet();
+            exchange.close();
+        }
     }
 
-    private JsonObject read(HttpExchange exchange, Set<String> allowed) throws IOException {
+    /** Lê o corpo antes de ocupar um worker; um cliente lento só segura uma thread de I/O. Null quando read() vai recusar o pedido. */
+    private static byte[] preRead(HttpExchange exchange) throws IOException {
+        String length = exchange.getRequestHeaders().getFirst("Content-Length");
+        try { if (length != null && Long.parseLong(length) > 16_384) return null; }
+        catch (NumberFormatException e) { return null; }
+        return exchange.getRequestBody().readNBytes(16_385);
+    }
+
+    private JsonObject read(HttpExchange exchange, byte[] raw, Set<String> allowed) throws IOException {
         String type = exchange.getRequestHeaders().getFirst("Content-Type");
         if (type == null || !type.split(";")[0].equalsIgnoreCase("application/json")) throw new ApiFailure(415, "Use JSON no pedido.");
         String length = exchange.getRequestHeaders().getFirst("Content-Length");
         if (length != null && Long.parseLong(length) > 16_384) throw new ApiFailure(413, "Pedido muito grande.");
-        byte[] body = exchange.getRequestBody().readNBytes(16_385);
+        byte[] body = raw;
         if (body.length > 16_384) throw new ApiFailure(413, "Pedido muito grande.");
         JsonObject json = new GsonBuilder().setStrictness(Strictness.STRICT).create().fromJson(new String(body, StandardCharsets.UTF_8), JsonObject.class);
         if (json == null || !allowed.containsAll(json.keySet())) throw new ApiFailure(400, "Campos não permitidos.");
