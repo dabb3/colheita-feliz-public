@@ -63,6 +63,7 @@ final class GameHttpServer implements AutoCloseable {
             java.util.Objects.requireNonNull(timing);
             var headers = exchange.getResponseHeaders();
             headers.set("Cache-Control", "no-store"); headers.set("X-Content-Type-Options", "nosniff"); headers.set("Vary", "Origin");
+            if (development && !LOOPBACK_HOSTS.contains(hostName(exchange.getRequestHeaders().getFirst("Host")))) throw new ApiFailure(421, "Host não permitido.");
             String origin = exchange.getRequestHeaders().getFirst("Origin");
             if (origin != null) {
                 if (!origins.contains(origin)) throw new ApiFailure(403, "Origem não permitida.");
@@ -127,6 +128,13 @@ final class GameHttpServer implements AutoCloseable {
         return exchange.getRequestBody().readNBytes(16_385);
     }
 
+    private static final Set<String> LOOPBACK_HOSTS = Set.of("127.0.0.1", "localhost", "[::1]");
+    /** Host sem a porta; vazio quando ausente, para nunca casar com a lista. */
+    private static String hostName(String host) {
+        if (host == null) return "";
+        int end = host.startsWith("[") ? host.indexOf(']') + 1 : host.lastIndexOf(':');
+        return end > 0 ? host.substring(0, end) : host;
+    }
     private static final java.util.regex.Pattern IPV4 = java.util.regex.Pattern.compile("(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}");
     private static final java.util.regex.Pattern IPV6 = java.util.regex.Pattern.compile("[0-9A-Fa-f:.]{2,45}");
 
