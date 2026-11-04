@@ -35,16 +35,19 @@ final class SupabaseAuthenticator implements Authenticator {
                 if (!user.has("aud") || user.get("aud").isJsonNull() || !"authenticated".equals(user.get("aud").getAsString())) throw new ApiFailure(401, "Sessão não autorizada.");
                 if (!user.has("id") || user.get("id").isJsonNull()) throw new ApiFailure(503, "Resposta de autenticação inválida.");
                 UUID id = UUID.fromString(user.get("id").getAsString());
-                var metadata = user.getAsJsonObject("user_metadata");
-                String name = metadata != null && metadata.has("full_name") && !metadata.get("full_name").isJsonNull()
-                        ? metadata.get("full_name").getAsString() : "Fazendeiro";
-                return new Identity(id, name);
+                return new Identity(id, fullName(user));
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new ApiFailure(503, "Login interrompido. Tente novamente.");
         } catch (IOException e) { throw new ApiFailure(503, "Login temporariamente indisponível."); }
         catch (IllegalArgumentException | IllegalStateException | com.google.gson.JsonParseException e) { throw new ApiFailure(503, "Resposta de autenticação inválida."); }
+    }
+    /** Nome vindo do Auth só quando é texto; qualquer outro tipo vira o nome padrão em vez de falhar o login. */
+    private static String fullName(com.google.gson.JsonObject user) {
+        if (user.get("user_metadata") instanceof com.google.gson.JsonObject metadata
+                && metadata.get("full_name") instanceof com.google.gson.JsonPrimitive name && name.isString()) return name.getAsString();
+        return "Fazendeiro";
     }
     @Override public void close() { client.close(); }
 }

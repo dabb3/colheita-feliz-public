@@ -143,10 +143,12 @@ final class OnlineGameService implements AutoCloseable {
 
     JsonArray friends(JdbcOnlineStore.Tx tx, UUID actor) { active(tx, actor); return JSON.toJsonTree(tx.friends(actor)).getAsJsonArray(); }
 
-    private static String cleanName(String name) {
-        String clean = name == null ? "Fazendeiro" : name.replaceAll("\\p{Cntrl}", "").strip();
-        if (clean.isEmpty()) clean = "Fazendeiro";
-        return clean.substring(0, Math.min(40, clean.length()));
+    static String cleanName(String name) {
+        String clean = name == null ? "" : name.replaceAll("[\\p{Cntrl}\\u061C\\u200E\\u200F\\u202A-\\u202E\\u2066-\\u2069]", "").strip();
+        if (clean.isEmpty()) return "Fazendeiro";
+        int end = Math.min(40, clean.length());
+        if (end == 40 && Character.isHighSurrogate(clean.charAt(39))) end = 39;
+        return clean.substring(0, end);
     }
 
     JsonObject visit(UUID actor, UUID owner) {
