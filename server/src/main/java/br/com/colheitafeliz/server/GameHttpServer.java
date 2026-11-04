@@ -29,6 +29,7 @@ final class GameHttpServer implements AutoCloseable {
     private final Authenticator auth;
     private final Set<String> origins;
     private final boolean development;
+    private final boolean trustFlyClientIp;
     // Threads de plataforma de propósito: o HttpServer do JDK fixa a thread virtual (pinning) em leituras lentas de socket,
     // e com ActiveProcessorCount=2 bastariam 2 conexões lentas para travar tudo. Estas threads só esperam I/O; o trabalho
     // de verdade fica limitado por `workers`.
@@ -42,6 +43,11 @@ final class GameHttpServer implements AutoCloseable {
 
     GameHttpServer(InetSocketAddress address, OnlineGameService service, Authenticator auth,
                    Set<String> origins, boolean development, Clock clock) throws IOException {
+        this(address, service, auth, origins, development, clock, false);
+    }
+    GameHttpServer(InetSocketAddress address, OnlineGameService service, Authenticator auth,
+                   Set<String> origins, boolean development, Clock clock, boolean trustFlyClientIp) throws IOException {
+        this.trustFlyClientIp = trustFlyClientIp;
         if (development && !address.getAddress().isLoopbackAddress()) throw new IllegalArgumentException("Development auth requires loopback");
         this.service = service; this.auth = auth; this.origins = Set.copyOf(origins); this.development = development; this.clock = clock;
         http = HttpServer.create(address, 32);
@@ -73,7 +79,7 @@ final class GameHttpServer implements AutoCloseable {
             if (admitted.incrementAndGet() > WORKERS + QUEUE) { admitted.decrementAndGet(); throw new ApiFailure(503, "Servidor ocupado. Tente novamente em instantes."); }
             counted = true;
             workers.acquireUninterruptibly(); held = true;
-            rate("ip:" + exchange.getRemoteAddress().getAddress().getHostAddress(), 300);
+            rate("ip:" + clientAddress(exchange.getRequestHeaders().getFirst("Fly-Client-IP"), exchange.getRemoteAddress().getAddress(), trustFlyClientIp), 300);
             if (method.equals("GET") && path.equals("/v1/catalog")) { send(exchange, 200, service.catalog()); return; }
             Authenticator.Identity identity;
             long authStarted = System.nanoTime();
@@ -119,6 +125,21 @@ final class GameHttpServer implements AutoCloseable {
         try { if (length != null && Long.parseLong(length) > 16_384) return null; }
         catch (NumberFormatException e) { return null; }
         return exchange.getRequestBody().readNBytes(16_385);
+    }
+
+    private static final java.util.regex.Pattern IPV4 = java.util.regex.Pattern.compile("(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}");
+    private static final java.util.regex.Pattern IPV6 = java.util.regex.Pattern.compile("[0-9A-Fa-f:.]{2,45}");
+
+    /** IP usado no limite por IP. Atrás do Fly vale o Fly-Client-IP, mas só literais IP: nunca hostname, então nunca DNS. */
+    static String clientAddress(String flyClientIp, java.net.InetAddress peer, boolean trust) {
+        if (trust && flyClientIp != null) {
+            boolean v4 = IPV4.matcher(flyClientIp).matches();
+            if (v4 || (flyClientIp.indexOf(':') >= 0 && IPV6.matcher(flyClientIp).matches())) {
+                try { return java.net.InetAddress.getByName(flyClientIp).getHostAddress(); }
+                catch (java.net.UnknownHostException e) { /* literal inválido: cai no peer */ }
+            }
+        }
+        return peer.getHostAddress();
     }
 
     private JsonObject read(HttpExchange exchange, byte[] raw, Set<String> allowed) throws IOException {

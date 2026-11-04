@@ -42,7 +42,7 @@ public final class ServerMain {
         store.initialize(owner);
         var server = new GameHttpServer(new InetSocketAddress(host, Integer.parseInt(env.getOrDefault("PORT", "8080"))),
                 new OnlineGameService(store, Clock.systemUTC(), java.util.concurrent.ThreadLocalRandom.current()::nextInt, PARTICIPANT_LIMIT),
-                auth, origins, development, Clock.systemUTC());
+                auth, origins, development, Clock.systemUTC(), !development && "true".equals(env.get("TRUST_FLY_CLIENT_IP")));
         Runtime.getRuntime().addShutdownHook(new Thread(server::close, "server-shutdown"));
         server.start();
         System.out.println("Colheita API listening on " + host + ":" + server.port() + (development ? " (local development only)" : ""));
