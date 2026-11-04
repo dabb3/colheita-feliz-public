@@ -126,7 +126,9 @@ class HttpCapacityTest {
             var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + "/v1/request-id")).timeout(Duration.ofSeconds(10)).build();
             for (int i = 0; i < GameHttpServer.WORKERS + GameHttpServer.QUEUE; i++) busy.add(client.sendAsync(request, HttpResponse.BodyHandlers.ofString()));
             assertTrue(entered.await(5, TimeUnit.SECONDS));
-            Thread.sleep(500);
+            long deadline = System.nanoTime() + 10_000_000_000L;
+            while (server.admitted() < GameHttpServer.WORKERS + GameHttpServer.QUEUE && System.nanoTime() < deadline) Thread.sleep(10);
+            assertEquals(GameHttpServer.WORKERS + GameHttpServer.QUEUE, server.admitted());
             var response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
             assertEquals(503, response.statusCode());
             assertEquals("5", response.headers().firstValue("Retry-After").orElseThrow());
@@ -157,6 +159,16 @@ class HttpCapacityTest {
                     + "Content-Type: application/json\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
             String status = new String(socket.getInputStream().readNBytes(12), StandardCharsets.US_ASCII);
             assertTrue(status.startsWith("HTTP/1.1 400"), status);
+        } finally { stop(server); }
+    }
+
+    @Test void authenticationUnavailable503KeepsNoRetryAfter() throws Exception {
+        var server = start(token -> { throw new ApiFailure(503, "Login temporariamente indisponível."); });
+        try {
+            var response = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + "/v1/request-id"))
+                    .timeout(Duration.ofSeconds(5)).build(), HttpResponse.BodyHandlers.ofString());
+            assertEquals(503, response.statusCode());
+            assertTrue(response.headers().firstValue("Retry-After").isEmpty());
         } finally { stop(server); }
     }
 }

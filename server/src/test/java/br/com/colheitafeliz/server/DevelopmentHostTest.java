@@ -25,10 +25,10 @@ class DevelopmentHostTest {
     }
 
     @Test void developmentAllowsLoopbackHosts() throws Exception {
-        for (String host : new String[] {"127.0.0.1:P", "localhost:P", "[::1]:P", "localhost", "[::1]"}) check(true, host, 200);
+        for (String host : new String[] {"127.0.0.1:P", "localhost:P", "[::1]:P", "localhost", "[::1]", "LOCALHOST:P", "localhost.:P", "LocalHost."}) check(true, host, 200);
     }
     @Test void developmentRejectsOtherHostsWith421() throws Exception {
-        for (String host : new String[] {"evil.example:P", "evil.example", "127.0.0.1.evil.example:P", "[2001:db8::1]:P"}) check(true, host, 421);
+        for (String host : new String[] {"evil.example:P", "evil.example", "127.0.0.1.evil.example:P", "[2001:db8::1]:P", "localhost..:P"}) check(true, host, 421);
     }
     @Test void productionDoesNotRestrictHost() throws Exception {
         check(false, "evil.example", 200);

@@ -55,6 +55,7 @@ final class GameHttpServer implements AutoCloseable {
         http.createContext("/", this::handle);
     }
     void start() { http.start(); }
+    int admitted() { return admitted.get(); }
     int port() { return http.getAddress().getPort(); }
 
     private void handle(HttpExchange exchange) throws IOException {
@@ -77,7 +78,7 @@ final class GameHttpServer implements AutoCloseable {
             String path = exchange.getRequestURI().getPath(), method = exchange.getRequestMethod();
             if (method.equals("GET") && path.equals("/health")) { send(exchange, 200, object("ok", true, "development", development)); return; }
             byte[] raw = method.equals("POST") ? preRead(exchange) : null;
-            if (admitted.incrementAndGet() > WORKERS + QUEUE) { admitted.decrementAndGet(); throw new ApiFailure(503, "Servidor ocupado. Tente novamente em instantes."); }
+            if (admitted.incrementAndGet() > WORKERS + QUEUE) { admitted.decrementAndGet(); exchange.getResponseHeaders().set("Retry-After", "5"); throw new ApiFailure(503, "Servidor ocupado. Tente novamente em instantes."); }
             counted = true;
             workers.acquireUninterruptibly(); held = true;
             rate("ip:" + clientAddress(exchange.getRequestHeaders().getFirst("Fly-Client-IP"), exchange.getRemoteAddress().getAddress(), trustFlyClientIp), 300);
@@ -106,7 +107,6 @@ final class GameHttpServer implements AutoCloseable {
             send(exchange, 200, response);
         } catch (ApiFailure e) {
             if (e.status() == 429) exchange.getResponseHeaders().set("Retry-After", "60");
-            if (e.status() == 503) exchange.getResponseHeaders().set("Retry-After", "5");
             send(exchange, e.status(), object("error", e.getMessage()));
         } catch (IllegalArgumentException | IllegalStateException | com.google.gson.JsonParseException e) {
             send(exchange, 400, object("error", "Pedido inválido."));
@@ -132,7 +132,8 @@ final class GameHttpServer implements AutoCloseable {
     private static String hostName(String host) {
         host = java.util.Objects.requireNonNullElse(host, "");
         int end = host.startsWith("[") ? host.indexOf(']') + 1 : host.lastIndexOf(':');
-        return end > 0 ? host.substring(0, end) : host;
+        String name = end > 0 ? host.substring(0, end) : host;
+        return (name.endsWith(".") ? name.substring(0, name.length() - 1) : name).toLowerCase(java.util.Locale.ROOT);
     }
     private static final java.util.regex.Pattern IPV4 = java.util.regex.Pattern.compile("(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}");
     private static final java.util.regex.Pattern IPV6 = java.util.regex.Pattern.compile("[0-9A-Fa-f:.]{2,45}");
