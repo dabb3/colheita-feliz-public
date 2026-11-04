@@ -72,17 +72,19 @@ export function cropGroups(crops: Crop[]) {
   };
 }
 export function soundForAction(action: string, animalReady = false) {
-  if (action === "PLOW") return "click_button";
-  if (action === "PLANT" || action === "FERTILIZE" || action === "LOVE")
-    return "plant";
-  if (action === "WATER") return "water";
+  if (action === "PLOW") return "pa-cavando-terra";
+  if (action === "PLANT") return "plant";
+  if (action === "FERTILIZE") return "adubo-caindo";
+  if (action === "LOVE") return "adubo-amor";
+  if (action === "WATER") return "regador";
+  if (action === "STEAL") return "furto";
+  if (action === "CLAIM_DAILY_ALLOWANCE") return "resgatar-recompensa";
   if (
     action === "HARVEST" ||
-    action === "STEAL" ||
     (action === "TEND_ANIMAL" && animalReady)
   )
     return "harvest";
-  if (action === "WEED" || action === "PESTICIDE") return "weed";
+  if (action === "WEED" || action === "PESTICIDE") return "borrifada";
   if (action === "TEND_ANIMAL") return "plant";
   if (action.startsWith("BUY_")) return "buy";
   if (action.startsWith("SELL_")) return "sell";

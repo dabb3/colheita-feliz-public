@@ -258,6 +258,8 @@ sendo parte dos ensaios de integração, com PostgreSQL descartável.
 
 ### Animações e áudio
 
+Com o cursor selecionado, manter o mouse sobre um animal por 500 ms toca seu efeito uma vez. No celular, tocar no animal abre a inspeção e toca o efeito. Cada som novo interrompe o anterior. Os animais ficam silenciosos à noite e quando os efeitos estão desligados.
+
 Animais móveis percorrem trajetos locais curtos, com repouso, orientação e quadros
 de caminhada vinculados ao deslocamento. Pombo e colmeia permanecem fixos; pavão
 alterna penas a cada quatro segundos. Pés, sombras e seleção usam a mesma posição
@@ -273,14 +275,12 @@ aparecem após sucesso confirmado, sem animar outra fazenda após sair da visita
 Ajustes oferece controles separados de música, efeitos e volumes, guardados na
 chave local `colheita:audio`. Ambos começam desligados sem preferência anterior;
 reprodução depende de interação do usuário. O toggle da toolbar controla efeitos.
-Logout e aba oculta pausam áudio. O player usa `farm_loop.mp3` de dia e no pôr do sol; ao entrar no mesmo período do fundo noturno, troca para `noite.mp3`, também em looping. A faixa anterior pausa antes da troca e a escolha Música continua valendo. O período é o mesmo relógio local do cenário. Reutiliza os oito cues
-do desktop, com até três efeitos simultâneos e intervalo mínimo de150ms por cue.
+Logout e aba oculta pausam música, ambiente e sons de animais. A música usa `farm_loop.mp3` de dia e no pôr do sol e `noite.mp3` à noite. O controle Efeitos também regula a ambientação, com vento e pássaros de dia e grilos à noite. Os efeitos de ferramenta, furto e resgate tocam após a confirmação da API. Uma recusa do jogo toca o aviso de ação bloqueada. Quando a API confirma que uma planta própria passou de crescendo para pronta, toca um aviso por atualização, mesmo se várias plantas amadurecerem juntas.
 Falha de storage, decoder ou autoplay não interrompe o jogo.
 
 Na revisão isolada, Ajustes usa o player real e os botões Regar/Plantar/Colher
 apresentam efeitos demonstrativos sem comandar a API. Para ouvir, habilite Efeitos
-nos Ajustes antes de usar os botões. Sons novos de animais permanecem pendentes:
-nesta entrega não há novos arquivos sonoros nem geração paga. Audição subjetiva,
+nos Ajustes antes de usar os botões. Audição subjetiva,
 autoplay em Firefox/Safari e medição de fluidez em diferentes máquinas ainda
 precisam de ensaio; testes automatizados não comprovam esses resultados.
 

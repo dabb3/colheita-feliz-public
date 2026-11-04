@@ -47,9 +47,24 @@ function syncAudioRow(channel:'music'|'effects'){
  const enabled=channel==='music'?musicEnabled:effectsEnabled,muted=!enabled,slider=row.querySelector<HTMLInputElement>('input[type="range"]'),value=row.querySelector<HTMLOutputElement>('output'),mute=row.querySelector<HTMLButtonElement>('.audio-mute');
  if(!slider||!value||!mute)return;row.classList.toggle('is-muted',muted);slider.style.setProperty('--range-progress',`${slider.value}%`);value.textContent=muted?'Mudo':`${slider.value}%`;mute.setAttribute('aria-pressed',String(muted));mute.setAttribute('aria-label',`${muted?'Ativar':'Silenciar'} ${channel==='music'?'música':'efeitos'}`);mute.replaceChildren(audioIcon(muted));
 }
-function updateAudioSettings(channel:'music'|'effects',enabled:boolean,volume:number){if(channel==='music'){musicEnabled=enabled;musicVolume=volume;if(music)music.volume=volume;syncMusic();}else{effectsEnabled=enabled;effectsVolume=volume;}syncAudioRow(channel);saveAudioSettings();}
-function toggleEffects(){effectsEnabled=!effectsEnabled;saveAudioSettings();syncAudioRow('effects');}
+function updateAudioSettings(channel:'music'|'effects',enabled:boolean,volume:number){if(channel==='music'){musicEnabled=enabled;musicVolume=volume;if(music)music.volume=volume;syncMusic();}else{effectsEnabled=enabled;effectsVolume=volume;if(animalSound){animalSound.volume=volume;if(!enabled)animalSound.pause();}syncAmbience(periodAt(new Date())==='night');}syncAudioRow(channel);saveAudioSettings();}
+function toggleEffects(){effectsEnabled=!effectsEnabled;if(!effectsEnabled)animalSound?.pause();syncAmbience(periodAt(new Date())==='night');saveAudioSettings();syncAudioRow('effects');}
+let ambience:HTMLAudioElement[]=[];
+let ambiencePeriod:'day'|'night'|undefined;
+function syncAmbience(night:boolean){
+ const period=night?'night':'day';
+ if(!effectsEnabled||!own||document.hidden){for(const clip of ambience)clip.pause();return;}
+ if(ambiencePeriod!==period){
+  for(const clip of ambience)clip.pause();
+  const tracks=night?['grilos-ambientacao']:['ventos-leves-ambientacao','passaros-ambientacao'];
+  ambience=tracks.map(track=>{const clip=new Audio('/assets/sounds/'+track+'.mp3');clip.loop=true;return clip;});
+  ambiencePeriod=period;
+ }
+ for(const clip of ambience){clip.volume=effectsVolume*.18;if(clip.paused)void clip.play().catch(()=>{});}
+}
 function syncMusic(period=periodAt(new Date())){
+ syncAmbience(period==='night');
+ if(period==='night'||document.hidden||!effectsEnabled)animalSound?.pause();
  if(!musicEnabled||!own||document.hidden){music?.pause();return;}
  const track=period==='night'?'noite.mp3':'farm_loop.mp3';
  if(!music||musicTrack!==track){music?.pause();music=new Audio('/assets/sounds/'+track);musicTrack=track;music.loop=true;}
@@ -121,7 +136,7 @@ function settings(){
  const developers=document.createElement('div');developers.className='developer-links';for(const name of ['dabb3','mrlsouz']){const link=document.createElement('a');link.href=`https://github.com/${name}`;link.append(document.createTextNode(`@${name}`),githubIcon());link.target='_blank';link.rel='noopener noreferrer';developers.append(link);}about.append(developers);
  const logoutButton=button('Sair da conta',logout,modalFooter);logoutButton.className='settings-logout';modalFooter.hidden=false;
 }
-function closeScene(){sceneResize?.disconnect();sceneResize=undefined;scene?.close();health(null,null);}
+function closeScene(){animalSound?.pause();for(const clip of ambience)clip.pause();sceneResize?.disconnect();sceneResize=undefined;scene?.close();health(null,null);}
 function avatarSettings(){
  dialog('Seu avatar');paragraph('Escolha um dos seis avatares do jogo ou a foto da sua conta Google. Esta preferência vale neste navegador.');
  const options=document.createElement('div');options.className='avatar-options';content.append(options);
@@ -210,7 +225,7 @@ function renderToolTray(){
 async function refresh(){
  if(!api||busy)return;const client=api,generation=sessionGeneration,navigation=navigationGeneration;
  try{
-  const farm=await client.get<Farm>('/v1/me/farm');if(generation!==sessionGeneration)return;own=acceptFarm(own,farm);
+  const farm=await client.get<Farm>('/v1/me/farm');if(generation!==sessionGeneration)return;updateOwnFarm(farm);
   if(visited&&navigation===navigationGeneration){const target=visited.owner;const incoming=await client.get<Farm>(`/v1/farms/${target}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||visited?.owner!==target)return;visited=acceptFarm(visited,incoming);}
   showConnection();render();void client.prepareRequestId().catch(()=>{});
  }catch(error){if(generation===sessionGeneration)handleError(error);}
@@ -221,8 +236,15 @@ function handleError(error:unknown){
  else{showConnection('Conexão interrompida. Aguarde o servidor e tente novamente.');notify(message);}
  syncPending();
 }
+function updateOwnFarm(farm:Farm){
+ const previous=own;
+ own=acceptFarm(own,farm);
+ if(previous&&own!==previous&&own.tiles.some(tile=>tile.state==='READY'&&previous.tiles.some(old=>
+  old.column===tile.column&&old.row===tile.row&&old.cropId===tile.cropId&&old.season===tile.season&&old.state==='GROWING'
+ )))playEffect('planta-pronta-para-colher');
+}
 function receive(reply:Reply,announce=true){
- if(reply.farm)own=acceptFarm(own,reply.farm);
+ if(reply.farm)updateOwnFarm(reply.farm);
  if(reply.visitedFarm&&visited?.owner===reply.visitedFarm.owner)visited=acceptFarm(visited,reply.visitedFarm);
  if(reply.result&&announce)notify(reply.result.message);
  render();
@@ -231,10 +253,18 @@ async function action(fields:CommandFields,path='/v1/me/actions'){
  if(!api||!own||busy)return;
  if(!navigator.onLine){notify('Sem conexão. Reconecte antes de agir.');return;}
  busy=true;let stale=false;const client=api,generation=sessionGeneration,previousFarm=own,animalReady=fields.action==='TEND_ANIMAL'&&own.animals.some(animal=>animal.id===fields.itemId&&animal.status==='READY');
- try{const reply=await client.mutate(path,{...fields,expectedRevision:path==='/v1/me/actions'?own.revision:visited!.revision});if(generation===sessionGeneration){if(reply.result?.success&&reply.farm){await fadeSoldDepositRows(fields,reply.farm);if(generation!==sessionGeneration)return;}receive(reply,false);if(reply.result?.success&&own){const reward=actionRewardModel(previousFarm,own),selling=String(fields.action).startsWith('SELL_');if(selling){notifySale(reward.coins,reward.greens);if(reward.coins>0)animateGoldBalance(Number(previousFarm.coins??0),Number(own.coins??0));}else notifyAction(reply.result.message,String(fields.action),typeof fields.itemId==='string'?fields.itemId:undefined,reward);const cue=reward.leveledUp?'levelup':soundForAction(String(fields.action),animalReady);if(cue)playEffect(cue);}else if(reply.result)notify(reply.result.message);}}
+ try{const reply=await client.mutate(path,{...fields,expectedRevision:path==='/v1/me/actions'?own.revision:visited!.revision});if(generation===sessionGeneration){if(reply.result?.success&&reply.farm){await fadeSoldDepositRows(fields,reply.farm);if(generation!==sessionGeneration)return;}receive(reply,false);if(reply.result?.success&&own){const reward=actionRewardModel(previousFarm,own),selling=String(fields.action).startsWith('SELL_');if(selling){notifySale(reward.coins,reward.greens);if(reward.coins>0)animateGoldBalance(Number(previousFarm.coins??0),Number(own.coins??0));}else notifyAction(reply.result.message,String(fields.action),typeof fields.itemId==='string'?fields.itemId:undefined,reward);const cue=reward.leveledUp?'levelup':soundForAction(String(fields.action),animalReady);if(cue)playEffect(cue);}else if(reply.result){playEffect('acao-bloqueada');notify(reply.result.message);}}}
  catch(error){stale=error instanceof ApiError&&[409,410].includes(error.status);if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();if(stale)void refresh();else void client.prepareRequestId().catch(()=>{});}}
 }
-function playEffect(file:string){if(!effectsEnabled)return;const audio=new Audio(`/assets/sounds/${file}.wav`);audio.volume=effectsVolume;void audio.play().catch(()=>{});}
+let animalSound:HTMLAudioElement|undefined;
+function playAnimalSound(id:string){
+ if(!effectsEnabled||tool!=='CURSOR'||modal.open||document.hidden||periodAt(new Date())==='night')return;
+ animalSound?.pause();
+ animalSound=new Audio('/assets/sounds/animals/'+id+'.wav');
+ animalSound.volume=effectsVolume;
+ void animalSound.play().catch(()=>{});
+}
+function playEffect(file:string){if(!effectsEnabled||document.hidden)return;const audio=new Audio(`/assets/sounds/${file}.wav`);audio.volume=effectsVolume;void audio.play().catch(()=>{});}
 async function tileAction(tile:Tile){
  if(tool==='CURSOR'&&tile.cropId){health(tile,tileCenter(tile.column,tile.row),'tap');return;}
  if(visited&&tool==='CURSOR')return;
@@ -502,7 +532,7 @@ async function connect(user:string,token:()=>Promise<string>,photo?:unknown,disp
  sessionGeneration++;navigationGeneration++;busy=false;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;closeScene();const generation=sessionGeneration;
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
  avatarUser=`${config.api}:${user}`;googlePhoto=googleAvatar(photo);avatarChoice=readAvatar(avatarStore,avatarUser);loadAudioSettings();
- scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,(tile,pointerType)=>{if(pointerType==='touch'&&!(tool==='CURSOR'&&tile.cropId))closeHealth();void tileAction(tile);},id=>{const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health,syncMusic,()=>{if(healthPinned)closeHealth();});
+ scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,(tile,pointerType)=>{if(pointerType==='touch'&&!(tool==='CURSOR'&&tile.cropId))closeHealth();void tileAction(tile);},(id,pointerType)=>{if(pointerType==='touch'&&tool==='CURSOR'){playAnimalSound(id);animalPopup(id);return;}const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health,syncMusic,()=>{if(healthPinned)closeHealth();},playAnimalSound);
 sceneResize=new ResizeObserver(()=>{layoutHud();health(healthTile,healthPoint,'resize');});for(const id of ['farm','farm-header','tools-bar','notice'])sceneResize.observe(element(id));
  try{await refresh();if(generation===sessionGeneration&&!own)setLoginStep('invite',displayName||user);}
  catch(error){handleError(error);}
