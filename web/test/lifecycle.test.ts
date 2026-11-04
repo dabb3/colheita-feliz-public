@@ -22,11 +22,11 @@ function app(){
   querySelector(selector){return this.querySelectorAll(selector)[0]??null;},focus(){ctx.document.activeElement=this;},
   getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(){},close(){this.open=false;},showModal(){this.open=true;}});
  const storage={getItem:()=>null,setItem(){},removeItem(){}};
- const ctx={...presentation,...uiPresentation,...avatar,window:{COLHEITA_CONFIG:{development:true},setInterval(callback,delay){intervals.set(delay,callback);return delay;},clearInterval(id){intervals.delete(id);},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
+ const ctx={...presentation,...uiPresentation,...avatar,window:{COLHEITA_CONFIG:{development:true},setInterval(callback,delay){intervals.set(delay,callback);return delay;},clearInterval(id){intervals.delete(id);},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}addEventListener(){}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
  const uiSource=readFileSync(new URL('../src/ui.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(uiSource),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={refresh,logout,syncMusic,toggleMusic,shop,missions,friends,receive,dialog,health,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
+ source+='\nglobalThis.h={refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,missions,friends,receive,dialog,health,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:{...ctx.h,runTimeouts(){for(const [id,callback]of [...timeouts]){timeouts.delete(id);callback();}}},elements,listeners,audioClips,observers,ctx,intervals};
 }
 function text(node){return(node.textContent??'')+(node.children??[]).map(child=>typeof child==='object'?text(child):child).join('');}
@@ -407,4 +407,30 @@ test('night music follows scenery changes, loops and pauses the previous track',
  h.syncMusic('sunset');assert.equal(night.paused,true);assert.equal(audioClips.at(-1).path,'/assets/sounds/farm_loop.mp3');assert.equal(audioClips.filter(clip=>!clip.paused).length,1);
  h.toggleMusic();h.syncMusic('night');assert.ok(audioClips.every(clip=>clip.paused));
  ctx.document.hidden=true;h.toggleMusic();h.syncMusic('night');assert.ok(audioClips.every(clip=>clip.paused));
+});
+
+test('muting, hiding and logging out pause every active one-shot effect',async()=>{
+ const {h,listeners,ctx,audioClips}=app();
+ h.set({own:farm('alice')});h.toggleEffects();
+ const start=()=>{h.playEffect('regador');h.playEffect('furto');return audioClips.slice(-2);};
+ let clips=start();h.toggleEffects();assert.ok(clips.every(clip=>clip.paused));
+ h.toggleEffects();clips=start();ctx.document.hidden=true;listeners.get('visibilitychange')();assert.ok(clips.every(clip=>clip.paused));
+ ctx.document.hidden=false;clips=start();await h.logout();assert.ok(clips.every(clip=>clip.paused));
+});
+
+test('ambience follows the scenery and pauses the previous period',()=>{
+ const {h,audioClips}=app();h.set({own:farm('alice')});h.toggleEffects();h.syncMusic('day');
+ const day=audioClips.filter(clip=>!clip.paused);
+ assert.deepEqual(day.map(clip=>clip.path.split('/').pop()),['ventos-leves-ambientacao.mp3','passaros-ambientacao.mp3']);
+ h.syncMusic('night');assert.ok(day.every(clip=>clip.paused));
+ const night=audioClips.at(-1);assert.match(night.path,/grilos-ambientacao/);assert.equal(night.loop,true);assert.equal(night.paused,false);
+});
+
+test('several newly ready plants play one chime and a repeated projection plays none',()=>{
+ const {h,audioClips}=app();
+ const tiles=[0,1].map(column=>({column,row:0,cropId:'nabo',season:1,state:'GROWING'}));
+ const own={...farm('alice'),tiles};h.set({own});h.toggleEffects();
+ const ready={...own,tiles:tiles.map(tile=>({...tile,state:'READY'}))};
+ h.receive({farm:ready});h.receive({farm:ready});
+ assert.equal(audioClips.filter(clip=>clip.path.endsWith('/planta-pronta-para-colher.wav')).length,1);
 });

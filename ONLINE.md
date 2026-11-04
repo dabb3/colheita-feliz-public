@@ -275,7 +275,7 @@ aparecem após sucesso confirmado, sem animar outra fazenda após sair da visita
 Ajustes oferece controles separados de música, efeitos e volumes, guardados na
 chave local `colheita:audio`. Ambos começam desligados sem preferência anterior;
 reprodução depende de interação do usuário. O toggle da toolbar controla efeitos.
-Logout e aba oculta pausam música, ambiente e sons de animais. A música usa `farm_loop.mp3` de dia e no pôr do sol e `noite.mp3` à noite. O controle Efeitos também regula a ambientação, com vento e pássaros de dia e grilos à noite. Os efeitos de ferramenta, furto e resgate tocam após a confirmação da API. Uma recusa do jogo toca o aviso de ação bloqueada. Quando a API confirma que uma planta própria passou de crescendo para pronta, toca um aviso por atualização, mesmo se várias plantas amadurecerem juntas.
+Logout e aba oculta pausam música, ambiente, sons de animais e efeitos em andamento. Desligar Efeitos interrompe os sons desse canal imediatamente. A música usa `farm_loop.mp3` de dia e no pôr do sol e `noite.mp3` à noite. O controle Efeitos também regula a ambientação, com vento e pássaros de dia e grilos à noite. Os efeitos de ferramenta, furto e resgate tocam após a confirmação da API. Uma recusa do jogo toca o aviso de ação bloqueada. Quando a API confirma que uma planta própria passou de crescendo para pronta, toca um aviso por atualização, mesmo se várias plantas amadurecerem juntas.
 Falha de storage, decoder ou autoplay não interrompe o jogo.
 
 Na revisão isolada, Ajustes usa o player real e os botões Regar/Plantar/Colher

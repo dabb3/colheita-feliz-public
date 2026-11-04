@@ -47,8 +47,8 @@ function syncAudioRow(channel:'music'|'effects'){
  const enabled=channel==='music'?musicEnabled:effectsEnabled,muted=!enabled,slider=row.querySelector<HTMLInputElement>('input[type="range"]'),value=row.querySelector<HTMLOutputElement>('output'),mute=row.querySelector<HTMLButtonElement>('.audio-mute');
  if(!slider||!value||!mute)return;row.classList.toggle('is-muted',muted);slider.style.setProperty('--range-progress',`${slider.value}%`);value.textContent=muted?'Mudo':`${slider.value}%`;mute.setAttribute('aria-pressed',String(muted));mute.setAttribute('aria-label',`${muted?'Ativar':'Silenciar'} ${channel==='music'?'música':'efeitos'}`);mute.replaceChildren(audioIcon(muted));
 }
-function updateAudioSettings(channel:'music'|'effects',enabled:boolean,volume:number){if(channel==='music'){musicEnabled=enabled;musicVolume=volume;if(music)music.volume=volume;syncMusic();}else{effectsEnabled=enabled;effectsVolume=volume;if(animalSound){animalSound.volume=volume;if(!enabled)animalSound.pause();}syncAmbience(periodAt(new Date())==='night');}syncAudioRow(channel);saveAudioSettings();}
-function toggleEffects(){effectsEnabled=!effectsEnabled;if(!effectsEnabled)animalSound?.pause();syncAmbience(periodAt(new Date())==='night');saveAudioSettings();syncAudioRow('effects');}
+function updateAudioSettings(channel:'music'|'effects',enabled:boolean,volume:number){if(channel==='music'){musicEnabled=enabled;musicVolume=volume;if(music)music.volume=volume;syncMusic();}else{effectsEnabled=enabled;effectsVolume=volume;if(animalSound){animalSound.volume=volume;if(!enabled)animalSound.pause();}if(!enabled)stopEffects();else for(const clip of activeEffects)clip.volume=volume;syncAmbience(periodAt(new Date())==='night');}syncAudioRow(channel);saveAudioSettings();}
+function toggleEffects(){effectsEnabled=!effectsEnabled;if(!effectsEnabled){animalSound?.pause();stopEffects();}syncAmbience(periodAt(new Date())==='night');saveAudioSettings();syncAudioRow('effects');}
 let ambience:HTMLAudioElement[]=[];
 let ambiencePeriod:'day'|'night'|undefined;
 function syncAmbience(night:boolean){
@@ -63,6 +63,7 @@ function syncAmbience(night:boolean){
  for(const clip of ambience){clip.volume=effectsVolume*.18;if(clip.paused)void clip.play().catch(()=>{});}
 }
 function syncMusic(period=periodAt(new Date())){
+ if(document.hidden)stopEffects();
  syncAmbience(period==='night');
  if(period==='night'||document.hidden||!effectsEnabled)animalSound?.pause();
  if(!musicEnabled||!own||document.hidden){music?.pause();return;}
@@ -136,7 +137,7 @@ function settings(){
  const developers=document.createElement('div');developers.className='developer-links';for(const name of ['dabb3','mrlsouz']){const link=document.createElement('a');link.href=`https://github.com/${name}`;link.append(document.createTextNode(`@${name}`),githubIcon());link.target='_blank';link.rel='noopener noreferrer';developers.append(link);}about.append(developers);
  const logoutButton=button('Sair da conta',logout,modalFooter);logoutButton.className='settings-logout';modalFooter.hidden=false;
 }
-function closeScene(){animalSound?.pause();for(const clip of ambience)clip.pause();sceneResize?.disconnect();sceneResize=undefined;scene?.close();health(null,null);}
+function closeScene(){stopEffects();animalSound?.pause();for(const clip of ambience)clip.pause();sceneResize?.disconnect();sceneResize=undefined;scene?.close();health(null,null);}
 function avatarSettings(){
  dialog('Seu avatar');paragraph('Escolha um dos seis avatares do jogo ou a foto da sua conta Google. Esta preferência vale neste navegador.');
  const options=document.createElement('div');options.className='avatar-options';content.append(options);
@@ -264,7 +265,21 @@ function playAnimalSound(id:string){
  animalSound.volume=effectsVolume;
  void animalSound.play().catch(()=>{});
 }
-function playEffect(file:string){if(!effectsEnabled||document.hidden)return;const audio=new Audio(`/assets/sounds/${file}.wav`);audio.volume=effectsVolume;void audio.play().catch(()=>{});}
+const activeEffects=new Set<HTMLAudioElement>();
+function stopEffects(){
+ for(const audio of activeEffects)audio.pause();
+ activeEffects.clear();
+}
+function playEffect(file:string){
+ if(!effectsEnabled||document.hidden)return;
+ const audio=new Audio('/assets/sounds/'+file+'.wav');
+ const release=()=>activeEffects.delete(audio);
+ audio.addEventListener('ended',release,{once:true});
+ audio.addEventListener('error',release,{once:true});
+ audio.volume=effectsVolume;
+ activeEffects.add(audio);
+ void audio.play().catch(release);
+}
 async function tileAction(tile:Tile){
  if(tool==='CURSOR'&&tile.cropId){health(tile,tileCenter(tile.column,tile.row),'tap');return;}
  if(visited&&tool==='CURSOR')return;
