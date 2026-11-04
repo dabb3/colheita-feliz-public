@@ -57,7 +57,7 @@ test('missions claims the own daily allowance explicitly once, including while v
 });
 
 test('visit defaults to inspection and a touch or cursor click never sends a social action',async()=>{
- const {h,ctx,elements}=app();let tap,client;const sent=[];
+ const {h,ctx,elements,listeners}=app();let tap,client;const sent=[];
  ctx.Scene=class{constructor(_canvas,_catalog,onTile){tap=onTile;}update(){}close(){}};
  ctx.ApiClient=class{pending=null;constructor(){client=this;}get(){return Promise.resolve(farm('alice'));}prepareRequestId(){return Promise.resolve();}mutate(path,command){sent.push({path,command});return Promise.resolve({});}};
  h.set({own:undefined});await h.connect('alice',async()=> 'synthetic-token');
@@ -77,6 +77,8 @@ test('visit defaults to inspection and a touch or cursor click never sends a soc
   h.set({own:farm('alice'),api:client,catalog});h.pickTool('CURSOR');
   tap(tile,'mouse'); // A touch-generated click can arrive as a MouseEvent.
   assert.equal(panel.hidden,false);assert.match(text(panel),/Nabo/);assert.equal(sent.length,1);
+  listeners.get('pointerdown')({pointerType:'mouse',target:elements.get('game')});
+  assert.equal(panel.hidden,true);
 });
 
 test('pest tools exist only in visits and send the selected plot with its revisions',async()=>{

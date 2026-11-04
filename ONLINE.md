@@ -258,6 +258,8 @@ sendo parte dos ensaios de integração, com PostgreSQL descartável.
 
 ### Animações e áudio
 
+- [ ] Abrir a ficha do animal ao clicar com o cursor no desktop. Deixar alimentação e coleta como ações explícitas na ficha.
+
 Com o cursor selecionado, manter o mouse sobre um animal por 500 ms toca seu efeito uma vez. No celular, tocar no animal abre a inspeção e toca o efeito. Cada som novo interrompe o anterior. Os animais ficam silenciosos à noite e quando os efeitos estão desligados.
 
 Animais móveis percorrem trajetos locais curtos, com repouso, orientação e quadros
@@ -299,5 +301,6 @@ A consulta existente de fazenda usa LEFT JOIN para carregar o último dia, sem n
 ## Inspeção de plantas com o cursor
 
 Na própria fazenda e nas visitas, toque ou clique numa planta com o cursor selecionado para fixar o popup de crescimento.
+Clique ou toque fora da planta para fechar o popup. Selecionar outra planta troca a inspeção.
 
 A visita começa com o cursor Inspecionar plantas. Tocar numa planta abre e fixa o popup de crescimento, inclusive em celular; clicar com o cursor também inspeciona. A inspeção não envia ações sociais, mesmo em plantas prontas. Furto, amor e pragas exigem selecionar a ferramenta correspondente. As restrições continuam verificadas pelo servidor.
