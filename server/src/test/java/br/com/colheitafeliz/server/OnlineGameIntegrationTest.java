@@ -23,9 +23,9 @@ class OnlineGameIntegrationTest {
 
     @AfterEach void closeStore() { if (store != null) store.close(); }
 
-    @Test void productionLimitAdmitsFifteenActiveParticipantsIncludingOwnerAndRejectsSixteenth() {
+    @Test void productionLimitAdmitsTwentyActiveParticipantsIncludingOwnerAndRejectsTwentyFirst() {
         service = new OnlineGameService(store, clock, bound -> bound - 1, ServerMain.PARTICIPANT_LIMIT);
-        for (int count = 2; count <= 15; count++) {
+        for (int count = 2; count <= 20; count++) {
             String code = service.createInvitation(alice, requestId()).get("code").getAsString();
             UUID player = UUID.randomUUID();
             assertTrue(service.acceptInvitation(player, "Player " + count, code, requestId()).get("success").getAsBoolean());
@@ -34,10 +34,10 @@ class OnlineGameIntegrationTest {
         UUID extra = UUID.randomUUID();
         String code = service.createInvitation(alice, requestId()).get("code").getAsString();
         ApiFailure failure = assertThrows(ApiFailure.class,
-                () -> service.acceptInvitation(extra, "Sixteenth", code, requestId()));
+                () -> service.acceptInvitation(extra, "Twenty-first", code, requestId()));
         assertEquals(409, failure.status());
         assertEquals("O grupo de teste atingiu o limite de participantes.", failure.getMessage());
-        assertEquals(15, store.transaction(alice, tx -> tx.query("SELECT count(*) FROM " + testSchema
+        assertEquals(20, store.transaction(alice, tx -> tx.query("SELECT count(*) FROM " + testSchema
                 + ".players WHERE active", row -> row.getInt(1)).getFirst()).intValue());
         assertNull(store.transaction(alice, tx -> tx.player(extra)));
     }
