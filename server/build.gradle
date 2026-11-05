@@ -16,11 +16,24 @@ dependencies {
 }
 application {
     mainClass = 'br.com.colheitafeliz.server.ServerMain'
+    // Limites de conexão do deploy: o proxy do Fly não documenta timeout de leitura e o fly.toml não define hard_limit,
+    // então são estes flags que limitam conexões lentas. maxReqTime cobre cabeçalhos e corpo; maxConnections fecha o
+    // excedente no accept. A tarefa capacityTest roda com eles.
     applicationDefaultJvmArgs = ['-Xms32m', '-Xmx192m', '-XX:MaxMetaspaceSize=96m', '-XX:ActiveProcessorCount=2',
         '-Djdk.httpserver.maxConnections=48', '-Dsun.net.httpserver.maxReqHeaders=32', '-Dsun.net.httpserver.maxReqHeaderSize=16384',
         '-Dsun.net.httpserver.maxReqTime=10', '-Dsun.net.httpserver.maxRspTime=20']
 }
-tasks.test { useJUnitPlatform { excludeTags 'integration' }; finalizedBy tasks.jacocoTestReport }
+tasks.test { useJUnitPlatform { excludeTags 'integration', 'capacity' }; finalizedBy tasks.jacocoTestReport }
+tasks.register('capacityTest', Test) {
+    group = 'verification'
+    description = 'Exercises slow and excess connections under the deploy JVM flags.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'capacity' }
+    jvmArgs application.applicationDefaultJvmArgs
+    shouldRunAfter tasks.test
+}
+tasks.named('check') { dependsOn tasks.named('capacityTest') }
 tasks.register('integrationTest', Test) {
     group = 'verification'
     description = 'Tests transactions against disposable PostgreSQL; requires TEST_DATABASE_URL.'
@@ -33,7 +46,7 @@ tasks.register('integrationTest', Test) {
 jacoco { toolVersion = '0.8.12' }
 tasks.jacocoTestReport {
     executionData fileTree(layout.buildDirectory.dir('jacoco')) { include '*.exec' }
-    mustRunAfter tasks.named('integrationTest')
+    mustRunAfter tasks.named('integrationTest'), tasks.named('capacityTest')
     reports { xml.required = true; html.required = true }
 }
 tasks.withType(JavaCompile).configureEach {
