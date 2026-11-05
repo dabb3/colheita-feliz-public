@@ -12,7 +12,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 public final class ServerMain {
-    static final int PARTICIPANT_LIMIT = 15;
+    static final int PARTICIPANT_LIMIT = 20;
     private ServerMain() {}
     public static void main(String[] args) throws Exception {
         Map<String, String> env = System.getenv();

@@ -1,6 +1,6 @@
 # Online com amigos
 
-O desktop continua disponível. O servidor online cria fazendas novas e não importa saves locais. O piloto admite 15 participantes ativos no total, incluindo o dono, por convite aceito. O limite é definido no backend e exige publicar a API atualizada para mudar em produção; enviar apenas o link comum da página não autoriza uma conta nova. O cliente TypeScript/Canvas usa a mesma economia Java no servidor.
+O desktop continua disponível. O servidor online cria fazendas novas e não importa saves locais. O piloto admite 20 participantes ativos no total, incluindo o dono, por convite aceito. O limite é definido no backend e exige publicar a API atualizada para mudar em produção; enviar apenas o link comum da página não autoriza uma conta nova. O cliente TypeScript/Canvas usa a mesma economia Java no servidor.
 
 ## Testar o servidor
 
