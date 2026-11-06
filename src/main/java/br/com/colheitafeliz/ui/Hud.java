@@ -35,7 +35,8 @@ import java.util.List;
  * (floaters), banner de subir de nível e o balão de status do canteiro.
  */
 public final class Hud {
-    public enum Shortcut { ALERTS, MISSIONS, SHOP, DEPOSIT, SETTINGS }
+    public enum Shortcut { MISSIONS, ALERTS, SHOP, DEPOSIT, SETTINGS }
+    private final NotificationPanel notificationPanel=new NotificationPanel();
     /** Ações do painel de Ajustes, executadas por quem trata a entrada. */
     public enum Setting { MUSIC, EFFECTS, SPEED, DEBUG, SAVE }
     private enum Panel { NONE, ALERTS, SETTINGS }
@@ -103,7 +104,8 @@ public final class Hud {
     private static final float PANEL_W = 340, ROW = 40;
     private static final Setting[] SETTINGS = Setting.values();
 
-    public void toggleAlerts() { panel = panel == Panel.ALERTS ? Panel.NONE : Panel.ALERTS; }
+    public void toggleAlerts() { panel = panel == Panel.ALERTS ? Panel.NONE : Panel.ALERTS; notificationPanel.reset(); }
+    public boolean notificationClick(float x,float y,GameState state){return panel==Panel.ALERTS&&notificationPanel.click(x,y,state);}
     public void toggleSettings() { panel = panel == Panel.SETTINGS ? Panel.NONE : Panel.SETTINGS; }
     public boolean panelOpen() { return panel != Panel.NONE; }
     public void closePanel() { panel = Panel.NONE; }
@@ -129,29 +131,10 @@ public final class Hud {
         drawProfile(batch, skin, assets, state);
         if (state.tutorial().active()) drawTutorial(batch, skin, assets, state.tutorial());
         drawShortcuts(batch, skin, assets, state, px, py);
-        if (panel == Panel.ALERTS) drawAlerts(batch, skin, state.alerts());
+        if (panel == Panel.ALERTS) notificationPanel.draw(batch,skin,state);
         if (panel == Panel.SETTINGS) drawSettings(batch, skin, state, speed, debug, px, py);
     }
 
-
-    private void drawAlerts(SpriteBatch batch, UiSkin skin, List<GameState.Alert> alerts) {
-        Rectangle anchor = shortcutBounds(Shortcut.ALERTS);
-        int shown = Math.min(alerts.size(), 8);
-        float h = 50 + Math.max(1, shown) * 30 + (alerts.size() > shown ? 26 : 0);
-        float x = Math.min(anchor.x, 1600 - 12 - PANEL_W), y = anchor.y - 8 - h;
-        skin.dropShadow(batch, x, y, PANEL_W, h, 4);
-        skin.draw(batch, skin.window, x, y, PANEL_W, h);
-        skin.text(batch, skin.label, "Avisos da fazenda", x + 16, y + h - 16, Palette.INK, Align.left);
-        if (alerts.isEmpty())
-            skin.text(batch, skin.body, "Tudo certo por aqui.", x + 16, y + h - 52, Palette.INK_MUTED, Align.left);
-        for (int i = 0; i < shown; i++) {
-            float ry = y + h - 52 - i * 30;
-            skin.text(batch, skin.label, alerts.get(i).title(), x + 16, ry, Palette.BERRY_INK, Align.left);
-            skin.text(batch, skin.body, alerts.get(i).detail(), x + PANEL_W - 16, ry, Palette.INK_MUTED, Align.right);
-        }
-        if (alerts.size() > shown)
-            skin.text(batch, skin.caption, "e mais " + (alerts.size() - shown), x + 16, y + 18, Palette.INK_MUTED, Align.left);
-    }
 
     private void drawSettings(SpriteBatch batch, UiSkin skin, GameState state, double speed, boolean debug,
                               float px, float py) {
@@ -243,7 +226,7 @@ public final class Hud {
         else for (DailyMissionBoard.Mission mission : state.dailyMissions().missions())
             if (!state.dailyMissions().completed(mission)) pending++;
         boolean produce = !state.depositTotals().isEmpty();
-        int alerts = state.alerts().size();
+        int alerts = state.notifications().unread();
         for (Shortcut s : Shortcut.values()) {
             Rectangle r = shortcutBounds(s);
             boolean hover = r.contains(px, py);
@@ -401,7 +384,8 @@ public final class Hud {
         }
         Crop crop = tile.crop();
         CropType type = crop.type();
-        float w = 330, h = 134;
+        boolean protectedCrop=state.protectedPlots().contains(state.land().at(col,row).id());
+        float w = 330, h = protectedCrop ? 154 : 134;
         float x = clamp(tileX - w / 2f, 12, 1600 - w - 12), y = Math.min(900 - 140 - h, tileY + 92);
         tipBox(batch, skin, x, y, w, h, tileX);
         List<String[]> chips = chips(tile, now);
@@ -424,6 +408,7 @@ public final class Hud {
         boolean paused = crop.paused();
         skin.bar(batch, paused || !crop.watered() ? skin.barGray : skin.barLeaf, x + 48, y + 22, w - 62, 17, fraction,
                 growthLine(tile, now));
+        if(protectedCrop){Toolbar.drawFitted(batch,assets.protectionLock,x+22,y+10,14);skin.text(batch,skin.micro,"Protegida",x+34,y+13,Palette.INK,Align.left);}
     }
 
     /** Temporada atual e o que a colheita rende: sempre uma unidade, ou o bloqueio de venda sem VIP. */

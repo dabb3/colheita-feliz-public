@@ -13,8 +13,10 @@ public record GameSnapshot(BigDecimal coins, List<br.com.colheitafeliz.domain.in
                            List<String> completedDailyMissions, List<Integer> unlockedPlotIds,
                            Integer tutorialStep, List<AnimalSnapshot> animals,
                            Map<String, Integer> feed, Map<String, Integer> fertilizers, String selectedFertilizerId,
-                           BigDecimal greenCoins, String vipExpiresAt, ProtectionSnapshot protection) {
+                           BigDecimal greenCoins, String vipExpiresAt, ProtectionSnapshot protection,
+                           br.com.colheitafeliz.domain.notification.NotificationInbox.Snapshot notifications) {
     public GameSnapshot {
+        if(notifications==null)notifications=new br.com.colheitafeliz.domain.notification.NotificationInbox().snapshot();
         if (coins == null || greenCoins == null || coins.signum() < 0 || greenCoins.signum() < 0
                 || coins.stripTrailingZeros().scale() > 1 || greenCoins.stripTrailingZeros().scale() > 1
                 || currentXp == null || currentXp.signum() < 0 || level < 1

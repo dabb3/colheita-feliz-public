@@ -50,6 +50,8 @@ final class OnlineViews {
         JsonObject view = object("owner", owner.toString(), "name", name, "revision", Long.toString(revision),
                 "serverTime", now.toString(), "own", own, "tiles", tiles, "animals", animals);
         if (!own) return view;
+        view.add("notifications",JSON.toJsonTree(game.notifications().entries()));
+        view.addProperty("unreadNotifications",game.notifications().unread());
         view.addProperty("coins", game.wallet().coins().stripTrailingZeros().toPlainString());
         view.addProperty("greenCoins", game.greenCoins().stripTrailingZeros().toPlainString());
         view.addProperty("level", game.progress().level());

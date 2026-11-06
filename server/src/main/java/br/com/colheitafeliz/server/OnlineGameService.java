@@ -229,7 +229,7 @@ final class OnlineGameService implements AutoCloseable {
                 return ActionResult.fail("Colheita reservada ao dono por mais " + seconds / 60 + "min " + seconds % 60 + "s.");
             }
         }
-        return visits.steal(destination.game(), visitor.game(), command.column(), command.row(), season);
+        return visits.steal(destination.game(), visitor.game(), command.column(), command.row(), season, visitor.name());
     }
 
     private Loaded load(JdbcOnlineStore.Tx tx, UUID owner) {
@@ -296,6 +296,8 @@ final class OnlineGameService implements AutoCloseable {
     private ActionResult act(GameState game, Command c) {
         Currency currency = c.currency() == null ? Currency.GOLD : Currency.valueOf(c.currency());
         return switch (c.action()) {
+            case "READ_NOTIFICATION" -> game.markNotificationRead(c.requireItem());
+            case "READ_ALL_NOTIFICATIONS" -> game.markAllNotificationsRead();
             case "BUY_SEED" -> game.buySeed(catalog.get(c.requireItem()), currency);
             case "BUY_ANIMAL" -> game.buyAnimal(game.animalType(c.requireItem()), currency);
             case "BUY_FEED" -> game.buyFeed(c.requireItem());

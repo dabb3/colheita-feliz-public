@@ -212,6 +212,7 @@ final class JdbcOnlineStore implements AutoCloseable {
                     throw new ApiFailure(503, "Versão da fazenda online incompatível.");
                 var snapshot = JsonParser.parseString(r.getString(1));
                 br.com.colheitafeliz.persistence.CropSaleJsonValidation.validate(snapshot);
+                br.com.colheitafeliz.persistence.NotificationJsonValidation.validate(snapshot);
                 br.com.colheitafeliz.persistence.AnimalSaleJsonValidation.validate(snapshot);
                 var state = JSON.fromJson(snapshot, GameSnapshot.class);
                 br.com.colheitafeliz.persistence.CropSaleJsonValidation.validateTerms(state);

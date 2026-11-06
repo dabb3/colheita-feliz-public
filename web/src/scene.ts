@@ -662,9 +662,7 @@ export class Scene {
           true,
         );
       if (tile.protected) {
-        ctx.fillStyle = "#90def1";
-        ctx.font = "18px sans-serif";
-        ctx.fillText("◆", p.x + 58, p.y);
+        this.thing("classic/icons/icone-cadeado.png",p.x+58,p.y+6,18,true);
       }
     }
     for (const animal of this.farm.animals)

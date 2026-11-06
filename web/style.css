@@ -459,3 +459,11 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 .crop-growth-nominal,.crop-growth-condition{margin:6px 0 0;font-size:11px;line-height:1.4;color:#526353}.crop-growth-condition{color:#705719}.crop-growth-estimate{text-align:left;line-height:1.4}.crop-time-notice{font-size:12px;line-height:1.4}
 
 .daily-allowance{margin-bottom:20px;padding:14px;border:1px solid #d8c279;border-radius:12px;background:#fff8df}.daily-allowance h3{display:flex;align-items:center;gap:8px;margin:0;font-size:16px;color:#426b36}.daily-allowance h3 img{width:22px;height:22px;object-fit:contain}.daily-allowance p{margin:8px 0;font-size:12px;line-height:1.4}.daily-allowance button{min-height:40px}
+.farm-menu-button#notifications{position:relative}
+#game .notification-badge{position:absolute;right:4px;top:0;min-width:20px;padding:2px 5px;border-radius:12px;background:#bd3528;color:#fff;font-size:11px;font-weight:700}
+#notification-badge[hidden]{display:none}
+.notification-list{max-height:60vh;overflow:auto;display:grid;gap:10px;margin-top:12px}
+.notification-entry{padding:12px;border:1px solid #d2bc79;border-radius:10px;background:#fff4ce;overflow-wrap:anywhere}
+.notification-entry.is-read{background:#f4f5e9;color:#626956}
+.notification-entry p{margin:0 0 8px}.notification-entry time{display:block;font-size:12px;margin-bottom:8px}
+.protection-icon{width:18px;height:18px;object-fit:contain}

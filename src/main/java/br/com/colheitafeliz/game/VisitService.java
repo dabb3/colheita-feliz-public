@@ -10,14 +10,24 @@ import br.com.colheitafeliz.domain.farm.TileState;
  */
 public final class VisitService {
     public ActionResult steal(GameState owner, GameState visitor, int col, int row, long expectedRevision) {
+        return steal(owner,visitor,col,row,expectedRevision,"Um visitante");
+    }
+    public ActionResult steal(GameState owner, GameState visitor, int col, int row, long expectedRevision, String visitorName) {
         synchronized (GameState.class) {
             FarmTile tile = eligibleTile(owner, visitor, col, row, expectedRevision);
             if (tile == null || tile.crop() == null || !tile.crop().matureAt(owner.now()))
                 return ActionResult.fail("Temporada indisponível para furto.");
             var origin = tile.crop().origin();
+            var cropType=tile.crop().type();
             if (!visitor.inventory().canAddProduceLot(origin) || tile.harvestRevision() == Long.MAX_VALUE)
                 return ActionResult.fail("Destino ou revisão sem capacidade.");
             visitor.inventory().addProduceLot(tile.harvest(owner.now()));
+            String name=visitorName==null||visitorName.isBlank()?"Um visitante":visitorName.strip().replaceAll("[\\p{Cntrl}]", "");
+            name=name.substring(0,Math.min(80,name.length()));
+            owner.notifications().record("theft",col+":"+row+":"+expectedRevision,
+                    br.com.colheitafeliz.domain.notification.GameNotification.Type.THEFT,
+                    name+" furtou 1 "+cropType.name()+" da sua fazenda.",owner.realNow(),
+                    java.util.Map.of("actorName",name,"cropId",cropType.id(),"quantity","1"));
             return ActionResult.ok("Uma unidade transferida ao visitante.");
         }
     }

@@ -5,6 +5,7 @@ import {Scene} from './scene.ts';
 import {takeInvite} from './invite-url.ts';
 import {renderWallet,control,text,renderDailyAllowance} from './ui.ts';
 import {durationLabel,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText} from './ui-presentation.ts';
+import {PROTECTED_ICON,notificationCount,renderNotifications} from './notifications.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,readAvatar,saveAvatar,type AvatarChoice} from './avatar.ts';
 import {periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalStatusText,animalActionLabel,animalClickCommand,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
 
@@ -156,7 +157,7 @@ function display(){return visited??own;}
 function refreshOpenDialog(){
  if(!modal.open||!refreshDialog)return;
  const hadFocus=content.contains(document.activeElement),key=document.activeElement?.getAttribute('data-focus-key');
- const scrollContainers=()=>[modal,content,...content.querySelectorAll<HTMLElement>('.market-scroll')];
+ const scrollContainers=()=>[modal,content,...content.querySelectorAll<HTMLElement>('.market-scroll'),...content.querySelectorAll<HTMLElement>('.notification-list')];
  const scroll=scrollContainers().map(node=>({top:node.scrollTop,left:node.scrollLeft}));
  refreshDialog();
  if(hadFocus){
@@ -167,6 +168,7 @@ function refreshOpenDialog(){
 }
 function render(){
  if(!own)return;
+ const badge=element('notification-badge'),unread=own.unreadNotifications??notificationCount(own.notifications??[]);badge.textContent=String(unread);badge.hidden=unread===0;element('notifications').setAttribute('aria-label',`Notificações, ${unread} não lidas`);
  syncMusic();
  element('welcome').hidden=true;element('game').hidden=false;
  renderWallet(element('wallet'),own,visited?.name,avatarSource(avatarChoice,googlePhoto),avatarSettings);
@@ -320,7 +322,7 @@ function renderHealth(tile:Tile,point:{x:number;y:number},force=false){
  const growth=document.createElement('section');growth.className='crop-growth';const caption=document.createElement('div');caption.className='crop-progress-caption';caption.append(document.createElement('span'));caption.firstElementChild!.textContent='CRESCIMENTO';const value=document.createElement('strong');value.className='crop-growth-value';caption.append(value);const track=document.createElement('div');track.className='crop-growth-track';track.setAttribute('role','progressbar');track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax','100');track.setAttribute('aria-label','Progresso de crescimento');const fill=document.createElement('span');fill.className='crop-growth-fill';track.append(fill);const estimate=document.createElement('p');estimate.className='crop-growth-estimate';const nominal=document.createElement('p');nominal.className='crop-growth-nominal';const condition=document.createElement('p');condition.className='crop-growth-condition';growth.append(caption,track,nominal,condition,estimate);panel.append(growth);
  const season=document.createElement('section');season.className='crop-season';const seasonLabel=document.createElement('p');seasonLabel.className='crop-season-label';seasonLabel.textContent=`Temporada ${tile.season} de ${tile.seasons}`;seasonLabel.setAttribute('aria-label',seasonLabel.textContent);const segments=document.createElement('div');segments.className='crop-season-track';segments.setAttribute('role','img');segments.setAttribute('aria-label',seasonLabel.textContent);for(let index=0;index<tile.seasons;index++){const segment=document.createElement('span');if(index<tile.season)segment.className='is-filled';segment.setAttribute('aria-hidden','true');segments.append(segment);}season.append(seasonLabel,segments);panel.append(season);
  if(!dead&&crop.vipOnly&&!(visited?own?.vipActive:farm.vipActive)){const warning=document.createElement('p');warning.className='crop-vip-warning';const vipIcon=document.createElement('img');vipIcon.src='/assets/classic/icons/cartao-vip.png';vipIcon.alt='';warning.append(vipIcon,document.createTextNode('Venda exige VIP'));panel.append(warning);}
- const chips=document.createElement('div');chips.className='crop-status-chips';if(!dead){if(tile.weeds)addChip(chips,'Ervas','/assets/classic/icons/hud/herbicida-ui.png','problem');if(tile.insects>0)addChip(chips,tile.insects===1?'Inseto':`${tile.insects} insetos`,'/assets/classic/icons/hud/pesticida-ui.png','problem');if(tile.dry&&tile.state!=='READY')addChip(chips,'Seca','/assets/classic/icons/hud/regador-ui.png','problem');if(tile.fertilized)addChip(chips,'Adubada','/assets/classic/icons/adubo-comum.png','benefit');if(tile.protected)addChip(chips,'Protegida','/assets/classic/animals/abelha/abelha.png','benefit');}if(chips.childElementCount)panel.append(chips);
+ const chips=document.createElement('div');chips.className='crop-status-chips';if(!dead){if(tile.weeds)addChip(chips,'Ervas','/assets/classic/icons/hud/herbicida-ui.png','problem');if(tile.insects>0)addChip(chips,tile.insects===1?'Inseto':`${tile.insects} insetos`,'/assets/classic/icons/hud/pesticida-ui.png','problem');if(tile.dry&&tile.state!=='READY')addChip(chips,'Seca','/assets/classic/icons/hud/regador-ui.png','problem');if(tile.fertilized)addChip(chips,'Adubada','/assets/classic/icons/adubo-comum.png','benefit');if(tile.protected)addChip(chips,'Protegida',PROTECTED_ICON,'benefit');}if(chips.childElementCount)panel.append(chips);
  const action=healthAction(tile,ready,dead);if(action){const hint=document.createElement('div');hint.className='crop-action-hint';const toolIcon=document.createElement('img');toolIcon.src=action.icon;toolIcon.alt='';const verb=document.createElement('span');verb.textContent=action.label;hint.append(toolIcon,verb);if(action.key){const keycap=document.createElement('kbd');keycap.textContent=action.key;hint.append(keycap);}panel.append(hint);}
  updateHealthDisplay(tile,remaining,ready,dead);positionHealth(panel,game,point);scheduleHealthClock();
 }
@@ -583,6 +585,7 @@ async function start(){
   }
  }catch(error){showConnection();notify(error instanceof Error?error.message:'Servidor indisponível.');button('Tentar conectar novamente',start,login);}
 }
+element('notifications').onclick=notifications;
 element('shop').onclick=()=>shop();element('deposit').onclick=deposit;element('missions').onclick=missions;element('friends').onclick=()=>void friends();
 element('home').onclick=()=>{navigationGeneration++;visited=undefined;tool='PLOW';render();};element('settings').onclick=()=>shortcutPanel('Ajustes',settings);element('close-modal').onclick=()=>modal.close();
 element('retry').onclick=async()=>{if(!api||busy)return;const client=api,generation=sessionGeneration;busy=true;try{const reply=await client.retry();if(generation!==sessionGeneration)return;receive(reply);if(reply.code){dialog('Convite confirmado');paragraph(reply.code);}}catch(error){if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();await refresh();}}};
@@ -594,3 +597,8 @@ document.addEventListener('keydown',event=>{if(!own||event.repeat||event.target 
 document.addEventListener('visibilitychange',()=>{syncMusic();if(!document.hidden)void refresh();});
 window.setInterval(()=>{if(!document.hidden)void refresh();},30_000);
 void start();
+
+function notifications(){
+ if(!own)return;dialog('Notificações');refreshDialog=notifications;
+ renderNotifications(content,own.notifications??[],id=>{void action({action:'READ_NOTIFICATION',itemId:id});},()=>{void action({action:'READ_ALL_NOTIFICATIONS'});});
+}

@@ -839,6 +839,42 @@ class OnlineGameIntegrationTest {
         return new Command(requestId(), service.farm(actor).get("revision").getAsString(), "CLAIM_DAILY_ALLOWANCE", null, null, null, null, null);
     }
 
+    @Test void theftNotificationNamesActorIsPrivateAndReadCommandsSurviveReopen() {
+        connectFriends();prepare(alice,"morango",true,false);clock.advanceSeconds(301);
+        var steal=theftCommand(bob,alice);var reply=service.visitAction(bob,alice,steal);
+        assertTrue(reply.getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(reply,service.visitAction(bob,alice,steal));
+        assertFalse(reply.getAsJsonObject("visitedFarm").has("notifications"));
+        var notes=service.farm(alice).getAsJsonArray("notifications");
+        var theft=java.util.stream.StreamSupport.stream(notes.spliterator(),false).map(e->e.getAsJsonObject()).filter(n->n.get("type").getAsString().equals("THEFT")).toList();
+        assertEquals(1,theft.size());assertEquals("Bob furtou 1 Morango da sua fazenda.",theft.getFirst().get("message").getAsString());
+        assertEquals("1",theft.getFirst().getAsJsonObject("metadata").get("quantity").getAsString());
+        assertEquals(clock.instant().toString(),theft.getFirst().get("createdAt").getAsString());
+        var id=theft.getFirst().get("id").getAsString();
+        var other=new Command(requestId(),service.farm(bob).get("revision").getAsString(),"READ_NOTIFICATION",id,null,null,null,null);
+        assertFalse(service.command(bob,other).getAsJsonObject("result").get("success").getAsBoolean());
+        var before=service.farm(alice);
+        var read=new Command(requestId(),before.get("revision").getAsString(),"READ_NOTIFICATION",id,null,null,null,null);
+        assertTrue(service.command(alice,read).getAsJsonObject("result").get("success").getAsBoolean());
+        var all=new Command(requestId(),service.farm(alice).get("revision").getAsString(),"READ_ALL_NOTIFICATIONS",null,null,null,null,null);
+        var readReply=service.command(alice,all);assertEquals(readReply,service.command(alice,all));
+        assertEquals(before.get("coins"),service.farm(alice).get("coins"));assertEquals(before.get("greenCoins"),service.farm(alice).get("greenCoins"));
+        store.close();store=new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"),"postgres","",testSchema);service=new OnlineGameService(store,clock,bound->99,5);
+        assertEquals(0,service.farm(alice).get("unreadNotifications").getAsInt());
+        assertEquals(notes.size(),service.farm(alice).getAsJsonArray("notifications").size());
+    }
+
+    @Test void theftRollbackAndFailedAttemptsCannotLeaveNotificationsBehind() {
+        connectFriends();prepare(alice,"morango",true,false);clock.advanceSeconds(301);
+        var before=service.farm(alice);var command=theftCommand(bob,alice);
+        assertThrows(IllegalStateException.class,()->store.transaction(bob,tx->{service.visitAction(tx,bob,alice,command);throw new IllegalStateException("rollback notification and theft");}));
+        assertEquals(before.get("notifications"),service.farm(alice).get("notifications"));assertEquals(0,quantity(service.farm(bob)));
+        assertTrue(service.visitAction(bob,alice,command).getAsJsonObject("result").get("success").getAsBoolean());
+        var notes=service.farm(alice).get("notifications");
+        assertFalse(service.visitAction(bob,alice,theftCommand(bob,alice)).getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(notes,service.farm(alice).get("notifications"));
+    }
+
     private UUID prepareTheftFriends() {
         connectFriends();
         UUID carol = UUID.randomUUID();
