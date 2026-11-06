@@ -35,6 +35,8 @@ O snapshot mantém `christmas2026.registeredAt` e `giftGranted`. A notificação
 
 Semente, recibo e notificação são persistidos na transação já protegida pelo lock da fazenda. Consultas simultâneas entregam uma unidade; rollback permite uma nova tentativa sem perder nem duplicar o presente. Não há novo endpoint de resgate. Estoque cheio adia a concessão.
 
+A concessão online acontece exclusivamente em `OnlineGameService.farm()`, quando o proprietário autenticado carrega a própria fazenda. `load()` apenas restaura e atualiza o estado compartilhado; visitas e ações sociais não entregam o presente ao proprietário ausente nem ao visitante. O visitante precisa carregar sua própria fazenda para receber o seu presente.
+
 O presente não debita moedas, não gera XP e não cumpre missões ou tutorial. Seu custo-base de 30 verdes identifica os termos de venda V1; não representa gasto do presenteado. O ROI de 70% aplica-se à compra normal. Receber a semente não dispensa VIP nem nível 55 para plantar. Depois de expirar o VIP, cuidados e colheitas seguem as regras atuais e a venda permanece bloqueada até renovar.
 
 ## Compatibilidade e implantação posterior
@@ -64,3 +66,11 @@ O PostgreSQL 17 usado nos ensaios foi um contêiner descartável acessível some
 O harness gerou 48 cenas. Foram inspecionadas `build/visual-review/46-natal-dia-mini-bis.png`, `47-natal-por-do-sol.png` e `48-natal-noite.png`, sem abrir o save do jogador. Os cinco estágios fornecidos aparecem no cenário de dia. Os backgrounds fornecidos têm composições diferentes entre períodos; foram utilizados sem editar a arte.
 
 O teste automatizado de áudio verifica seleção, pausa, repetição e retorno às faixas padrão. A qualidade sonora e o volume percebido precisam de escuta humana. Não houve teste em aparelho físico nem implantação; datas visuais dependem do relógio do dispositivo, conforme o ciclo já adotado.
+
+## Correção da revisão do PR #70
+
+O apontamento de mrlsouz foi reproduzido em cinco casos PostgreSQL: visita simples e tentativas de furto, amor, insetos e ervas. Todos falharam antes da correção porque o carregador compartilhado entregava o presente ao dono ausente.
+
+A chamada de concessão foi movida de `load()` para `farm()`, depois do lock e antes da persistência, usando a mesma data de cadastro autoritativa. Os cinco casos agora verificam ausência de semente, recibo, cursor e notificação durante a visita/ação, inclusive após reabrir o banco e visitar novamente depois de 01/01/2027. Dois carregamentos simultâneos posteriores pelo dono entregam exatamente uma unidade e uma notificação persistidas; a reentrada não repete o presente. O visitante continua sem presente até acessar a própria fazenda.
+
+Os 11 testes de integração de Natal e os 40 unitários do servidor passaram. SpotBugs de produção e testes do servidor não apresentou achados. A execução posterior de `gradlew.bat :server:integrationTest :server:installDist` passou em 3 min 21 s, com os 79 testes PostgreSQL aprovados, sem falhas ou ignorados, e distribuição gerada. Economia, mídia e mecânicas sociais não foram alteradas.

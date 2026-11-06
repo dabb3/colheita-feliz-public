@@ -76,6 +76,7 @@ final class OnlineGameService implements AutoCloseable {
                 tx.updateName(actor, cleanName(authenticatedName));
             tx.lockFarms(actor);
             var farm = load(tx, actor);
+            farm.game().claimChristmasGift(participant.registeredAt());
             return withRequestLease(persist(tx, farm, false, true));
     }
 
@@ -244,7 +245,6 @@ final class OnlineGameService implements AutoCloseable {
         GameState game = saved == null ? new GameState(fixed::instant, fixed, catalog, random)
                 : GameState.restore(fixed::instant, fixed, catalog, saved.snapshot(), random);
         if (saved == null) game.startNewFarm();
-        game.claimChristmasGift(participant.registeredAt());
         game.refresh(); game.protectedPlots();
         return new Loaded(owner, participant.name(), game, saved == null ? 0 : saved.revision(), saved == null ? null : saved.snapshot(), saved == null ? null : saved.allowanceDay());
     }

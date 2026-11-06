@@ -22,6 +22,40 @@ class ChristmasGiftIntegrationTest {
     }
     @AfterEach void close(){if(store!=null)store.close();}
     private UUID request(){return RequestIds.issue(clock.instant());}
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"VISIT","STEAL","LOVE","SPREAD_INSECTS","SPREAD_WEEDS"})
+    void friendCannotClaimAbsentOwnersGiftAndOwnerCanClaimOnceAfterEvent(String action) throws Exception {
+        var friend=UUID.randomUUID();var invite=service.createInvitation(owner,request()).get("code").getAsString();
+        service.acceptInvitation(friend,"Amigo",invite,request());service.farm(friend);
+        var visited=service.visit(friend,owner);clock.at=Christmas2026.GIFT_START.plusSeconds(3600);
+        if(action.equals("VISIT"))service.visit(friend,owner);
+        else service.visitAction(friend,owner,new Command(request(),visited.get("revision").getAsString(),action,null,null,0,0,"0"));
+        assertGiftPending(owner);assertGiftPending(friend);
+        clock.at=Christmas2026.END.plusSeconds(86400);store.close();
+        store=new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"),"postgres","",schema);service=new OnlineGameService(store,clock,bound->99,20);
+        service.visit(friend,owner);assertGiftPending(owner);
+        try(var executor=java.util.concurrent.Executors.newFixedThreadPool(2)){
+            var first=executor.submit(()->service.farm(owner));var second=executor.submit(()->service.farm(owner));
+            assertEquals(1,first.get().getAsJsonObject("seedCounts").get("mini-bis").getAsInt());
+            assertEquals(1,second.get().getAsJsonObject("seedCounts").get("mini-bis").getAsInt());
+        }
+        var own=service.farm(owner);assertEquals(1,own.getAsJsonObject("seedCounts").get("mini-bis").getAsInt());
+        store.transaction(owner,tx->{
+            var snapshot=tx.farm(owner).snapshot();assertTrue(snapshot.christmas2026().giftGranted());
+            assertEquals("2026",snapshot.notifications().observed().get("christmas-gift-2026"));
+            assertEquals(1,snapshot.notifications().entries().stream().filter(n->n.type()==br.com.colheitafeliz.domain.notification.GameNotification.Type.CHRISTMAS_GIFT).count());
+            assertEquals(Instant.parse("2026-11-06T03:00:00Z"),tx.player(owner).registeredAt());return null;
+        });
+        assertGiftPending(friend);
+    }
+    private void assertGiftPending(UUID player){
+        store.transaction(player,tx->{var snapshot=tx.farm(player).snapshot();
+            assertFalse(snapshot.christmas2026().giftGranted());
+            assertTrue(snapshot.seeds().stream().noneMatch(lot->lot.itemId().equals("mini-bis")));
+            assertFalse(snapshot.notifications().observed().containsKey("christmas-gift-2026"));
+            assertTrue(snapshot.notifications().entries().stream().noneMatch(n->n.type()==br.com.colheitafeliz.domain.notification.GameNotification.Type.CHRISTMAS_GIFT));return null;
+        });
+    }
     @Test void concurrentRefreshAndReopenGrantOneSeedAndOneNoticeWithoutChargingOrCompletingMissions() throws Exception {
         var before=service.farm(owner);clock.at=Christmas2026.GIFT_START;
         try(var executor=java.util.concurrent.Executors.newFixedThreadPool(2)){
