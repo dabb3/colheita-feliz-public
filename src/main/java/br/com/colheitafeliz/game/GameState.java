@@ -351,7 +351,8 @@ public final class GameState {
         BigDecimal price = known.prices().get(Objects.requireNonNull(currency));
         if (price == null || wallet.balance(currency).compareTo(price) < 0)
             return report(ActionResult.fail("Moedas insuficientes."));
-        Animal animal = Animal.acquire(known, new ItemLot(known.id(), currency, price, 1, false), realClock.instant(), clock.now());
+        Animal animal = Animal.acquire(known, new ItemLot(known.id(), currency, price, 1, false)
+                .withAnimalSale(known.saleTerms(currency)), realClock.instant(), clock.now());
         wallet.debit(currency, price);
         barn.add(animal);
         return report(ActionResult.ok("Comprou " + known.name() + " com alimentação cheia. " + recordDailyMission("purchase", 1)));
@@ -466,7 +467,7 @@ public final class GameState {
         Animal animal = barn.get(index);
         if (animal.type().kind() != AnimalType.Kind.GROWING || animal.stageAt(clock.now()) != Animal.Stage.ADULT)
             return report(ActionResult.fail("Só animais de crescimento adultos podem ser vendidos."));
-        BigDecimal total = animal.origin().unitCost().multiply(new BigDecimal(vipActive() ? "1.25" : "1.15"))
+        BigDecimal total = Market.unitRevenue(animal.origin(), vipActive())
                 .setScale(1, java.math.RoundingMode.CEILING);
         barn.remove(index);
         wallet.credit(animal.origin().currency(), total);
@@ -653,6 +654,7 @@ public final class GameState {
             throw new IllegalArgumentException("Invalid farm snapshot");
         GameState game = new GameState(clock, realClock, catalog, random, snapshot.coins(), snapshot.greenCoins(),
                 snapshot.level(), snapshot.currentXp());
+        AnimalSaleValidation.validate(snapshot, game.animalTypes);
         game.vip = new VipStatus(snapshot.vipExpiresAt() == null ? null : Instant.parse(snapshot.vipExpiresAt()));
         game.land.restore(snapshot.unlockedPlotIds());
         game.tutorial.restore(snapshot.tutorialStep());

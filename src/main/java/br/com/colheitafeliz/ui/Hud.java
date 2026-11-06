@@ -468,6 +468,7 @@ public final class Hud {
         else line = (type.kind() == AnimalType.Kind.GROWING ? "Crescendo · " + switch (animal.stageAt(now)) {
             case BABY -> "bebê"; case YOUNG -> "jovem"; case ADULT -> "adulto";
         } : type.productName()) + " · " + MarketPanel.formatTime(animal.remainingAt(now).toSeconds()) + " restantes";
+        if (type.kind() != AnimalType.Kind.PROTECTOR) line += " · Venda: " + GameText.animalSale(animal,state.vipActive());
         simpleTip(batch, skin, x, y, type.name(), line);
     }
 

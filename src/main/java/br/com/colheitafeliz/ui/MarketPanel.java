@@ -263,7 +263,7 @@ public final class MarketPanel {
             float center = LEFT + WIDTH / 2;
             Toolbar.drawFitted(batch, assets.vipCard, center, BOTTOM + 355, 130);
             skin.text(batch, skin.label, "Cartão VIP · 30 dias · 100 verdes", center, BOTTOM + 265, Palette.INK, Align.center);
-            skin.text(batch, skin.body, "Venda com acréscimo de 25%. Renovação acumula mais 30 dias.",
+            skin.text(batch, skin.body, "Vendas VIP conforme o item. Renovação acumula mais 30 dias.",
                     center, BOTTOM + 225, Palette.INK_MUTED, Align.center);
             skin.text(batch, skin.body, state.vipActive() ? "Ativo até " + GameText.vipExpiry(state.vip().expiresAt(), java.time.ZoneId.systemDefault()) : "VIP inativo",
                     center, BOTTOM + 195, Palette.INK_MUTED, Align.center);
@@ -393,6 +393,11 @@ public final class MarketPanel {
         };
         skin.text(batch, skin.caption, info, r.x + 108, mid + 2, Palette.INK_MUTED, Align.left);
         skin.text(batch, skin.caption, "Nível " + type.requiredLevel() + " · " + type.collectXp() + " XP", r.x + 108, mid - 18, Palette.SKY_INK, Align.left);
+        if (type.kind() != AnimalType.Kind.PROTECTOR) {
+            String quote = java.util.Arrays.stream(Currency.values()).map(currency -> GameText.money(type.saleTerms(currency).unitRevenue(state.vipActive()))
+                    + (currency == Currency.GOLD ? " ouro" : " verdes")).collect(java.util.stream.Collectors.joining(" | "));
+            skin.text(batch, skin.micro, "Venda nova: " + quote, r.x + 108, mid - 36, Palette.INK_MUTED, Align.left);
+        }
         boolean canBuy = unlocked && !full;
         for (Currency currency : Currency.values()) {
             Rectangle buy = buyAnimalButton(index, currency);
@@ -418,7 +423,9 @@ public final class MarketPanel {
         } else if (type.kind() == AnimalType.Kind.GROWING) {
             Rectangle sell = sellProductOneButton(index);
             button(batch, skin, skin.glassNeutral, sell, "Adulto", Palette.INK, null, sell.contains(px, py));
-            skin.text(batch, skin.caption, "Venda única", r.x + 790, mid + 24, Palette.INK_MUTED, Align.left);
+            String ownedQuote = state.barn().animals().stream().filter(a -> a.type().id().equals(type.id()))
+                    .findFirst().map(a -> GameText.animalSale(a,state.vipActive())).orElse("Venda única");
+            skin.text(batch, skin.caption, ownedQuote, r.x + 790, mid + 24, Palette.INK_MUTED, Align.left);
         } else {
             int owned = state.inventory().product(type.productId());
             Toolbar.drawFitted(batch, assets.product(type.id()), r.x + 750, mid + 4, 40);

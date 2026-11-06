@@ -23,6 +23,9 @@ export interface Animal {
   stage: string;
   status: string;
   remainingSeconds: number;
+  saleQuote?: string;
+  saleCurrency?: string;
+  economyVersion?: number;
 }
 export interface Farm {
   owner: string;
@@ -85,6 +88,7 @@ export interface AnimalType {
   kind: string;
   requiredLevel: number;
   prices: Record<string, number>;
+  salePrices?: Record<string, {commonTenths: number; vipTenths: number}>;
   productId: string;
   productName: string;
   productionSeconds?: number;

@@ -13,6 +13,7 @@ public record Animal(AnimalType type, ItemLot origin, Instant acquiredAt, Instan
     public Animal {
         Objects.requireNonNull(type); Objects.requireNonNull(origin); Objects.requireNonNull(acquiredAt);
         Objects.requireNonNull(growthAnchorAt); Objects.requireNonNull(fedUntil);
+        type.validateSaleTerms(origin, false);
         if (!origin.itemId().equals(type.id()) || origin.quantity() != 1 || origin.vipOnly()
                 || grownAtAnchorMillis < 0 || grownAtAnchorMillis > type.requiredMillis()
                 || fedUntil.isBefore(growthAnchorAt)

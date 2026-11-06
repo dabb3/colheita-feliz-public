@@ -125,22 +125,22 @@ O XP preserva integralmente os valores fracionários resultantes da fórmula, se
 
 ### 4.1. Tabela consolidada
 
-Nos preços, a ordem é **ouro / moedas verdes**. A compra usa uma das moedas e a venda devolve a moeda usada na aquisição. Para produtores, o preço de venda corresponde a **uma unidade do produto**; para animais de crescimento, ao **animal adulto**. Os valores de venda foram calculados com os acréscimos da seção 6 e arredondados para cima em uma casa decimal. Em vendas de várias unidades, o arredondamento é aplicado somente ao total, conforme a seção 9.1.
+Nos preços, a ordem é **ouro / moedas verdes**. A compra usa uma das moedas e a venda devolve a moeda usada na aquisição. Para produtores, o preço de venda corresponde a **uma unidade do produto**; para animais de crescimento, ao **animal adulto**. A tabela contém as vendas V2 aprovadas: curva ouro e alternativa B em verdes. Cada nova aquisição captura os dois perfis de venda na sua moeda; o perfil ativo na venda escolhe o valor. Animais e produtos adquiridos antes da V2 conservam a fórmula histórica da seção 6.1, inclusive em vendas agrupadas.
 
 Na coluna de crescimento, os tempos representam bebê → jovem e jovem → adulto, seguidos do total. Na produção, a duração começa na compra e existe apenas um ciclo por animal; não há produções seguintes. Os tempos dependem da alimentação. O limite de quantidade é por tipo de animal.
 
 | Animal | Tipo / produto vendido | Nível / limite | Compra: ouro / verdes | Venda comum: ouro / verdes | Venda VIP: ouro / verdes | Crescimento: bebê → jovem → adulto | Produção: primeira / seguintes | Unidades por ciclo / total de ciclos | Alimentação: custo e duração | XP | Encerramento |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Galinha | Produção / ovo | 10 / 1 | 8.000 / 9 | 9.200 / 10,4 | 10.000 / 11,3 | Comprado adulto | 8 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 100 por coleta | Após coleta única |
-| Abelha | Produção / mel | 14 / 1 | 28.000 / 28 | 32.200 / 32,2 | 35.000 / 35 | Comprado adulto | 12 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 140 por coleta | Após coleta única |
-| Pombo | Crescimento / adulto | 18 / 1 | 36.000 / 36 | 41.400 / 41,4 | 45.000 / 45 | 12 h + 24 h = 36 h | Não se aplica | Venda única | 80 ouro / 12 h | 180 por venda | Após venda adulta |
-| Coelho | Crescimento / adulto | 24 / 1 | 60.000 / 59 | 69.000 / 67,9 | 75.000 / 73,8 | 16 h + 32 h = 48 h | Não se aplica | Venda única | 80 ouro / 12 h | 240 por venda | Após venda adulta |
-| Pato | Produção / ovo de pato | 28 / 1 | 70.000 / 69 | 80.500 / 79,4 | 87.500 / 86,3 | Comprado adulto | 16 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 280 por coleta | Após coleta única |
-| Pavão | Produção / pena | 32 / 1 | 100.000 / 99 | 115.000 / 113,9 | 125.000 / 123,8 | Comprado adulto | 28 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 320 por coleta | Após coleta única |
-| Porco | Crescimento / adulto | 36 / 1 | 150.000 / 100 | 172.500 / 115 | 187.500 / 125 | 20 h + 40 h = 60 h | Não se aplica | Venda única | 80 ouro / 12 h | 360 por venda | Após venda adulta |
-| Burro | Crescimento / adulto | 40 / 1 | 150.000 / 100 | 172.500 / 115 | 187.500 / 125 | 24 h + 48 h = 72 h | Não se aplica | Venda única | 80 ouro / 12 h | 400 por venda | Após venda adulta |
-| Ovelha | Produção / lã | 44 / 1 | 180.000 / 120 | 207.000 / 138 | 225.000 / 150 | Comprado adulto | 20 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 440 por coleta | Após coleta única |
-| Vaca leiteira | Produção / leite | 48 / 1 | 220.000 / 180 | 253.000 / 207 | 275.000 / 225 | Comprado adulto | 24 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 480 por coleta | Após coleta única |
+| Galinha | Produção / ovo | 10 / 1 | 8.000 / 9 | 8.480,0 / 9,2 | 8.600,0 / 9,4 | Comprado adulto | 8 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 100 por coleta | Após coleta única |
+| Abelha | Produção / mel | 14 / 1 | 28.000 / 28 | 29.200,0 / 28,4 | 29.470,0 / 28,8 | Comprado adulto | 12 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 140 por coleta | Após coleta única |
+| Pombo | Crescimento / adulto | 18 / 1 | 36.000 / 36 | 40.480,0 / 37,4 | 41.560,0 / 38,6 | 12 h + 24 h = 36 h | Não se aplica | Venda única | 80 ouro / 12 h | 180 por venda | Após venda adulta |
+| Coelho | Crescimento / adulto | 24 / 1 | 60.000 / 59 | 67.440,0 / 61,4 | 69.240,0 / 62,6 | 16 h + 32 h = 48 h | Não se aplica | Venda única | 80 ouro / 12 h | 240 por venda | Após venda adulta |
+| Pato | Produção / ovo de pato | 28 / 1 | 70.000 / 69 | 73.000,0 / 70,0 | 73.720,0 / 70,6 | Comprado adulto | 16 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 280 por coleta | Após coleta única |
+| Pavão | Produção / pena | 32 / 1 | 100.000 / 99 | 106.240,0 / 101,0 | 107.710,0 / 102,0 | Comprado adulto | 28 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 320 por coleta | Após coleta única |
+| Porco | Crescimento / adulto | 36 / 1 | 150.000 / 100 | 164.720,0 / 104,8 | 168.320,0 / 107,2 | 20 h + 40 h = 60 h | Não se aplica | Venda única | 80 ouro / 12 h | 360 por venda | Após venda adulta |
+| Burro | Crescimento / adulto | 40 / 1 | 150.000 / 100 | 169.840,0 / 106,4 | 174.700,0 / 109,6 | 24 h + 48 h = 72 h | Não se aplica | Venda única | 80 ouro / 12 h | 400 por venda | Após venda adulta |
+| Ovelha | Produção / lã | 44 / 1 | 180.000 / 120 | 186.240,0 / 122,0 | 187.740,0 / 123,0 | Comprado adulto | 20 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 440 por coleta | Após coleta única |
+| Vaca leiteira | Produção / leite | 48 / 1 | 220.000 / 180 | 228.160,0 / 182,6 | 230.140,0 / 184,0 | Comprado adulto | 24 h / Não se aplica | 1 unidade / 1 ciclo; venda única | 120 ouro / 8 h | 480 por coleta | Após coleta única |
 | Cão Robô | Proteção de plantações | 10 / 1 | 20.000 / 15 | Não pode vender | Não pode vender | Comprado adulto | Não produz | Não se aplica | 80 ou 120 ouro / 6 h | 0 | Removido após 30 dias |
 | Cão Mastiff | Proteção de plantações | 20 / 1 | 50.000 / 50 | Não pode vender | Não pode vender | Comprado adulto | Não produz | Não se aplica | 80 ou 120 ouro / 6 h | 0 | Removido após 30 dias |
 | Avestruz | Proteção de plantações | 30 / 1 | 80.000 / 75 | Não pode vender | Não pode vender | Comprado adulto | Não produz | Não se aplica | 80 ou 120 ouro / 6 h | 0 | Removido após 30 dias |
@@ -203,14 +203,14 @@ Nenhum fertilizante pode ser aplicado a uma planta não saudável: seca, com pra
 
 ## 6. Regra geral de venda
 
-Para plantas v1, a receita de autoridade é a tabela da seção 2.1, repartida conforme a seção 6.3. Animais e produtos de plantas v0 mantêm os acréscimos sobre seu custo-base abaixo.
+Para plantas v1, a receita de autoridade é a tabela da seção 2.1, repartida conforme a seção 6.3. Animais v0 e produtos de plantas v0 mantêm os acréscimos sobre seu custo-base abaixo.
 
 | Perfil do jogador | Acréscimo sobre o custo-base | Multiplicador |
 |---|---:|---:|
 | Comum | 15% | 1,15 |
 | VIP | 25% | 1,25 |
 
-Os multiplicadores acima abrangem animais de produção, animais de crescimento e somente as plantas anteriores à v1.
+Os multiplicadores acima abrangem somente aquisições e produtos animais v0 e plantas anteriores à v1. Animais V2 usam a tabela fixa da seção 4.1.
 
 ### 6.1. Fórmulas
 
@@ -220,9 +220,9 @@ total_sem_arredondar = valor_unitario_sem_arredondar × quantidade_vendida
 valor_total_venda = teto(total_sem_arredondar × 10) ÷ 10
 ```
 
-Para animais e plantas v0, o multiplicador é 1,15 para o perfil comum e 1,25 para VIP. A função teto arredonda para o inteiro imediatamente superior, preservando valores já inteiros. O valor unitário não é arredondado antes da multiplicação pela quantidade. Por exemplo, dois ovos de uma galinha adquirida por 9 moedas verdes rendem 20,7 moedas verdes no perfil comum (9 × 1,15 × 2), embora uma venda isolada de um ovo renda 10,4 moedas verdes.
+Para animais v0 e plantas v0, o multiplicador é 1,15 para o perfil comum e 1,25 para VIP. A função teto arredonda para o inteiro imediatamente superior, preservando valores já inteiros. O valor unitário não é arredondado antes da multiplicação pela quantidade. Por exemplo, dois ovos de uma galinha adquirida por 9 moedas verdes rendem 20,7 moedas verdes no perfil comum (9 × 1,15 × 2), embora uma venda isolada de um ovo renda 10,4 moedas verdes.
 
-Para animais e plantas v0, o benefício VIP acrescenta **10 pontos percentuais** ao acréscimo padrão: 15% + 10% = 25%. Para plantas v1, vale apenas a repartição da seção 6.3.
+Para animais v0 e plantas v0, o benefício VIP acrescenta **10 pontos percentuais** ao acréscimo padrão: 15% + 10% = 25%. Para plantas v1, vale apenas a repartição da seção 6.3.
 
 No comando **Vender tudo**, produtos VIP bloqueados são ignorados e permanecem no armazém; os demais são vendidos normalmente. Para cada moeda, somam-se os valores exatos de todos os itens/lotes elegíveis e aplica-se o teto de uma casa decimal uma única vez ao total dessa moeda. Ouro e verdes nunca são somados nem convertidos. Esta unidade de arredondamento por operação e moeda é a decisão técnica adotada para concretizar a regra de arredondar o total.
 
@@ -247,9 +247,21 @@ Cada lote mantém ID da cultura, moeda, custo da semente, quantidade e restriç�
 
 Na migração, economyVersion=0 sem cropSale identifica v0; a ausência total dos marcadores em saves históricos também identifica v0. Um lote marcado externamente como v1 não pode perder cropSale nem ser reclassificado como v0. Rascunhos anteriores com cropSale completo e sem marcador externo continuam aceitos como v1. Plantas em andamento, todas as suas temporadas futuras e produtos no depósito mantêm 1,15/1,25 até a venda. Uma semente já comprada, quando plantada após a atualização, entra na v1. Exceção de compatibilidade: sementes históricas cuja moeda, custo ou restrição VIP diferem do catálogo atual conservam v0; não converter sua aquisição para uma tabela em outra moeda ou outro custo. Saldos, XP, animais e demais estoques ficam intactos.
 
-O formato estrutural permanece v20 e o caminho save/game-rules-v4.json. Arquivos v19/v20 com ruleset economy-2026-10 são carregados preservando v0. Novas gravações usam economy-2026-11-plants-v1, recusado pelo leitor desktop anterior. V1–v18, futuras e versões econômicas desconhecidas são recusadas. No online, a transação preserva os novos termos no snapshot JSON. Antes de uma implantação futura, criar backup e publicar somente servidores que conheçam ambos os preços; não misturar binários anteriores e novos nem fazer rollback para um leitor que descarte cropSale.
+O formato estrutural permanece v20 e o caminho save/game-rules-v4.json. Arquivos v19/v20 com ruleset economy-2026-10 são carregados preservando v0. O ruleset economy-2026-11-plants-v1 permanece aceito. Novas gravações usam economy-2026-11-animals-v2, recusado pelo leitor desktop anterior. V1–v18, futuras e versões econômicas desconhecidas são recusadas. No online, a transação preserva os novos termos no snapshot JSON. Antes de uma implantação futura, criar backup e publicar somente servidores que conheçam ambos os preços; não misturar binários anteriores e novos nem fazer rollback para um leitor que descarte cropSale.
 
-A API calcula elegibilidade, preço unitário e totais e credita o saldo sob lock da fazenda e recibo idempotente, na mesma transação do estoque. Campos de preço enviados pelo cliente não são aceitos. Vender tudo ignora os produtos VIP bloqueados. Por decisão final de 2026-11-05, o arredondamento histórico de v0 fica preservado, inclusive a diferença possível entre vendas separadas e agrupadas. Misturas com v0/animais continuam usando o teto único por moeda apenas para suas frações antigas. Para produtos exclusivamente v1, venda individual, por lote e total produzem exatamente a mesma soma.
+A API calcula elegibilidade, preço unitário e totais e credita o saldo sob lock da fazenda e recibo idempotente, na mesma transação do estoque. Campos de preço enviados pelo cliente não são aceitos. Vender tudo ignora os produtos VIP bloqueados. Por decisão final de 2026-11-05, o arredondamento histórico de v0 fica preservado, inclusive a diferença possível entre vendas separadas e agrupadas. Misturas com v0 continuam usando o teto único por moeda apenas para suas frações antigas. Para produtos exclusivamente v1, venda individual, por lote e total produzem exatamente a mesma soma.
+
+### 6.4. Termos econômicos dos animais V2
+
+A compra de cada animal vendável captura `animalSale`: `economyVersion=2`, `animalId`, `commonRevenueTenths` e `vipRevenueTenths`. O lote externo também identifica `economyVersion=2`. Os valores são receitas finais inteiras em décimos na moeda da aquisição, conforme a seção 4.1; não são multiplicadores e não incluem conversão do custo de ração. O perfil VIP é verificado no momento da venda. A alimentação inicial, os custos das refeições seguintes e todos os tempos/XP permanecem iguais.
+
+A coleta de um produtor transfere os mesmos termos para uma unidade do produto e remove o animal. Adultos de crescimento liquidam diretamente pelos termos da aquisição. Termos de plantas e animais são mutuamente exclusivos. Sementes e plantações não podem conter termos animais; protetores não recebem termos de venda.
+
+Animais e produtos anteriores sem `animalSale` mantêm v0, inclusive após carga, alimentação, coleta ou expiração do VIP. Não há recálculo retroativo nem pagamento na migração. Na mesma venda podem coexistir plantas v0/v1 e produtos animais v0/V2. Produtos V2 já têm precisão de décimos: venda individual e agrupada rendem exatamente a mesma soma. As frações históricas v0 continuam sujeitas ao teto por operação/moeda da seção 6.1.
+
+A leitura valida versão, campos completos, números inteiros sem coerção, moeda, custo de aquisição, espécie/produto e preços da versão aprovada. Marcador externo V2 sem termos é erro, não legado. Dados inconsistentes são recusados sem sobrescrever o save. Esses metadados não são assinatura criptográfica: o banco online continua confiável e somente comandos autenticados podem alterá-lo; o cliente não envia snapshots nem preços de venda.
+
+O formato continua v20, no mesmo caminho. Os rulesets `economy-2026-10` e `economy-2026-11-plants-v1` são lidos sem alterar os estoques; as gravações usam `economy-2026-11-animals-v2`. Os dois caminhos de escrita PostgreSQL gravam snapshot e ruleset na mesma transação. Binários anteriores recusam o novo identificador. Uma futura revisão de preços deve criar nova versão e conservar a validação histórica V2; não editar a interpretação de termos já adquiridos. Antes de qualquer implantação, fazer backup e planejar restauração; não fazer downgrade de binário sobre dados V2 nem manter escritores antigos e novos simultaneamente.
 
 ## 7. Cartão VIP
 
@@ -258,7 +270,7 @@ A API calcula elegibilidade, preço unitário e totais e credita o saldo sob loc
 - **Renovação:** com VIP ativo, cada compra soma 30 dias ao prazo restante; com VIP expirado, inicia 30 dias a partir da compra. Dez compras consecutivas, uma de cada vez, acumulam 300 dias de duração concedida.
 - O cartão não fica armazenado no depósito nem aguarda uso manual: a compra aplica o benefício imediatamente.
 - **Acesso exclusivo:** sementes VIP indisponíveis para jogadores comuns.
-- **Venda:** aplica a repartição v1 das plantas comuns da seção 6.3 e libera produtos exclusivos VIP. Animais e plantas v0 mantêm acréscimo de 25% sobre seu custo-base.
+- **Venda:** aplica a repartição v1 das plantas comuns da seção 6.3 e libera produtos exclusivos VIP. Animais v0 e plantas v0 mantêm acréscimo de 25% sobre seu custo-base. Animais V2 usam a coluna VIP da seção 4.1.
 - As sementes identificadas como VIP estão listadas na tabela consolidada da seção 2.
 - Não existem animais exclusivos VIP.
 - Após o término, sementes VIP armazenadas não podem ser plantadas. Plantações VIP existentes continuam permitindo cuidados e colheitas, mas seus produtos armazenados ficam bloqueados para uso e venda até a renovação. As regras detalhadas estão na seção 9.2.
@@ -313,7 +325,7 @@ As tabelas abaixo complementam as regras das seções anteriores. Os valores sã
 | Tratamento de empate no arredondamento | Não se aplica: qualquer fração além da precisão permitida é arredondada para cima. |
 | Momento do arredondamento (por unidade ou após multiplicar pela quantidade) | após multiplicar pela quantidade |
 
-Para animais e plantas v0, 2,25 resulta em 2,3 e 2,20 permanece 2,2, com teto no total da venda. Plantas v1 já têm valores em décimos inteiros por temporada e não passam por arredondamento adicional.
+Para animais v0 e plantas v0, 2,25 resulta em 2,3 e 2,20 permanece 2,2, com teto no total da venda. Plantas v1 já têm valores em décimos inteiros por temporada e não passam por arredondamento adicional.
 
 ### 9.2. Exclusividade e término do VIP
 

@@ -24,7 +24,8 @@ public final class Barn {
         if (animal.type().kind() != AnimalType.Kind.PRODUCER || animal.statusAt(now) != Animal.Status.READY)
             throw new IllegalStateException("Nothing to collect");
         remove(index);
-        return new ItemLot(animal.type().productId(), animal.origin().currency(), animal.origin().unitCost(), 1, false);
+        return new ItemLot(animal.type().productId(), animal.origin().currency(), animal.origin().unitCost(), 1, false)
+                .withAnimalSale(animal.origin().animalSale());
     }
     public int activeProtectors(Instant realNow, Instant simulationNow) {
         return (int) animals.stream().filter(a -> a.activeAt(realNow, simulationNow)).count();

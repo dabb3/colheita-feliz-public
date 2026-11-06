@@ -65,6 +65,7 @@ public final class Market {
 
     /** One authority for settlement and presentation; legacy rounding stays at transaction total. */
     public static BigDecimal unitRevenue(ItemLot lot, boolean vipActive) {
+        if (lot.animalSale() != null) return lot.animalSale().unitRevenue(vipActive);
         return lot.cropSale() == null
                 ? lot.unitCost().multiply(new BigDecimal(vipActive ? "1.25" : "1.15"))
                 : lot.cropSale().unitRevenue(vipActive);
