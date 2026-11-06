@@ -1,5 +1,18 @@
 import type { Animal, AnimalType, Crop, Farm, Tile } from "./types.ts";
 
+export function seedArtPath(stem:string):string {
+  return `classic/crops/seeds/${stem==='mini-bis'?'semente-mini-bis':`semente_${stem}`}.png`;
+}
+export function christmasActive(now:Date):boolean {
+  const time=now.getTime();return time>=Date.parse('2026-11-06T03:00:00Z')&&time<Date.parse('2027-01-01T03:00:00Z');
+}
+export function backgroundArtPath(period:'day'|'sunset'|'night',now:Date):string {
+  return christmasActive(now)?`classic/background/background-natal-${period==='sunset'?'por-do-sol':period==='day'?'dia':'noite'}.png`:`classic/background/background${period==='day'?'':'-'+period}.png`;
+}
+export function musicArtPath(period:'day'|'sunset'|'night',now:Date):string {
+  return christmasActive(now)?`musica-evento-natal-${period==='night'?'noite':'dia-e-por-do-sol'}.mp3`:period==='night'?'noite.mp3':'farm_loop.mp3';
+}
+
 export function animalSaleOffer(type:AnimalType,vip:boolean):string {
   if(type.kind==='PROTECTOR')return 'Sem revenda';
   const quotes=['GOLD','GREEN'].flatMap(currency=>{const p=type.salePrices?.[currency];return p?[`${((vip?p.vipTenths:p.commonTenths)/10).toFixed(1).replace('.',',')} ${currency==='GOLD'?'ouro':'verdes'}`]:[];});

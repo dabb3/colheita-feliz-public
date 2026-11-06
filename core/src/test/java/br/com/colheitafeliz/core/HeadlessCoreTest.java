@@ -16,7 +16,7 @@ class HeadlessCoreTest {
         var catalog = CropCatalogLoader.load();
         var game = new GameState(clock::instant, clock, catalog, bound -> 99);
         game.startNewFarm();
-        assertEquals(33, catalog.all().size());
+        assertEquals(34, catalog.all().size());
         assertEquals(0, new BigDecimal("500").compareTo(game.wallet().coins()));
         assertEquals(0, new BigDecimal("5").compareTo(game.greenCoins()));
         var restored = GameState.restore(clock::instant, clock, catalog, game.snapshot(), bound -> 99);

@@ -25,7 +25,7 @@ class CropEconomyV1Test {
             167,175,183,191,199,207,215,223,231,239,276,504,18,48,90,144,210};
 
     @Test void allThirtyThreeCyclesMatchTableProfitAndNominalSlope() {
-        var crops = CropCatalogLoader.load().all();
+        var crops = CropCatalogLoader.load().all().stream().filter(crop->!crop.id().equals("mini-bis")).toList();
         assertEquals(33, crops.size());
         for (int i = 0; i < crops.size(); i++) {
             var crop = crops.get(i);

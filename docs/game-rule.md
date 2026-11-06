@@ -54,6 +54,7 @@ Os tempos são as durações nominais de crescimento do estágio 1 ao 5, sujeito
 | Limão | VIP | 30 | 12 verdes | Bloqueada sem VIP | 4,4 → 4,4 → 4,3 → 4,3 verdes | 36 h | 18 h | 4 | 1 | 54 → 27 → 13,5 → 6,75 | Sim |
 | Noz | VIP | 40 | 16 verdes | Bloqueada sem VIP | 5,0 → 5,0 → 5,0 → 4,9 → 4,9 verdes | 48 h | 24 h | 5 | 1 | 72 → 36 → 18 → 9 → 4,5 | Sim |
 | Coco | VIP | 50 | 20 verdes | Bloqueada sem VIP | 5,5 → 5,5 → 5,5 → 5,5 → 5,5 → 5,5 verdes | 60 h | 30 h | 6 | 1 | 90 → 45 → 22,5 → 11,25 → 5,625 → 2,8125 | Sim |
+| Mini-Bis | VIP | 55 | 30 verdes | Bloqueada sem VIP | 8,5 → 8,5 → 8,5 → 8,5 → 8,5 → 8,5 verdes | 72 h | 36 h | 6 | 1 | 108 → 54 → 27 → 13,5 → 6,75 → 3,375 | Sim |
 
 ### 2.1. Receita e lucro por ciclo v1
 
@@ -94,8 +95,9 @@ Os valores de culturas comuns são em ouro e usam perfil comum durante todas as 
 | limao | 12,0 | 4 | 90 | 17,4 | 5,4 | 45% |
 | noz | 16,0 | 5 | 144 | 24,8 | 8,8 | 55% |
 | coco | 20,0 | 6 | 210 | 33,0 | 13,0 | 65% |
+| mini-bis | 30,0 | 6 | 252 | 51,0 | 21,0 | 70% |
 
-Culturas comuns seguem lucro nominal de 4,5 ouro/h no nabo, aumentando 1,5 ouro/h por posição. As exclusivas VIP seguem ROI de 25%, 35%, 45%, 55% e 65%. A receita comum com VIP integral aumenta exatamente 10% do custo de uma semente por ciclo.
+Culturas comuns seguem lucro nominal de 4,5 ouro/h no nabo, aumentando 1,5 ouro/h por posição. As cinco exclusivas VIP originais seguem ROI de 25%, 35%, 45%, 55% e 65%; Mini-Bis acrescenta ROI de 70%, sem alterar as anteriores. A receita comum com VIP integral aumenta exatamente 10% do custo de uma semente por ciclo.
 
 ## 3. Cultivo, temporadas e XP
 
@@ -247,7 +249,7 @@ Cada lote mantém ID da cultura, moeda, custo da semente, quantidade e restriç�
 
 Na migração, economyVersion=0 sem cropSale identifica v0; a ausência total dos marcadores em saves históricos também identifica v0. Um lote marcado externamente como v1 não pode perder cropSale nem ser reclassificado como v0. Rascunhos anteriores com cropSale completo e sem marcador externo continuam aceitos como v1. Plantas em andamento, todas as suas temporadas futuras e produtos no depósito mantêm 1,15/1,25 até a venda. Uma semente já comprada, quando plantada após a atualização, entra na v1. Exceção de compatibilidade: sementes históricas cuja moeda, custo ou restrição VIP diferem do catálogo atual conservam v0; não converter sua aquisição para uma tabela em outra moeda ou outro custo. Saldos, XP, animais e demais estoques ficam intactos.
 
-O formato estrutural permanece v20 e o caminho save/game-rules-v4.json. Arquivos v19/v20 com ruleset economy-2026-10 são carregados preservando v0. O ruleset economy-2026-11-plants-v1 permanece aceito. Novas gravações usam economy-2026-11-animals-v2, recusado pelo leitor desktop anterior. V1–v18, futuras e versões econômicas desconhecidas são recusadas. No online, a transação preserva os novos termos no snapshot JSON. Antes de uma implantação futura, criar backup e publicar somente servidores que conheçam ambos os preços; não misturar binários anteriores e novos nem fazer rollback para um leitor que descarte cropSale.
+O formato estrutural permanece v20 e o caminho save/game-rules-v4.json. Arquivos v19/v20 com ruleset economy-2026-10 são carregados preservando v0. Os rulesets economy-2026-11-plants-v1 e economy-2026-11-animals-v2 permanecem aceitos. Novas gravações usam economy-2026-11-mini-bis-v1, recusado pelo leitor desktop anterior. V1–v18, futuras e versões econômicas desconhecidas são recusadas. No online, a transação preserva os novos termos no snapshot JSON. Antes de uma implantação futura, criar backup e publicar somente servidores que conheçam ambos os preços; não misturar binários anteriores e novos nem fazer rollback para um leitor que descarte cropSale.
 
 A API calcula elegibilidade, preço unitário e totais e credita o saldo sob lock da fazenda e recibo idempotente, na mesma transação do estoque. Campos de preço enviados pelo cliente não são aceitos. Vender tudo ignora os produtos VIP bloqueados. Por decisão final de 2026-11-05, o arredondamento histórico de v0 fica preservado, inclusive a diferença possível entre vendas separadas e agrupadas. Misturas com v0 continuam usando o teto único por moeda apenas para suas frações antigas. Para produtos exclusivamente v1, venda individual, por lote e total produzem exatamente a mesma soma.
 
@@ -261,7 +263,7 @@ Animais e produtos anteriores sem `animalSale` mantêm v0, inclusive após carga
 
 A leitura valida versão, campos completos, números inteiros sem coerção, moeda, custo de aquisição, espécie/produto e preços da versão aprovada. Marcador externo V2 sem termos é erro, não legado. Dados inconsistentes são recusados sem sobrescrever o save. Esses metadados não são assinatura criptográfica: o banco online continua confiável e somente comandos autenticados podem alterá-lo; o cliente não envia snapshots nem preços de venda.
 
-O formato continua v20, no mesmo caminho. Os rulesets `economy-2026-10` e `economy-2026-11-plants-v1` são lidos sem alterar os estoques; as gravações usam `economy-2026-11-animals-v2`. Os dois caminhos de escrita PostgreSQL gravam snapshot e ruleset na mesma transação. Binários anteriores recusam o novo identificador. Uma futura revisão de preços deve criar nova versão e conservar a validação histórica V2; não editar a interpretação de termos já adquiridos. Antes de qualquer implantação, fazer backup e planejar restauração; não fazer downgrade de binário sobre dados V2 nem manter escritores antigos e novos simultaneamente.
+O formato continua v20, no mesmo caminho. Os rulesets `economy-2026-10`, `economy-2026-11-plants-v1` e `economy-2026-11-animals-v2` são lidos sem alterar os estoques; as gravações usam `economy-2026-11-mini-bis-v1`. Os dois caminhos de escrita PostgreSQL gravam snapshot e ruleset na mesma transação. Binários anteriores recusam o novo identificador. Uma futura revisão de preços deve criar nova versão e conservar a validação histórica V2; não editar a interpretação de termos já adquiridos. Antes de qualquer implantação, fazer backup e planejar restauração; não fazer downgrade de binário sobre dados V2 nem manter escritores antigos e novos simultaneamente.
 
 ## 7. Cartão VIP
 
@@ -364,7 +366,7 @@ Para animais v0 e plantas v0, 2,25 resulta em 2,3 e 2,20 permanece 2,2, com teto
 - Não converter saldo, itens, culturas em andamento, animais, adubo ou progresso dos saves legados para a economia nova. O jogo novo começa vazio, com apenas os saldos iniciais definidos acima.
 - A implementação deve separar o save da nova economia dos saves legados, preservando os arquivos antigos em disco. Não apagar, sobrescrever ou reinicializar silenciosamente um save existente, inclusive quando houver caminho explícito em `COLHEITA_SAVE_PATH`.
 - O tutorial somente orienta. A sequência será comprar, arar, plantar, regar, aguardar a maturação, colher e vender. Não concede moedas, sementes, itens nem XP extra; ações reais continuam concedendo o XP normal da seção 11.
-- Não há presentes em sementes, itens grátis, nabos iniciais prontos ou recompensas de conclusão do tutorial. A tabela de nível concede apenas as moedas da seção 8. As fontes financeiras do núcleo novo são as descritas neste documento; o bônus legado de baú ao arar não será mantido.
+- Não há presentes recorrentes em sementes, itens grátis, nabos iniciais prontos ou recompensas de conclusão do tutorial. A única exceção é a semente de Mini-Bis do Natal de 2026, descrita na seção 14. A tabela de nível concede apenas as moedas da seção 8. As fontes financeiras do núcleo novo são as descritas neste documento; o bônus legado de baú ao arar não será mantido.
 
 ## 11. Curva de nível e XP das ações
 
@@ -440,3 +442,17 @@ As pragas pausam o crescimento sem apagar o progresso. O dono usa herbicida para
 Reutilizar os assets existentes, com mapeamento explícito de nomes do catálogo para nomes de arquivos. A presença no disco deve ser conferida para os cinco estágios e a semente de cada cultura, fases e produtos animais e ícones de itens. A implementação deve conferir o carregamento e o resultado visual no jogo; inventário de caminhos não substitui revisão visual.
 
 O alinhamento destes textos e a existência dos planos não significam que a economia nova, o VIP ou o social estejam implementados. O acompanhamento da entrega fica em `regras-de-negocio.md` e nos planos vinculados.
+
+### 14.1. Natal de 2026 e Mini-Bis
+
+O tema de Natal começa em 06/11/2026 às 00:00 e termina em 01/01/2027 às 00:00, no fuso America/Sao_Paulo. Durante esse período, desktop e web usam os três backgrounds natalinos e as músicas de Natal: uma para dia/pôr do sol e outra para noite. Na virada, voltam automaticamente aos arquivos padrão, inclusive com o jogo aberto. Os horários locais de dia, pôr do sol e noite e o sono dos animais permanecem os existentes; o tempo acelerado da simulação não controla o calendário do evento.
+
+Mini-Bis é permanente: semente VIP de 30 verdes, nível mínimo 55, primeira temporada nominal de 72 horas com rega em dia e sem pragas, mais cinco temporadas de 36 horas. Cada temporada entrega uma unidade com venda de 8,5 verdes; o ciclo completo soma 51 verdes, lucro de 21 e ROI líquido de 70% sobre a semente comprada. Não existe bônus VIP adicional. A planta segue as mesmas regras de rega, seca, pragas, temporadas, XP, furto e restrições VIP das demais plantas. A compra continua disponível depois do evento.
+
+A partir de 24/12/2026 às 00:00, cada jogador ativo cadastrado até 24/12 inclusive recebe uma única semente VIP de Mini-Bis ao carregar sua própria fazenda. Quem retornar depois continua elegível, sem prazo final de retirada. Cadastro a partir de 25/12 não qualifica. A API usa a data de cadastro persistida pelo servidor; contas anteriores à introdução dessa coluna são reconhecidas como preexistentes. No desktop, utiliza-se o cadastro da fazenda salvo localmente; saves válidos anteriores são considerados preexistentes.
+
+Visitas e ações de amigos não concedem o presente ao proprietário ausente. No online, a concessão ocorre exclusivamente no carregamento autenticado da própria fazenda; o carregador compartilhado de estado não entrega presentes.
+
+O presente não cobra moedas, não concede XP e não conta como compra para missões ou tutorial. Mantém nível 55 e VIP para plantar; produtos exigem VIP para venda. O lote utiliza custo-base de 30 verdes apenas para os termos de venda V1, sem representar desembolso do presenteado. O ROI de 70% descreve sementes compradas. Estoque cheio adia a entrega até haver espaço. O recibo de entrega e o cursor permanente da notificação CHRISTMAS_GIFT são gravados com a semente, na mesma transação online. Divergências entre esses metadados são recusadas sem sobrescrita. Marcar a notificação como lida ou removê-la pelo limite de 100 não permite novo presente.
+
+O save permanece no formato v20, com ruleset economy-2026-11-mini-bis-v1. Leitores anteriores devem recusar esse identificador; não executar escritores antigos sobre dados já atualizados. A migração de cadastro não descarta jogadores, estoques ou saldos. Nenhuma outra cultura, preço, recompensa, animal ou regra social muda neste evento.

@@ -127,7 +127,7 @@ class AnimalEconomyIntegrationTest {
         assertTrue(service.command(actor,command("TEND_ANIMAL","galinha")).getAsJsonObject("result").get("success").getAsBoolean());
         var before=service.farm(actor).get("greenCoins").getAsBigDecimal();service.command(actor,command("SELL_ALL",null));
         assertEquals(0,new BigDecimal("11.3").compareTo(service.farm(actor).get("greenCoins").getAsBigDecimal().subtract(before)));
-        assertEquals("economy-2026-11-animals-v2",store.transaction(actor,tx->tx.query("SELECT ruleset FROM "+schema+".farms WHERE owner=?",r->r.getString(1),actor).getFirst()));
+        assertEquals(br.com.colheitafeliz.persistence.GameSave.RULESET,store.transaction(actor,tx->tx.query("SELECT ruleset FROM "+schema+".farms WHERE owner=?",r->r.getString(1),actor).getFirst()));
     }
     @Test void corruptJdbcTermsAreRejectedBeforeGsonCoercionAndLeaveDatabaseUntouched() {
         for(String corruption:java.util.List.of("fraction","string","missing","marker","price","currency")){

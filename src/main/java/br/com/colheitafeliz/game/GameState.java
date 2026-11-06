@@ -64,6 +64,19 @@ public final class GameState {
     private int lastHarvestAmount;
     private int lastCollected;
     private VipStatus vip = new VipStatus(null);
+    private GameSnapshot.ChristmasState christmas2026;
+    public boolean claimChristmasGift(){return claimChristmasGift(Instant.parse(christmas2026.registeredAt()));}
+    public boolean claimChristmasGift(Instant registeredAt){
+        christmas2026=new GameSnapshot.ChristmasState(registeredAt.toString(),christmas2026.giftGranted());
+        if(christmas2026.giftGranted()||!Christmas2026.giftDue(realClock.instant(),registeredAt))return false;
+        var type=catalog.get("mini-bis");
+        if(inventory.seeds(type)==Integer.MAX_VALUE)return false;
+        inventory.addSeedLot(new ItemLot(type.id(),Currency.GREEN,type.seedPrice().getValue(),1,true));
+        christmas2026=new GameSnapshot.ChristmasState(registeredAt.toString(),true);
+        notifications.record("christmas-gift-2026","2026",br.com.colheitafeliz.domain.notification.GameNotification.Type.CHRISTMAS_GIFT,
+                "Presente de Natal: você recebeu 1 semente VIP de Mini-Bis!",realClock.instant(),Map.of("cropId","mini-bis","quantity","1"));
+        return true;
+    }
     private br.com.colheitafeliz.domain.notification.NotificationInbox notifications = new br.com.colheitafeliz.domain.notification.NotificationInbox();
     public br.com.colheitafeliz.domain.notification.NotificationInbox notifications(){return notifications;}
     public ActionResult markNotificationRead(String id){return notifications.markRead(id)?ActionResult.ok("Notificação lida."):ActionResult.fail("Notificação indisponível.");}
@@ -85,6 +98,7 @@ public final class GameState {
                       BigDecimal coins, BigDecimal green, int level, BigDecimal currentXp) {
         this.clock = Objects.requireNonNull(clock);
         this.realClock = Objects.requireNonNull(realClock);
+        christmas2026=new GameSnapshot.ChristmasState(realClock.instant().toString(),false);
         this.catalog = Objects.requireNonNull(catalog);
         wallet = new Wallet(coins, green);
         market = new Market(wallet, inventory);
@@ -639,7 +653,7 @@ public final class GameState {
                         animal.type().id(), animal.origin(), animal.acquiredAt().toString(), animal.growthAnchorAt().toString(),
                         animal.grownAtAnchorMillis(), animal.fedUntil().toString())).toList(),
                 inventory.feedSnapshot(), inventory.fertilizerSnapshot(), fertilizer.id(),
-                greenCoins(), vip.expiresAt() == null ? null : vip.expiresAt().toString(), protection, notifications.snapshot());
+                greenCoins(), vip.expiresAt() == null ? null : vip.expiresAt().toString(), protection, notifications.snapshot(),christmas2026);
     }
 
     public static GameState restore(GameClock clock, CropCatalog catalog, GameSnapshot snapshot) {
@@ -661,6 +675,7 @@ public final class GameState {
                 snapshot.level(), snapshot.currentXp());
         AnimalSaleValidation.validate(snapshot, game.animalTypes);
         game.notifications = new br.com.colheitafeliz.domain.notification.NotificationInbox(snapshot.notifications());
+        game.christmas2026=snapshot.christmas2026()==null?new GameSnapshot.ChristmasState(Instant.EPOCH.toString(),false):snapshot.christmas2026();
         for(String key:snapshot.notifications().observed().keySet())
             if(key.startsWith("animal:")&&game.animalTypes.stream().noneMatch(type->key.equals("animal:"+type.id())))
                 throw new IllegalArgumentException("Unknown notification animal cursor");

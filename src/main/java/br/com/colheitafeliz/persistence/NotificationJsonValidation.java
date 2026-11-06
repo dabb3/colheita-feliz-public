@@ -7,6 +7,13 @@ import java.util.Set;
 public final class NotificationJsonValidation {
     private NotificationJsonValidation() {}
     public static void validate(JsonElement snapshot){
+        if(snapshot!=null&&snapshot.isJsonObject()&&snapshot.getAsJsonObject().has("christmas2026")){
+            var christmas=snapshot.getAsJsonObject().get("christmas2026");
+            if(!christmas.isJsonObject()||!christmas.getAsJsonObject().keySet().equals(Set.of("registeredAt","giftGranted")))throw new IllegalArgumentException("Invalid Christmas state");
+            string(christmas.getAsJsonObject().get("registeredAt"));
+            var granted=christmas.getAsJsonObject().get("giftGranted");
+            if(!granted.isJsonPrimitive()||!granted.getAsJsonPrimitive().isBoolean())throw new IllegalArgumentException("Invalid gift receipt");
+        }
         if(snapshot==null||!snapshot.isJsonObject()||!snapshot.getAsJsonObject().has("notifications"))return;
         var state=snapshot.getAsJsonObject().get("notifications");
         if(!state.isJsonObject()||!state.getAsJsonObject().keySet().equals(Set.of("version","entries","observed")))throw new IllegalArgumentException("Invalid inbox schema");

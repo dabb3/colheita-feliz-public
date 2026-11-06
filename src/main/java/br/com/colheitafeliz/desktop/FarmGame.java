@@ -36,6 +36,8 @@ public final class FarmGame extends ApplicationAdapter {
     }
 
     @Override public void render() {
+        audio.update();
+        if(session.state().claimChristmasGift())save();
         if (session.state().refresh()) {
             renderer.pestAlert(session.state().lastOutbreak());
             save();

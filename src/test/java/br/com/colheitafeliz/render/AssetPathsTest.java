@@ -13,6 +13,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** O jogo quebra ao abrir se um asset carregado não existe; os testes de lógica não abrem texturas. */
 class AssetPathsTest {
+    @Test void miniBisSeedUsesTheSuppliedHyphenatedFileName() {
+        assertEquals("classic/crops/seeds/semente-mini-bis.png",GameAssets.seedPath("mini-bis"));
+        assertTrue(Files.exists(Path.of("assets",GameAssets.seedPath("mini-bis"))));
+    }
     private static final Path ASSETS = Path.of("assets");
     private static final Pattern ASSET_LITERAL = Pattern.compile("\"([^\"]+\\.(?:png|jpg|wav|mp3|ttf))\"");
 

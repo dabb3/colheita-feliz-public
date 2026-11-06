@@ -148,7 +148,7 @@ public final class FarmRenderer implements AutoCloseable {
 
         batch.begin();
         DayPeriod period = DayPeriod.at(localClock);
-        Texture background = assets.background(period);
+        Texture background = assets.background(period,localClock.instant());
         float backgroundScale = Math.max(viewport.getWorldWidth() / background.getWidth(),
                 viewport.getWorldHeight() / background.getHeight());
         float backgroundWidth = background.getWidth() * backgroundScale;

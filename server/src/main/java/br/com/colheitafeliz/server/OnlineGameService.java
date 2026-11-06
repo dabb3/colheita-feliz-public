@@ -76,6 +76,7 @@ final class OnlineGameService implements AutoCloseable {
                 tx.updateName(actor, cleanName(authenticatedName));
             tx.lockFarms(actor);
             var farm = load(tx, actor);
+            farm.game().claimChristmasGift(participant.registeredAt());
             return withRequestLease(persist(tx, farm, false, true));
     }
 
@@ -129,7 +130,7 @@ final class OnlineGameService implements AutoCloseable {
                     throw new ApiFailure(404, "Convite indisponível.");
                 active(tx, invite.owner());
                 if (invite.usedBy() != null && !invite.usedBy().equals(actor)) throw new ApiFailure(409, "Convite já utilizado.");
-                tx.addPlayer(actor, cleanName(name), limit);
+                tx.addPlayer(actor, cleanName(name), limit,clock.instant());
                 tx.befriend(actor, invite.owner());
                 tx.accept(hash(code), actor);
                 return object("success", true, "message", "Convite aceito. Vocês são amigos.");
@@ -141,7 +142,11 @@ final class OnlineGameService implements AutoCloseable {
         return store.transaction(actor, tx -> friends(tx, actor));
     }
 
-    JsonArray friends(JdbcOnlineStore.Tx tx, UUID actor) { active(tx, actor); return JSON.toJsonTree(tx.friends(actor)).getAsJsonArray(); }
+    JsonArray friends(JdbcOnlineStore.Tx tx, UUID actor) {
+        active(tx, actor);var result=new JsonArray();
+        for(var player:tx.friends(actor))result.add(object("id",player.id(),"name",player.name(),"active",player.active()));
+        return result;
+    }
 
     static String cleanName(String name) {
         String clean = name == null ? "" : name.replaceAll("[\\p{Cntrl}\\u061C\\u200E\\u200F\\u202A-\\u202E\\u2066-\\u2069]", "").strip();

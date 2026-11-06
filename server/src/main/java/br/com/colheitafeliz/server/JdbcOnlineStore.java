@@ -25,7 +25,7 @@ import java.util.function.Function;
 /** Persistência exclusivamente do online; não lê nem importa arquivos locais do jogador. */
 final class JdbcOnlineStore implements AutoCloseable {
     static final int RECEIPTS_PER_ACTOR = 1000;
-    record Player(UUID id, String name, boolean active) {}
+    record Player(UUID id, String name, boolean active, Instant registeredAt) {}
     record Farm(GameSnapshot snapshot, long revision, Instant time, LocalDate allowanceDay) {}
     record Receipt(String hash, JsonObject response) {}
     record Invitation(UUID owner, UUID usedBy, Instant expiresAt) {}
@@ -68,9 +68,15 @@ final class JdbcOnlineStore implements AutoCloseable {
     @Override public void close() { pool.close(); }
 
     void initialize(UUID owner) {
+        initialize(owner,Instant.now());
+    }
+    void initialize(UUID owner,Instant registeredAt) {
         transaction(owner, tx -> {
             tx.execute("CREATE SCHEMA IF NOT EXISTS " + schema);
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".players (id uuid PRIMARY KEY, name varchar(80) NOT NULL, active boolean NOT NULL)");
+            // Existing rows predate this release; new registrations receive authoritative server time.
+            tx.execute("ALTER TABLE " + schema + ".players ADD COLUMN IF NOT EXISTS registered_at timestamptz NOT NULL DEFAULT '1970-01-01 00:00:00+00'");
+            tx.execute("ALTER TABLE " + schema + ".players ALTER COLUMN registered_at SET DEFAULT CURRENT_TIMESTAMP");
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".farms (owner uuid PRIMARY KEY REFERENCES " + schema
                     + ".players(id), ruleset text NOT NULL, revision bigint NOT NULL CHECK(revision > 0), game_time timestamptz NOT NULL, snapshot jsonb NOT NULL)");
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".receipts (actor uuid NOT NULL, request_id uuid NOT NULL, hash text NOT NULL, response jsonb NOT NULL, PRIMARY KEY(actor,request_id))");
@@ -99,7 +105,7 @@ final class JdbcOnlineStore implements AutoCloseable {
                     tx.execute("REVOKE ALL ON ALL TABLES IN SCHEMA " + schema + " FROM " + role);
                 }
             }
-            tx.execute("INSERT INTO " + schema + ".players VALUES (?, ?, true) ON CONFLICT(id) DO NOTHING", owner, "Minha fazenda");
+            tx.execute("INSERT INTO " + schema + ".players (id,name,active,registered_at) VALUES (?, ?, true, ?) ON CONFLICT(id) DO NOTHING", owner, "Minha fazenda", java.sql.Timestamp.from(registeredAt));
             return null;
         });
     }
@@ -185,8 +191,8 @@ final class JdbcOnlineStore implements AutoCloseable {
         }
         Player player(UUID id) {
             // FOR SHARE keeps this row stable until the transaction ends; never cache across requests.
-            if (!players.containsKey(id)) players.put(id, first(query("SELECT id,name,active FROM " + schema + ".players WHERE id=? FOR SHARE",
-                    r -> new Player(r.getObject(1, UUID.class), r.getString(2), r.getBoolean(3)), id)));
+            if (!players.containsKey(id)) players.put(id, first(query("SELECT id,name,active,registered_at FROM " + schema + ".players WHERE id=? FOR SHARE",
+                    r -> new Player(r.getObject(1, UUID.class), r.getString(2), r.getBoolean(3),r.getTimestamp(4).toInstant()), id)));
             return players.get(id);
         }
         void setActive(UUID id, boolean active) {
@@ -197,12 +203,12 @@ final class JdbcOnlineStore implements AutoCloseable {
             execute("UPDATE " + schema + ".players SET name=? WHERE id=? AND active AND name<>?", name, id, name);
             players.remove(id);
         }
-        void addPlayer(UUID id, String name, int limit) {
+        void addPlayer(UUID id, String name, int limit, Instant registeredAt) {
             lock("membership");
             if (player(id) != null) return;
             int count = query("SELECT count(*) FROM " + schema + ".players WHERE active", r -> r.getInt(1)).getFirst();
             if (count >= limit) throw new ApiFailure(409, "O grupo de teste atingiu o limite de participantes.");
-            execute("INSERT INTO " + schema + ".players VALUES (?,?,true)", id, name);
+            execute("INSERT INTO " + schema + ".players (id,name,active,registered_at) VALUES (?,?,true,?)", id, name,java.sql.Timestamp.from(registeredAt));
             players.remove(id);
         }
         Farm farm(UUID owner) {
@@ -288,9 +294,9 @@ final class JdbcOnlineStore implements AutoCloseable {
             return !query("SELECT 1 FROM " + schema + ".friendships WHERE (a=? AND b=?) OR (a=? AND b=?)", r -> 1, one, two, two, one).isEmpty();
         }
         List<Player> friends(UUID actor) {
-            return query("SELECT p.id,p.name,p.active FROM " + schema + ".players p JOIN " + schema
+            return query("SELECT p.id,p.name,p.active,p.registered_at FROM " + schema + ".players p JOIN " + schema
                     + ".friendships f ON p.id=CASE WHEN f.a=? THEN f.b ELSE f.a END WHERE (f.a=? OR f.b=?) AND p.active",
-                    r -> new Player(r.getObject(1, UUID.class), r.getString(2), r.getBoolean(3)), actor, actor, actor);
+                    r -> new Player(r.getObject(1, UUID.class), r.getString(2), r.getBoolean(3),r.getTimestamp(4).toInstant()), actor, actor, actor);
         }
         void execute(String sql, Object... values) {
             try (PreparedStatement statement = prepare(sql, values)) { statement.execute(); }
