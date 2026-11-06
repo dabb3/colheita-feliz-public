@@ -48,19 +48,20 @@ public final class VisualReviewLauncher {
                 "22-cinco-estagios.png", "23-pragas-simultaneas.png", "24-temporada-reiniciada.png", "25-loja-ultima-pagina.png",
                 "26-loja-fertilizantes.png", "27-bandeja-fertilizantes.png", "28-pronta-pelo-fertilizante.png", "29-animais-bebes.png", "30-animais-jovens.png", "31-animais-adultos.png",
                 "32-animais-sono.png", "33-protetores-expirados.png", "34-animais-pagina2.png", "35-animais-pagina3.png", "36-animais-pagina4.png", "37-tarefas-no-tutorial.png", "38-terreno-verde-comprado.png", "39-saldos-milionarios.png", "40-planta-morta.png",
-                "41-background-dia.png", "42-background-por-do-sol.png", "43-background-noite.png"
+                "41-background-dia.png", "42-background-por-do-sol.png", "43-background-noite.png", "44-notificacoes.png", "45-protegida-cadeado.png"
         };
-        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
         static { FRAMES[30] = 150; } // Cinco segundos: inclui deslocamento e a cauda aberta do pavão.
         private final Path output = Path.of(System.getProperty("colheita.visualOutput", "build/visual-review"));
         private FarmRenderer renderer;
         private final ManualClock backgroundClock = new ManualClock();
         private GameState fresh, states, rich, newcomer, rancher, stages, seasons, fertilized, tasks, expanded, millionaire;
         private int scene, frames;
-        private GameState animalsBaby, animalsYoung, animalsAdult, animalsSleep, animalsExpired, harvested;
+        private GameState animalsBaby, animalsYoung, animalsAdult, animalsSleep, animalsExpired, harvested, protectedCrop;
 
         @Override public void create() {
             CropCatalog catalog = CropCatalogLoader.load();
+            protectedCrop = buildProtected(catalog);
             ManualClock freshClock = new ManualClock();
             fresh = new GameState(freshClock::instant, freshClock, catalog, bound -> 99);
             states = buildStates(catalog);
@@ -122,6 +123,15 @@ public final class VisualReviewLauncher {
          * Primeira coluna, todos nabos (10 h, úmidos por 3 h 20 min): úmido, seco, com 2 vermes, com erva e vermes ao
          * mesmo tempo, e pronto. As pragas pausam o crescimento; a seca só o reduz à metade.
          */
+        private static GameState buildProtected(CropCatalog catalog) {
+            var clock=new ManualClock();var game=new GameState(clock::instant,clock,catalog,bound->99);
+            while(game.progress().level()<60)game.progress().award(game.progress().xpToNext());
+            game.wallet().credit(1_000_000);
+            for(var type:game.animalTypes())if(type.kind()==br.com.colheitafeliz.domain.animal.AnimalType.Kind.PROTECTOR)game.buyAnimal(type);
+            var tile=game.farm().tile(0,0);tile.plow();tile.plant(catalog.get("nabo"),clock.instant());
+            return game;
+        }
+
         private static GameState buildStates(CropCatalog catalog) {
             ManualClock clock = new ManualClock();
             GameState game = new GameState(clock::instant, clock, catalog, bound -> 99);
@@ -252,7 +262,8 @@ public final class VisualReviewLauncher {
             if (frames == 0) setUp(scene);
             GameState state = switch (scene) {
                 case 0, 10, 17, 18, 19 -> fresh;
-                case 5, 6, 7, 9, 15, 16, 20 -> rich;
+                case 5, 6, 7, 9, 15, 16, 20, 43 -> rich;
+                case 44 -> protectedCrop;
                 case 11, 12 -> newcomer;
                 case 13, 14 -> rancher;
                 case 21 -> stages;
@@ -278,7 +289,7 @@ public final class VisualReviewLauncher {
                 case 10, 37 -> new IsoRenderer.GridPosition(2, 0);
                 case 11 -> new IsoRenderer.GridPosition(0, 0);
                 case 22 -> new IsoRenderer.GridPosition(0, 3);
-                case 23, 27 -> new IsoRenderer.GridPosition(0, 0);
+                case 23, 27, 44 -> new IsoRenderer.GridPosition(0, 0);
                 default -> null;
             };
             if (hovered != null) {
@@ -320,6 +331,13 @@ public final class VisualReviewLauncher {
             rich.selectTool(Tool.HAND);
             renderer.toolbar().closeTray();
             switch (scene) {
+                case 43 -> {
+                    var inbox=rich.notifications();var now=rich.realNow();
+                    inbox.record("theft","visual",br.com.colheitafeliz.domain.notification.GameNotification.Type.THEFT,"João furtou 1 Morango da sua fazenda.",now,java.util.Map.of());
+                    inbox.record("crop:0","visual",br.com.colheitafeliz.domain.notification.GameNotification.Type.CROP_READY,"Morango: planta pronta para colher.",now,java.util.Map.of());
+                    inbox.record("vip","visual",br.com.colheitafeliz.domain.notification.GameNotification.Type.VIP_EXPIRED,"Seu cartão VIP expirou.",now,java.util.Map.of());
+                    renderer.hud().toggleAlerts();
+                }
                 case 4 -> renderer.toolbar().picked(Tool.SEED, Tool.HAND);
                 case 25 -> {
                     fresh.wallet().credit(5_000);

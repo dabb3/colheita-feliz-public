@@ -84,6 +84,7 @@ public final class InputController extends InputAdapter {
         }
         Hud.Shortcut shortcut = renderer.hud().shortcutHit(p.x, p.y);
         if (renderer.hud().panelOpen() && shortcut != Hud.Shortcut.ALERTS && shortcut != Hud.Shortcut.SETTINGS) {
+            if(renderer.hud().notificationClick(p.x,p.y,state)){save.getAsBoolean();return true;}
             Hud.Setting setting = renderer.hud().panelClick(p.x, p.y);
             if (setting != null) apply(setting);
             return true;

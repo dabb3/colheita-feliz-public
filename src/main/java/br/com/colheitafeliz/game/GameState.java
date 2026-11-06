@@ -64,6 +64,10 @@ public final class GameState {
     private int lastHarvestAmount;
     private int lastCollected;
     private VipStatus vip = new VipStatus(null);
+    private br.com.colheitafeliz.domain.notification.NotificationInbox notifications = new br.com.colheitafeliz.domain.notification.NotificationInbox();
+    public br.com.colheitafeliz.domain.notification.NotificationInbox notifications(){return notifications;}
+    public ActionResult markNotificationRead(String id){return notifications.markRead(id)?ActionResult.ok("Notificação lida."):ActionResult.fail("Notificação indisponível.");}
+    public ActionResult markAllNotificationsRead(){notifications.markAllRead();return ActionResult.ok("Notificações lidas.");}
 
     public GameState(GameClock clock, CropCatalog catalog) {
         this(clock, catalog, ThreadLocalRandom.current()::nextInt);
@@ -572,7 +576,8 @@ public final class GameState {
         lastOutbreak = pests.update(farm, now);
         if (lastOutbreak.weeds()) message = "Ervas daninhas! Use o herbicida.";
         else if (lastOutbreak.insects()) message = "Insetos na plantação! Use o pesticida.";
-        return removed || lastOutbreak.any();
+        boolean notified=NotificationEvents.observe(this);
+        return removed || lastOutbreak.any() || notified;
     }
 
     /** Pragas que surgiram no último {@link #refresh()}. */
@@ -634,7 +639,7 @@ public final class GameState {
                         animal.type().id(), animal.origin(), animal.acquiredAt().toString(), animal.growthAnchorAt().toString(),
                         animal.grownAtAnchorMillis(), animal.fedUntil().toString())).toList(),
                 inventory.feedSnapshot(), inventory.fertilizerSnapshot(), fertilizer.id(),
-                greenCoins(), vip.expiresAt() == null ? null : vip.expiresAt().toString(), protection);
+                greenCoins(), vip.expiresAt() == null ? null : vip.expiresAt().toString(), protection, notifications.snapshot());
     }
 
     public static GameState restore(GameClock clock, CropCatalog catalog, GameSnapshot snapshot) {
@@ -655,6 +660,10 @@ public final class GameState {
         GameState game = new GameState(clock, realClock, catalog, random, snapshot.coins(), snapshot.greenCoins(),
                 snapshot.level(), snapshot.currentXp());
         AnimalSaleValidation.validate(snapshot, game.animalTypes);
+        game.notifications = new br.com.colheitafeliz.domain.notification.NotificationInbox(snapshot.notifications());
+        for(String key:snapshot.notifications().observed().keySet())
+            if(key.startsWith("animal:")&&game.animalTypes.stream().noneMatch(type->key.equals("animal:"+type.id())))
+                throw new IllegalArgumentException("Unknown notification animal cursor");
         game.vip = new VipStatus(snapshot.vipExpiresAt() == null ? null : Instant.parse(snapshot.vipExpiresAt()));
         game.land.restore(snapshot.unlockedPlotIds());
         game.tutorial.restore(snapshot.tutorialStep());

@@ -26,12 +26,26 @@ function app(){
  const ctx={...presentation,...uiPresentation,...avatar,...inviteUrl,history:{state:null,replaceState(){}},window:{COLHEITA_CONFIG:{development:true},setInterval(callback,delay){intervals.set(delay,callback);return delay;},clearInterval(id){intervals.delete(id);},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}addEventListener(){}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
  const uiSource=readFileSync(new URL('../src/ui.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(uiSource),ctx);
+ const notificationSource=readFileSync(new URL('../src/notifications.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
+ runInNewContext(stripTypeScriptTypes(notificationSource),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
  source+='\nglobalThis.h={refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,missions,friends,receive,dialog,health,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:{...ctx.h,runTimeouts(){for(const [id,callback]of [...timeouts]){timeouts.delete(id);callback();}}},elements,listeners,audioClips,observers,ctx,intervals};
 }
 function text(node){return(node.textContent??'')+(node.children??[]).map(child=>typeof child==='object'?text(child):child).join('');}
 function descendants(node){return[node,...(node.children??[]).flatMap(child=>typeof child==='object'?descendants(child):[])];}
+
+test('notification badge and panel follow own state during a visit and retain list scroll on refresh',()=>{
+ const {h,elements}=app();
+ const notes=[{id:'one',type:'THEFT',message:'João furtou 1 Morango.',createdAt:'2026-11-06T12:00:00Z',read:false,metadata:{}},{id:'two',type:'VIP_EXPIRED',message:'VIP expirou',createdAt:'2026-11-06T11:00:00Z',read:false,metadata:{}}];
+ const own={...farm('alice'),notifications:notes,unreadNotifications:2};
+ h.set({own,visited:farm('bob'),api:{pending:false,busy:false}});h.receive({});
+ assert.equal(elements.get('notification-badge').textContent,'2');elements.get('notifications').onclick();
+ let list=descendants(elements.get('modal-content')).find(n=>n.className==='notification-list');assert.ok(list);list.scrollTop=340;
+ h.receive({farm:{...own,revision:'2',notifications:notes.map((n,i)=>({...n,read:i===0})),unreadNotifications:1}});
+ list=descendants(elements.get('modal-content')).find(n=>n.className==='notification-list');assert.equal(list.scrollTop,340);assert.equal(elements.get('notification-badge').textContent,'1');
+ h.receive({farm:{...own,revision:'3',notifications:notes.map(n=>({...n,read:true})),unreadNotifications:0}});assert.equal(elements.get('notification-badge').hidden,true);
+});
 
 test('open missions refreshes the claimed allowance at UTC rollover',async()=>{
  const {h,elements,intervals}=app(),status={amount:'100',available:false,nextResetAt:'2026-11-04T00:00:00Z'};

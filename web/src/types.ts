@@ -28,6 +28,8 @@ export interface Animal {
   economyVersion?: number;
 }
 export interface Farm {
+  notifications?: GameNotification[];
+  unreadNotifications?: number;
   owner: string;
   name: string;
   revision: string;
@@ -69,6 +71,14 @@ export interface Farm {
     done: boolean;
   }[];
   nextPlot?: { column: number; row: number };
+}
+export interface GameNotification {
+  id: string;
+  type: 'THEFT'|'CROP_READY'|'ANIMAL_READY'|'VIP_EXPIRED';
+  message: string;
+  createdAt: string;
+  read: boolean;
+  metadata: Record<string,string>;
 }
 export interface Crop {
   id: string;

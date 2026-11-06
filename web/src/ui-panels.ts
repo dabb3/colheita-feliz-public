@@ -250,6 +250,7 @@ export function renderPlantHealth(
     for (const line of [timing.nominal, timing.condition, timing.estimate])
       if (line) root.append(text("p", line, "muted"));
   }
+  if(tile.protected)root.append(image("classic/icons/icone-cadeado.png","protection-icon"));
   const conditions = [
     tile.dry ? "Precisa de água" : "",
     tile.paused ? "Crescimento pausado" : "",
