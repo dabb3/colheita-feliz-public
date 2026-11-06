@@ -208,8 +208,13 @@ final class JdbcOnlineStore implements AutoCloseable {
         Farm farm(UUID owner) {
             return first(query("SELECT f.snapshot,f.revision,f.game_time,f.ruleset,a.last_claimed_day FROM " + schema
                     + ".farms f LEFT JOIN " + schema + ".daily_allowances a ON a.actor=f.owner WHERE f.owner=? FOR UPDATE OF f", r -> {
-                if (!GameSave.RULESET.equals(r.getString(4))) throw new ApiFailure(503, "Versão da fazenda online incompatível.");
-                return new Farm(JSON.fromJson(r.getString(1), GameSnapshot.class), r.getLong(2), r.getTimestamp(3).toInstant(), r.getObject(5, LocalDate.class));
+                if (!GameSave.RULESET.equals(r.getString(4)) && !GameSave.PREVIOUS_RULESET.equals(r.getString(4)))
+                    throw new ApiFailure(503, "Versão da fazenda online incompatível.");
+                var snapshot = JsonParser.parseString(r.getString(1));
+                br.com.colheitafeliz.persistence.CropSaleJsonValidation.validate(snapshot);
+                var state = JSON.fromJson(snapshot, GameSnapshot.class);
+                br.com.colheitafeliz.persistence.CropSaleJsonValidation.validateTerms(state);
+                return new Farm(state, r.getLong(2), r.getTimestamp(3).toInstant(), r.getObject(5, LocalDate.class));
             }, owner));
         }
         void recordAllowance(UUID actor, LocalDate day) {
@@ -222,7 +227,7 @@ final class JdbcOnlineStore implements AutoCloseable {
                 return;
             }
             execute("INSERT INTO " + schema + ".farms VALUES (?,?,?,?,?::jsonb) ON CONFLICT(owner) DO UPDATE SET "
-                    + "revision=EXCLUDED.revision,game_time=EXCLUDED.game_time,snapshot=EXCLUDED.snapshot",
+                    + "ruleset=EXCLUDED.ruleset,revision=EXCLUDED.revision,game_time=EXCLUDED.game_time,snapshot=EXCLUDED.snapshot",
                     owner, GameSave.RULESET, revision, java.sql.Timestamp.from(now), JSON.toJson(snapshot));
         }
         Receipt receipt(UUID actor, UUID request) {
@@ -257,7 +262,7 @@ final class JdbcOnlineStore implements AutoCloseable {
                     values.add(farm.owner()); values.add(GameSave.RULESET); values.add(farm.revision());
                     values.add(java.sql.Timestamp.from(farm.time())); values.add(JSON.toJson(farm.snapshot()));
                 }
-                sql.append(" ON CONFLICT(owner) DO UPDATE SET revision=EXCLUDED.revision,game_time=EXCLUDED.game_time,snapshot=EXCLUDED.snapshot RETURNING owner) ");
+                sql.append(" ON CONFLICT(owner) DO UPDATE SET ruleset=EXCLUDED.ruleset,revision=EXCLUDED.revision,game_time=EXCLUDED.game_time,snapshot=EXCLUDED.snapshot RETURNING owner) ");
             }
             sql.append("INSERT INTO ").append(schema).append(".receipts (actor,request_id,hash,response,expires_at) VALUES (?,?,?,?::jsonb,?)");
             values.add(actor); values.add(request); values.add(hash); values.add(JSON.toJson(response)); values.add(java.sql.Timestamp.from(expires));

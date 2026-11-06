@@ -41,11 +41,14 @@ export interface Farm {
   vipExpiresAt?: string;
   seedCounts?: Record<string, number>;
   depositTotals?: Record<string, string | number>;
+  itemSaleTotals?: Record<string, Record<string, string | number>>;
+  itemSaleSingles?: Record<string, Record<string, string | number>>;
   produceLots?: {
     itemId: string;
     quantity: number;
     currency: string;
     unitCost?: string | number;
+    unitSale?: string | number;
     vipOnly?: boolean;
   }[];
   feed?: Record<string, number>;

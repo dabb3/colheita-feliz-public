@@ -327,6 +327,7 @@ public final class GameState {
     /** Totais elegíveis do depósito, separados por moeda e perfil atual. */
     public Map<Currency, BigDecimal> depositTotals() { return market.quoteEverything(vipActive()); }
     public Map<Currency, BigDecimal> quoteItem(String id) { return market.quoteProduce(id, 1, vipActive()); }
+    public Map<Currency, BigDecimal> quoteAllItem(String id) { return market.quoteProduce(id, Integer.MAX_VALUE, vipActive()); }
     public BigDecimal depositValue() { return depositTotals().getOrDefault(Currency.GOLD, BigDecimal.ZERO); }
     public static String formatTotals(Map<Currency, BigDecimal> totals) {
         List<String> parts = new ArrayList<>();
@@ -657,10 +658,15 @@ public final class GameState {
         game.tutorial.restore(snapshot.tutorialStep());
         game.dailyMissions.restore(snapshot.dailyMissionDay(), snapshot.dailyMissionProgress(),
                 snapshot.completedDailyMissions(), LocalDate.ofInstant(realClock.instant(), java.time.ZoneOffset.UTC));
-        for (var lot : snapshot.seeds()) catalog.get(lot.itemId());
+        for (var lot : snapshot.seeds()) {
+            catalog.get(lot.itemId());
+            if (lot.cropSale() != null) throw new IllegalArgumentException("Seeds cannot contain harvested sale terms");
+        }
         for (var lot : snapshot.produce()) {
             boolean animalProduct = game.animalTypes.stream().anyMatch(type -> type.kind() == AnimalType.Kind.PRODUCER && type.productId().equals(lot.itemId()));
-            if (!animalProduct) catalog.get(lot.itemId());
+            if (!animalProduct) catalog.get(lot.itemId()).validateSaleTerms(lot);
+            if (lot.cropSale() != null && (animalProduct || lot.cropSale().seasonIndex() == 0))
+                throw new IllegalArgumentException("Invalid product sale metadata");
         }
         game.inventory.restoreLots(snapshot.seeds(), snapshot.produce());
         for (String id : snapshot.feed().keySet())
@@ -671,10 +677,12 @@ public final class GameState {
         if (snapshot.selectedFertilizerId() != null) game.fertilizer = game.fertilizer(snapshot.selectedFertilizerId());
         if (snapshot.animals() != null) {
             List<Animal> animals = new ArrayList<>();
-            for (GameSnapshot.AnimalSnapshot saved : snapshot.animals())
+            for (GameSnapshot.AnimalSnapshot saved : snapshot.animals()) {
+                if (saved.origin().cropSale() != null) throw new IllegalArgumentException("Animal cannot contain crop sale terms");
                 animals.add(new Animal(game.animalType(saved.typeId()),
                         saved.origin(), Instant.parse(saved.acquiredAt()), Instant.parse(saved.growthAnchorAt()),
                         saved.grownAtAnchorMillis(), Instant.parse(saved.fedUntil())));
+            }
             game.barn.restore(animals);
         }
         for (int i = 0; i < snapshot.tiles().size(); i++) {

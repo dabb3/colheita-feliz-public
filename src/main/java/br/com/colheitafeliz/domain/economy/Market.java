@@ -41,14 +41,14 @@ public final class Market {
         List<ItemLot> remaining = new ArrayList<>();
         int left = quantity;
         boolean sold = false;
-        BigDecimal multiplier = new BigDecimal(vipActive ? "1.25" : "1.15");
         for (ItemLot lot : inventory.produceLots()) {
             if ((id != null && left == 0) || (id != null && !id.equals(lot.itemId())) || (lot.vipOnly() && !vipActive)) {
                 remaining.add(lot);
                 continue;
             }
             int count = id == null ? lot.quantity() : Math.min(left, lot.quantity());
-            BigDecimal total = lot.unitCost().multiply(multiplier).multiply(BigDecimal.valueOf(count));
+            BigDecimal unit = unitRevenue(lot, vipActive);
+            BigDecimal total = unit.multiply(BigDecimal.valueOf(count));
             totals.merge(lot.currency(), total, BigDecimal::add);
             if (id != null) left -= count;
             sold = true;
@@ -61,6 +61,13 @@ public final class Market {
             inventory.replaceProduceLots(remaining);
         }
         return Map.copyOf(totals);
+    }
+
+    /** One authority for settlement and presentation; legacy rounding stays at transaction total. */
+    public static BigDecimal unitRevenue(ItemLot lot, boolean vipActive) {
+        return lot.cropSale() == null
+                ? lot.unitCost().multiply(new BigDecimal(vipActive ? "1.25" : "1.15"))
+                : lot.cropSale().unitRevenue(vipActive);
     }
 
     /** Compra uma semente na moeda pedida; o lote guarda moeda, preço e exclusividade VIP para a venda. */

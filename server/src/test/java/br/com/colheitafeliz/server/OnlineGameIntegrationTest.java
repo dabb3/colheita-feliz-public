@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import java.math.BigDecimal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
@@ -207,6 +208,130 @@ class OnlineGameIntegrationTest {
         var sell = new Command(requestId(), farm.get("revision").getAsString(), "SELL_ITEM_ALL", "morango", null, null, null, null);
         assertTrue(service.command(alice, sell).getAsJsonObject("result").get("success").getAsBoolean());
         assertEquals(0, quantity(service.farm(alice)));
+    }
+
+    @Test void concurrentV1SalesAndReplayCreditOnlyOnePaymentAndRollbackRetainsStock() throws Exception {
+        service.farm(alice);
+        seedV1Produce(alice, "tomate", 1);
+        var farm = service.farm(alice);
+        assertEquals("679.0", farm.getAsJsonArray("produceLots").get(0).getAsJsonObject().get("unitSale").getAsString());
+        var one = new Command(requestId(), farm.get("revision").getAsString(), "SELL_ITEM", "tomate", null, null, null, null);
+        var two = new Command(requestId(), farm.get("revision").getAsString(), "SELL_ALL", null, null, null, null, null);
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> confirmed(() -> service.command(alice, one)));
+            var second = executor.submit(() -> confirmed(() -> service.command(alice, two)));
+            assertEquals(1, (first.get() ? 1 : 0) + (second.get() ? 1 : 0));
+        }
+        assertEquals("1179.1", service.farm(alice).get("coins").getAsString());
+        assertEquals(0, quantity(service.farm(alice)));
+        seedV1Produce(alice, "tomate", 2);
+        farm = service.farm(alice);
+        var sell = new Command(requestId(), farm.get("revision").getAsString(), "SELL_ITEM_ALL", "tomate", null, null, null, null);
+        assertThrows(IllegalStateException.class, () -> store.transaction(alice, tx -> {
+            service.command(tx, alice, sell);
+            throw new IllegalStateException("rollback sale");
+        }));
+        assertEquals(1, quantity(service.farm(alice)));
+        var reply = service.command(alice, sell);
+        assertEquals(reply, service.command(alice, sell));
+        assertEquals(0, quantity(service.farm(alice)));
+        assertEquals("1858.1", service.farm(alice).get("coins").getAsString());
+    }
+
+    @Test void previousRulesetLoadsUnchangedAndBothWritePathsUpgradeItsLabel() {
+        service.farm(alice);
+        var oldRuleset = br.com.colheitafeliz.persistence.GameSave.PREVIOUS_RULESET;
+        var newRuleset = br.com.colheitafeliz.persistence.GameSave.RULESET;
+        store.transaction(alice, tx -> {
+            tx.execute("UPDATE " + testSchema + ".farms SET ruleset=? WHERE owner=?", oldRuleset, alice);
+            return null;
+        });
+        var before = service.farm(alice);
+        assertEquals("500", before.get("coins").getAsString());
+        var purchase = new Command(requestId(), before.get("revision").getAsString(), "BUY_SEED", "nabo", "GOLD", null, null, null);
+        store.transaction(alice, tx -> {
+            tx.execute("UPDATE " + testSchema + ".farms SET ruleset=? WHERE owner=?", oldRuleset, alice);
+            return null;
+        });
+        assertTrue(service.command(alice, purchase).getAsJsonObject("result").get("success").getAsBoolean());
+        store.transaction(alice, tx -> {
+            assertEquals(newRuleset, tx.query("SELECT ruleset FROM " + testSchema + ".farms WHERE owner=?", r -> r.getString(1), alice).getFirst());
+            var saved = tx.farm(alice);
+            tx.execute("UPDATE " + testSchema + ".farms SET ruleset=? WHERE owner=?", oldRuleset, alice);
+            tx.save(alice, saved.snapshot(), saved.revision(), clock.instant());
+            assertEquals(newRuleset, tx.query("SELECT ruleset FROM " + testSchema + ".farms WHERE owner=?", r -> r.getString(1), alice).getFirst());
+            return null;
+        });
+        assertEquals("200", service.farm(alice).get("coins").getAsString());
+    }
+
+    private void seedV1Produce(UUID actor, String id, int season) {
+        store.transaction(actor, tx -> {
+            tx.lockFarms(actor);
+            var saved = tx.farm(actor);
+            var game = br.com.colheitafeliz.game.GameState.restore(clock::instant, clock,
+                    br.com.colheitafeliz.game.CropCatalogLoader.load(), saved.snapshot(), bound -> bound - 1);
+            var type = game.catalog().get(id);
+            var price = type.seedPrice();
+            var origin = new br.com.colheitafeliz.domain.inventory.ItemLot(id, price.getKey(), price.getValue(), 1, type.vipOnly());
+            game.inventory().addProduceLot(type.plantingOrigin(origin).harvested(season));
+            if (game.wallet().coins().compareTo(new BigDecimal("500")) == 0)
+                game.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GOLD, new BigDecimal("0.1"));
+            tx.save(actor, game.snapshot(), saved.revision() + 1, clock.instant());
+            return null;
+        });
+    }
+
+    @Test void jdbcRejectsCorruptedV1WithoutNormalizingOrOverwritingTheSnapshot() {
+        service.farm(alice);
+        seedV1Produce(alice, "tomate", 1);
+        String original = store.transaction(alice, tx -> tx.query("SELECT snapshot::text FROM " + testSchema
+                + ".farms WHERE owner=?", row -> row.getString(1), alice).getFirst());
+        for (String corrupt : new String[]{"fraction", "missing", "terms", "seasons"}) {
+            var damaged = com.google.gson.JsonParser.parseString(original).getAsJsonObject();
+            var lot = damaged.getAsJsonArray("produce").get(0).getAsJsonObject();
+            switch (corrupt) {
+                case "fraction" -> lot.getAsJsonObject("cropSale").addProperty("seasonIndex", new BigDecimal("1.9"));
+                case "missing" -> lot.getAsJsonObject("cropSale").remove("cycleVipBonusTenths");
+                case "terms" -> lot.remove("cropSale");
+                default -> lot.getAsJsonObject("cropSale").addProperty("seasons", 1);
+            }
+            store.transaction(alice, tx -> {
+                tx.execute("UPDATE " + testSchema + ".farms SET snapshot=?::jsonb WHERE owner=?", damaged.toString(), alice);
+                return null;
+            });
+            String before = store.transaction(alice, tx -> tx.query("SELECT snapshot::text FROM " + testSchema
+                    + ".farms WHERE owner=?", row -> row.getString(1), alice).getFirst());
+            assertThrows(RuntimeException.class, () -> service.farm(alice), corrupt);
+            String after = store.transaction(alice, tx -> tx.query("SELECT snapshot::text FROM " + testSchema
+                    + ".farms WHERE owner=?", row -> row.getString(1), alice).getFirst());
+            assertEquals(before, after, corrupt);
+        }
+    }
+
+    @Test void stolenV1SeasonKeepsItsPriceAndOnlyVisitorCanSellItWithoutHarvestXp() {
+        connectFriends();
+        prepare(alice, "morango", true, false);
+        clock.advanceSeconds(300);
+        JsonObject ownerBefore = service.farm(alice), visitorBefore = service.farm(bob);
+        JsonObject visit = service.visit(bob, alice);
+        String harvestRevision = visit.getAsJsonArray("tiles").get(0).getAsJsonObject().get("harvestRevision").getAsString();
+        var steal = new Command(requestId(), visit.get("revision").getAsString(), "STEAL", null, null, 0, 0, harvestRevision);
+        var result = service.visitAction(bob, alice, steal);
+        assertTrue(result.getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(result, service.visitAction(bob, alice, steal));
+        var stolen = service.farm(bob).getAsJsonArray("produceLots").get(0).getAsJsonObject();
+        assertEquals(1, stolen.getAsJsonObject("cropSale").get("seasonIndex").getAsInt());
+        assertEquals("846.7", stolen.get("unitSale").getAsString());
+        assertEquals(ownerBefore.get("currentXp"), service.farm(alice).get("currentXp"));
+        assertEquals(visitorBefore.get("currentXp"), service.farm(bob).get("currentXp"));
+        for (UUID actor : new UUID[]{alice,bob}) {
+            var farm = service.farm(actor);
+            var sell = new Command(requestId(), farm.get("revision").getAsString(), "SELL_ITEM", "morango", null, null, null, null);
+            assertEquals(actor.equals(bob), service.command(actor, sell).getAsJsonObject("result").get("success").getAsBoolean());
+        }
+        assertEquals(0, quantity(service.farm(alice)) + quantity(service.farm(bob)));
+        assertEquals(2, service.farm(alice).getAsJsonArray("tiles").get(0).getAsJsonObject().get("season").getAsInt());
     }
 
     @Test void friendshipAuthorizesVisitsButNeverExposesOwnerInventoryAndRevocationWinsOverReplay() {

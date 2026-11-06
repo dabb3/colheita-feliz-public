@@ -19,8 +19,12 @@ public record Crop(CropType type, Instant plantedAt, Instant wateredAt, Instant 
         Objects.requireNonNull(type);
         Objects.requireNonNull(plantedAt);
         Objects.requireNonNull(origin);
+        type.validateSaleTerms(origin);
         if (!origin.itemId().equals(type.id()) || origin.quantity() != 1)
             throw new IllegalArgumentException("Invalid crop origin");
+        if (origin.cropSale() != null && (origin.cropSale().seasonIndex() != 0
+                || origin.cropSale().seasons() != type.seasons()))
+            throw new IllegalArgumentException("Invalid plant sale metadata");
         if (season < 1 || season > type.seasons())
             throw new IllegalArgumentException("Invalid crop season");
         if (wateredAt != null && wateredAt.isBefore(plantedAt))

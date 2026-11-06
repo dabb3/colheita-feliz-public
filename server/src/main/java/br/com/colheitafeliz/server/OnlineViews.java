@@ -51,7 +51,21 @@ final class OnlineViews {
         JsonObject seeds = new JsonObject();
         for (var crop : game.catalog().all()) seeds.addProperty(crop.id(), game.inventory().seeds(crop));
         view.add("seedCounts", seeds);
-        view.add("produceLots", JSON.toJsonTree(game.inventory().produceLots()));
+        JsonArray produce = new JsonArray();
+        JsonObject itemTotals = new JsonObject();
+        JsonObject itemSingles = new JsonObject();
+        for (var lot : game.inventory().produceLots()) {
+            JsonObject product = JSON.toJsonTree(lot).getAsJsonObject();
+            product.addProperty("unitSale", br.com.colheitafeliz.domain.economy.Market.unitRevenue(lot, game.vipActive()).toPlainString());
+            produce.add(product);
+            if (!itemTotals.has(lot.itemId())) {
+                itemTotals.add(lot.itemId(), JSON.toJsonTree(game.quoteAllItem(lot.itemId())));
+                itemSingles.add(lot.itemId(), JSON.toJsonTree(game.quoteItem(lot.itemId())));
+            }
+        }
+        view.add("produceLots", produce);
+        view.add("itemSaleTotals", itemTotals);
+        view.add("itemSaleSingles", itemSingles);
         view.add("depositTotals", JSON.toJsonTree(game.depositTotals()));
         view.add("feed", JSON.toJsonTree(game.inventory().feedSnapshot()));
         view.add("fertilizers", JSON.toJsonTree(game.inventory().fertilizerSnapshot()));
