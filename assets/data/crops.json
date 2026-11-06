@@ -31,5 +31,6 @@
   {"id":"amendoim", "name":"Amendoim", "growthSeconds":86400, "regrowthSeconds":43200, "seasons":3, "stages":5, "spriteStem":"amendoim", "requiredLevel":20, "vipOnly":true, "seedPrices":{"GREEN":8}, "cycleRevenueTenths":108},
   {"id":"limao", "name":"Limão", "growthSeconds":129600, "regrowthSeconds":64800, "seasons":4, "stages":5, "spriteStem":"limao", "requiredLevel":30, "vipOnly":true, "seedPrices":{"GREEN":12}, "cycleRevenueTenths":174},
   {"id":"noz", "name":"Noz", "growthSeconds":172800, "regrowthSeconds":86400, "seasons":5, "stages":5, "spriteStem":"noz", "requiredLevel":40, "vipOnly":true, "seedPrices":{"GREEN":16}, "cycleRevenueTenths":248},
-  {"id":"coco", "name":"Coco", "growthSeconds":216000, "regrowthSeconds":108000, "seasons":6, "stages":5, "spriteStem":"coco", "requiredLevel":50, "vipOnly":true, "seedPrices":{"GREEN":20}, "cycleRevenueTenths":330}
+  {"id":"coco", "name":"Coco", "growthSeconds":216000, "regrowthSeconds":108000, "seasons":6, "stages":5, "spriteStem":"coco", "requiredLevel":50, "vipOnly":true, "seedPrices":{"GREEN":20}, "cycleRevenueTenths":330},
+  {"id":"mini-bis", "name":"Mini-Bis", "growthSeconds":259200, "regrowthSeconds":129600, "seasons":6, "stages":5, "spriteStem":"mini-bis", "requiredLevel":55, "vipOnly":true, "seedPrices":{"GREEN":30}, "cycleRevenueTenths":510}
 ]

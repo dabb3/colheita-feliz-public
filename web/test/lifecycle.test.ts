@@ -453,14 +453,27 @@ test('closed canvas scene removes previous event handlers',()=>{
  for(const handler of handlers.get('click'))handler({clientX:585,clientY:400});assert.deepEqual(calls,['2']);
 });
 
+test('Christmas music switches without overlapping and returns to normal during the same night',()=>{
+ const {h,audioClips}=app();h.set({own:farm('alice')});h.toggleMusic();
+ h.syncMusic('day',new Date('2026-12-24T15:00:00Z'));const day=audioClips.at(-1);
+ assert.equal(day.path,'/assets/sounds/musica-evento-natal-dia-e-por-do-sol.mp3');
+ h.syncMusic('sunset',new Date('2026-12-24T20:00:00Z'));assert.equal(audioClips.at(-1),day);
+ h.syncMusic('night',new Date('2027-01-01T02:59:59Z'));const night=audioClips.at(-1);
+ assert.equal(night.path,'/assets/sounds/musica-evento-natal-noite.mp3');assert.equal(day.paused,true);
+ h.syncMusic('night',new Date('2027-01-01T03:00:00Z'));const normal=audioClips.at(-1);
+ assert.equal(normal.path,'/assets/sounds/noite.mp3');assert.equal(night.paused,true);assert.equal(normal.loop,true);
+ assert.equal(audioClips.filter(clip=>!clip.paused).length,1);
+ h.toggleMusic();assert.ok(audioClips.every(clip=>clip.paused));
+});
+
 test('night music follows scenery changes, loops and pauses the previous track',()=>{
  const {h,ctx,audioClips}=app();h.set({own:farm('alice')});h.toggleMusic();
- h.syncMusic('day');const day=audioClips.at(-1);assert.equal(day.path,'/assets/sounds/farm_loop.mp3');
- h.syncMusic('night');const night=audioClips.at(-1);assert.equal(night.path,'/assets/sounds/noite.mp3');assert.equal(day.paused,true);assert.equal(night.loop,true);assert.equal(night.volume,.25);
- const count=audioClips.length;h.syncMusic('night');assert.equal(audioClips.length,count);assert.equal(night.playCount,1);
- h.syncMusic('sunset');assert.equal(night.paused,true);assert.equal(audioClips.at(-1).path,'/assets/sounds/farm_loop.mp3');assert.equal(audioClips.filter(clip=>!clip.paused).length,1);
- h.toggleMusic();h.syncMusic('night');assert.ok(audioClips.every(clip=>clip.paused));
- ctx.document.hidden=true;h.toggleMusic();h.syncMusic('night');assert.ok(audioClips.every(clip=>clip.paused));
+ h.syncMusic('day',new Date('2026-01-01T12:00:00Z'));const day=audioClips.at(-1);assert.equal(day.path,'/assets/sounds/farm_loop.mp3');
+ h.syncMusic('night',new Date('2026-01-01T12:00:00Z'));const night=audioClips.at(-1);assert.equal(night.path,'/assets/sounds/noite.mp3');assert.equal(day.paused,true);assert.equal(night.loop,true);assert.equal(night.volume,.25);
+ const count=audioClips.length;h.syncMusic('night',new Date('2026-01-01T12:00:00Z'));assert.equal(audioClips.length,count);assert.equal(night.playCount,1);
+ h.syncMusic('sunset',new Date('2026-01-01T12:00:00Z'));assert.equal(night.paused,true);assert.equal(audioClips.at(-1).path,'/assets/sounds/farm_loop.mp3');assert.equal(audioClips.filter(clip=>!clip.paused).length,1);
+ h.toggleMusic();h.syncMusic('night',new Date('2026-01-01T12:00:00Z'));assert.ok(audioClips.every(clip=>clip.paused));
+ ctx.document.hidden=true;h.toggleMusic();h.syncMusic('night',new Date('2026-01-01T12:00:00Z'));assert.ok(audioClips.every(clip=>clip.paused));
 });
 
 test('muting, hiding and logging out pause every active one-shot effect',async()=>{

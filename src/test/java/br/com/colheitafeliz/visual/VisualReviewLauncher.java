@@ -48,9 +48,10 @@ public final class VisualReviewLauncher {
                 "22-cinco-estagios.png", "23-pragas-simultaneas.png", "24-temporada-reiniciada.png", "25-loja-ultima-pagina.png",
                 "26-loja-fertilizantes.png", "27-bandeja-fertilizantes.png", "28-pronta-pelo-fertilizante.png", "29-animais-bebes.png", "30-animais-jovens.png", "31-animais-adultos.png",
                 "32-animais-sono.png", "33-protetores-expirados.png", "34-animais-pagina2.png", "35-animais-pagina3.png", "36-animais-pagina4.png", "37-tarefas-no-tutorial.png", "38-terreno-verde-comprado.png", "39-saldos-milionarios.png", "40-planta-morta.png",
-                "41-background-dia.png", "42-background-por-do-sol.png", "43-background-noite.png", "44-notificacoes.png", "45-protegida-cadeado.png"
+                "41-background-dia.png", "42-background-por-do-sol.png", "43-background-noite.png", "44-notificacoes.png", "45-protegida-cadeado.png",
+                "46-natal-dia-mini-bis.png", "47-natal-por-do-sol.png", "48-natal-noite.png"
         };
-        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
         static { FRAMES[30] = 150; } // Cinco segundos: inclui deslocamento e a cauda aberta do pavão.
         private final Path output = Path.of(System.getProperty("colheita.visualOutput", "build/visual-review"));
         private FarmRenderer renderer;
@@ -58,6 +59,7 @@ public final class VisualReviewLauncher {
         private GameState fresh, states, rich, newcomer, rancher, stages, seasons, fertilized, tasks, expanded, millionaire;
         private int scene, frames;
         private GameState animalsBaby, animalsYoung, animalsAdult, animalsSleep, animalsExpired, harvested, protectedCrop;
+        private GameState miniBis;
 
         @Override public void create() {
             CropCatalog catalog = CropCatalogLoader.load();
@@ -65,7 +67,8 @@ public final class VisualReviewLauncher {
             ManualClock freshClock = new ManualClock();
             fresh = new GameState(freshClock::instant, freshClock, catalog, bound -> 99);
             states = buildStates(catalog);
-            stages = buildStages(catalog);
+            stages = buildStages(catalog,"nabo");
+            miniBis = buildStages(catalog,"mini-bis");
             seasons = buildSeasons(catalog);
             ManualClock harvestedClock = new ManualClock();
             harvested = new GameState(harvestedClock::instant, harvestedClock, catalog, bound -> 99);
@@ -160,12 +163,17 @@ public final class VisualReviewLauncher {
             return game;
         }
 
-        /** Cinco nabos, um estágio de diferença por linha: do pronto (linha 0) ao recém-regado (linha 4). */
-        private static GameState buildStages(CropCatalog catalog) {
+        /** Cinco plantas, um estágio de diferença por linha: do pronto (linha 0) ao recém-regado (linha 4). */
+        private static GameState buildStages(CropCatalog catalog,String cropId) {
             ManualClock clock = new ManualClock();
             GameState game = new GameState(clock::instant, clock, catalog, bound -> 99);
-            CropType turnip = catalog.get("nabo");
+            CropType turnip = catalog.get(cropId);
             game.wallet().credit(1500);
+            if(turnip.vipOnly()){
+                while(game.progress().level()<turnip.requiredLevel())game.progress().award(game.progress().xpToNext());
+                game.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GREEN,new java.math.BigDecimal("1000"));
+                game.buyVip();
+            }
             long quarter = turnip.growthTime(1).toSeconds() / (turnip.stages() - 1);
             for (int row = 0; row < 5; row++) {
                 // A terra seca a cada terço e um estágio leva um quarto: passos de um doze avos acertam os dois.
@@ -264,6 +272,7 @@ public final class VisualReviewLauncher {
                 case 0, 10, 17, 18, 19 -> fresh;
                 case 5, 6, 7, 9, 15, 16, 20, 43 -> rich;
                 case 44 -> protectedCrop;
+                case 45,46,47 -> miniBis;
                 case 11, 12 -> newcomer;
                 case 13, 14 -> rancher;
                 case 21 -> stages;
@@ -289,7 +298,7 @@ public final class VisualReviewLauncher {
                 case 10, 37 -> new IsoRenderer.GridPosition(2, 0);
                 case 11 -> new IsoRenderer.GridPosition(0, 0);
                 case 22 -> new IsoRenderer.GridPosition(0, 3);
-                case 23, 27, 44 -> new IsoRenderer.GridPosition(0, 0);
+                case 23, 27, 44, 45 -> new IsoRenderer.GridPosition(0, 0);
                 default -> null;
             };
             if (hovered != null) {
@@ -315,10 +324,10 @@ public final class VisualReviewLauncher {
         }
 
         private void setUp(int scene) {
-            Instant target = Instant.parse("2026-01-01T" + switch (scene) {
+            Instant target = Instant.parse((scene>=45?"2026-12-24T":"2026-01-01T") + switch (scene) {
                 case 40 -> "06:00:00Z";
-                case 41 -> "17:00:00Z";
-                case 31, 42 -> "18:31:00Z";
+                case 41,46 -> "17:00:00Z";
+                case 31, 42,47 -> "18:31:00Z";
                 default -> "12:00:00Z";
             });
             backgroundClock.advanceSeconds(java.time.Duration.between(backgroundClock.instant(), target).toSeconds());

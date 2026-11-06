@@ -7,7 +7,7 @@ import {renderWallet,control,text,renderDailyAllowance} from './ui.ts';
 import {durationLabel,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText} from './ui-presentation.ts';
 import {PROTECTED_ICON,notificationCount,renderNotifications} from './notifications.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,readAvatar,saveAvatar,type AvatarChoice} from './avatar.ts';
-import {periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalStatusText,animalActionLabel,animalClickCommand,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
+import {musicArtPath,seedArtPath,periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalStatusText,animalActionLabel,animalClickCommand,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
 
 const config=window.COLHEITA_CONFIG;
 const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
@@ -64,12 +64,12 @@ function syncAmbience(night:boolean){
  }
  for(const clip of ambience){clip.volume=effectsVolume*.18;if(clip.paused)void clip.play().catch(()=>{});}
 }
-function syncMusic(period=periodAt(new Date())){
+function syncMusic(period=periodAt(new Date()),now=new Date()){
  if(document.hidden)stopEffects();
  syncAmbience(period==='night');
  if(period==='night'||document.hidden||!effectsEnabled)animalSound?.pause();
  if(!musicEnabled||!own||document.hidden){music?.pause();return;}
- const track=period==='night'?'noite.mp3':'farm_loop.mp3';
+ const track=musicArtPath(period,now);
  if(!music||musicTrack!==track){music?.pause();music=new Audio('/assets/sounds/'+track);musicTrack=track;music.loop=true;}
  music.volume=musicVolume;if(music.paused)void music.play().catch(()=>{});
 }
@@ -190,7 +190,7 @@ function renderTools(){
   if(pest){const limit=document.createElement('span');limit.className='tool-count';limit.textContent='1/24h';b.append(limit);}
   if(id==='PLANT'){
    const crop=catalog.crops.find(item=>item.id===selectedSeed),seedCount=own?.seedCounts?.[selectedSeed]??0;
-   if(crop){const seed=document.createElement('img');seed.className='tool-selected-item';seed.alt='';seed.src=`/assets/classic/crops/seeds/semente_${crop.spriteStem}.png`;b.append(seed);const count=document.createElement('span');count.className='tool-count';count.textContent=`x${seedCount}`;b.append(count);}
+   if(crop){const seed=document.createElement('img');seed.className='tool-selected-item';seed.alt='';seed.src=`/assets/${seedArtPath(crop.spriteStem)}`;b.append(seed);const count=document.createElement('span');count.className='tool-count';count.textContent=`x${seedCount}`;b.append(count);}
   }
   if(id==='FERTILIZE'||id==='LOVE'){const count=document.createElement('span');count.className='tool-count';count.textContent=`x${own?.fertilizers?.[selectedFertilizer]??0}`;b.append(count);}
   if(!visited){const key=document.createElement('span');key.className='tool-key';key.textContent=String(index+1);b.append(key);}
@@ -208,7 +208,7 @@ function renderToolTray(){
    if(!unlocked){notify(`${crop.name} libera no nível ${crop.requiredLevel}.`);return;}
    selectedSeed=crop.id;trayOpen=false;renderTools();notify(`Semente selecionada: ${crop.name}.`);
   },grid);item.className='tray-item';item.setAttribute('aria-pressed',String(selectedSeed===crop.id));item.setAttribute('aria-label',`${crop.name}, ${unlocked?`${count} sementes`:`libera no nível ${crop.requiredLevel}`}`);if(!unlocked)item.classList.add('locked');
-   const image=document.createElement('img');image.alt='';image.src=`/assets/classic/crops/seeds/semente_${crop.spriteStem}.png`;item.append(image);const badge=document.createElement('span');badge.textContent=unlocked?`x${count}`:`Nv ${crop.requiredLevel}`;item.append(badge);
+   const image=document.createElement('img');image.alt='';image.src=`/assets/${seedArtPath(crop.spriteStem)}`;item.append(image);const badge=document.createElement('span');badge.textContent=unlocked?`x${count}`:`Nv ${crop.requiredLevel}`;item.append(badge);
    item.onmouseenter=()=>{const caption=document.getElementById('tool-tray-caption');if(caption)caption.textContent=unlocked?`${crop.name} · ${count} sementes`:`${crop.name} · libera no nível ${crop.requiredLevel}`;};
    item.onmouseleave=()=>{const caption=document.getElementById('tool-tray-caption');if(caption)caption.textContent=selected?`${selected} · ${detail}`:'';};
   }
@@ -316,7 +316,7 @@ function renderHealth(tile:Tile,point:{x:number;y:number},force=false){
  if(dataKey!==healthDataKey){healthDataKey=dataKey;healthAnchorAt=Date.now();healthBaseRemaining=tile.remainingSeconds;healthBaseNominal=tile.nominalRemainingSeconds;}
  healthKey=key;healthTile=tile;healthPoint=point;panel.hidden=false;panel.replaceChildren();
  const remaining=healthRemaining(tile),ready=tile.state==='READY'||tile.state==='GROWING'&&remaining<=0,dead=tile.state==='DEAD',paused=tile.paused;
- const heading=document.createElement('div');heading.className='crop-tooltip-head';const icon=document.createElement('img');icon.className='crop-tooltip-icon';icon.src=`/assets/classic/crops/seeds/semente_${crop.spriteStem}.png`;icon.alt='';const name=document.createElement('strong');name.textContent=crop.name;heading.append(icon,name);
+ const heading=document.createElement('div');heading.className='crop-tooltip-head';const icon=document.createElement('img');icon.className='crop-tooltip-icon';icon.src=`/assets/${seedArtPath(crop.spriteStem)}`;icon.alt='';const name=document.createElement('strong');name.textContent=crop.name;heading.append(icon,name);
  if(crop.vipOnly){const vip=document.createElement('span');vip.className='crop-vip-badge';vip.textContent='VIP';heading.append(vip);}
  const state=document.createElement('span');state.className=`crop-state-badge${ready?' is-ready':dead?' is-dead':paused||tile.dry?' is-problem':''}`;state.textContent=dead?'Morta':ready?'Pronta':paused?'Parada':tile.dry?'Seca':'Saudável';heading.append(state);panel.append(heading);
  const growth=document.createElement('section');growth.className='crop-growth';const caption=document.createElement('div');caption.className='crop-progress-caption';caption.append(document.createElement('span'));caption.firstElementChild!.textContent='CRESCIMENTO';const value=document.createElement('strong');value.className='crop-growth-value';caption.append(value);const track=document.createElement('div');track.className='crop-growth-track';track.setAttribute('role','progressbar');track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax','100');track.setAttribute('aria-label','Progresso de crescimento');const fill=document.createElement('span');fill.className='crop-growth-fill';track.append(fill);const estimate=document.createElement('p');estimate.className='crop-growth-estimate';const nominal=document.createElement('p');nominal.className='crop-growth-nominal';const condition=document.createElement('p');condition.className='crop-growth-condition';growth.append(caption,track,nominal,condition,estimate);panel.append(growth);

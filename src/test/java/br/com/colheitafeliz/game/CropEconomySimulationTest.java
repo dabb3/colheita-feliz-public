@@ -103,7 +103,7 @@ class CropEconomySimulationTest {
                     run(csv, crop, logins, plots, vip, loss);
                     scenarios++;
                 }
-        assertEquals(1647, scenarios); // 28 common × 54 + 5 VIP-only × 27.
+        assertEquals(1674, scenarios); // 28 common × 54 + 6 VIP-only × 27.
         Path output = Path.of("build/reports/economy-v1/30-days.csv");
         Files.createDirectories(java.util.Objects.requireNonNull(output.getParent()));
         Files.writeString(output, csv);

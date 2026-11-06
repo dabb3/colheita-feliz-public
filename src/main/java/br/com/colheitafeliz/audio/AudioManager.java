@@ -12,11 +12,18 @@ public final class AudioManager implements AutoCloseable {
     private final GameState state;
     private final EnumMap<Cue, Sound> sounds = new EnumMap<>(Cue.class);
     private Music music;
+    private String musicTrack;
+    private final java.time.Clock clock;
 
     public AudioManager(GameState state) {
+        this(state,java.time.Clock.systemDefaultZone());
+    }
+    AudioManager(GameState state,java.time.Clock clock) {
         this.state = state;
+        this.clock = clock;
         try {
-            music = Gdx.audio.newMusic(Gdx.files.internal("sounds/farm_loop.mp3"));
+            musicTrack=track();
+            music = Gdx.audio.newMusic(Gdx.files.internal(musicTrack));
             music.setLooping(true);
             sounds.put(Cue.PLOW, load("click_button.wav"));
             sounds.put(Cue.PLANT, load("plant.wav"));
@@ -34,6 +41,15 @@ public final class AudioManager implements AutoCloseable {
     }
 
     private Sound load(String name) { return Gdx.audio.newSound(Gdx.files.internal("sounds/" + name)); }
+    private String track(){return br.com.colheitafeliz.game.Christmas2026.musicPath(clock.instant(),br.com.colheitafeliz.render.DayPeriod.at(clock)==br.com.colheitafeliz.render.DayPeriod.NIGHT);}
+    public void update(){
+        if(music==null)return;
+        String desired=track();if(desired.equals(musicTrack))return;
+        try{
+            Music next=Gdx.audio.newMusic(Gdx.files.internal(desired));next.setLooping(true);
+            music.stop();music.dispose();music=next;musicTrack=desired;applySettings();
+        }catch(RuntimeException e){Gdx.app.error("audio","Music unavailable; game continues silently",e);close();}
+    }
 
     public void applySettings() {
         if (music == null) return;

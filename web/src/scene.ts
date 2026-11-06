@@ -1,6 +1,8 @@
 import type { Farm, Catalog, Tile } from "./types.ts";
 import {
   sceneTransform,
+  backgroundArtPath,
+  christmasActive,
   screenToWorld,
   periodAt,
   backgroundBounds,
@@ -520,17 +522,17 @@ export class Scene {
   }
   private draw() {
     if (document.hidden) return;
-    const ctx = this.ctx,
-      period = periodAt(new Date());
-    if (this.backgroundPeriod !== period) {
-      this.backgroundPeriod = period;
+    const ctx = this.ctx, now=new Date(),
+      period = periodAt(now),periodKey=period+':'+christmasActive(now);
+    if (this.backgroundPeriod !== periodKey) {
+      this.backgroundPeriod = periodKey;
       this.onPeriodChange(period);
     }
     ctx.clearRect(0, 0, 1600, 900);
     ctx.fillStyle = period === "night" ? "#15464f" : "#84ba30";
     ctx.fillRect(0, 0, 1600, 900);
     const background = this.sprite(
-      `classic/background/background${period === "day" ? "" : "-" + period}.png`,
+      backgroundArtPath(period,now),
     );
     if (background) {
       const bounds = backgroundBounds(

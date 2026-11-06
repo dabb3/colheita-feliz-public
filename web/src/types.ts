@@ -74,7 +74,7 @@ export interface Farm {
 }
 export interface GameNotification {
   id: string;
-  type: 'THEFT'|'CROP_READY'|'ANIMAL_READY'|'VIP_EXPIRED';
+  type: 'THEFT'|'CROP_READY'|'ANIMAL_READY'|'VIP_EXPIRED'|'CHRISTMAS_GIFT';
   message: string;
   createdAt: string;
   read: boolean;

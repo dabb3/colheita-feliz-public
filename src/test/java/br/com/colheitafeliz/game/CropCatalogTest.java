@@ -23,9 +23,9 @@ class CropCatalogTest {
                        String commonSale, String vipSale, long firstHours, long nextHours, int seasons,
                        int units, List<BigDecimal> xp) {}
 
-    @Test void catalogHasExactlyTheThirtyThreeCropsOfTheRule() throws IOException {
+    @Test void catalogHasTheThirtyThreeOriginalCropsAndPermanentMiniBis() throws IOException {
         List<Row> rows = normativeRows();
-        assertEquals(33, rows.size(), "a tabela da seção 2 tem 33 culturas");
+        assertEquals(34, rows.size(), "33 culturas originais e Mini-Bis permanente");
         assertEquals(rows.stream().map(Row::name).toList(), catalog.all().stream().map(CropType::name).toList());
         for (String legacy : new String[]{"arroz", "repolho", "girassol"})
             assertThrows(IllegalArgumentException.class, () -> catalog.get(legacy), legacy);

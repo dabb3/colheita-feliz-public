@@ -127,6 +127,7 @@ class ConnectionPoolTest {
                             case "getObject" -> playerId;
                             case "getString" -> "Player";
                             case "getBoolean" -> active;
+                            case "getTimestamp" -> java.sql.Timestamp.from(java.time.Instant.EPOCH);
                             default -> null;
                         });
                     });

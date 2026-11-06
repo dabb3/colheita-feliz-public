@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.UUID;
 
 public record GameNotification(String id, Type type, String message, String createdAt, boolean read, Map<String,String> metadata) {
-    public enum Type { THEFT, CROP_READY, ANIMAL_READY, VIP_EXPIRED }
+    public enum Type { THEFT, CROP_READY, ANIMAL_READY, VIP_EXPIRED, CHRISTMAS_GIFT }
     public GameNotification {
         if(id==null||type==null||message==null||message.isBlank()||message.length()>300||createdAt==null)
             throw new IllegalArgumentException("Invalid notification");

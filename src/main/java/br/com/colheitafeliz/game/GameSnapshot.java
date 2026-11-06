@@ -14,9 +14,21 @@ public record GameSnapshot(BigDecimal coins, List<br.com.colheitafeliz.domain.in
                            Integer tutorialStep, List<AnimalSnapshot> animals,
                            Map<String, Integer> feed, Map<String, Integer> fertilizers, String selectedFertilizerId,
                            BigDecimal greenCoins, String vipExpiresAt, ProtectionSnapshot protection,
-                           br.com.colheitafeliz.domain.notification.NotificationInbox.Snapshot notifications) {
+                           br.com.colheitafeliz.domain.notification.NotificationInbox.Snapshot notifications,
+                           ChristmasState christmas2026) {
+    public record ChristmasState(String registeredAt,boolean giftGranted) {
+        public ChristmasState {
+            var registration=java.time.Instant.parse(registeredAt);
+            if(giftGranted&&!registration.isBefore(Christmas2026.REGISTRATION_CUTOFF))
+                throw new IllegalArgumentException("Christmas gift outside registration window");
+        }
+    }
     public GameSnapshot {
         if(notifications==null)notifications=new br.com.colheitafeliz.domain.notification.NotificationInbox().snapshot();
+        var giftCursor=notifications.observed().get("christmas-gift-2026");
+        if((giftCursor!=null&&!giftCursor.equals("2026"))
+                || (christmas2026!=null&&christmas2026.giftGranted())!="2026".equals(giftCursor))
+            throw new IllegalArgumentException("Inconsistent Christmas gift receipt");
         if (coins == null || greenCoins == null || coins.signum() < 0 || greenCoins.signum() < 0
                 || coins.stripTrailingZeros().scale() > 1 || greenCoins.stripTrailingZeros().scale() > 1
                 || currentXp == null || currentXp.signum() < 0 || level < 1

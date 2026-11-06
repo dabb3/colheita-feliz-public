@@ -11,7 +11,7 @@ public final class NotificationInbox {
         public Snapshot {
             if(version!=1||entries==null||observed==null)throw new IllegalArgumentException("Invalid notification state");
             entries=List.copyOf(entries);observed=Map.copyOf(observed);
-            if(entries.size()>LIMIT||observed.size()>47||entries.stream().map(GameNotification::id).distinct().count()!=entries.size()
+            if(entries.size()>LIMIT||observed.size()>48||entries.stream().map(GameNotification::id).distinct().count()!=entries.size()
                     ||observed.entrySet().stream().anyMatch(e->!validKey(e.getKey())||e.getValue().isBlank()||e.getValue().length()>240))
                 throw new IllegalArgumentException("Invalid notification history");
         }
@@ -20,9 +20,9 @@ public final class NotificationInbox {
     private final Map<String,String> observed=new HashMap<>();
     public NotificationInbox() {}
     public NotificationInbox(Snapshot state){if(state!=null){entries.addAll(state.entries());observed.putAll(state.observed());}}
-    private static boolean validKey(String key){return key.equals("vip")||key.equals("theft")||key.matches("crop:([0-9]|[12][0-9])")||key.matches("animal:[a-z0-9-]{1,60}");}
+    private static boolean validKey(String key){return key.equals("christmas-gift-2026")||key.equals("vip")||key.equals("theft")||key.matches("crop:([0-9]|[12][0-9])")||key.matches("animal:[a-z0-9-]{1,60}");}
     public boolean record(String key,String stamp,GameNotification.Type type,String message,Instant now,Map<String,String> metadata){
-        if(!validKey(key)||stamp==null||stamp.isBlank()||stamp.length()>240||(!observed.containsKey(key)&&observed.size()>=47))
+        if(!validKey(key)||stamp==null||stamp.isBlank()||stamp.length()>240||(!observed.containsKey(key)&&observed.size()>=48))
             throw new IllegalArgumentException("Invalid event cursor");
         if(stamp.equals(observed.get(key)))return false;
         String id=UUID.nameUUIDFromBytes((key+":"+stamp).getBytes(StandardCharsets.UTF_8)).toString();
