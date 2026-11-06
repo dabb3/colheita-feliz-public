@@ -208,12 +208,14 @@ final class JdbcOnlineStore implements AutoCloseable {
         Farm farm(UUID owner) {
             return first(query("SELECT f.snapshot,f.revision,f.game_time,f.ruleset,a.last_claimed_day FROM " + schema
                     + ".farms f LEFT JOIN " + schema + ".daily_allowances a ON a.actor=f.owner WHERE f.owner=? FOR UPDATE OF f", r -> {
-                if (!GameSave.RULESET.equals(r.getString(4)) && !GameSave.PREVIOUS_RULESET.equals(r.getString(4)))
+                if (!GameSave.supports(r.getString(4)))
                     throw new ApiFailure(503, "Versão da fazenda online incompatível.");
                 var snapshot = JsonParser.parseString(r.getString(1));
                 br.com.colheitafeliz.persistence.CropSaleJsonValidation.validate(snapshot);
+                br.com.colheitafeliz.persistence.AnimalSaleJsonValidation.validate(snapshot);
                 var state = JSON.fromJson(snapshot, GameSnapshot.class);
                 br.com.colheitafeliz.persistence.CropSaleJsonValidation.validateTerms(state);
+                br.com.colheitafeliz.persistence.AnimalSaleJsonValidation.validateTerms(state);
                 return new Farm(state, r.getLong(2), r.getTimestamp(3).toInstant(), r.getObject(5, LocalDate.class));
             }, owner));
         }

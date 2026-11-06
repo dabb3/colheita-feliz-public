@@ -82,7 +82,7 @@ class NewEconomySaveTest {
         var restored = GameSession.open(clock, catalog, repository, bound -> 99).state();
         assertEquals(0, new BigDecimal("8000").compareTo(restored.inventory().produceLots().getFirst().unitCost()));
         assertEquals(Currency.GOLD, restored.inventory().produceLots().getFirst().currency());
-        assertEquals(0, new BigDecimal("9200").compareTo(restored.depositValue()));
+        assertEquals(0, new BigDecimal("8480").compareTo(restored.depositValue()));
     }
 
     @Test void legacyAndFutureFilesAreNeverImportedOrOverwritten() throws IOException {

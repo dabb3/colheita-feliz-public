@@ -14,7 +14,17 @@
     "youngSeconds": 0,
     "productId": "ovo",
     "productName": "Ovo",
-    "collectXp": 100
+    "collectXp": 100,
+    "salePrices": {
+      "GREEN": {
+        "commonTenths": 92,
+        "vipTenths": 94
+      },
+      "GOLD": {
+        "commonTenths": 84800,
+        "vipTenths": 86000
+      }
+    }
   },
   {
     "id": "abelha",
@@ -31,7 +41,17 @@
     "youngSeconds": 0,
     "productId": "mel",
     "productName": "Mel",
-    "collectXp": 140
+    "collectXp": 140,
+    "salePrices": {
+      "GREEN": {
+        "commonTenths": 284,
+        "vipTenths": 288
+      },
+      "GOLD": {
+        "commonTenths": 292000,
+        "vipTenths": 294700
+      }
+    }
   },
   {
     "id": "pombo",
@@ -48,7 +68,17 @@
     "youngSeconds": 86400,
     "productId": "",
     "productName": "Adulto",
-    "collectXp": 180
+    "collectXp": 180,
+    "salePrices": {
+      "GREEN": {
+        "commonTenths": 374,
+        "vipTenths": 386
+      },
+      "GOLD": {
+        "commonTenths": 404800,
+        "vipTenths": 415600
+      }
+    }
   },
   {
     "id": "coelho",
@@ -65,7 +95,17 @@
     "youngSeconds": 115200,
     "productId": "",
     "productName": "Adulto",
-    "collectXp": 240
+    "collectXp": 240,
+    "salePrices": {
+      "GREEN": {
+        "commonTenths": 614,
+        "vipTenths": 626
+      },
+      "GOLD": {
+        "commonTenths": 674400,
+        "vipTenths": 692400
+      }
+    }
   },
   {
     "id": "pato",
@@ -82,7 +122,17 @@
     "youngSeconds": 0,
     "productId": "ovo_de_pata",
     "productName": "Ovo de pato",
-    "collectXp": 280
+    "collectXp": 280,
+    "salePrices": {
+      "GREEN": {
+        "commonTenths": 700,
+        "vipTenths": 706
+      },
+      "GOLD": {
+        "commonTenths": 730000,
+        "vipTenths": 737200
+      }
+    }
   },
   {
     "id": "pavao",
@@ -99,7 +149,17 @@
     "youngSeconds": 0,
     "productId": "pena",
     "productName": "Pena",
-    "collectXp": 320
+    "collectXp": 320,
+    "salePrices": {
+      "GREEN": {
+        "commonTenths": 1010,
+        "vipTenths": 1020
+      },
+      "GOLD": {
+        "commonTenths": 1062400,
+        "vipTenths": 1077100
+      }
+    }
   },
   {
     "id": "porco",
@@ -116,7 +176,17 @@
     "youngSeconds": 144000,
     "productId": "",
     "productName": "Adulto",
-    "collectXp": 360
+    "collectXp": 360,
+    "salePrices": {
+      "GREEN": {
+        "commonTenths": 1048,
+        "vipTenths": 1072
+      },
+      "GOLD": {
+        "commonTenths": 1647200,
+        "vipTenths": 1683200
+      }
+    }
   },
   {
     "id": "burro",
@@ -133,7 +203,17 @@
     "youngSeconds": 172800,
     "productId": "",
     "productName": "Adulto",
-    "collectXp": 400
+    "collectXp": 400,
+    "salePrices": {
+      "GREEN": {
+        "commonTenths": 1064,
+        "vipTenths": 1096
+      },
+      "GOLD": {
+        "commonTenths": 1698400,
+        "vipTenths": 1747000
+      }
+    }
   },
   {
     "id": "ovelha",
@@ -150,7 +230,17 @@
     "youngSeconds": 0,
     "productId": "la",
     "productName": "Lã",
-    "collectXp": 440
+    "collectXp": 440,
+    "salePrices": {
+      "GREEN": {
+        "commonTenths": 1220,
+        "vipTenths": 1230
+      },
+      "GOLD": {
+        "commonTenths": 1862400,
+        "vipTenths": 1877400
+      }
+    }
   },
   {
     "id": "vaca",
@@ -167,7 +257,17 @@
     "youngSeconds": 0,
     "productId": "leite",
     "productName": "Leite",
-    "collectXp": 480
+    "collectXp": 480,
+    "salePrices": {
+      "GREEN": {
+        "commonTenths": 1826,
+        "vipTenths": 1840
+      },
+      "GOLD": {
+        "commonTenths": 2281600,
+        "vipTenths": 2301400
+      }
+    }
   },
   {
     "id": "cachorro-robo",

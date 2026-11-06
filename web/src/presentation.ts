@@ -1,4 +1,14 @@
-import type { Crop, Farm, Tile } from "./types.ts";
+import type { Animal, AnimalType, Crop, Farm, Tile } from "./types.ts";
+
+export function animalSaleOffer(type:AnimalType,vip:boolean):string {
+  if(type.kind==='PROTECTOR')return 'Sem revenda';
+  const quotes=['GOLD','GREEN'].flatMap(currency=>{const p=type.salePrices?.[currency];return p?[`${((vip?p.vipTenths:p.commonTenths)/10).toFixed(1).replace('.',',')} ${currency==='GOLD'?'ouro':'verdes'}`]:[];});
+  return quotes.length?`Venda: ${quotes.join(' · ')}`:'';
+}
+export function animalOwnedSale(animal:Animal):string {
+  if(animal.saleQuote===undefined||!animal.saleCurrency)return '';
+  return `Venda: ${animal.saleQuote.replace('.',',')} ${animal.saleCurrency==='GOLD'?'ouro':'verdes'}`;
+}
 type Point = { x: number; y: number };
 type SceneTransform = { scaleX: number; scaleY: number; offsetX: number; offsetY: number };
 export function sceneTransform(width: number, height: number): SceneTransform {

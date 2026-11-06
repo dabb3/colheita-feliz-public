@@ -36,8 +36,17 @@ final class OnlineViews {
                     "nominalRemainingSeconds", crop == null ? 0 : Math.max(0, crop.currentDuration().toMillis() - crop.grownMillisAt(now)) / 1000));
         }
         JsonArray animals = new JsonArray();
-        for (var animal : game.barn().animals()) animals.add(object("id", animal.type().id(), "stage", animal.stageAt(now),
-                "status", animal.statusAt(now), "remainingSeconds", animal.remainingAt(now).toSeconds()));
+        for (var animal : game.barn().animals()) {
+            var entry = object("id", animal.type().id(), "stage", animal.stageAt(now),
+                    "status", animal.statusAt(now), "remainingSeconds", animal.remainingAt(now).toSeconds());
+            if (own && animal.type().kind() != br.com.colheitafeliz.domain.animal.AnimalType.Kind.PROTECTOR) {
+                entry.addProperty("saleQuote", br.com.colheitafeliz.domain.economy.Market.unitRevenue(animal.origin(),game.vipActive())
+                        .setScale(1,java.math.RoundingMode.CEILING).toPlainString());
+                entry.addProperty("saleCurrency",animal.origin().currency().name());
+                entry.addProperty("economyVersion",animal.origin().economyVersion());
+            }
+            animals.add(entry);
+        }
         JsonObject view = object("owner", owner.toString(), "name", name, "revision", Long.toString(revision),
                 "serverTime", now.toString(), "own", own, "tiles", tiles, "animals", animals);
         if (!own) return view;
