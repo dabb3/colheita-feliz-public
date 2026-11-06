@@ -275,6 +275,43 @@ test('deposit disables product bulk sale when some lots require VIP',()=>{
  assert.equal(bulk.disabled,true);
 });
 
+test('deposit uses server crop quotes instead of applying acquisition multipliers',()=>{
+ const {h,elements}=app();
+ const own={...farm('alice'),vipActive:true,
+  produceLots:[{itemId:'coco',quantity:6,currency:'GREEN',unitCost:20,unitSale:'5.5',vipOnly:true}],
+  depositTotals:{GREEN:'33.0'},itemSaleTotals:{coco:{GREEN:'33.0'}},itemSaleSingles:{coco:{GREEN:'5.5'}}};
+ h.set({own,catalog:{crops:[{id:'coco',name:'Coco',spriteStem:'coco',vipOnly:true}],animals:[],fertilizers:[],vip:{greenPrice:100}}});
+ elements.get('deposit').onclick();
+ const single=descendants(elements.get('modal-content')).find(node=>node.getAttribute('data-focus-key')==='sell-one:coco');
+ assert.match(single.title,/5,5 verdes/);
+ const bulk=descendants(elements.get('modal-content')).find(node=>node.getAttribute('data-focus-key')==='sell-product:coco');
+ assert.match(bulk.title,/33/);
+ assert.ok(!text(elements.get('modal-content')).includes('150'));
+});
+
+test('mixed legacy and v1 deposit follows server quotes when VIP expires and renews',()=>{
+ const {h,elements}=app();
+ const lots=[{itemId:'melancia',quantity:2,currency:'GOLD',unitCost:1975,unitSale:'2271.25'},
+  {itemId:'melancia',quantity:1,currency:'GOLD',unitCost:1975,unitSale:'1204.4'},
+  {itemId:'coco',quantity:1,currency:'GREEN',unitCost:20,unitSale:'5.5',vipOnly:true}];
+ const own={...farm('alice'),vipActive:false,produceLots:lots,depositTotals:{GOLD:'5746.9'},
+  itemSaleTotals:{melancia:{GOLD:'5746.9'},coco:{}},itemSaleSingles:{melancia:{GOLD:'2271.3'},coco:{}}};
+ h.set({own,catalog:{crops:[{id:'melancia',name:'Melancia',spriteStem:'melancia'},{id:'coco',name:'Coco',spriteStem:'coco',vipOnly:true}],animals:[],fertilizers:[],vip:{greenPrice:100}}});
+ const control=key=>descendants(elements.get('modal-content')).find(node=>node.getAttribute('data-focus-key')===key);
+ elements.get('deposit').onclick();
+ assert.match(control('sell-one:melancia').title,/2.271,3 ouro/);
+ assert.match(control('sell-product:melancia').title,/5.746,9 ouro/);
+ assert.equal(control('sell-one:coco').disabled,true);
+ h.receive({farm:{...own,revision:'2',vipActive:true,
+  produceLots:[{...lots[0],unitSale:'2468.75'},{...lots[1],unitSale:'1270.3'},lots[2]],
+  depositTotals:{GOLD:'6207.8',GREEN:'5.5'},itemSaleTotals:{melancia:{GOLD:'6207.8'},coco:{GREEN:'5.5'}},
+  itemSaleSingles:{melancia:{GOLD:'2468.8'},coco:{GREEN:'5.5'}}}});
+ assert.match(control('sell-one:melancia').title,/2.468,8 ouro/);
+ assert.match(control('sell-product:melancia').title,/6.207,8 ouro/);
+ assert.equal(control('sell-one:coco').disabled,false);
+ assert.match(control('sell-one:coco').title,/5,5 verdes/);
+});
+
 test('late sale confirmation does not reopen a deposit that the player closed',async()=>{
  const {h,elements}=app(),{own}=marketFixture(h),reply=deferred();
  h.set({own:{...own,produceLots:[],depositTotals:{GOLD:12}},api:{pending:null,mutate:()=>reply.promise,prepareRequestId:async()=>{}}});

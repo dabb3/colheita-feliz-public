@@ -337,11 +337,12 @@ public final class MarketPanel {
         }
         String info = selling ? "cada" : formatTime(crop.growthSeconds());
         var seedPrice = crop.seedPrice();
-        String price = GameText.money(seedPrice.getValue().multiply(new java.math.BigDecimal(selling ? (state.vipActive() ? "1.25" : "1.15") : "1")).setScale(1, java.math.RoundingMode.CEILING));
+        String price = selling ? "—" : GameText.money(seedPrice.getValue());
         boolean green = seedPrice.getKey() == br.com.colheitafeliz.domain.economy.Currency.GREEN;
         if (vipBlocked) {
             var origin = state.inventory().produceLots().stream().filter(lot -> lot.itemId().equals(crop.id())).findFirst().orElseThrow();
-            price = GameText.money(origin.unitCost().multiply(new java.math.BigDecimal("1.15")).setScale(1, java.math.RoundingMode.CEILING));
+            price = GameText.money(br.com.colheitafeliz.domain.economy.Market.unitRevenue(origin, true)
+                    .setScale(1, java.math.RoundingMode.CEILING));
             green = origin.currency() == br.com.colheitafeliz.domain.economy.Currency.GREEN;
         }
         if (!quote.isEmpty()) {

@@ -51,7 +51,9 @@ public final class JsonSaveRepository implements SaveRepository {
         try {
             JsonObject data = JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)).getAsJsonObject();
             int version = data.get("version").getAsInt();
-            if ((version != GameSave.VERSION && version != 19) || !GameSave.RULESET.equals(data.get("ruleset").getAsString()))
+            String ruleset = data.get("ruleset").getAsString();
+            if ((version != GameSave.VERSION && version != 19)
+                    || !(GameSave.RULESET.equals(ruleset) || GameSave.PREVIOUS_RULESET.equals(ruleset)))
                 throw new IOException("Incompatible save; select a new path for the new progression: " + file);
             if (version == GameSave.VERSION) {
                 JsonObject snapshot = data.getAsJsonObject("snapshot");
@@ -61,8 +63,10 @@ public final class JsonSaveRepository implements SaveRepository {
                     if (!tile.getAsJsonObject().has("harvestRevision") || tile.getAsJsonObject().get("harvestRevision").isJsonNull())
                         throw new IOException("Missing tile revision: " + file);
             }
+            CropSaleJsonValidation.validate(data.get("snapshot"));
             GameSave save = gson.fromJson(data, GameSave.class);
             if (save.snapshot() == null) throw new IOException("Incomplete save file: " + file);
+            CropSaleJsonValidation.validateTerms(save.snapshot());
             return Optional.of(new LoadedGame(save.snapshot(), Instant.parse(save.savedAtReal()), Instant.parse(save.gameTime())));
         } catch (RuntimeException e) {
             throw new IOException("Invalid save file: " + file, e);

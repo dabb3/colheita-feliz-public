@@ -237,7 +237,7 @@ class GameStateTest {
         BigDecimal green = game.greenCoins();
         assertTrue(game.buyVip().success());
         assertTrue(game.sellAllProduce(sweetPotato).success());
-        assertEquals(0, green.subtract(new BigDecimal("100")).add(new BigDecimal("6")).compareTo(game.greenCoins()),
+        assertEquals(0, green.subtract(new BigDecimal("100")).add(new BigDecimal("3.5")).compareTo(game.greenCoins()),
                 "a venda devolve verdes, nunca ouro");
     }
 }

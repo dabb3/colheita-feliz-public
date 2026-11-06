@@ -13,47 +13,89 @@ Esta é a fonte normativa dos valores e das regras desejadas. `docs/regras-de-ne
 
 ## 2. Sementes e plantas: tabela consolidada
 
-O preço de compra é por semente. A venda é por unidade colhida, na mesma moeda da aquisição; o custo-base é o preço da semente. Todas as culturas rendem uma unidade por terreno em cada temporada. As sementes VIP exigem cartão VIP ativo para compra, plantio e venda dos produtos, conforme as seções 7 e 9.2.
+O preço de compra é por semente. A receita v1 é o retorno do ciclo completo, repartido entre as temporadas na moeda da aquisição. Cada produto preserva o custo da semente e sua própria temporada. Todas as culturas rendem uma unidade por terreno em cada temporada. As sementes VIP exigem cartão VIP ativo para compra, plantio e venda dos produtos, conforme as seções 7 e 9.2.
 
-As vendas comuns usam acréscimo de 15% e as VIP, de 25%. Os valores abaixo são para venda de uma unidade, arredondados para cima em uma casa decimal; para várias unidades, arredonda-se apenas o total, conforme a seção 6. O bloqueio de venda sem VIP prevalece para as culturas VIP.
+Desde o balanceamento v1 de 2026-11-05, a coluna de venda mostra os valores exatos por temporada, na ordem das colheitas. Para culturas comuns, VIP ativo na venda acrescenta somente a parcela proporcional de 10% do custo da semente, dividida entre todas as temporadas. Culturas exclusivas VIP exigem VIP ativo na venda e recebem apenas o valor da tabela, sem bônus adicional. As plantas e os produtos anteriores conservam a regra v0, conforme a seção 6.3.
 
 Os tempos são as durações nominais de crescimento do estágio 1 ao 5, sujeitos à rega e às pausas por pragas e insetos. O total de temporadas inclui a primeira colheita. A sequência de XP corresponde às colheitas da primeira até a última temporada, calculada conforme a seção 3.1.
 
-| Semente | Condição | Nível mínimo | Compra por semente | Venda comum por unidade | Venda VIP por unidade | Primeira colheita | Intervalo após próximas coletas | Temporadas | Unidades por colheita | XP por temporada | Cinco estágios em disco |
+| Semente | Condição | Nível mínimo | Compra por semente | Venda comum por temporada | Venda VIP por temporada | Primeira colheita | Intervalo após próximas coletas | Temporadas | Unidades por colheita | XP por temporada | Cinco estágios em disco |
 |---|---|---:|---|---|---|---|---|---:|---:|---|---|
-| Nabo | Comum | 1 | 300 ouro | 345 ouro | 375 ouro | 10 h | Não se aplica | 1 | 1 | 15 | Sim |
-| Cenoura | Comum | 1 | 350 ouro | 402,5 ouro | 437,5 ouro | 15 h | Não se aplica | 1 | 1 | 22,5 | Sim |
-| Milho | Comum | 2 | 500 ouro | 575 ouro | 625 ouro | 20 h | Não se aplica | 1 | 1 | 30 | Sim |
-| Batata | Comum | 3 | 650 ouro | 747,5 ouro | 812,5 ouro | 22 h | Não se aplica | 1 | 1 | 33 | Sim |
-| Berinjela | Comum | 4 | 800 ouro | 920 ouro | 1.000 ouro | 24 h | Não se aplica | 1 | 1 | 36 | Sim |
-| Tomate | Comum | 5 | 950 ouro | 1.092,5 ouro | 1.187,5 ouro | 26 h | 8 h | 2 | 1 | 39 → 19,5 | Sim |
-| Pimenta | Comum | 5 | 1.100 ouro | 1.265 ouro | 1.375 ouro | 28 h | 9 h | 2 | 1 | 42 → 21 | Sim |
-| Abóbora | Comum | 7 | 1.250 ouro | 1.437,5 ouro | 1.562,5 ouro | 29 h | 10 h | 2 | 1 | 43,5 → 21,75 | Sim |
-| Ervilha | Comum | 9 | 1.400 ouro | 1.610 ouro | 1.750 ouro | 30 h | 11 h | 2 | 1 | 45 → 22,5 | Sim |
-| Morango | Comum | 11 | 1.550 ouro | 1.782,5 ouro | 1.937,5 ouro | 31 h | 12 h | 3 | 1 | 46,5 → 23,25 → 11,625 | Sim |
-| Maçã | Comum | 13 | 1.800 ouro | 2.070 ouro | 2.250 ouro | 42 h | 14 h | 3 | 1 | 63 → 31,5 → 15,75 | Sim |
-| Melancia | Comum | 16 | 1.975 ouro | 2.271,3 ouro | 2.468,8 ouro | 46 h | 16 h | 3 | 1 | 69 → 34,5 → 17,25 | Sim |
-| Banana | Comum | 19 | 2.150 ouro | 2.472,5 ouro | 2.687,5 ouro | 50 h | 18 h | 3 | 1 | 75 → 37,5 → 18,75 | Sim |
-| Pêssego | Comum | 22 | 3.075 ouro | 3.536,3 ouro | 3.843,8 ouro | 54 h | 20 h | 3 | 1 | 81 → 40,5 → 20,25 | Sim |
-| Laranja | Comum | 25 | 3.350 ouro | 3.852,5 ouro | 4.187,5 ouro | 60 h | 22 h | 3 | 1 | 90 → 45 → 22,5 | Sim |
-| Uva | Comum | 28 | 4.125 ouro | 4.743,8 ouro | 5.156,3 ouro | 66 h | 24 h | 4 | 1 | 99 → 49,5 → 24,75 → 12,375 | Sim |
-| Romã | Comum | 31 | 3.875 ouro | 4.456,3 ouro | 4.843,8 ouro | 68 h | 33 h | 4 | 1 | 102 → 51 → 25,5 → 12,75 | Sim |
-| Melão | Comum | 35 | 4.600 ouro | 5.290 ouro | 5.750 ouro | 70 h | 35 h | 4 | 1 | 105 → 52,5 → 26,25 → 13,125 | Sim |
-| Cana | Comum | 39 | 4.600 ouro | 5.290 ouro | 5.750 ouro | 72 h | 37 h | 4 | 1 | 108 → 54 → 27 → 13,5 | Sim |
-| Lichia | Comum | 43 | 4.750 ouro | 5.462,5 ouro | 5.937,5 ouro | 74 h | 39 h | 4 | 1 | 111 → 55,5 → 27,75 → 13,875 | Sim |
-| Kiwi | Comum | 45 | 5.050 ouro | 5.807,5 ouro | 6.312,5 ouro | 76 h | 41 h | 4 | 1 | 114 → 57 → 28,5 → 14,25 | Sim |
-| Abacaxi | Comum | 47 | 5.200 ouro | 5.980 ouro | 6.500 ouro | 78 h | 43 h | 4 | 1 | 117 → 58,5 → 29,25 → 14,625 | Sim |
-| Cereja | Comum | 49 | 5.500 ouro | 6.325 ouro | 6.875 ouro | 80 h | 45 h | 4 | 1 | 120 → 60 → 30 → 15 | Sim |
-| Pitaya | Comum | 51 | 6.180 ouro | 7.107 ouro | 7.725 ouro | 82 h | 47 h | 4 | 1 | 123 → 61,5 → 30,75 → 15,375 | Sim |
-| Manga | Comum | 53 | 6.850 ouro | 7.877,5 ouro | 8.562,5 ouro | 84 h | 49 h | 4 | 1 | 126 → 63 → 31,5 → 15,75 | Sim |
-| Cacau | Comum | 55 | 8.500 ouro | 9.775 ouro | 10.625 ouro | 86 h | 51 h | 4 | 1 | 129 → 64,5 → 32,25 → 16,125 | Sim |
-| Goiaba | Comum | 57 | 15.000 ouro | 17.250 ouro | 18.750 ouro | 96 h | 60 h | 4 | 1 | 144 → 72 → 36 → 18 | Sim |
-| Caviar | Comum | 60 | 25.000 ouro | 28.750 ouro | 31.250 ouro | 168 h | 84 h | 5 | 1 | 252 → 126 → 63 → 31,5 → 15,75 | Sim |
-| Batata-doce | VIP | 10 | 4 verdes | Bloqueada sem VIP | 5 verdes | 12 h | 6 h | 2 | 1 | 18 → 9 | Sim |
-| Amendoim | VIP | 20 | 8 verdes | Bloqueada sem VIP | 10 verdes | 24 h | 12 h | 3 | 1 | 36 → 18 → 9 | Sim |
-| Limão | VIP | 30 | 12 verdes | Bloqueada sem VIP | 15 verdes | 36 h | 18 h | 4 | 1 | 54 → 27 → 13,5 → 6,75 | Sim |
-| Noz | VIP | 40 | 16 verdes | Bloqueada sem VIP | 20 verdes | 48 h | 24 h | 5 | 1 | 72 → 36 → 18 → 9 → 4,5 | Sim |
-| Coco | VIP | 50 | 20 verdes | Bloqueada sem VIP | 25 verdes | 60 h | 30 h | 6 | 1 | 90 → 45 → 22,5 → 11,25 → 5,625 → 2,8125 | Sim |
+| Nabo | Comum | 1 | 300 ouro | 345,0 ouro | 375,0 ouro | 10 h | Não se aplica | 1 | 1 | 15 | Sim |
+| Cenoura | Comum | 1 | 350 ouro | 440,0 ouro | 475,0 ouro | 15 h | Não se aplica | 1 | 1 | 22,5 | Sim |
+| Milho | Comum | 2 | 500 ouro | 650,0 ouro | 700,0 ouro | 20 h | Não se aplica | 1 | 1 | 30 | Sim |
+| Batata | Comum | 3 | 650 ouro | 848,0 ouro | 913,0 ouro | 22 h | Não se aplica | 1 | 1 | 33 | Sim |
+| Berinjela | Comum | 4 | 800 ouro | 1.052,0 ouro | 1.132,0 ouro | 24 h | Não se aplica | 1 | 1 | 36 | Sim |
+| Tomate | Comum | 5 | 950 ouro | 679,0 → 679,0 ouro | 726,5 → 726,5 ouro | 26 h | 8 h | 2 | 1 | 39 → 19,5 | Sim |
+| Pimenta | Comum | 5 | 1.100 ouro | 799,8 → 799,7 ouro | 854,8 → 854,7 ouro | 28 h | 9 h | 2 | 1 | 42 → 21 | Sim |
+| Abóbora | Comum | 7 | 1.250 ouro | 917,5 → 917,5 ouro | 980,0 → 980,0 ouro | 29 h | 10 h | 2 | 1 | 43,5 → 21,75 | Sim |
+| Ervilha | Comum | 9 | 1.400 ouro | 1.038,3 → 1.038,2 ouro | 1.108,3 → 1.108,2 ouro | 30 h | 11 h | 2 | 1 | 45 → 22,5 | Sim |
+| Morango | Comum | 11 | 1.550 ouro | 846,7 → 846,7 → 846,6 ouro | 898,4 → 898,4 → 898,2 ouro | 31 h | 12 h | 3 | 1 | 46,5 → 23,25 → 11,625 | Sim |
+| Maçã | Comum | 13 | 1.800 ouro | 1.055,0 → 1.055,0 → 1.055,0 ouro | 1.115,0 → 1.115,0 → 1.115,0 ouro | 42 h | 14 h | 3 | 1 | 63 → 31,5 → 15,75 | Sim |
+| Melancia | Comum | 16 | 1.975 ouro | 1.204,4 → 1.204,3 → 1.204,3 ouro | 1.270,3 → 1.270,1 → 1.270,1 ouro | 46 h | 16 h | 3 | 1 | 69 → 34,5 → 17,25 | Sim |
+| Banana | Comum | 19 | 2.150 ouro | 1.361,7 → 1.361,7 → 1.361,6 ouro | 1.433,4 → 1.433,4 → 1.433,2 ouro | 50 h | 18 h | 3 | 1 | 75 → 37,5 → 18,75 | Sim |
+| Pêssego | Comum | 22 | 3.075 ouro | 1.777,0 → 1.777,0 → 1.777,0 ouro | 1.879,5 → 1.879,5 → 1.879,5 ouro | 54 h | 20 h | 3 | 1 | 81 → 40,5 → 20,25 | Sim |
+| Laranja | Comum | 25 | 3.350 ouro | 2.000,7 → 2.000,7 → 2.000,6 ouro | 2.112,4 → 2.112,4 → 2.112,2 ouro | 60 h | 22 h | 3 | 1 | 90 → 45 → 22,5 | Sim |
+| Uva | Comum | 28 | 4.125 ouro | 1.962,8 → 1.962,8 → 1.962,7 → 1.962,7 ouro | 2.066,0 → 2.065,9 → 2.065,8 → 2.065,8 ouro | 66 h | 24 h | 4 | 1 | 99 → 49,5 → 24,75 → 12,375 | Sim |
+| Romã | Comum | 31 | 3.875 ouro | 2.158,7 → 2.158,6 → 2.158,6 → 2.158,6 ouro | 2.255,6 → 2.255,5 → 2.255,5 → 2.255,4 ouro | 68 h | 33 h | 4 | 1 | 102 → 51 → 25,5 → 12,75 | Sim |
+| Melão | Comum | 35 | 4.600 ouro | 2.462,5 → 2.462,5 → 2.462,5 → 2.462,5 ouro | 2.577,5 → 2.577,5 → 2.577,5 → 2.577,5 ouro | 70 h | 35 h | 4 | 1 | 105 → 52,5 → 26,25 → 13,125 | Sim |
+| Cana | Comum | 39 | 4.600 ouro | 2.591,2 → 2.591,1 → 2.591,1 → 2.591,1 ouro | 2.706,2 → 2.706,1 → 2.706,1 → 2.706,1 ouro | 72 h | 37 h | 4 | 1 | 108 → 54 → 27 → 13,5 | Sim |
+| Lichia | Comum | 43 | 4.750 ouro | 2.763,3 → 2.763,3 → 2.763,2 → 2.763,2 ouro | 2.882,1 → 2.882,1 → 2.881,9 → 2.881,9 ouro | 74 h | 39 h | 4 | 1 | 111 → 55,5 → 27,75 → 13,875 | Sim |
+| Kiwi | Comum | 45 | 5.050 ouro | 2.978,9 → 2.978,9 → 2.978,9 → 2.978,8 ouro | 3.105,2 → 3.105,2 → 3.105,1 → 3.105,0 ouro | 76 h | 41 h | 4 | 1 | 114 → 57 → 28,5 → 14,25 | Sim |
+| Abacaxi | Comum | 47 | 5.200 ouro | 3.163,0 → 3.163,0 → 3.163,0 → 3.163,0 ouro | 3.293,0 → 3.293,0 → 3.293,0 → 3.293,0 ouro | 78 h | 43 h | 4 | 1 | 117 → 58,5 → 29,25 → 14,625 | Sim |
+| Cereja | Comum | 49 | 5.500 ouro | 3.390,7 → 3.390,6 → 3.390,6 → 3.390,6 ouro | 3.528,2 → 3.528,1 → 3.528,1 → 3.528,1 ouro | 80 h | 45 h | 4 | 1 | 120 → 60 → 30 → 15 | Sim |
+| Pitaya | Comum | 51 | 6.180 ouro | 3.719,3 → 3.719,3 → 3.719,2 → 3.719,2 ouro | 3.873,8 → 3.873,8 → 3.873,7 → 3.873,7 ouro | 82 h | 47 h | 4 | 1 | 123 → 61,5 → 30,75 → 15,375 | Sim |
+| Manga | Comum | 53 | 6.850 ouro | 4.051,4 → 4.051,4 → 4.051,4 → 4.051,3 ouro | 4.222,7 → 4.222,7 → 4.222,6 → 4.222,5 ouro | 84 h | 49 h | 4 | 1 | 126 → 63 → 31,5 → 15,75 | Sim |
+| Cacau | Comum | 55 | 8.500 ouro | 4.634,5 → 4.634,5 → 4.634,5 → 4.634,5 ouro | 4.847,0 → 4.847,0 → 4.847,0 → 4.847,0 ouro | 86 h | 51 h | 4 | 1 | 129 → 64,5 → 32,25 → 16,125 | Sim |
+| Goiaba | Comum | 57 | 15.000 ouro | 6.751,5 → 6.751,5 → 6.751,5 → 6.751,5 ouro | 7.126,5 → 7.126,5 → 7.126,5 → 7.126,5 ouro | 96 h | 60 h | 4 | 1 | 144 → 72 → 36 → 18 | Sim |
+| Caviar | Comum | 60 | 25.000 ouro | 9.536,0 → 9.536,0 → 9.536,0 → 9.536,0 → 9.536,0 ouro | 10.036,0 → 10.036,0 → 10.036,0 → 10.036,0 → 10.036,0 ouro | 168 h | 84 h | 5 | 1 | 252 → 126 → 63 → 31,5 → 15,75 | Sim |
+| Batata-doce | VIP | 10 | 4 verdes | Bloqueada sem VIP | 2,5 → 2,5 verdes | 12 h | 6 h | 2 | 1 | 18 → 9 | Sim |
+| Amendoim | VIP | 20 | 8 verdes | Bloqueada sem VIP | 3,6 → 3,6 → 3,6 verdes | 24 h | 12 h | 3 | 1 | 36 → 18 → 9 | Sim |
+| Limão | VIP | 30 | 12 verdes | Bloqueada sem VIP | 4,4 → 4,4 → 4,3 → 4,3 verdes | 36 h | 18 h | 4 | 1 | 54 → 27 → 13,5 → 6,75 | Sim |
+| Noz | VIP | 40 | 16 verdes | Bloqueada sem VIP | 5,0 → 5,0 → 5,0 → 4,9 → 4,9 verdes | 48 h | 24 h | 5 | 1 | 72 → 36 → 18 → 9 → 4,5 | Sim |
+| Coco | VIP | 50 | 20 verdes | Bloqueada sem VIP | 5,5 → 5,5 → 5,5 → 5,5 → 5,5 → 5,5 verdes | 60 h | 30 h | 6 | 1 | 90 → 45 → 22,5 → 11,25 → 5,625 → 2,8125 | Sim |
+
+### 2.1. Receita e lucro por ciclo v1
+
+Os valores de culturas comuns são em ouro e usam perfil comum durante todas as vendas. Os valores de culturas exclusivas VIP são em verdes. O tempo inclui a primeira duração e todos os intervalos seguintes, com rega em dia e sem pragas. Lucro é receita menos uma única semente, antes de outros custos. As taxas são metas de projeto para playtest de 30 dias.
+
+| ID | Custo da semente | Temporadas | Horas nominais totais | Receita total | Lucro do ciclo | Ouro líquido/h ou ROI VIP |
+|---|---:|---:|---:|---:|---:|---:|
+| nabo | 300,0 | 1 | 10 | 345,0 | 45,0 | 4,5 |
+| cenoura | 350,0 | 1 | 15 | 440,0 | 90,0 | 6,0 |
+| milho | 500,0 | 1 | 20 | 650,0 | 150,0 | 7,5 |
+| batata | 650,0 | 1 | 22 | 848,0 | 198,0 | 9,0 |
+| berinjela | 800,0 | 1 | 24 | 1.052,0 | 252,0 | 10,5 |
+| tomate | 950,0 | 2 | 34 | 1.358,0 | 408,0 | 12,0 |
+| pimenta | 1.100,0 | 2 | 37 | 1.599,5 | 499,5 | 13,5 |
+| abobora | 1.250,0 | 2 | 39 | 1.835,0 | 585,0 | 15,0 |
+| ervilha | 1.400,0 | 2 | 41 | 2.076,5 | 676,5 | 16,5 |
+| morango | 1.550,0 | 3 | 55 | 2.540,0 | 990,0 | 18,0 |
+| maca | 1.800,0 | 3 | 70 | 3.165,0 | 1.365,0 | 19,5 |
+| melancia | 1.975,0 | 3 | 78 | 3.613,0 | 1.638,0 | 21,0 |
+| banana | 2.150,0 | 3 | 86 | 4.085,0 | 1.935,0 | 22,5 |
+| pessego | 3.075,0 | 3 | 94 | 5.331,0 | 2.256,0 | 24,0 |
+| laranja | 3.350,0 | 3 | 104 | 6.002,0 | 2.652,0 | 25,5 |
+| uva | 4.125,0 | 4 | 138 | 7.851,0 | 3.726,0 | 27,0 |
+| roma | 3.875,0 | 4 | 167 | 8.634,5 | 4.759,5 | 28,5 |
+| melao | 4.600,0 | 4 | 175 | 9.850,0 | 5.250,0 | 30,0 |
+| cana | 4.600,0 | 4 | 183 | 10.364,5 | 5.764,5 | 31,5 |
+| lichia | 4.750,0 | 4 | 191 | 11.053,0 | 6.303,0 | 33,0 |
+| kiwi | 5.050,0 | 4 | 199 | 11.915,5 | 6.865,5 | 34,5 |
+| abacaxi | 5.200,0 | 4 | 207 | 12.652,0 | 7.452,0 | 36,0 |
+| cereja | 5.500,0 | 4 | 215 | 13.562,5 | 8.062,5 | 37,5 |
+| pitaya | 6.180,0 | 4 | 223 | 14.877,0 | 8.697,0 | 39,0 |
+| manga | 6.850,0 | 4 | 231 | 16.205,5 | 9.355,5 | 40,5 |
+| cacau | 8.500,0 | 4 | 239 | 18.538,0 | 10.038,0 | 42,0 |
+| goiaba | 15.000,0 | 4 | 276 | 27.006,0 | 12.006,0 | 43,5 |
+| caviar | 25.000,0 | 5 | 504 | 47.680,0 | 22.680,0 | 45,0 |
+| batata-doce | 4,0 | 2 | 18 | 5,0 | 1,0 | 25% |
+| amendoim | 8,0 | 3 | 48 | 10,8 | 2,8 | 35% |
+| limao | 12,0 | 4 | 90 | 17,4 | 5,4 | 45% |
+| noz | 16,0 | 5 | 144 | 24,8 | 8,8 | 55% |
+| coco | 20,0 | 6 | 210 | 33,0 | 13,0 | 65% |
+
+Culturas comuns seguem lucro nominal de 4,5 ouro/h no nabo, aumentando 1,5 ouro/h por posição. As exclusivas VIP seguem ROI de 25%, 35%, 45%, 55% e 65%. A receita comum com VIP integral aumenta exatamente 10% do custo de uma semente por ciclo.
 
 ## 3. Cultivo, temporadas e XP
 
@@ -161,14 +203,14 @@ Nenhum fertilizante pode ser aplicado a uma planta não saudável: seca, com pra
 
 ## 6. Regra geral de venda
 
-Todo item vendível segue um acréscimo sobre seu custo-base:
+Para plantas v1, a receita de autoridade é a tabela da seção 2.1, repartida conforme a seção 6.3. Animais e produtos de plantas v0 mantêm os acréscimos sobre seu custo-base abaixo.
 
 | Perfil do jogador | Acréscimo sobre o custo-base | Multiplicador |
 |---|---:|---:|
 | Comum | 15% | 1,15 |
 | VIP | 25% | 1,25 |
 
-A regra abrange os itens vendíveis de cultivo, animais de produção e animais de crescimento.
+Os multiplicadores acima abrangem animais de produção, animais de crescimento e somente as plantas anteriores à v1.
 
 ### 6.1. Fórmulas
 
@@ -178,15 +220,15 @@ total_sem_arredondar = valor_unitario_sem_arredondar × quantidade_vendida
 valor_total_venda = teto(total_sem_arredondar × 10) ÷ 10
 ```
 
-O multiplicador é 1,15 para o perfil comum e 1,25 para VIP. A função teto arredonda para o inteiro imediatamente superior, preservando valores já inteiros. O valor unitário não é arredondado antes da multiplicação pela quantidade. Por exemplo, dois ovos de uma galinha adquirida por 9 moedas verdes rendem 20,7 moedas verdes no perfil comum (9 × 1,15 × 2), embora uma venda isolada de um ovo renda 10,4 moedas verdes.
+Para animais e plantas v0, o multiplicador é 1,15 para o perfil comum e 1,25 para VIP. A função teto arredonda para o inteiro imediatamente superior, preservando valores já inteiros. O valor unitário não é arredondado antes da multiplicação pela quantidade. Por exemplo, dois ovos de uma galinha adquirida por 9 moedas verdes rendem 20,7 moedas verdes no perfil comum (9 × 1,15 × 2), embora uma venda isolada de um ovo renda 10,4 moedas verdes.
 
-O benefício VIP acrescenta **10 pontos percentuais** ao acréscimo padrão: 15% + 10% = 25%.
+Para animais e plantas v0, o benefício VIP acrescenta **10 pontos percentuais** ao acréscimo padrão: 15% + 10% = 25%. Para plantas v1, vale apenas a repartição da seção 6.3.
 
 No comando **Vender tudo**, produtos VIP bloqueados são ignorados e permanecem no armazém; os demais são vendidos normalmente. Para cada moeda, somam-se os valores exatos de todos os itens/lotes elegíveis e aplica-se o teto de uma casa decimal uma única vez ao total dessa moeda. Ouro e verdes nunca são somados nem convertidos. Esta unidade de arredondamento por operação e moeda é a decisão técnica adotada para concretizar a regra de arredondar o total.
 
 ### 6.2. Exemplo: nabo
 
-Uma semente de nabo custa 300 ouro. Conforme a regra definida, cada unidade de nabo colhida usa esse valor como custo-base.
+Uma semente de nabo custa 300 ouro e tem uma única temporada. A receita v1 comum é 345 ouro. Com VIP na venda, recebe também 30 ouro, totalizando 375 ouro.
 
 | Perfil | Cálculo do acréscimo | Acréscimo | Venda por unidade |
 |---|---|---:|---:|
@@ -195,6 +237,20 @@ Uma semente de nabo custa 300 ouro. Conforme a regra definida, cada unidade de n
 
 O percentual representa um acréscimo sobre o custo-base. O lucro líquido da atividade depende também de alimentação, fertilizantes, quantidade produzida e outros custos aplicáveis.
 
+### 6.3. Repartição, lotes e migração v1
+
+Receita e bônus são inteiros em décimos. Para um total T e N temporadas: q = T / N por divisão inteira e r = T % N. A temporada i (1 a N) recebe q + 1 décimo quando i <= r, e q nos demais casos. Aplicar separadamente à receita e ao bônus total. Somar os décimos das unidades vendidas, sem novo arredondamento. Não aplicar 1,15 ou 1,25 sobre a receita v1.
+
+O tomate retorna 1.358,0 ouro em duas colheitas de 679,0. Com VIP em ambas as vendas, soma 95,0 ouro em bônus, ou 47,5 por temporada. O amendoim retorna 3,6 verdes em cada uma das três temporadas. O coco retorna seis vezes 5,5 verdes, total de 33,0 e lucro de 13,0 após a semente de 20.
+
+Cada lote mantém ID da cultura, moeda, custo da semente, quantidade e restrição VIP. O lote guarda também economyVersion=0 ou 1. Na versão 1, cropSale é obrigatório e contém economyVersion=1, seasonIndex, seasons, cycleRevenueTenths e cycleVipBonusTenths. Os dois marcadores devem concordar. O índice zero identifica a origem da planta e não pode ser vendido; cada unidade colhida usa seu índice de 1 a N. A tabela v1 é imutável: leitores conferem versão, presença dos campos, inteiros exatos, limites de índices e coerência de cultura, custo, moeda, temporadas, receita e restrição VIP. A validação ocorre antes de o parser normalizar campos ausentes ou números fracionários. Guardar os parâmetros evita reprecificação; uma tabela futura exige outra versão e deve conservar a autoridade v1 para liquidar seus estoques. Furto transfere esses mesmos termos e consome a temporada do dono, sem estorno, unidade extra, XP ou segundo pagamento.
+
+Na migração, economyVersion=0 sem cropSale identifica v0; a ausência total dos marcadores em saves históricos também identifica v0. Um lote marcado externamente como v1 não pode perder cropSale nem ser reclassificado como v0. Rascunhos anteriores com cropSale completo e sem marcador externo continuam aceitos como v1. Plantas em andamento, todas as suas temporadas futuras e produtos no depósito mantêm 1,15/1,25 até a venda. Uma semente já comprada, quando plantada após a atualização, entra na v1. Exceção de compatibilidade: sementes históricas cuja moeda, custo ou restrição VIP diferem do catálogo atual conservam v0; não converter sua aquisição para uma tabela em outra moeda ou outro custo. Saldos, XP, animais e demais estoques ficam intactos.
+
+O formato estrutural permanece v20 e o caminho save/game-rules-v4.json. Arquivos v19/v20 com ruleset economy-2026-10 são carregados preservando v0. Novas gravações usam economy-2026-11-plants-v1, recusado pelo leitor desktop anterior. V1–v18, futuras e versões econômicas desconhecidas são recusadas. No online, a transação preserva os novos termos no snapshot JSON. Antes de uma implantação futura, criar backup e publicar somente servidores que conheçam ambos os preços; não misturar binários anteriores e novos nem fazer rollback para um leitor que descarte cropSale.
+
+A API calcula elegibilidade, preço unitário e totais e credita o saldo sob lock da fazenda e recibo idempotente, na mesma transação do estoque. Campos de preço enviados pelo cliente não são aceitos. Vender tudo ignora os produtos VIP bloqueados. Por decisão final de 2026-11-05, o arredondamento histórico de v0 fica preservado, inclusive a diferença possível entre vendas separadas e agrupadas. Misturas com v0/animais continuam usando o teto único por moeda apenas para suas frações antigas. Para produtos exclusivamente v1, venda individual, por lote e total produzem exatamente a mesma soma.
+
 ## 7. Cartão VIP
 
 - **Preço:** 100 moedas verdes.
@@ -202,7 +258,7 @@ O percentual representa um acréscimo sobre o custo-base. O lucro líquido da at
 - **Renovação:** com VIP ativo, cada compra soma 30 dias ao prazo restante; com VIP expirado, inicia 30 dias a partir da compra. Dez compras consecutivas, uma de cada vez, acumulam 300 dias de duração concedida.
 - O cartão não fica armazenado no depósito nem aguarda uso manual: a compra aplica o benefício imediatamente.
 - **Acesso exclusivo:** sementes VIP indisponíveis para jogadores comuns.
-- **Venda:** acréscimo de 25% sobre o custo-base de todos os itens vendíveis enquanto o benefício estiver ativo.
+- **Venda:** aplica a repartição v1 das plantas comuns da seção 6.3 e libera produtos exclusivos VIP. Animais e plantas v0 mantêm acréscimo de 25% sobre seu custo-base.
 - As sementes identificadas como VIP estão listadas na tabela consolidada da seção 2.
 - Não existem animais exclusivos VIP.
 - Após o término, sementes VIP armazenadas não podem ser plantadas. Plantações VIP existentes continuam permitindo cuidados e colheitas, mas seus produtos armazenados ficam bloqueados para uso e venda até a renovação. As regras detalhadas estão na seção 9.2.
@@ -257,7 +313,7 @@ As tabelas abaixo complementam as regras das seções anteriores. Os valores sã
 | Tratamento de empate no arredondamento | Não se aplica: qualquer fração além da precisão permitida é arredondada para cima. |
 | Momento do arredondamento (por unidade ou após multiplicar pela quantidade) | após multiplicar pela quantidade |
 
-Com a precisão registrada, 2,25 resulta em 2,3 e 2,20 permanece 2,2. O arredondamento é aplicado ao total da venda, após multiplicar pela quantidade.
+Para animais e plantas v0, 2,25 resulta em 2,3 e 2,20 permanece 2,2, com teto no total da venda. Plantas v1 já têm valores em décimos inteiros por temporada e não passam por arredondamento adicional.
 
 ### 9.2. Exclusividade e término do VIP
 
@@ -346,6 +402,8 @@ Abrir o jogo, visitar, concluir tutorial ou consultar a fazenda não paga a ajud
 O servidor persiste o último dia pago junto com o crédito, sem confiar no relógio ou em valores enviados pelo cliente. Repetição, pedidos simultâneos, logout e reinício não pagam novamente. Retrocesso do relógio não reabre dia já resgatado. Uma transação revertida preserva o saldo e a disponibilidade.
 
 ## 13. Furto de temporadas
+
+Decisão final de 2026-11-05: manter cinco minutos de exclusividade por temporada e um furto bem-sucedido por jogador a cada 24 horas. Não há imunidade para iniciantes.
 
 Cada jogador pode realizar um único furto bem-sucedido a cada 24 horas, somando todas as fazendas visitadas. A janela começa no último furto bem-sucedido, pelo relógio real do servidor; não renova à meia-noite. Tentativas recusadas não consomem o limite. O horário persiste após logout e reinício da API. Pedidos simultâneos só podem produzir um sucesso, e repetir o mesmo pedido não transfere outro produto nem reinicia a janela. Ao recusar pelo limite, informar o tempo restante. Ajuda com amor não consome esse limite.
 

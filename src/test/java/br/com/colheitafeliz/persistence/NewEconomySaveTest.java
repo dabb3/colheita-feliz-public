@@ -31,7 +31,7 @@ class NewEconomySaveTest {
         session.save();
         var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
         assertEquals(20, json.get("version").getAsInt());
-        assertEquals("economy-2026-10", json.get("ruleset").getAsString());
+        assertEquals(GameSave.RULESET, json.get("ruleset").getAsString());
         var restored = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state();
         assertEquals(0, new BigDecimal("500.1").compareTo(restored.wallet().coins()));
         assertEquals(0, BigDecimal.ONE.compareTo(restored.greenCoins()));

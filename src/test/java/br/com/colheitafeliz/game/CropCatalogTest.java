@@ -5,7 +5,6 @@ import br.com.colheitafeliz.domain.crop.CropType;
 import br.com.colheitafeliz.domain.economy.Currency;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -49,8 +48,8 @@ class CropCatalogTest {
             for (int season = 1; season <= type.seasons(); season++)
                 assertEquals(0, row.xp().get(season - 1).compareTo(type.harvestXp(season)), id + " temporada " + season);
             assertEquals(5, type.stages(), id);
-            assertEquals(row.vipSale(), sale(row.price(), "1.25") + suffix(row.currency()), id);
-            assertEquals(row.commonSale(), row.vip() ? "Bloqueada sem VIP" : sale(row.price(), "1.15") + suffix(row.currency()), id);
+            assertEquals(row.vipSale(), seasonalSales(type, true) + suffix(row.currency()), id);
+            assertEquals(row.commonSale(), row.vip() ? "Bloqueada sem VIP" : seasonalSales(type, false) + suffix(row.currency()), id);
         }
     }
 
@@ -85,21 +84,24 @@ class CropCatalogTest {
         assertThrows(IllegalStateException.class, () -> CropCatalogLoader.load(new java.io.StringReader("[]")));
     }
 
-    /** Valor de venda de uma unidade, arredondado para cima em uma casa decimal e escrito como na tabela. */
-    private static String sale(BigDecimal price, String multiplier) {
-        BigDecimal value = price.multiply(new BigDecimal(multiplier)).setScale(1, RoundingMode.CEILING);
-        String text = value.stripTrailingZeros().toPlainString();
-        String[] parts = text.split("\\.");
-        StringBuilder integer = new StringBuilder(parts[0]);
-        for (int i = integer.length() - 3; i > 0; i -= 3) integer.insert(i, '.');
-        return integer + (parts.length > 1 ? "," + parts[1] : "");
+    private static String seasonalSales(CropType type, boolean vip) {
+        var price = type.seedPrice();
+        var origin = type.plantingOrigin(new br.com.colheitafeliz.domain.inventory.ItemLot(
+                type.id(), price.getKey(), price.getValue(), 1, type.vipOnly()));
+        var format = java.text.NumberFormat.getNumberInstance(java.util.Locale.forLanguageTag("pt-BR"));
+        format.setMinimumFractionDigits(1);
+        format.setMaximumFractionDigits(1);
+        List<String> values = new ArrayList<>();
+        for (int season = 1; season <= type.seasons(); season++)
+            values.add(format.format(origin.harvested(season).cropSale().unitRevenue(vip)));
+        return String.join(" → ", values);
     }
 
     private static String suffix(Currency currency) { return currency == Currency.GOLD ? " ouro" : " verdes"; }
 
     private static List<Row> normativeRows() throws IOException {
         String rule = Files.readString(Path.of("docs/game-rule.md"));
-        String section = rule.substring(rule.indexOf("## 2."), rule.indexOf("## 3."));
+        String section = rule.substring(rule.indexOf("## 2."), rule.indexOf("### 2.1."));
         List<Row> rows = new ArrayList<>();
         for (String line : section.lines().toList()) {
             if (!line.startsWith("| ") || line.startsWith("| Semente")) continue;

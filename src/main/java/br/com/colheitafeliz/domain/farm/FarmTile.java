@@ -51,7 +51,7 @@ public final class FarmTile {
     public void plant(CropType type, Instant now, ItemLot origin) {
         require(TileState.PLOWED);
         long nextRevision = Math.incrementExact(harvestRevision);
-        startSeason(new Crop(type, now, origin));
+        startSeason(new Crop(type, now, type.plantingOrigin(origin)));
         harvestRevision = nextRevision;
     }
 
@@ -147,7 +147,7 @@ public final class FarmTile {
         if (done.season() < done.type().seasons()) {
             startSeason(new Crop(done.type(), now, done.origin(), done.season() + 1));
             harvestRevision = nextRevision;
-            return done.origin();
+            return done.origin().harvested(done.season());
         }
         crop = null;
         pest = PestState.NONE;
@@ -158,7 +158,7 @@ public final class FarmTile {
         fertilized = false;
         state = TileState.DEAD;
         harvestRevision = nextRevision;
-        return done.origin();
+        return done.origin().harvested(done.season());
     }
 
     public void restore(TileState state, Crop crop) {
