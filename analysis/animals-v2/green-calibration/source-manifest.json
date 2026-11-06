@@ -1,0 +1,17 @@
+{
+  "base": "be6e985",
+  "scope": "offline GREEN margin sensitivity only",
+  "files": {
+    "docs/game-rule.md": "67cdfb73cf5d2f2901c68dc1054aaab99bba5e04f6e18c3c4584126fa75beb58",
+    "assets/data/animals.json": "9a0b67936529cc448408a23f9fb9de44d647346b5b799c4c6c2a0bedb0154577",
+    "assets/data/crops.json": "1169d5582b9be35319e58a973f3db2bff1d56fef23c1981eafc69284050ab22d",
+    "assets/data/progression.json": "206a0365f1ba4da028ff8b1fa4bbea3a4c71a000fb797367d9959656b76356a9"
+  },
+  "alternatives": {
+    "A": 1,
+    "B": 2,
+    "C": 3
+  },
+  "trajectories": 1296,
+  "observations": 3888
+}
