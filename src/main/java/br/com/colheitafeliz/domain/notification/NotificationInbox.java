@@ -35,5 +35,7 @@ public final class NotificationInbox {
     public int unread(){return (int)entries.stream().filter(n->!n.read()).count();}
     public boolean markRead(String id){for(int i=0;i<entries.size();i++)if(entries.get(i).id().equals(id)){entries.set(i,entries.get(i).asRead());return true;}return false;}
     public boolean markAllRead(){boolean changed=unread()>0;entries.replaceAll(GameNotification::asRead);return changed;}
+    public boolean dismissRead(String id){return entries.removeIf(n->n.read()&&n.id().equals(id));}
+    public int dismissAllRead(){int before=entries.size();entries.removeIf(GameNotification::read);return before-entries.size();}
     public Snapshot snapshot(){return new Snapshot(1,entries,observed);}
 }

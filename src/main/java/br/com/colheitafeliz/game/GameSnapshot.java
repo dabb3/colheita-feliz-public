@@ -15,7 +15,7 @@ public record GameSnapshot(BigDecimal coins, List<br.com.colheitafeliz.domain.in
                            Map<String, Integer> feed, Map<String, Integer> fertilizers, String selectedFertilizerId,
                            BigDecimal greenCoins, String vipExpiresAt, ProtectionSnapshot protection,
                            br.com.colheitafeliz.domain.notification.NotificationInbox.Snapshot notifications,
-                           ChristmasState christmas2026) {
+                           ChristmasState christmas2026, PlayerAvatar avatar) {
     public record ChristmasState(String registeredAt,boolean giftGranted) {
         public ChristmasState {
             var registration=java.time.Instant.parse(registeredAt);

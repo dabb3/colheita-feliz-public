@@ -20,11 +20,15 @@ final class OnlineViews {
     static JsonObject farm(UUID owner, String name, GameState game, long revision, boolean own) {
         var now = game.now();
         var protectedPlots = game.protectedPlots();
+        var nextPlot=game.land().next();
         JsonArray tiles = new JsonArray();
         for (int row = 0; row < GameState.ROWS; row++) for (int col = 0; col < GameState.COLUMNS; col++) {
             var tile = game.farm().tile(col, row);
             var crop = tile.crop();
+            var plot=game.land().at(col,row);
             tiles.add(object("column", col, "row", row, "unlocked", game.land().isUnlocked(col, row),
+                    "requiredLevel",plot.requiredLevel(),"price",plot.price(),"currency",plot.currency(),
+                    "purchasable",nextPlot!=null&&nextPlot.id()==plot.id(),
                     "state", tile.state(), "cropId", crop == null ? null : crop.type().id(),
                     "stage", crop == null ? 0 : crop.stageAt(now), "season", crop == null ? 0 : crop.season(),
                     "seasons", crop == null ? 0 : crop.type().seasons(), "watered", crop != null && crop.watered(),
@@ -49,14 +53,16 @@ final class OnlineViews {
         }
         JsonObject view = object("owner", owner.toString(), "name", name, "revision", Long.toString(revision),
                 "serverTime", now.toString(), "own", own, "tiles", tiles, "animals", animals);
-        if (!own) return view;
-        view.add("notifications",JSON.toJsonTree(game.notifications().entries()));
-        view.addProperty("unreadNotifications",game.notifications().unread());
+        view.add("avatar",JSON.toJsonTree(game.avatar()==null?new br.com.colheitafeliz.game.PlayerAvatar("classic",null):game.avatar()));
         view.addProperty("coins", game.wallet().coins().stripTrailingZeros().toPlainString());
         view.addProperty("greenCoins", game.greenCoins().stripTrailingZeros().toPlainString());
         view.addProperty("level", game.progress().level());
         view.addProperty("currentXp", game.progress().currentXp().toPlainString());
         view.addProperty("xpToNext", game.progress().xpToNext().toPlainString());
+        if (!own) return view;
+        view.addProperty("avatarSelected",game.avatar()!=null);
+        view.add("notifications",JSON.toJsonTree(game.notifications().entries()));
+        view.addProperty("unreadNotifications",game.notifications().unread());
         view.addProperty("vipActive", game.vipActive());
         view.add("vipExpiresAt", JSON.toJsonTree(game.vip().expiresAt() == null ? null : game.vip().expiresAt().toString()));
         JsonObject seeds = new JsonObject();
@@ -89,7 +95,7 @@ final class OnlineViews {
                 "done", game.dailyMissions().completed(mission)));
         view.add("missions", missions);
         LandExpansion.Plot next = game.land().next();
-        view.add("nextPlot", JSON.toJsonTree(next));
+        view.add("nextPlot",next==null?com.google.gson.JsonNull.INSTANCE:object("id",next.id(),"column",next.column(),"row",next.row(),"requiredLevel",next.requiredLevel(),"price",next.price(),"currency",next.currency()));
         return view;
     }
 }

@@ -339,7 +339,7 @@ class OnlineGameIntegrationTest {
         JsonObject invite = service.createInvitation(alice, requestId());
         service.acceptInvitation(bob, "Bob", invite.get("code").getAsString(), requestId());
         JsonObject visit = service.visit(bob, alice);
-        assertFalse(visit.has("coins"));
+        assertEquals(service.farm(alice).get("coins"),visit.get("coins"));
         assertFalse(visit.has("produceLots"));
         assertFalse(visit.has("seedCounts"));
         assertEquals(1, service.friends(bob).size());
@@ -620,7 +620,21 @@ class OnlineGameIntegrationTest {
         });
     }
 
-    @Test void pestLimitsAreIndependentGlobalPersistedAndExpireAfterExactlyTwentyFourHours() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"SPREAD_INSECTS,43140,false","SPREAD_INSECTS,43200,true","SPREAD_INSECTS,43260,true","SPREAD_WEEDS,43140,false","SPREAD_WEEDS,43200,true","SPREAD_WEEDS,43260,true"})
+    void historicalPestTimestampUsesTwelveHoursWithoutResettingIt(String kind,long elapsed,boolean allowed){
+        preparePestFriends(false);var historical=clock.instant().minusSeconds(elapsed);
+        store.transaction(bob,tx->{tx.recordPest(bob,kind,historical);return null;});
+        store.close();store=new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"),"postgres","",testSchema);store.initialize(alice);
+        service=new OnlineGameService(store,clock,bound->bound-1,5);
+        assertEquals(historical,store.transaction(bob,tx->tx.lastPest(bob,kind)));
+        var response=service.visitAction(bob,alice,pestCommand(bob,alice,kind));
+        assertEquals(allowed,response.getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(allowed?clock.instant():historical,store.transaction(bob,tx->tx.lastPest(bob,kind)));
+        assertNull(store.transaction(bob,tx->tx.lastPest(bob,kind.equals("SPREAD_WEEDS")?"SPREAD_INSECTS":"SPREAD_WEEDS")));
+        assertNull(store.transaction(bob,tx->tx.lastTheft(bob)));
+    }
+    @Test void pestLimitsAreIndependentGlobalPersistedAndExpireAfterExactlyTwelveHours() {
         UUID carol = preparePestFriends(false);
         var before = service.farm(bob);
         var insect = pestCommand(bob, alice, "SPREAD_INSECTS");
@@ -636,7 +650,7 @@ class OnlineGameIntegrationTest {
         store = new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"), "postgres", "", testSchema);
         store.initialize(alice);
         service = new OnlineGameService(store, clock, bound -> bound - 1, 5);
-        clock.advanceSeconds(86399);
+        clock.advanceSeconds(43199);
         for (String kind : java.util.List.of("SPREAD_INSECTS", "SPREAD_WEEDS")) {
             var refused = service.visitAction(bob, carol, pestCommand(bob, carol, kind));
             assertFalse(refused.getAsJsonObject("result").get("success").getAsBoolean());

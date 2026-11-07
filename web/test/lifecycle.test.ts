@@ -11,7 +11,7 @@ import * as inviteUrl from '../src/invite-url.ts';
 
 const farm=owner=>({owner,name:owner,revision:'1',tiles:[],animals:[],seedCounts:{}});
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve};}
-function app(){
+function app(preferences=new Map()){
  const intervals=new Map(),elements=new Map(),listeners=new Map(),audioClips=[],observers=[],timeouts=new Map();let nextTimeout=0;
  const make=(tag='div')=>({tag,value:'',selectedIndex:0,hidden:false,children:[],attributes:{},dataset:{},style:{setProperty(key,value){this[key]=value;}},scrollTop:0,scrollLeft:0,classList:{add(){},remove(){},toggle(){}},
   replaceChildren(...nodes){if(this.contains(ctx.document.activeElement))ctx.document.activeElement=null;this.children=nodes;},
@@ -23,7 +23,7 @@ function app(){
   querySelector(selector){return this.querySelectorAll(selector)[0]??null;},focus(){ctx.document.activeElement=this;},
   getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(){},close(){this.open=false;},showModal(){this.open=true;}});
  const storage={getItem:()=>null,setItem(){},removeItem(){}};
- const ctx={...presentation,...uiPresentation,...avatar,...inviteUrl,history:{state:null,replaceState(){}},window:{COLHEITA_CONFIG:{development:true},setInterval(callback,delay){intervals.set(delay,callback);return delay;},clearInterval(id){intervals.delete(id);},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}addEventListener(){}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
+ const ctx={...presentation,...uiPresentation,...avatar,...inviteUrl,history:{state:null,replaceState(){}},window:{localStorage:{getItem:key=>preferences.get(key)??null,setItem:(key,value)=>preferences.set(key,value)},COLHEITA_CONFIG:{development:true},setInterval(callback,delay){intervals.set(delay,callback);return delay;},clearInterval(id){intervals.delete(id);},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}addEventListener(){}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
  const uiSource=readFileSync(new URL('../src/ui.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(uiSource),ctx);
  const notificationSource=readFileSync(new URL('../src/notifications.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
@@ -99,9 +99,9 @@ test('visit defaults to inspection and a touch or cursor click never sends a soc
 test('pest tools exist only in visits and send the selected plot with its revisions',async()=>{
  const {h,elements}=app(),own=farm('alice'),visited={...farm('bob'),revision:'42'},sent=[];
  const api={pending:null,mutate:async(path,command)=>{sent.push({path,command});return{result:{success:false,message:'Disponível em 1h 0min 0s.'}};},prepareRequestId:()=>Promise.resolve()};
- h.set({own,api});h.receive({});assert.ok(!text(elements.get('tools')).includes('1/24h'));
+ h.set({own,api});h.receive({});assert.ok(!text(elements.get('tools')).includes('1/12h'));
  h.set({own,visited,api});h.receive({});
- for(const [action,label,asset]of [['SPREAD_INSECTS','Lançar inseto · 1/24h','verme_1'],['SPREAD_WEEDS','Lançar erva · 1/24h','erva_daninha_1']]){
+ for(const [action,label,asset]of [['SPREAD_INSECTS','Lançar inseto · 1/12h','verme_1'],['SPREAD_WEEDS','Lançar erva · 1/12h','erva_daninha_1']]){
   const choice=descendants(elements.get('tools')).find(n=>n.getAttribute?.('aria-label')===label);assert.ok(choice);assert.ok(choice.children.some(n=>n.src===`/assets/classic/effects/${asset}.png`));
   choice.onclick();await h.tileAction({column:2,row:1,harvestRevision:'9'});
   assert.equal(text(elements.get('notice')),'Disponível em 1h 0min 0s.');
@@ -178,29 +178,10 @@ test('settings offer avatar selection without a duplicate list of land plots',()
  assert.doesNotMatch(text(elements.get('modal-content')),/Lista de terras/);
 });
 
-test('Google avatar can be selected from the authenticated photo without changing farm data',async()=>{
- const {h,elements,ctx}=app();ctx.Scene=class{update(){}close(){}};
- ctx.ApiClient=class{pending=null;get(){return Promise.resolve(farm('alice'));}prepareRequestId(){return Promise.resolve();}};
- h.set({own:undefined});await h.connect('alice',async()=> 'synthetic-token','https://lh3.googleusercontent.com/a/synthetic');
- h.avatarSettings();descendants(elements.get('modal-content')).find(node=>node.textContent==='Foto do Google').onclick();
- const image=descendants(elements.get('wallet')).find(node=>node.className==='avatar');
- assert.equal(image.src,'https://lh3.googleusercontent.com/a/synthetic');assert.equal(h.get().own.revision,'1');
- await h.connect('bob',async()=> 'synthetic-token');h.avatarSettings();
- assert.equal(descendants(elements.get('modal-content')).find(node=>node.textContent==='Foto do Google').disabled,true);
- assert.equal(descendants(elements.get('wallet')).find(node=>node.className==='avatar').src,'/assets/classic/icons/avatar_masculino.png');
-});
-
-test('avatar picker offers and applies every supplied game avatar without changing the farm',()=>{
- const {h,elements}=app(),initial=farm('alice');h.set({own:initial});h.avatarSettings();
- const options=descendants(elements.get('modal-content')).filter(node=>node.tag==='button');
- assert.equal(options.length,7);
- for(const {label,file} of avatar.GAME_AVATARS){
-  descendants(elements.get('modal-content')).find(node=>node.textContent===label).onclick();
-  assert.equal(descendants(elements.get('wallet')).find(node=>node.className==='avatar').src,`/assets/classic/icons/${file}`);
-  h.avatarSettings();
-  assert.equal(descendants(elements.get('modal-content')).find(node=>node.textContent===label).getAttribute('aria-pressed'),'true');
-  assert.equal(h.get().own,initial);
- }
+test('settings render the persisted owner photo without sending a referrer',()=>{
+ const {h,elements}=app();h.set({own:{...farm('alice'),avatar:{id:'google',photoUrl:'https://lh3.googleusercontent.com/a/owner-photo'}}});h.settings();
+ const avatar=descendants(elements.get('modal-content')).find(node=>node.className==='profile-avatar');
+ assert.equal(avatar.src,'https://lh3.googleusercontent.com/a/owner-photo');assert.equal(avatar.referrerPolicy,'no-referrer');
 });
 
 test('out-of-order refresh responses with equal revisions keep the newest projection in the UI',async()=>{
@@ -335,9 +316,9 @@ test('late sale confirmation does not reopen a deposit that the player closed',a
  await new Promise(resolve=>setTimeout(resolve,0));assert.equal(elements.get('modal').open,false);
 });
 
-test('active wallet uses original coin icons, exact XP and the own balance during a visit',()=>{
+test('active wallet uses original coin icons, exact XP and the public owner balance during a visit',()=>{
  const {h,elements}=app(),own={...farm('alice'),name:'Uma fazenda com um nome de 40 caracteres!',level:2,currentXp:'9007199254740993.1',xpToNext:'18014398509481986.2',coins:'9007199254740993.1',greenCoins:'5'};
- h.set({own,visited:{...farm('bob'),name:'Amigo'}});h.receive({});
+ h.set({own,visited:{...farm('bob'),name:'Amigo',level:own.level,currentXp:own.currentXp,xpToNext:own.xpToNext,coins:own.coins,greenCoins:own.greenCoins}});h.receive({});
  const nodes=descendants(elements.get('wallet'));
  assert.ok(nodes.some(n=>n.tag==='img'&&n.src?.endsWith('moeda-comum.png')));
  assert.ok(nodes.some(n=>n.tag==='img'&&n.src?.endsWith('moeda-verde.png')));
@@ -510,4 +491,47 @@ test('several newly ready plants play one chime and a repeated projection plays 
  const ready={...own,tiles:tiles.map(tile=>({...tile,state:'READY'}))};
  h.receive({farm:ready});h.receive({farm:ready});
  assert.equal(audioClips.filter(clip=>clip.path.endsWith('/planta-pronta-para-colher.wav')).length,1);
+});
+
+test('locked land requires confirmation and guards duplicate clicks',async()=>{
+ const {h,elements}=app(),sent=[],reply=deferred(),own={...farm('alice'),level:5,coins:'900'};
+ h.set({own,api:{pending:null,mutate:(_path,command)=>{sent.push(command);return reply.promise;},prepareRequestId:async()=>{}}});
+ const tile={column:2,row:1,unlocked:false,requiredLevel:5,price:350,currency:'GOLD',purchasable:true};
+ await h.tileAction(tile);assert.equal(sent.length,0);assert.match(text(elements.get('modal-content')),/3, 2/);assert.match(text(elements.get('modal-content')),/350 ouro/);assert.match(text(elements.get('modal-content')),/900 ouro/);
+ descendants(elements.get('modal-content')).find(n=>n.textContent==='Cancelar').onclick();assert.equal(sent.length,0);
+ await h.tileAction(tile);const escaped=descendants(elements.get('modal-content')).find(n=>n.textContent==='Confirmar compra');elements.get('modal').close();escaped.onclick();assert.equal(sent.length,0);await h.tileAction(tile);const confirm=descendants(elements.get('modal-content')).find(n=>n.textContent==='Confirmar compra');confirm.onclick();confirm.onclick();assert.equal(sent.length,1);assert.equal(sent[0].action,'BUY_PLOT');
+ reply.resolve({farm:{...own,revision:'2'},result:{success:true,message:'Comprada'}});await new Promise(r=>setTimeout(r,0));
+});
+test('visited wallet uses public owner profile without avatar picker',()=>{
+ const {h,elements}=app();h.set({own:farm('alice'),visited:{...farm('bob'),avatar:{id:'female-2'},level:8,currentXp:'30',xpToNext:'80',coins:'700'}});h.receive({});const wallet=elements.get('wallet');assert.match(text(wallet),/Nível 8/);assert.match(text(wallet),/700/);assert.equal(descendants(wallet).some(n=>n.className==='avatar-picker'),false);assert.equal(descendants(wallet).find(n=>n.className==='avatar').src,'/assets/classic/icons/avatar_feminino2.png');
+});
+test('avatar selection follows persisted server response',async()=>{
+ const {h,elements}=app(),own=farm('alice'),sent=[];h.set({own,api:{pending:null,mutate:async(_path,command)=>{sent.push(command);return {farm:{...own,revision:'2',avatar:{id:command.itemId},avatarSelected:true},result:{success:true,message:'Salvo'}};},prepareRequestId:async()=>{}}});h.avatarSettings();descendants(elements.get('modal-content')).find(n=>n.textContent==='Feminino 3').onclick();await new Promise(r=>setTimeout(r,0));assert.equal(sent[0].action,'SET_AVATAR');assert.equal(descendants(elements.get('wallet')).find(n=>n.className==='avatar').src,'/assets/classic/icons/avatar_feminino3.png');
+});
+
+test('login imports existing browser choice only when server has no selection',async()=>{
+ for(const selected of [false,true,undefined]){
+  const {h,ctx}=app(new Map([['colheita:avatar:undefined:alice','female-1']])),sent=[];const own={...farm('alice'),avatarSelected:selected,avatar:{id:'male-2'}};
+  ctx.Scene=class{update(){}close(){}};ctx.ApiClient=class{pending=null;get(){return Promise.resolve(own);}prepareRequestId(){return Promise.resolve();}mutate(_path,command){sent.push(command);return Promise.resolve({farm:{...own,revision:'2',avatarSelected:true,avatar:{id:command.itemId}},result:{success:true,message:'Importado'}});}};
+  h.set({own:undefined});await h.connect('alice',async()=> 'token');assert.equal(sent.length,selected===false?1:0);if(sent.length){assert.equal(sent[0].action,'IMPORT_AVATAR');assert.equal(sent[0].itemId,'female-1');}
+ }
+});
+test('fertilizer shop renders every actual catalog duration in hours and minutes',()=>{
+ const {h,elements}=app(),fertilizers=JSON.parse(readFileSync(new URL('../../assets/data/fertilizers.json',import.meta.url),'utf8'));
+ h.set({own:{...farm('alice'),level:50},catalog:{crops:[],animals:[],fertilizers,vip:{greenPrice:10}}});h.shop('fertilizers');const caption=text(elements.get('modal-content'));for(const fertilizer of fertilizers)assert.ok(caption.includes('Reduz '+uiPresentation.fertilizerDuration(fertilizer.reductionSeconds)));
+});
+
+test('late avatar response preserves a closed or replaced dialog',async()=>{
+ for(const close of [true,false]){
+  const {h,elements}=app(),own=farm('alice'),reply=deferred();h.set({own,api:{pending:null,mutate:()=>reply.promise,prepareRequestId:async()=>{}}});h.avatarSettings();descendants(elements.get('modal-content')).find(n=>n.textContent==='Feminino 3').onclick();
+  if(close)elements.get('modal').close();else h.dialog('Outro painel');
+  reply.resolve({farm:{...own,revision:'2',avatar:{id:'female-3'},avatarSelected:true},result:{success:true,message:'Salvo'}});await new Promise(r=>setTimeout(r,0));
+  assert.equal(elements.get('modal').open,!close);assert.equal(elements.get('modal-title').textContent,close?'Seu avatar':'Outro painel');
+ }
+});
+test('late avatar response cannot open settings in a new session',async()=>{
+ const {h,elements,ctx}=app(),own=farm('alice'),reply=deferred();h.set({own,api:{pending:null,mutate:()=>reply.promise,prepareRequestId:async()=>{}}});h.avatarSettings();descendants(elements.get('modal-content')).find(n=>n.textContent==='Feminino 3').onclick();await h.logout();
+ ctx.Scene=class{update(){}close(){}};ctx.ApiClient=class{pending=null;get(){return Promise.resolve(farm('bob'));}prepareRequestId(){return Promise.resolve();}};
+ await h.connect('bob',async()=> 'token');h.dialog('Painel da nova sessão');reply.resolve({farm:{...own,revision:'2',avatar:{id:'female-3'},avatarSelected:true},result:{success:true,message:'Salvo'}});await new Promise(r=>setTimeout(r,0));
+ assert.equal(h.get().own.owner,'bob');assert.equal(elements.get('modal-title').textContent,'Painel da nova sessão');
 });

@@ -65,6 +65,13 @@ public final class GameState {
     private int lastCollected;
     private VipStatus vip = new VipStatus(null);
     private GameSnapshot.ChristmasState christmas2026;
+    private PlayerAvatar avatar;
+    public PlayerAvatar avatar(){return avatar;}
+    public ActionResult selectAvatar(PlayerAvatar choice,boolean onlyIfUnset){
+        Objects.requireNonNull(choice);
+        if(!onlyIfUnset||avatar==null)avatar=choice;
+        return ActionResult.ok("Avatar salvo.");
+    }
     public boolean claimChristmasGift(){return claimChristmasGift(Instant.parse(christmas2026.registeredAt()));}
     public boolean claimChristmasGift(Instant registeredAt){
         christmas2026=new GameSnapshot.ChristmasState(registeredAt.toString(),christmas2026.giftGranted());
@@ -81,6 +88,8 @@ public final class GameState {
     public br.com.colheitafeliz.domain.notification.NotificationInbox notifications(){return notifications;}
     public ActionResult markNotificationRead(String id){return notifications.markRead(id)?ActionResult.ok("Notificação lida."):ActionResult.fail("Notificação indisponível.");}
     public ActionResult markAllNotificationsRead(){notifications.markAllRead();return ActionResult.ok("Notificações lidas.");}
+    public ActionResult dismissNotification(String id){return notifications.dismissRead(id)?ActionResult.ok("Notificação descartada."):ActionResult.fail("Marque a notificação como lida antes de descartá-la.");}
+    public ActionResult dismissReadNotifications(){notifications.dismissAllRead();return ActionResult.ok("Notificações lidas descartadas.");}
 
     public GameState(GameClock clock, CropCatalog catalog) {
         this(clock, catalog, ThreadLocalRandom.current()::nextInt);
@@ -653,7 +662,7 @@ public final class GameState {
                         animal.type().id(), animal.origin(), animal.acquiredAt().toString(), animal.growthAnchorAt().toString(),
                         animal.grownAtAnchorMillis(), animal.fedUntil().toString())).toList(),
                 inventory.feedSnapshot(), inventory.fertilizerSnapshot(), fertilizer.id(),
-                greenCoins(), vip.expiresAt() == null ? null : vip.expiresAt().toString(), protection, notifications.snapshot(),christmas2026);
+                greenCoins(), vip.expiresAt() == null ? null : vip.expiresAt().toString(), protection, notifications.snapshot(),christmas2026,avatar);
     }
 
     public static GameState restore(GameClock clock, CropCatalog catalog, GameSnapshot snapshot) {
@@ -675,6 +684,7 @@ public final class GameState {
                 snapshot.level(), snapshot.currentXp());
         AnimalSaleValidation.validate(snapshot, game.animalTypes);
         game.notifications = new br.com.colheitafeliz.domain.notification.NotificationInbox(snapshot.notifications());
+        game.avatar=snapshot.avatar();
         game.christmas2026=snapshot.christmas2026()==null?new GameSnapshot.ChristmasState(Instant.EPOCH.toString(),false):snapshot.christmas2026();
         for(String key:snapshot.notifications().observed().keySet())
             if(key.startsWith("animal:")&&game.animalTypes.stream().noneMatch(type->key.equals("animal:"+type.id())))

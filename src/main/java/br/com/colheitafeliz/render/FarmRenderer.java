@@ -44,6 +44,8 @@ public final class FarmRenderer implements AutoCloseable {
     private final IsoRenderer iso = new IsoRenderer();
     private final DebugOverlay debugOverlay = new DebugOverlay();
     private final Toolbar toolbar = new Toolbar();
+    private final br.com.colheitafeliz.ui.PlotPurchasePanel plotPurchase = new br.com.colheitafeliz.ui.PlotPurchasePanel();
+    public br.com.colheitafeliz.ui.PlotPurchasePanel plotPurchase() { return plotPurchase; }
     private final MarketPanel marketPanel;
     private final MissionsWindow missions = new MissionsWindow();
     private final Hud hud = new Hud();
@@ -142,7 +144,7 @@ public final class FarmRenderer implements AutoCloseable {
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         Instant now = state.now();
-        boolean windowOpen = marketPanel.isOpen() || missions.isOpen();
+        boolean windowOpen = marketPanel.isOpen() || missions.isOpen() || plotPurchase.isOpen();
         boolean hoverFarm = hovered != null && state.farm().contains(hovered.column(), hovered.row()) && !windowOpen
                 && toolbar.hit(pointerX, pointerY) == null && hud.shortcutHit(pointerX, pointerY) == null;
 
@@ -180,6 +182,7 @@ public final class FarmRenderer implements AutoCloseable {
         marketPanel.draw(batch, skin, assets, state, pointerX, pointerY);
         missions.draw(batch, skin, assets, state, pointerX, pointerY);
         hud.drawOverlay(batch, skin);
+        plotPurchase.draw(batch, skin, state);
         batch.setColor(Color.WHITE);
         batch.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);

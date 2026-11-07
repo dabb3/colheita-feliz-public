@@ -58,3 +58,8 @@ export function animalCare(animal:{stage:string;status:string},type:{kind:string
  if(type.kind==='PRODUCER'&&animal.status==='READY')return{label:'Recolher produto',action:'TEND_ANIMAL'};
  if(animal.status==='HUNGRY')return{label:'Alimentar',action:'TEND_ANIMAL'};
 }
+
+export function fertilizerDuration(seconds:number) {
+ const minutes=Math.max(1,Math.ceil(seconds/60)),hours=Math.floor(minutes/60),rest=minutes%60;
+ return [hours?`${hours} ${hours===1?'hora':'horas'}`:'',rest?`${rest} ${rest===1?'minuto':'minutos'}`:''].filter(Boolean).join(' e ');
+}

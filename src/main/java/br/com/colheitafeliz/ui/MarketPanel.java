@@ -449,7 +449,7 @@ public final class MarketPanel {
         batch.setColor(Color.WHITE);
         skin.text(batch, skin.label, type.name() + " · tem " + state.inventory().fertilizer(type.id()), r.x + 92, mid + 24,
                 unlocked ? Palette.INK : Palette.INK_MUTED, Align.left);
-        String effect = "Reduz " + Hud.formatRemaining(type.reduction()) + " da temporada · nível " + type.requiredLevel()
+        String effect = "Reduz " + FertilizerDuration.format(type.reduction()) + " da temporada · nível " + type.requiredLevel()
                 + (type.friendsOnly() ? " · só na plantação de amigos" : "");
         skin.text(batch, skin.body, effect, r.x + 92, mid - 2, Palette.INK_MUTED, Align.left);
         for (Currency currency : Currency.values()) {

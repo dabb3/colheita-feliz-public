@@ -1,6 +1,6 @@
 import type { Farm, Catalog, CommandFields } from "./types.ts";
 import { animalPath } from "./presentation.ts";
-import { xpPercent, purchaseLock, seedGrowthLabel, CROP_TIME_NOTICE, dailyAllowanceText } from "./ui-presentation.ts";
+import { fertilizerDuration, xpPercent, purchaseLock, seedGrowthLabel, CROP_TIME_NOTICE, dailyAllowanceText } from "./ui-presentation.ts";
 
 export function text(tag: string, value: string, className = "") {
   const node = document.createElement(tag);
@@ -149,7 +149,7 @@ export function renderMarket(
             id: f.id,
             name: f.name,
             image: `classic/icons/adubo-${f.id}.png`,
-            details: `Reduz ${f.reductionSeconds / 60} min${f.friendsOnly ? " · em amigos" : ""}`,
+            details: `Reduz ${fertilizerDuration(f.reductionSeconds)}${f.friendsOnly ? " · em amigos" : ""}`,
             prices: f.prices,
             level: f.requiredLevel,
             vip: false,

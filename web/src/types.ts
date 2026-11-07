@@ -2,6 +2,10 @@ export interface Tile {
   column: number;
   row: number;
   unlocked: boolean;
+  requiredLevel?: number;
+  price?: string | number;
+  currency?: string;
+  purchasable?: boolean;
   state: string;
   cropId?: string;
   stage: number;
@@ -28,6 +32,8 @@ export interface Animal {
   economyVersion?: number;
 }
 export interface Farm {
+  avatar?: {id:string;photoUrl?:string|null};
+  avatarSelected?: boolean;
   notifications?: GameNotification[];
   unreadNotifications?: number;
   owner: string;
@@ -70,7 +76,7 @@ export interface Farm {
     target: number;
     done: boolean;
   }[];
-  nextPlot?: { column: number; row: number };
+  nextPlot?: { column: number; row: number; requiredLevel?:number; price?:string|number; currency?:string; purchasable?:boolean };
 }
 export interface GameNotification {
   id: string;

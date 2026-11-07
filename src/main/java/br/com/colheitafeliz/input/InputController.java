@@ -61,6 +61,7 @@ public final class InputController extends InputAdapter {
     }
 
     @Override public boolean scrolled(float amountX, float amountY) {
+        if (renderer.plotPurchase().isOpen()) return true;
         Vector3 p = world(Gdx.input.getX(), Gdx.input.getY());
         return renderer.marketPanel().scroll(p.x, p.y, amountY, session.state());
     }
@@ -69,6 +70,12 @@ public final class InputController extends InputAdapter {
         if (button != Input.Buttons.LEFT) return false;
         GameState state = session.state();
         Vector3 p = world(screenX, screenY);
+        if (renderer.plotPurchase().isOpen()) {
+            Snapshot before = new Snapshot(state);
+            ActionResult result = renderer.plotPurchase().click(p.x, p.y, state);
+            if (result != null) show(result, Cue.BUY, before, p.x, p.y + 20, null, 0);
+            return true;
+        }
         if (renderer.hud().bannerVisible()) { renderer.hud().dismissBanner(); return true; }
         if (renderer.missions().isOpen()) { renderer.missions().click(p.x, p.y); return true; }
         if (renderer.marketPanel().handles(p.x, p.y)) {
@@ -134,12 +141,12 @@ public final class InputController extends InputAdapter {
         Tool actionTool = state.tool();
         Snapshot before = new Snapshot(state);
         boolean lockedPlot = !state.land().isUnlocked(tile.column(), tile.row());
-        if (!lockedPlot && actionTool == Tool.CURSOR) return true;
+        if (lockedPlot) { renderer.plotPurchase().open(tile.column(), tile.row()); return true; }
+        if (actionTool == Tool.CURSOR) return true;
         FarmTile farmTile = state.farm().tile(tile.column(), tile.row());
         CropType crop = farmTile.crop() == null ? null : farmTile.crop().type();
-        ActionResult result = lockedPlot ? state.buyPlot(tile.column(), tile.row())
-                : state.act(tile.column(), tile.row());
-        Cue cue = lockedPlot ? Cue.BUY : switch (actionTool) {
+        ActionResult result = state.act(tile.column(), tile.row());
+        Cue cue = switch (actionTool) {
             case HAND -> Cue.HARVEST;
             case CURSOR -> Cue.PLOW;
             case HOE -> Cue.PLOW;
@@ -149,7 +156,7 @@ public final class InputController extends InputAdapter {
             case FERTILIZER -> Cue.PLANT;
         };
         Vector2 center = renderer.tileCenter(tile.column(), tile.row());
-        boolean harvested = !lockedPlot && actionTool == Tool.HAND && result.success();
+        boolean harvested = actionTool == Tool.HAND && result.success();
         show(result, cue, before, center.x, center.y + 70, harvested ? crop : null,
                 harvested ? state.lastHarvestAmount() : 0);
         return true;
@@ -178,6 +185,10 @@ public final class InputController extends InputAdapter {
 
     @Override public boolean keyDown(int keycode) {
         GameState state = session.state();
+        if (renderer.plotPurchase().isOpen()) {
+            if (keycode == Input.Keys.ESCAPE) renderer.plotPurchase().close();
+            return true;
+        }
         if (keycode >= Input.Keys.NUM_1 && keycode < Input.Keys.NUM_1 + Tool.BAR.size()) {
             Tool tool = Tool.BAR.get(keycode - Input.Keys.NUM_1);
             renderer.toolbar().picked(tool, state.tool());
