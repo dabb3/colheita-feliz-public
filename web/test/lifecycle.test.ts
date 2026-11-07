@@ -413,10 +413,10 @@ test('late retry response cannot restore a logged-out farm',async()=>{
  const retry=elements.get('retry').onclick();await h.logout();reply.resolve({farm:farm('alice')});await retry;
  assert.equal(h.get().own,undefined);assert.equal(elements.get('game').hidden,true);
 });
-test('music pauses while hidden and on logout, then resumes when visible',async()=>{
+test('music continues while hidden and pauses on logout',async()=>{
  const {h,listeners,ctx,audioClips}=app();h.set({own:farm('alice')});h.toggleMusic();const music=audioClips[0];assert.equal(music.playCount,1);
- ctx.document.hidden=true;listeners.get('visibilitychange')();assert.equal(music.paused,true);
- ctx.document.hidden=false;listeners.get('visibilitychange')();assert.equal(music.playCount,2);
+ ctx.document.hidden=true;listeners.get('visibilitychange')();assert.equal(music.paused,false);
+ ctx.document.hidden=false;listeners.get('visibilitychange')();assert.equal(music.playCount,1);
  await h.logout();assert.equal(music.paused,true);
 });
 test('open owned-animal screen refreshes after a successful state update',()=>{
@@ -473,7 +473,17 @@ test('night music follows scenery changes, loops and pauses the previous track',
  const count=audioClips.length;h.syncMusic('night',new Date('2026-01-01T12:00:00Z'));assert.equal(audioClips.length,count);assert.equal(night.playCount,1);
  h.syncMusic('sunset',new Date('2026-01-01T12:00:00Z'));assert.equal(night.paused,true);assert.equal(audioClips.at(-1).path,'/assets/sounds/farm_loop.mp3');assert.equal(audioClips.filter(clip=>!clip.paused).length,1);
  h.toggleMusic();h.syncMusic('night',new Date('2026-01-01T12:00:00Z'));assert.ok(audioClips.every(clip=>clip.paused));
- ctx.document.hidden=true;h.toggleMusic();h.syncMusic('night',new Date('2026-01-01T12:00:00Z'));assert.ok(audioClips.every(clip=>clip.paused));
+ ctx.document.hidden=true;h.toggleMusic();h.syncMusic('night',new Date('2026-01-01T12:00:00Z'));
+ assert.equal(audioClips.filter(clip=>['farm_loop.mp3','noite.mp3','musica-evento-natal-dia-e-por-do-sol.mp3','musica-evento-natal-noite.mp3'].some(path=>clip.path.endsWith('/'+path))&&!clip.paused).length,1);
+});
+
+test('background music and ambience continue when the tab is hidden',()=>{
+ const {h,listeners,ctx,audioClips}=app();h.set({own:farm('alice')});h.toggleMusic();h.toggleEffects();
+ h.syncMusic('day',new Date('2026-06-01T12:00:00Z'));
+ const musicPaths=['farm_loop.mp3','noite.mp3','musica-evento-natal-dia-e-por-do-sol.mp3','musica-evento-natal-noite.mp3'];
+ assert.ok(audioClips.some(clip=>clip.path.endsWith('/ventos-leves-ambientacao.mp3')));ctx.document.hidden=true;listeners.get('visibilitychange')();
+ assert.equal(audioClips.filter(clip=>musicPaths.some(path=>clip.path.endsWith('/'+path))&&!clip.paused).length,1);
+ assert.ok(audioClips.some(clip=>clip.path.endsWith('-ambientacao.mp3')&&!clip.paused));
 });
 
 test('muting, hiding and logging out pause every active one-shot effect',async()=>{

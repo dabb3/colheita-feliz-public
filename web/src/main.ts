@@ -55,7 +55,7 @@ let ambience:HTMLAudioElement[]=[];
 let ambiencePeriod:'day'|'night'|undefined;
 function syncAmbience(night:boolean){
  const period=night?'night':'day';
- if(!effectsEnabled||!own||document.hidden){for(const clip of ambience)clip.pause();return;}
+ if(!effectsEnabled||!own){for(const clip of ambience)clip.pause();return;}
  if(ambiencePeriod!==period){
   for(const clip of ambience)clip.pause();
   const tracks=night?['grilos-ambientacao']:['ventos-leves-ambientacao','passaros-ambientacao'];
@@ -68,7 +68,7 @@ function syncMusic(period=periodAt(new Date()),now=new Date()){
  if(document.hidden)stopEffects();
  syncAmbience(period==='night');
  if(period==='night'||document.hidden||!effectsEnabled)animalSound?.pause();
- if(!musicEnabled||!own||document.hidden){music?.pause();return;}
+ if(!musicEnabled||!own){music?.pause();return;}
  const track=musicArtPath(period,now);
  if(!music||musicTrack!==track){music?.pause();music=new Audio('/assets/sounds/'+track);musicTrack=track;music.loop=true;}
  music.volume=musicVolume;if(music.paused)void music.play().catch(()=>{});

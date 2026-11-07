@@ -58,6 +58,7 @@ test('animal walks pause and choose varied destinations within the desktop home 
  assert.ok(samples.every(motion=>Math.hypot(motion.dx,motion.dy)<=20));
  assert.notDeepEqual(animalMotion('galinha',10),animalMotion('galinha',20));
  assert.deepEqual(animalMotion('galinha',4,true),{...animalMotion('galinha',4),dx:0,dy:0,walking:false,open:false});
+ assert.deepEqual(animalMotion('galinha',40,true),animalMotion('galinha',400,true));
 });
 test('animal detail status distinguishes hunger, protection, production and ready items',()=>{
  assert.equal(animalStatusText('HUNGRY','PRODUCER',5400),'Com fome');
