@@ -1,9 +1,9 @@
 import {createClient} from '@supabase/supabase-js';
-import type {Farm,Catalog,Tile,Reply,CommandFields} from './types.ts';
+import type {Farm,Catalog,Tile,Reply,CommandFields,Friend} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
 import {takeInvite} from './invite-url.ts';
-import {renderWallet,control,text,renderDailyAllowance} from './ui.ts';
+import {renderWallet,control,text,renderDailyAllowance,friendAvatar} from './ui.ts';
 import {fertilizerDuration,durationLabel,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText} from './ui-presentation.ts';
 import {PROTECTED_ICON,notificationCount,renderNotifications} from './notifications.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,avatarImport,type AvatarChoice} from './avatar.ts';
@@ -557,7 +557,7 @@ async function friends(){
   catch(error){handleError(error);}finally{syncPending();}
  },invites);invitationForm(invites);content.append(invites);
  const heading=document.createElement('h3');heading.className='friends-title';heading.textContent='Seus amigos';content.append(heading);const listPanel=document.createElement('div');listPanel.className='friend-list';content.append(listPanel);
- try{const list=await client.get<{id:string;name:string}[]>('/v1/friends');if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open)return;for(const friend of list){const row=document.createElement('article');row.className='friend-card';const badge=document.createElement('span');badge.className='friend-avatar';badge.textContent=friend.name.slice(0,1).toUpperCase();const name=document.createElement('strong');name.textContent=friend.name;const visit=button('Visitar fazenda',async()=>{const navigation=++navigationGeneration;try{const farm=await client.get<Farm>(`/v1/farms/${friend.id}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||dialogGeneration!==panelGeneration||!modal.open)return;visited=farm;tool='CURSOR';render();modal.close();}catch(error){handleError(error);}},row);row.prepend(badge,name);listPanel.append(row);}if(!list.length)paragraph('Nenhum amigo adicionado ainda.',listPanel);}
+ try{const list=await client.get<Friend[]>('/v1/friends');if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open)return;for(const friend of list){const row=document.createElement('article');row.className='friend-card';const badge=friendAvatar(friend);const name=document.createElement('strong');name.textContent=friend.name;const visit=button('Visitar fazenda',async()=>{const navigation=++navigationGeneration;try{const farm=await client.get<Farm>(`/v1/farms/${friend.id}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||dialogGeneration!==panelGeneration||!modal.open)return;visited=farm;tool='CURSOR';render();modal.close();}catch(error){handleError(error);}},row);row.prepend(badge,name);listPanel.append(row);}if(!list.length)paragraph('Nenhum amigo adicionado ainda.',listPanel);}
  catch(error){handleError(error);}
 }
 async function migrateAvatar(){const migration=own&&avatarImport(avatarStore,avatarUser,own.avatarSelected,googlePhoto);if(migration)await action(migration);}

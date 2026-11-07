@@ -1,4 +1,5 @@
-import type { Farm, Catalog, CommandFields } from "./types.ts";
+import type { Farm, Catalog, CommandFields, Friend } from "./types.ts";
+import {avatarSource,type AvatarChoice} from './avatar.ts';
 import { animalPath } from "./presentation.ts";
 import { fertilizerDuration, xpPercent, purchaseLock, seedGrowthLabel, CROP_TIME_NOTICE, dailyAllowanceText } from "./ui-presentation.ts";
 
@@ -21,6 +22,14 @@ export function control(label: string, action: () => void) {
   node.setAttribute("data-focus-key", label);
   node.onclick = action;
   return node;
+}
+
+export function friendAvatar(friend:Friend){
+ const node=image('classic/icons/avatar_masculino.png','friend-avatar');
+ node.referrerPolicy='no-referrer';node.loading='lazy';node.alt=`Avatar de ${friend.name}`;
+ node.src=avatarSource(friend.avatar?.id as AvatarChoice,friend.avatar?.photoUrl??undefined);
+ node.onerror=()=>{node.onerror=null;node.src=avatarSource('classic');};
+ return node;
 }
 
 export function renderDailyAllowance(root: HTMLElement, status: Farm['dailyAllowance'], onClaim: () => void) {

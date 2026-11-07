@@ -11,6 +11,14 @@ import * as inviteUrl from '../src/invite-url.ts';
 
 const farm=owner=>({owner,name:owner,revision:'1',tiles:[],animals:[],seedCounts:{}});
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve};}
+test('friend list renders each persisted avatar and falls back safely without changing visit target',async()=>{
+ const {h,elements}=app();let target='';
+ h.set({own:farm('alice'),api:{get:path=>{if(path==='/v1/friends')return Promise.resolve([{id:'bob',name:'Bob',avatar:{id:'female-2'}},{id:'carol',name:'Carol',avatar:{id:'google',photoUrl:'https://lh3.googleusercontent.com/a/carol'}},{id:'dan',name:'Dan'}]);target=path;return Promise.resolve(farm('bob'));}}});
+ await h.friends();const images=descendants(elements.get('modal-content')).filter(node=>node.tag==='img'&&node.className==='friend-avatar');
+ assert.equal(images.length,3);assert.equal(images[0].src,'/assets/classic/icons/avatar_feminino2.png');assert.equal(images[1].src,'https://lh3.googleusercontent.com/a/carol');assert.equal(images[1].referrerPolicy,'no-referrer');
+ assert.equal(images[2].src,avatar.CLASSIC_AVATAR);images[1].onerror();assert.equal(images[1].src,avatar.CLASSIC_AVATAR);assert.equal(images[1].onerror,null);
+ await descendants(elements.get('modal-content')).find(node=>node.textContent==='Visitar fazenda').onclick();assert.equal(target,'/v1/farms/bob/visit');
+});
 function app(preferences=new Map()){
  const intervals=new Map(),elements=new Map(),listeners=new Map(),audioClips=[],observers=[],timeouts=new Map();let nextTimeout=0;
  const make=(tag='div')=>({tag,value:'',selectedIndex:0,hidden:false,children:[],attributes:{},dataset:{},style:{setProperty(key,value){this[key]=value;}},scrollTop:0,scrollLeft:0,classList:{add(){},remove(){},toggle(){}},
