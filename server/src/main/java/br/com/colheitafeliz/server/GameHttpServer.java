@@ -23,7 +23,7 @@ import static br.com.colheitafeliz.server.OnlineViews.object;
 
 final class GameHttpServer implements AutoCloseable {
     static final int WORKERS = 4, QUEUE = 32, IO_THREADS = 64;
-    private static final Set<String> COMMAND_FIELDS = Set.of("requestId", "expectedRevision", "action", "itemId", "currency", "column", "row", "harvestRevision");
+    private static final Set<String> COMMAND_FIELDS = Set.of("requestId", "expectedRevision", "action", "itemId", "currency", "column", "row", "harvestRevision", "photoUrl");
     private final HttpServer http;
     private final OnlineGameService service;
     private final Authenticator auth;
@@ -163,7 +163,7 @@ final class GameHttpServer implements AutoCloseable {
     private static Command command(JsonObject json) {
         return new Command(UUID.fromString(string(json, "requestId", true)), string(json, "expectedRevision", true),
                 string(json, "action", true), string(json, "itemId", false), string(json, "currency", false),
-                integer(json, "column"), integer(json, "row"), string(json, "harvestRevision", false));
+                integer(json, "column"), integer(json, "row"), string(json, "harvestRevision", false),string(json,"photoUrl",false));
     }
     private static String string(JsonObject object, String field, boolean required) {
         var value = object.get(field);

@@ -83,3 +83,7 @@ test('animal care follows server priority without collecting a protector',()=>{
  assert.equal(animalCare({stage:'YOUNG',status:'PRODUCING'},{kind:'GROWING'}),undefined);
  assert.deepEqual(animalCare({stage:'YOUNG',status:'HUNGRY'},{kind:'GROWING'}),{label:'Alimentar',action:'TEND_ANIMAL'});
 });
+
+test('fertilizer duration uses Portuguese hours and minutes',async()=>{
+ const {fertilizerDuration}=await import('../src/ui-presentation.ts');assert.equal(fertilizerDuration(3600),'1 hora');assert.equal(fertilizerDuration(3660),'1 hora e 1 minuto');assert.equal(fertilizerDuration(7260),'2 horas e 1 minuto');assert.equal(fertilizerDuration(120),'2 minutos');
+});

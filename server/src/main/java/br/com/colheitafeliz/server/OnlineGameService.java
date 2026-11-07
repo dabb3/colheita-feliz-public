@@ -202,11 +202,11 @@ final class OnlineGameService implements AutoCloseable {
                 } else if (PEST_ACTIONS.contains(command.action())) {
                     Instant now = clock.instant();
                     Instant last = tx.lastPest(actor, command.action());
-                    Instant availableAt = last == null ? now : last.plus(Duration.ofHours(24));
+                    Instant availableAt = last == null ? now : last.plus(Duration.ofHours(12));
                     if (now.isBefore(availableAt)) {
                         Duration remaining = Duration.between(now, availableAt);
                         long seconds = remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);
-                        result = ActionResult.fail("Você já lançou esse tipo de praga nas últimas 24 horas. Disponível em "
+                        result = ActionResult.fail("Você já lançou esse tipo de praga nas últimas 12 horas. Disponível em "
                                 + seconds / 3600 + "h " + seconds % 3600 / 60 + "min " + seconds % 60 + "s.");
                     } else {
                         result = command.action().equals("SPREAD_INSECTS")
@@ -301,6 +301,9 @@ final class OnlineGameService implements AutoCloseable {
     private ActionResult act(GameState game, Command c) {
         Currency currency = c.currency() == null ? Currency.GOLD : Currency.valueOf(c.currency());
         return switch (c.action()) {
+            case "SET_AVATAR", "IMPORT_AVATAR" -> game.selectAvatar(new br.com.colheitafeliz.game.PlayerAvatar(c.requireItem(),c.photoUrl()),c.action().equals("IMPORT_AVATAR"));
+            case "DISMISS_NOTIFICATION" -> game.dismissNotification(c.requireItem());
+            case "DISMISS_READ_NOTIFICATIONS" -> game.dismissReadNotifications();
             case "READ_NOTIFICATION" -> game.markNotificationRead(c.requireItem());
             case "READ_ALL_NOTIFICATIONS" -> game.markAllNotificationsRead();
             case "BUY_SEED" -> game.buySeed(catalog.get(c.requireItem()), currency);

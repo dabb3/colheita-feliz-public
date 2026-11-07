@@ -7,6 +7,14 @@ import java.util.Set;
 public final class NotificationJsonValidation {
     private NotificationJsonValidation() {}
     public static void validate(JsonElement snapshot){
+        if(snapshot!=null&&snapshot.isJsonObject()&&snapshot.getAsJsonObject().has("avatar")){
+            var avatar=snapshot.getAsJsonObject().get("avatar");
+            if(!avatar.isJsonNull()){
+                if(!avatar.isJsonObject()||!Set.of("id","photoUrl").containsAll(avatar.getAsJsonObject().keySet()))throw new IllegalArgumentException("Invalid avatar schema");
+                string(avatar.getAsJsonObject().get("id"));
+                var photo=avatar.getAsJsonObject().get("photoUrl");if(photo!=null&&!photo.isJsonNull())string(photo);
+            }
+        }
         if(snapshot!=null&&snapshot.isJsonObject()&&snapshot.getAsJsonObject().has("christmas2026")){
             var christmas=snapshot.getAsJsonObject().get("christmas2026");
             if(!christmas.isJsonObject()||!christmas.getAsJsonObject().keySet().equals(Set.of("registeredAt","giftGranted")))throw new IllegalArgumentException("Invalid Christmas state");

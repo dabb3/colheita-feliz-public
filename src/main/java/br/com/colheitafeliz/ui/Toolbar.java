@@ -159,7 +159,7 @@ public final class Toolbar {
                     Palette.ON_COLOR, new Color(0, 0, 0, .75f), 1f, Align.right);
         }
         FertilizerType shown = hovered != null ? hovered : state.selectedFertilizer();
-        String caption = shown.name() + " · reduz " + Hud.formatRemaining(shown.reduction())
+        String caption = shown.name() + " · reduz " + FertilizerDuration.format(shown.reduction())
                 + (shown.friendsOnly() ? " · plantação de amigos" : " · " + state.inventory().fertilizer(shown.id()) + " no estoque");
         skin.onScene(batch, skin.label, caption, 800, SEED_Y + height + 22, Align.center);
     }

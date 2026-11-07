@@ -110,7 +110,7 @@ final class LatencyBenchmark {
                 initial.selectedSeedId(), initial.tool(), 61, BigDecimal.ZERO, initial.musicEnabled(), initial.effectsEnabled(),
                 initial.dailyMissionDay(), initial.dailyMissionProgress(), initial.completedDailyMissions(), initial.unlockedPlotIds(),
                 6, initial.animals(), initial.feed(), initial.fertilizers(), initial.selectedFertilizerId(),
-                new BigDecimal("1000000"), null, initial.protection(), initial.notifications(),initial.christmas2026());
+                new BigDecimal("1000000"), null, initial.protection(), initial.notifications(),initial.christmas2026(),initial.avatar());
         var game = GameState.restore(CLOCK::instant, CLOCK, catalog, snapshot, bound -> bound - 1);
         var crop = catalog.get("nabo");
         game.inventory().addSeedLot(new ItemLot(crop.id(), Currency.GOLD, crop.seedPrices().get(Currency.GOLD), 3, false));

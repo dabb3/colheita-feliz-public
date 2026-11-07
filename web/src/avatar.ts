@@ -21,7 +21,7 @@ export function googleAvatar(value: unknown): string | undefined {
       url.hostname === "lh3.googleusercontent.com" &&
       !url.username &&
       !url.password &&
-      !url.port
+      !url.port && !url.search && !url.hash
     )
       return url.href;
   } catch {
@@ -56,4 +56,13 @@ export function saveAvatar(
   } catch {
     /* A browser preference must never prevent playing. */
   }
+}
+
+export function avatarImport(storage: StorageLike | undefined,user:string,selected:boolean|undefined,photo?:string): import('./types.ts').CommandFields | undefined {
+ if(selected!==false)return;
+ try {
+  const choice=storage?.getItem(`colheita:avatar:${user}`);
+  if(choice==='google')return googleAvatar(photo)?{action:'IMPORT_AVATAR',itemId:choice,photoUrl:googleAvatar(photo)!}:undefined;
+  if(GAME_AVATARS.some(avatar=>avatar.id===choice))return {action:'IMPORT_AVATAR',itemId:choice!};
+ }catch{/* Local preferences are optional. */}
 }

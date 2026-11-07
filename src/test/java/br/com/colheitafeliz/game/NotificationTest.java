@@ -8,6 +8,19 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NotificationTest {
+    @Test void dismissOnlyReadPreservesPermanentCursorsThroughRestore() {
+        var box=new NotificationInbox();var now=new ManualClock().instant();
+        box.record("christmas-gift-2026","claimed",GameNotification.Type.CROP_READY,"Presente",now,Map.of());
+        String gift=box.entries().getFirst().id();assertFalse(box.dismissRead(gift));
+        box.markRead(gift);assertTrue(box.dismissRead(gift));assertFalse(box.dismissRead(gift));
+        box.record("crop:0","ready",GameNotification.Type.CROP_READY,"Pronta",now,Map.of());
+        box.record("vip","expired",GameNotification.Type.VIP_EXPIRED,"VIP",now,Map.of());
+        box.markRead(box.entries().getFirst().id());assertEquals(1,box.dismissAllRead());assertEquals(1,box.unread());
+        var restored=new NotificationInbox(box.snapshot());assertEquals(box.snapshot(),restored.snapshot());
+        assertFalse(restored.record("christmas-gift-2026","claimed",GameNotification.Type.CROP_READY,"Presente",now,Map.of()));
+        assertFalse(restored.record("vip","expired",GameNotification.Type.VIP_EXPIRED,"VIP",now,Map.of()));
+        assertEquals(0,restored.dismissAllRead());assertEquals(1,restored.entries().size());
+    }
     @Test void eachReadySeasonAndTheftAreRecordedOnceWithoutRewards() {
         var clock=new ManualClock();var owner=AnimalEconomyV2Test.rich(clock);var visitor=AnimalEconomyV2Test.rich(clock);
         var tile=owner.farm().tile(0,0);tile.plow();tile.plant(owner.catalog().get("morango"),clock.instant());

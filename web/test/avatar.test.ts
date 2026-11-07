@@ -33,3 +33,8 @@ test('all six supplied game avatars resolve locally and keep independent saved c
  }
  values.set('colheita:avatar:alice','../../private.png');assert.equal(avatar.readAvatar(storage,'alice'),'classic');
 });
+
+test('provider photos reject queries and migration requires a valid existing choice',()=>{
+ assert.equal(avatar.googleAvatar('https://lh3.googleusercontent.com/a?x=1'),undefined);assert.equal(avatar.googleAvatar('https://lh3.googleusercontent.com/a#x'),undefined);
+ const storage={getItem:()=>null};assert.equal(avatar.avatarImport(storage,'alice',false),undefined);storage.getItem=()=> 'female-2';assert.deepEqual(avatar.avatarImport(storage,'alice',false),{action:'IMPORT_AVATAR',itemId:'female-2'});assert.equal(avatar.avatarImport(storage,'alice',true),undefined);assert.equal(avatar.avatarImport(storage,'alice',undefined),undefined);
+});

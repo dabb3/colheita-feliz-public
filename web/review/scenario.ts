@@ -1,3 +1,4 @@
+import {renderNotifications} from '../src/notifications.ts';
 import { Scene } from "../src/scene.ts";
 import { GameAudio } from "../src/audio.ts";
 import { animalLayout, tileCenter } from "../src/presentation.ts";
@@ -265,3 +266,9 @@ window.addEventListener(
   },
   { once: true },
 );
+
+if(params.get('panel')==='fertilizers')market('fertilizers');
+if(params.get('panel')==='notifications')openPanel('Notificações',(root)=>renderNotifications(root,[
+ {id:'review-unread',type:'THEFT',message:'Amigo furtou 1 Morango.',createdAt:'2026-11-06T12:00:00Z',read:false,metadata:{}},
+ {id:'review-read',type:'CHRISTMAS_GIFT',message:'Presente de Natal recebido.',createdAt:'2026-11-06T11:00:00Z',read:true,metadata:{}}
+],demonstration,demonstration,demonstration,demonstration));

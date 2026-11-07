@@ -49,9 +49,9 @@ public final class VisualReviewLauncher {
                 "26-loja-fertilizantes.png", "27-bandeja-fertilizantes.png", "28-pronta-pelo-fertilizante.png", "29-animais-bebes.png", "30-animais-jovens.png", "31-animais-adultos.png",
                 "32-animais-sono.png", "33-protetores-expirados.png", "34-animais-pagina2.png", "35-animais-pagina3.png", "36-animais-pagina4.png", "37-tarefas-no-tutorial.png", "38-terreno-verde-comprado.png", "39-saldos-milionarios.png", "40-planta-morta.png",
                 "41-background-dia.png", "42-background-por-do-sol.png", "43-background-noite.png", "44-notificacoes.png", "45-protegida-cadeado.png",
-                "46-natal-dia-mini-bis.png", "47-natal-por-do-sol.png", "48-natal-noite.png"
+                "46-natal-dia-mini-bis.png", "47-natal-por-do-sol.png", "48-natal-noite.png", "49-confirmar-terreno.png", "50-notificacoes-lidas.png"
         };
-        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+        private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
         static { FRAMES[30] = 150; } // Cinco segundos: inclui deslocamento e a cauda aberta do pavão.
         private final Path output = Path.of(System.getProperty("colheita.visualOutput", "build/visual-review"));
         private FarmRenderer renderer;
@@ -272,6 +272,7 @@ public final class VisualReviewLauncher {
                 case 0, 10, 17, 18, 19 -> fresh;
                 case 5, 6, 7, 9, 15, 16, 20, 43 -> rich;
                 case 44 -> protectedCrop;
+                case 49 -> rich;
                 case 45,46,47 -> miniBis;
                 case 11, 12 -> newcomer;
                 case 13, 14 -> rancher;
@@ -334,12 +335,18 @@ public final class VisualReviewLauncher {
             renderer.hud().reset();
             renderer.marketPanel().close();
             renderer.missions().close();
+            renderer.plotPurchase().close();
             renderer.pointer(-1, -1);
             fresh.selectTool(Tool.HAND);
             states.selectTool(scene == 4 ? Tool.SEED : Tool.HAND);
             rich.selectTool(Tool.HAND);
             renderer.toolbar().closeTray();
             switch (scene) {
+                case 48 -> renderer.plotPurchase().open(1,0);
+                case 49 -> {
+                    rich.markAllNotificationsRead();
+                    renderer.hud().toggleAlerts();
+                }
                 case 43 -> {
                     var inbox=rich.notifications();var now=rich.realNow();
                     inbox.record("theft","visual",br.com.colheitafeliz.domain.notification.GameNotification.Type.THEFT,"João furtou 1 Morango da sua fazenda.",now,java.util.Map.of());
