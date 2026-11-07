@@ -467,19 +467,3 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 .notification-entry.is-read{background:#f4f5e9;color:#626956}
 .notification-entry p{margin:0 0 8px}.notification-entry time{display:block;font-size:12px;margin-bottom:8px}
 .protection-icon{width:18px;height:18px;object-fit:contain}
-
-/* Seasonal accents follow the same event window as the Christmas farm art. */
-#app.christmas-theme #login-scene::after{background:linear-gradient(180deg,rgba(11,45,62,.38),rgba(13,54,39,.58))}
-#app.christmas-theme .login-card{border:2px solid #d6af54;background:linear-gradient(145deg,#fffaf0,#f6e8c8);box-shadow:0 18px 48px rgba(5,28,25,.48),inset 0 0 0 4px rgba(255,255,255,.55)}
-#app.christmas-theme #welcome #login-title{color:#a92e2a;text-shadow:0 1px #fff6d9}
-#app.christmas-theme .login-google{border-color:#b8342c;background:linear-gradient(#d94c3f,#a72c27);color:#fff8e8;box-shadow:0 3px 0 #78211f}
-#app.christmas-theme #game #wallet,#app.christmas-theme #game #tutorial,#app.christmas-theme #game #plant-health{border-color:rgba(222,190,110,.8);box-shadow:0 3px 12px rgba(0,25,20,.32),inset 0 1px rgba(255,255,255,.45)}
-#app.christmas-theme #game #wallet{background:rgba(248,241,218,.82)}
-#app.christmas-theme .level-badge{background:#b9342c}
-#app.christmas-theme #farm-menu .farm-menu-button{border:1px solid rgba(240,207,127,.5);background:rgba(13,65,50,.48);backdrop-filter:blur(4px)}
-#app.christmas-theme #farm-menu .farm-menu-button:hover,#app.christmas-theme #farm-menu .farm-menu-button:focus-visible{background:rgba(174,47,40,.78)}
-#app.christmas-theme #game footer{border-color:rgba(237,199,109,.72);background:linear-gradient(110deg,rgba(118,32,38,.88),rgba(11,73,51,.92));box-shadow:0 4px 14px rgba(0,20,18,.45),inset 0 1px rgba(255,255,255,.22)}
-#app.christmas-theme #modal{border-color:#d3ad58;box-shadow:0 18px 55px rgba(4,25,23,.55),inset 0 0 0 3px rgba(255,255,255,.42)}
-#app.christmas-theme #modal .dialog-header{background:linear-gradient(110deg,#9e302d,#176347);color:#fff8e8;border-bottom-color:#d4b15c}
-#app.christmas-theme #modal .dialog-header h2{color:inherit}
-#app.christmas-theme #notice{border-color:#d4b15c;border-left-color:#b7352d;background:rgba(255,249,229,.94)}

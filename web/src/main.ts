@@ -7,7 +7,7 @@ import {renderWallet,control,text,renderDailyAllowance} from './ui.ts';
 import {durationLabel,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText} from './ui-presentation.ts';
 import {PROTECTED_ICON,notificationCount,renderNotifications} from './notifications.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,readAvatar,saveAvatar,type AvatarChoice} from './avatar.ts';
-import {musicArtPath,backgroundArtPath,christmasActive,seedArtPath,periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalStatusText,animalActionLabel,animalClickCommand,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
+import {musicArtPath,seedArtPath,periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalStatusText,animalActionLabel,animalClickCommand,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
 
 const config=window.COLHEITA_CONFIG;
 const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
@@ -64,12 +64,7 @@ function syncAmbience(night:boolean){
  }
  for(const clip of ambience){clip.volume=effectsVolume*.18;if(clip.paused)void clip.play().catch(()=>{});}
 }
-function syncChristmasTheme(period=periodAt(new Date()),now=new Date()){
- const festive=christmasActive(now),app=element('app'),landscape=element<HTMLImageElement>('login-landscape'),background=`/assets/${festive?backgroundArtPath(period,now):'classic/background/background.png'}`;
- app.classList.toggle('christmas-theme',festive);if(landscape&&!String(landscape.src??'').endsWith(background))landscape.src=background;
-}
 function syncMusic(period=periodAt(new Date()),now=new Date()){
- syncChristmasTheme(period,now);
  if(document.hidden)stopEffects();
  syncAmbience(period==='night');
  if(period==='night'||document.hidden||!effectsEnabled)animalSound?.pause();
@@ -601,7 +596,6 @@ modal.addEventListener('close',()=>{health(healthTile,healthPoint);window.clearI
 document.addEventListener('keydown',event=>{if(!own||event.repeat||event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement)return;const shortcut=gameShortcut(event.key,!!visited);if(!shortcut)return;if(shortcut.action==='tool'){if(!modal.open)pickTool(shortcut.tool);return;}if(shortcut.action==='shop')shortcutPanel('Loja',()=>shop());else if(shortcut.action==='deposit')shortcutPanel('Depósito',deposit);else if(shortcut.action==='missions')shortcutPanel('Missões',missions);else if(shortcut.action==='plots')shortcutPanel('Terras da fazenda',tileList);else if(shortcut.action==='music')toggleMusic();else if(shortcut.action==='effects')toggleEffects();});
 document.addEventListener('visibilitychange',()=>{syncMusic();if(!document.hidden)void refresh();});
 window.setInterval(()=>{if(!document.hidden)void refresh();},30_000);
-syncChristmasTheme();
 void start();
 
 function notifications(){
