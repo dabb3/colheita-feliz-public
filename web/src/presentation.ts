@@ -398,7 +398,7 @@ export function animalMotion(
   open: boolean;
 } {
   if (sleeping) {
-    const motion = animalMotion(id, seconds);
+    const motion = animalMotion(id, 0);
     return { ...motion, dx: 0, dy: 0, walking: false, open: false };
   }
   if (id === "pombo" || id === "abelha")
