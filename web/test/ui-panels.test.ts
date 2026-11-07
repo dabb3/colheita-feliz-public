@@ -5,10 +5,11 @@ import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
 import * as values from '../src/ui-presentation.ts';
 import {animalPath,productPath} from '../src/presentation.ts';
+import {avatarSource} from '../src/avatar.ts';
 
 function panels(){
  const make=tag=>({tag,children:[],attributes:{},textContent:'',style:{setProperty(){}},append(...nodes){this.children.push(...nodes);},replaceChildren(){this.children=[];},setAttribute(k,v){this.attributes[k]=v;}});
- const ctx={...values,animalPath,productPath,document:{createElement:make}};
+ const ctx={...values,animalPath,productPath,avatarSource,document:{createElement:make}};
  const load=name=>readFileSync(new URL('../src/'+name,import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(load('ui.ts')+'\n'+load('ui-panels.ts'))+'\nglobalThis.panels={renderDeposit,renderPlantHealth,renderAnimal,renderMissions,renderFriends,renderAudioSettings:typeof renderAudioSettings==="undefined"?undefined:renderAudioSettings};',ctx);
  return{...ctx.panels,root:make('div')};

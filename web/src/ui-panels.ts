@@ -1,5 +1,5 @@
-import type { Farm, Catalog, Tile, CommandFields } from "./types.ts";
-import { text, image, control, renderDailyAllowance } from "./ui.ts";
+import type { Farm, Catalog, Tile, CommandFields, Friend } from "./types.ts";
+import { text, image, control, renderDailyAllowance,friendAvatar } from "./ui.ts";
 import { animalPath, productPath } from "./presentation.ts";
 import { durationLabel, animalCare, cropTimingText } from "./ui-presentation.ts";
 
@@ -387,7 +387,7 @@ export function renderMissions(root: HTMLElement, farm: Farm) {
 
 export function renderFriends(
   root: HTMLElement,
-  friends: { id: string; name: string }[],
+  friends: Friend[],
   onVisit: (id: string) => void,
 ) {
   root.replaceChildren();
@@ -396,7 +396,7 @@ export function renderFriends(
     const row = document.createElement("article");
     row.className = "friend-card";
     row.append(
-      image("classic/icons/avatar_masculino.png", "friend-avatar"),
+      friendAvatar(friend),
       text("strong", friend.name),
       control(`Visitar ${friend.name}`, () => onVisit(friend.id)),
     );

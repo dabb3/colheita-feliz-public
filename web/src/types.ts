@@ -78,6 +78,7 @@ export interface Farm {
   }[];
   nextPlot?: { column: number; row: number; requiredLevel?:number; price?:string|number; currency?:string; purchasable?:boolean };
 }
+export interface Friend { id:string; name:string; avatar?:Farm['avatar']; }
 export interface GameNotification {
   id: string;
   type: 'THEFT'|'CROP_READY'|'ANIMAL_READY'|'VIP_EXPIRED'|'CHRISTMAS_GIFT';

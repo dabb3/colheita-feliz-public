@@ -28,6 +28,18 @@ class UsabilityIntegrationTest {
         var data=OnlineViews.JSON.toJsonTree(command(action,id)).getAsJsonObject();if(photo!=null)data.addProperty("photoUrl",photo);return OnlineViews.JSON.fromJson(data,Command.class);
     }
     private void reopen(){store.close();store=new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"),"postgres","",schema);service=new OnlineGameService(store,clock,bound->99,20);}
+    @Test void friendListReturnsPersistedPublicAvatarWithoutLoadingOrExposingTheFarm(){
+        assertEquals("classic",service.friends(friend).get(0).getAsJsonObject().getAsJsonObject("avatar").get("id").getAsString());
+        act("SET_AVATAR","female-2");reopen();
+        var profile=service.friends(friend).get(0).getAsJsonObject();
+        assertEquals(java.util.Set.of("id","name","active","avatar"),profile.keySet());
+        assertEquals("female-2",profile.getAsJsonObject("avatar").get("id").getAsString());
+        service.command(owner,avatar("SET_AVATAR","google","https://lh3.googleusercontent.com/a/owner-photo"));
+        clock.now=Christmas2026.GIFT_START;
+        assertEquals("https://lh3.googleusercontent.com/a/owner-photo",service.friends(friend).get(0).getAsJsonObject().getAsJsonObject("avatar").get("photoUrl").getAsString());
+        store.transaction(owner,tx->{assertFalse(tx.farm(owner).snapshot().christmas2026().giftGranted());return null;});
+        store.transaction(owner,tx->{tx.setActive(owner,false);return null;});assertEquals(0,service.friends(friend).size());
+    }
     @Test void publicProfileBelongsToOwnerWhileInventoryAndNotificationsRemainPrivate(){
         var own=service.farm(owner);assertFalse(own.get("avatarSelected").getAsBoolean());
         var choose=command("SET_AVATAR","female-2");var response=service.command(owner,choose);assertEquals(response,service.command(owner,choose));

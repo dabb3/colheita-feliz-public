@@ -26,6 +26,7 @@ import java.util.function.Function;
 final class JdbcOnlineStore implements AutoCloseable {
     static final int RECEIPTS_PER_ACTOR = 1000;
     record Player(UUID id, String name, boolean active, Instant registeredAt) {}
+    record Friend(UUID id,String name,boolean active,br.com.colheitafeliz.game.PlayerAvatar avatar) {}
     record Farm(GameSnapshot snapshot, long revision, Instant time, LocalDate allowanceDay) {}
     record Receipt(String hash, JsonObject response) {}
     record Invitation(UUID owner, UUID usedBy, Instant expiresAt) {}
@@ -293,10 +294,18 @@ final class JdbcOnlineStore implements AutoCloseable {
         boolean friends(UUID one, UUID two) {
             return !query("SELECT 1 FROM " + schema + ".friendships WHERE (a=? AND b=?) OR (a=? AND b=?)", r -> 1, one, two, two, one).isEmpty();
         }
-        List<Player> friends(UUID actor) {
-            return query("SELECT p.id,p.name,p.active,p.registered_at FROM " + schema + ".players p JOIN " + schema
-                    + ".friendships f ON p.id=CASE WHEN f.a=? THEN f.b ELSE f.a END WHERE (f.a=? OR f.b=?) AND p.active",
-                    r -> new Player(r.getObject(1, UUID.class), r.getString(2), r.getBoolean(3),r.getTimestamp(4).toInstant()), actor, actor, actor);
+        List<Friend> friends(UUID actor) {
+            return query("SELECT p.id,p.name,p.active,g.snapshot->'avatar' FROM " + schema + ".players p JOIN " + schema
+                    + ".friendships f ON p.id=CASE WHEN f.a=? THEN f.b ELSE f.a END LEFT JOIN " + schema
+                    + ".farms g ON g.owner=p.id WHERE (f.a=? OR f.b=?) AND p.active",
+                    r -> new Friend(r.getObject(1, UUID.class), r.getString(2), r.getBoolean(3),publicAvatar(r.getString(4))), actor, actor, actor);
+        }
+        private br.com.colheitafeliz.game.PlayerAvatar publicAvatar(String json){
+            var avatar=json==null?com.google.gson.JsonNull.INSTANCE:JsonParser.parseString(json);
+            if(avatar.isJsonNull())return new br.com.colheitafeliz.game.PlayerAvatar("classic",null);
+            var wrapper=new com.google.gson.JsonObject();wrapper.add("avatar",avatar);
+            br.com.colheitafeliz.persistence.NotificationJsonValidation.validate(wrapper);
+            return JSON.fromJson(avatar,br.com.colheitafeliz.game.PlayerAvatar.class);
         }
         void execute(String sql, Object... values) {
             try (PreparedStatement statement = prepare(sql, values)) { statement.execute(); }

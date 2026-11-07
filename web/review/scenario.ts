@@ -218,7 +218,7 @@ document.getElementById("friends")!.onclick = () =>
     renderFriends(
       root,
       [
-        { id: "review-bob", name: "Fazenda do amigo" },
+        { id: "review-bob", name: "Fazenda do amigo",avatar:{id:"female-2"} },
         { id: "review-ana", name: "Fazenda da amiga" },
       ],
       demonstration,
