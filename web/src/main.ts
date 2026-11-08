@@ -1,9 +1,9 @@
 import {createClient} from '@supabase/supabase-js';
-import type {Farm,Catalog,Tile,Reply,CommandFields,Friend} from './types.ts';
+import type {Farm,Catalog,Tile,Animal,AnimalType,Reply,CommandFields,Friend} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
 import {takeInvite} from './invite-url.ts';
-import {renderWallet,control,text,renderDailyAllowance,friendAvatar,vipBadge} from './ui.ts';
+import {renderWallet,control,text,image,renderDailyAllowance,friendAvatar,vipBadge} from './ui.ts';
 import {fertilizerDuration,durationLabel,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText} from './ui-presentation.ts';
 import {PROTECTED_ICON,notificationCount,renderNotifications} from './notifications.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,avatarImport,type AvatarChoice} from './avatar.ts';
@@ -18,7 +18,7 @@ let avatarUser='',googlePhoto:string|undefined,avatarChoice:AvatarChoice='classi
 try{avatarStore=window.localStorage;}catch{/* Playing remains available when browser preferences are blocked. */}
 let musicTrack='';
 let tool='CURSOR',selectedSeed='nabo',selectedFertilizer='comum',trayOpen=false,effectsEnabled=false,musicEnabled=false,effectsVolume=.65,musicVolume=.25,music:HTMLAudioElement|undefined,busy=false,seedMarketGroup:'common'|'vip'='common',refreshDialog:(()=>void)|undefined;
-let toastTimer:number,loginTransitionTimer:number,sessionGeneration=0,navigationGeneration=0,dialogGeneration=0,healthTile:Tile|null=null,healthPoint:{x:number;y:number}|null=null;
+let toastTimer:number,loginTransitionTimer:number,sessionGeneration=0,navigationGeneration=0,dialogGeneration=0,healthTile:Tile|null=null,healthPoint:{x:number;y:number}|null=null,animalTooltipId='',animalTooltipPoint:{x:number;y:number}|null=null;
 let goldAnimationFrame=0;
 const depositNumber=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1});
 const depositPriceNumber=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2});
@@ -331,12 +331,14 @@ async function tileAction(tile:Tile){
 }
 let healthKey='',healthDataKey='',healthOpenTimer:number|undefined,healthClockTimer:number|undefined,healthPinned=false,healthAnchorAt=0,healthBaseRemaining=0,healthBaseNominal=0;
 function clearHealthTimers(){window.clearTimeout(healthOpenTimer);window.clearTimeout(healthClockTimer);healthOpenTimer=undefined;healthClockTimer=undefined;}
-function closeHealth(){clearHealthTimers();healthPinned=false;healthTile=null;healthPoint=null;healthKey='';healthDataKey='';element('plant-health').hidden=true;}
+function closeHealth(){clearHealthTimers();healthPinned=false;healthTile=null;healthPoint=null;animalTooltipId='';animalTooltipPoint=null;healthKey='';healthDataKey='';const panel=element('plant-health');panel.className='crop-tooltip';panel.hidden=true;}
 function health(tile:Tile|null,point:{x:number;y:number}|null,pointerType='mouse'){
  if(healthPinned&&!['tap','resize','refresh'].includes(pointerType))return;
  const panel=element('plant-health');
  if(pointerType==='touch')return;
- if(modal.open||!tile?.cropId||!point){if(!healthPinned||pointerType==='refresh')closeHealth();return;}
+ if(tile?.cropId&&animalTooltipId)closeHealth();
+ if(!tile?.cropId||!point){if(animalTooltipId){if(['resize','refresh'].includes(pointerType)&&animalTooltipPoint)animalTooltip(animalTooltipId,animalTooltipPoint);return;}if(!healthPinned||pointerType==='refresh')closeHealth();return;}
+ if(modal.open){closeHealth();return;}
  const sameTile=healthTile?.column===tile.column&&healthTile?.row===tile.row;
  healthTile=tile;healthPoint=point;
  if(panel.hidden&&pointerType!=='tap'){
@@ -347,7 +349,7 @@ function health(tile:Tile|null,point:{x:number;y:number}|null,pointerType='mouse
  renderHealth(tile,point);
 }
 function renderHealth(tile:Tile,point:{x:number;y:number},force=false){
- const panel=element('plant-health'),game=element('game'),farm=display(),crop=catalog.crops.find(item=>item.id===tile.cropId);if(!crop||!farm)return;
+ const panel=element('plant-health'),game=element('game'),farm=display(),crop=catalog.crops.find(item=>item.id===tile.cropId);if(!crop||!farm)return;panel.className='crop-tooltip';
  const dataKey=JSON.stringify([tile.cropId,tile.state,tile.stage,tile.season,tile.seasons,tile.remainingSeconds,tile.nominalRemainingSeconds,tile.watered,tile.dry,tile.paused,tile.weeds,tile.insects,tile.fertilized,tile.protected,farm.serverTime,(visited?own?.vipActive:farm.vipActive)]);
  const key=JSON.stringify([dataKey,tool]);
  if(!force&&key===healthKey){positionHealth(panel,game,point);return;}
@@ -407,7 +409,7 @@ async function buyFeed(id:FeedId,quantity:number){
  const meta=feedDetails.find(item=>item.id===id)!;notify(`+${purchased} ${meta.name}`);content.querySelector(`[data-feed-stock="${id}"]`)?.classList.add('feed-stock-pulse');
 }
 function shop(category='crops',focusKey?:string){
- dialog('Loja');const tabs=document.createElement('div');tabs.className='tabs shop-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Seções da Loja');tabs.setAttribute('aria-orientation','horizontal');content.append(tabs);
+ dialog('Loja');modal.dataset.shopCategory=category;const tabs=document.createElement('div');tabs.className='tabs shop-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Seções da Loja');tabs.setAttribute('aria-orientation','horizontal');content.append(tabs);
  refreshDialog=()=>shop(category);
  const tabItems=[['crops','Sementes'],['animals','Animais'],['fertilizers','Fertilizantes'],['vip','VIP'],['owned','Meus animais']] as const;
  for(const [id,label]of tabItems){const tab=button(label,()=>shop(id,`shop-tab:${id}`),tabs,`shop-tab:${id}`);tab.className=`shop-tab${id==='owned'?' owned-animals-tab':''}`;tab.id=`shop-tab-${id}`;tab.setAttribute('role','tab');tab.setAttribute('aria-selected',String(category===id));tab.setAttribute('aria-controls','shop-panel');tab.tabIndex=category===id?0:-1;if(id==='owned'){const icon=document.createElement('img');icon.src='/assets/classic/icons/icone-minha-fazenda.png';icon.alt='';icon.setAttribute('aria-hidden','true');tab.prepend(icon);}}
@@ -440,18 +442,47 @@ function shop(category='crops',focusKey?:string){
   for(const fertilizer of catalog.fertilizers)cards.append(marketCard(fertilizer.name,`classic/icons/adubo-${fertilizer.id}.png`,`Reduz ${fertilizerDuration(fertilizer.reductionSeconds)}${fertilizer.friendsOnly?' · em amigos':''}`,fertilizer.requiredLevel,fertilizer.prices,'BUY_FERTILIZER',fertilizer.id));
  }
  if(category==='vip'){
-  const offer=document.createElement('article');offer.className='vip-offer';const image=document.createElement('img');image.src='/assets/classic/icons/cartao-vip.png';image.alt='Cartão VIP';const details=document.createElement('div');const title=document.createElement('h3');title.textContent='Cartão VIP · 30 dias';const intro=paragraph('Desbloqueie o acesso às culturas VIP respeitando o nível de cada uma.',details);intro.className='vip-intro';const benefits=document.createElement('ul');for(const benefit of ['Preços VIP de venda conforme cada item.','Renove antes de expirar para acumular mais 30 dias.']){const item=document.createElement('li');item.textContent=benefit;benefits.append(item);}details.append(benefits);const status=paragraph(own?.vipActive?`VIP ativo até ${own.vipExpiresAt}`:'VIP inativo',details);status.className='vip-status';const buy=button(`Comprar cartão VIP · ${catalog.vip.greenPrice} verdes`,()=>confirmVipPurchase('Cartão VIP',catalog.vip.greenPrice,30,{action:'BUY_VIP'}),details);buy.className='vip-buy';buy.setAttribute('aria-label',`Comprar cartão VIP por ${catalog.vip.greenPrice} verdes`);const coin=document.createElement('img');coin.src='/assets/classic/icons/moeda-verde.png';coin.alt='';buy.append(coin);details.prepend(title);offer.append(image,details);scroll.append(offer);
-  paragraph('Cartão e três serviços: 400 verdes por 30 dias cada. Serviços opcionais, comprados separadamente.',scroll);
+  const offer=document.createElement('article');offer.className='vip-offer';
+  const cardArt=image('classic/icons/cartao-vip.png');cardArt.alt='Cartão VIP';
+  const details=document.createElement('div');details.className='vip-offer-details';
+  const heading=document.createElement('div');heading.className='vip-offer-heading';
+  heading.append(text('h3','Cartão VIP'),text('span','30 dias','vip-duration'));
+  const intro=paragraph('Acesse culturas e preços VIP e libere a compra de serviços automáticos.',details);intro.className='vip-intro';
+  const benefits=document.createElement('ul');benefits.className='vip-benefits';
+  for(const benefit of ['Acesso às culturas VIP','Preços VIP de venda','Acumule tempo VIP ao renovar antes de expirar'])benefits.append(text('li',benefit));
+  const actions=document.createElement('div');actions.className='vip-offer-actions';
+  const status=paragraph(own?.vipActive?`VIP ativo até ${new Date(own.vipExpiresAt!).toLocaleString('pt-BR')}`:'VIP inativo',actions);status.className='vip-status';
+  const buy=button(`Comprar cartão VIP · ${catalog.vip.greenPrice} verdes`,()=>confirmVipPurchase('Cartão VIP',catalog.vip.greenPrice,30,{action:'BUY_VIP'}),actions);buy.className='vip-buy';buy.setAttribute('aria-label',`Comprar cartão VIP por ${catalog.vip.greenPrice} verdes`);
+  const coin=image('classic/icons/moeda-verde.png');coin.alt='';coin.setAttribute('aria-hidden','true');buy.append(coin);
+  details.append(heading,intro,benefits,actions);offer.append(cardArt,details);scroll.append(offer);
+  const servicesBlock=document.createElement('section');servicesBlock.className='vip-services-block';
+  const servicesHeading=document.createElement('h3');servicesHeading.className='vip-services-heading';servicesHeading.append(text('span','Serviços VIP'));
+  const servicesNote=paragraph('Serviços vendidos separadamente. Requerem Cartão VIP ativo.',servicesBlock);servicesNote.className='vip-services-note';
+  const services=document.createElement('div');services.className='vip-services';servicesBlock.prepend(servicesHeading);servicesBlock.append(services);scroll.append(servicesBlock);
+  const serviceArt:Record<string,string>={water:'upgrade_vip_regador.png',pests:'upgrade_vip_praga.png',animals:'upgrade_vip_animal.png'};
+  const serviceNames:Record<string,string>={water:'Rega automática',pests:'Controle de pragas',animals:'Cuidador de animais'};
   for(const service of catalog.automationServices??[]){
-   const card=document.createElement('article');card.className='card automation-offer';const state=own?.automations?.find(item=>item.id===service.id);
-   card.append(text('h3',service.name),text('p',service.description),text('p',service.greenPrice+' verdes · '+service.durationDays+' dias'));
+   const card=document.createElement('article');card.className='vip-service';
+   const artFrame=document.createElement('div');artFrame.className='vip-service-art-frame';
+   const art=image(`classic/icons/vip/${serviceArt[service.id]??'upgrade_vip_regador.png'}`);art.className='vip-service-art';art.alt='';art.setAttribute('aria-hidden','true');artFrame.append(art);
+   const contentNode=document.createElement('div');contentNode.className='vip-service-details';
+   contentNode.append(text('h3',serviceNames[service.id]??service.name),text('p',service.description,'vip-service-description'));
+   const state=own?.automations?.find(item=>item.id===service.id);
    const labels={ACTIVE:'Ativo',SUSPENDED:'Suspenso: exige VIP ativo',EXPIRED:'Expirado',NOT_PURCHASED:'Não comprado'};
-   card.append(text('p',labels[state?.status??'NOT_PURCHASED'],'status-badge'));
-   if(state?.expiresAt)card.append(text('p','Validade: '+new Date(state.expiresAt).toLocaleString('pt-BR')));
-   const buyService=button('Comprar '+service.name+' · '+service.greenPrice+' verdes',()=>confirmVipPurchase(service.name,service.greenPrice,service.durationDays,{action:'BUY_AUTOMATION',itemId:service.id}),card);
-   buyService.disabled=!own?.vipActive||Number(own?.greenCoins??0)<service.greenPrice;
-   if(!own?.vipActive)paragraph('Ative o cartão VIP para comprar e usar este serviço.',card);else if(Number(own?.greenCoins??0)<service.greenPrice)paragraph('Saldo de verdes insuficiente.',card);
-   scroll.append(card);
+   const purchase=document.createElement('div');purchase.className='vip-service-purchase';
+   const meta=document.createElement('div');meta.className='vip-service-meta';meta.append(text('span',`${service.durationDays} dias`,'vip-service-duration'));
+   const price=text('span',`${service.greenPrice} verdes`,'vip-service-price'),greenCoin=image('classic/icons/moeda-verde.png');greenCoin.alt='';greenCoin.setAttribute('aria-hidden','true');price.prepend(greenCoin);meta.append(price);purchase.append(meta);
+   if(!own?.vipActive)purchase.append(text('span','Requer VIP ativo','vip-service-requirement'));
+   else{
+    purchase.className+=' vip-service-purchase-active';
+    if(state?.status==='ACTIVE')purchase.append(text('span',state.expiresAt?`Ativo até ${new Date(state.expiresAt).toLocaleString('pt-BR')}`:'Ativo','vip-service-status'));
+    else if(state?.status==='EXPIRED'||state?.status==='SUSPENDED')purchase.append(text('span',labels[state.status],'vip-service-status'));
+    const buyService=button(`Comprar · ${service.greenPrice} verdes`,()=>confirmVipPurchase(service.name,service.greenPrice,service.durationDays,{action:'BUY_AUTOMATION',itemId:service.id}),purchase);
+    buyService.className='vip-service-buy';buyService.setAttribute('aria-label',`Comprar ${serviceNames[service.id]??service.name} por ${service.greenPrice} verdes por ${service.durationDays} dias`);
+    buyService.disabled=Number(own?.greenCoins??0)<service.greenPrice;
+    if(buyService.disabled){buyService.title='Saldo de verdes insuficiente.';purchase.append(text('small','Saldo de verdes insuficiente','vip-service-requirement'));}
+   }
+   card.append(artFrame,contentNode,purchase);services.append(card);
   }
  }
  if(category==='owned'){
@@ -479,6 +510,7 @@ function animalPopup(id:string){
  const image=id==='abelha'?'classic/animals/abelha/abelha.png':animalPath(id,animal.stage,false,false,false);
  const detail=card(type.name,image);content.append(detail);
  paragraph(`${stage[animal.stage]??animal.stage} · ${animalStatusText(animal.status,type.kind,animal.remainingSeconds)}`,detail);
+ addAnimalProgress(detail,animal,type);
  if(!visited&&farm?.own){
   const sale=animalOwnedSale(animal);if(sale)paragraph(sale,detail);
   const label=animalActionLabel(animal.status,type.kind,animal.stage);if(label)button(label,()=>{modal.close();void action({action:'TEND_ANIMAL',itemId:id});},detail);
@@ -486,6 +518,38 @@ function animalPopup(id:string){
   button(`Comprar ração · ${catalog.feedPrices[feedId]} ouro`,()=>{modal.close();void action({action:'BUY_FEED',itemId:feedId});},detail);
   if(type.kind==='GROWING')button('Vender adulto',()=>{modal.close();void action({action:'SELL_ANIMAL',itemId:id});},detail);
  }else paragraph('Somente visualização durante a visita.',detail);
+}
+function animalDuration(type:AnimalType){return type.kind==='PRODUCER'?type.productionSeconds??0:type.kind==='GROWING'?(type.babySeconds??0)+(type.youngSeconds??0):0;}
+function addAnimalProgress(parent:HTMLElement,animal:Animal,type:AnimalType){
+ const duration=animalDuration(type);if(duration<=0)return;
+ const remaining=Math.max(0,animal.remainingSeconds),ready=animal.status==='READY',progress=ready?1:Math.max(0,Math.min(1,1-remaining/duration));
+ const section=document.createElement('section');section.className='crop-growth';
+ const caption=document.createElement('div');caption.className='crop-progress-caption';caption.append(text('span',type.kind==='GROWING'?'CRESCIMENTO':'PRODUÇÃO'));
+ const value=text('strong',ready?'Pronto':animal.status==='HUNGRY'?`${formatRemaining(remaining)} · com fome`:`${formatRemaining(remaining)} restantes`);caption.append(value);
+ const track=document.createElement('div');track.className=`crop-growth-track${ready?' is-ready':''}`;track.setAttribute('role','progressbar');track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax','100');track.setAttribute('aria-valuenow',String(Math.round(progress*100)));track.setAttribute('aria-label',`${type.kind==='GROWING'?'Crescimento':'Produção'}: ${Math.round(progress*100)}%`);
+ const fill=document.createElement('span');fill.className='crop-growth-fill';fill.style.width=`${progress*100}%`;track.append(fill);section.append(caption,track);parent.append(section);
+}
+function animalTooltip(id:string|null,point?:{x:number;y:number}){
+ if(!id||!point){if(healthPinned)return;animalTooltipId='';animalTooltipPoint=null;healthKey='';healthDataKey='';const panel=element('plant-health');panel.className='crop-tooltip';panel.hidden=true;return;}
+ const farm=display(),animal=farm?.animals.find(item=>item.id===id),type=catalog.animals.find(item=>item.id===id);
+ if(!farm||!animal||!type){animalTooltip(null);return;}
+ if(modal.open||healthPinned)return;
+ animalTooltipId=id;animalTooltipPoint=point;healthTile=null;healthPoint=point;healthPinned=false;clearHealthTimers();
+ const panel=element('plant-health'),game=element('game'),key=JSON.stringify([id,animal.stage,animal.status,animal.remainingSeconds,farm.serverTime,visited?.owner]);
+ if(!panel.hidden&&panel.className.includes('animal-tooltip')&&key===healthDataKey){positionHealth(panel,game,point);return;}
+ healthDataKey=key;panel.className='crop-tooltip animal-tooltip';panel.hidden=false;panel.replaceChildren();
+ const heading=document.createElement('div');heading.className='crop-tooltip-head';const art=document.createElement('img');art.className='crop-tooltip-icon';art.src=`/assets/${id==='abelha'?'classic/animals/abelha/abelha.png':animalPath(id,animal.stage,false,false,false)}`;art.alt='';
+ const name=text('strong',type.name),stage:Record<string,string>={BABY:'Filhote',YOUNG:'Jovem',ADULT:'Adulto'};heading.append(art,name);
+ if(type.kind==='GROWING')heading.append(text('span',stage[animal.stage]??animal.stage,'animal-stage-badge'));
+ const ready=animal.status==='READY',hungry=animal.status==='HUNGRY',badge=text('span',animalStatusText(animal.status,type.kind,animal.remainingSeconds),`crop-state-badge${ready?' is-ready':hungry?' is-problem':''}`);heading.append(badge);panel.append(heading);
+ addAnimalProgress(panel,animal,type);
+ if(!visited&&farm.own){
+  if(hungry){const chips=document.createElement('div');chips.className='crop-status-chips';addChip(chips,'Precisa de ração','/assets/classic/icons/racao-generica.png','problem');panel.append(chips);}
+  const sale=animalOwnedSale(animal);if(sale){const note=document.createElement('p');note.className='crop-growth-estimate';note.textContent=sale;panel.append(note);}
+  const label=animalActionLabel(animal.status,type.kind,animal.stage);
+  if(label){const hint=document.createElement('div');hint.className='crop-action-hint';const icon=document.createElement('img');icon.src=hungry?'/assets/classic/icons/racao-generica.png':'/assets/classic/icons/hud/mao-restaurada.png';icon.alt='';hint.append(icon,text('span',label));panel.append(hint);}
+ }else panel.append(text('p','Somente visualização durante a visita.','crop-growth-estimate'));
+ positionHealth(panel,game,point);
 }
 function deposit(){
  dialog('Depósito');
@@ -605,7 +669,7 @@ async function connect(user:string,token:()=>Promise<string>,photo?:unknown,disp
  pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner='';sessionGeneration++;navigationGeneration++;busy=false;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;closeScene();const generation=sessionGeneration;
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
  avatarUser=`${config.api}:${user}`;googlePhoto=googleAvatar(photo);avatarChoice='classic';loadAudioSettings();
- scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>{if(healthPinned&&!(tool==='CURSOR'&&tile.cropId))closeHealth();void tileAction(tile);},(id,pointerType)=>{if(pointerType==='touch'&&tool==='CURSOR'){playAnimalSound(id);animalPopup(id);return;}const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health,syncMusic,()=>{if(healthPinned)closeHealth();},playAnimalSound);
+ scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>{if(healthPinned&&!(tool==='CURSOR'&&tile.cropId))closeHealth();void tileAction(tile);},(id,pointerType)=>{if(pointerType==='touch'&&tool==='CURSOR'){playAnimalSound(id);animalPopup(id);return;}const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health,syncMusic,()=>{if(healthPinned)closeHealth();},(id,point)=>{if(id&&point){playAnimalSound(id);animalTooltip(id,point);}else animalTooltip(null);});
 sceneResize=new ResizeObserver(()=>{layoutHud();health(healthTile,healthPoint,'resize');});for(const id of ['farm','farm-header','tools-bar','notice'])sceneResize.observe(element(id));
  try{await refresh();if(generation===sessionGeneration)await migrateAvatar();if(generation===sessionGeneration&&!own)setLoginStep('invite',displayName||user);}
  catch(error){handleError(error);}

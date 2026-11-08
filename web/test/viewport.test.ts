@@ -84,9 +84,9 @@ test('canvas clicks and hover share the uniform transform and ignore letterbox s
  scene.update({owner:'synthetic',tiles,animals:[{id:'abelha'}]});
  const point={clientX:1210,clientY:800,pointerType:'mouse'};
  handlers.get('pointermove')(point);assert.equal(timers.size,1);assert.deepEqual(sounds,[]);
- handlers.get('pointerleave')();assert.equal(timers.size,0);
+ handlers.get('pointerleave')();assert.equal(timers.size,0);assert.deepEqual(sounds,[null]);
  handlers.get('pointermove')(point);assert.equal(timers.size,1);
  const [id,fire]=timers.entries().next().value;timers.delete(id);fire();
- handlers.get('pointermove')(point);assert.equal(timers.size,0);assert.deepEqual(sounds,['abelha']);
+ handlers.get('pointermove')(point);assert.equal(timers.size,0);assert.deepEqual(sounds,[null,'abelha']);
  scene.close();
 });

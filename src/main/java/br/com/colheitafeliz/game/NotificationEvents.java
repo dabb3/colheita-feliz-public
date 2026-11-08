@@ -12,9 +12,11 @@ final class NotificationEvents {
         for(int row=0;row<GameState.ROWS;row++)for(int col=0;col<GameState.COLUMNS;col++){
             var tile=game.farm().tile(col,row);var crop=tile.crop();
             if(crop!=null&&crop.matureAt(game.now())){
+                var maturedAt=crop.maturedAt(game.now());
+                var ownerExclusiveUntil=maturedAt.plus(java.time.Duration.ofMinutes(5));
                 String plot=Integer.toString(row*GameState.COLUMNS+col);
                 changed|=inbox.record("crop:"+plot,Long.toString(tile.harvestRevision()),Type.CROP_READY,
-                        crop.type().name()+": planta pronta para colher.",now,Map.of("cropId",crop.type().id(),"plot",plot,"season",Integer.toString(crop.season())));
+                        crop.type().name()+": planta pronta para colher.",now,Map.of("cropId",crop.type().id(),"plot",plot,"season",Integer.toString(crop.season()),"maturedAt",maturedAt.toString(),"ownerExclusiveUntil",ownerExclusiveUntil.toString()));
             }
         }
         for(var animal:game.barn().animals())if(animal.type().kind()!=AnimalType.Kind.PROTECTOR&&animal.statusAt(game.now())==Animal.Status.READY){

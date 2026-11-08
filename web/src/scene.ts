@@ -83,7 +83,7 @@ export class Scene {
     ) => void,
     onPeriodChange: (period: ReturnType<typeof periodAt>) => void = () => {},
     onEmptyTap: () => void = () => {},
-    onAnimalHover: (id: string) => void = () => {},
+    onAnimalHover: (id: string | null, point?: { x: number; y: number }) => void = () => {},
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
@@ -106,10 +106,12 @@ export class Scene {
         const pick = p ? pickTile(p.x, p.y) : null;
         const animal = e.pointerType === "mouse" && !pick && p ? this.animalAt(p) : undefined;
         if (animal !== this.hoveredAnimal) {
+          const previous = this.hoveredAnimal;
           this.clearAnimalHover();
+          if (previous) onAnimalHover(null);
           this.hoveredAnimal = animal;
           if (animal && p) this.animalHoverTimer = window.setTimeout(() => {
-            if (this.animalAt(p) === animal) onAnimalHover(animal);
+            if (this.animalAt(p) === animal) onAnimalHover(animal, p);
           }, 500);
         }
         this.hover = pick
@@ -128,6 +130,7 @@ export class Scene {
     canvas.addEventListener(
       "pointerleave",
       () => {
+        if (this.hoveredAnimal) onAnimalHover(null);
         this.clearAnimalHover();
         this.hover = null;
         this.onHover(null, null);

@@ -10,7 +10,12 @@ export function renderNotifications(parent:HTMLElement,entries:GameNotification[
  if(!entries.length)list.append(text('p','Nenhuma notificação por enquanto.'));
  for(const entry of entries){
   const row=document.createElement('article');row.className=`notification-entry${entry.read?' is-read':''}`;
-  row.append(text('p',entry.message));const time=document.createElement('time');time.dateTime=entry.createdAt;time.textContent=new Date(entry.createdAt).toLocaleString('pt-BR');row.append(time);
+  row.append(text('p',entry.message));
+  if(entry.type==='CROP_READY')for(const [key,label]of [['maturedAt','Maturou'],['ownerExclusiveUntil','Proteção até']]){
+   const value=entry.metadata?.[key];if(!value||!Number.isFinite(Date.parse(value)))continue;
+   const timing=document.createElement('time');timing.dateTime=value;timing.textContent=`${label}: ${new Date(value).toLocaleString('pt-BR')}`;row.append(timing);
+  }
+  const time=document.createElement('time');time.dateTime=entry.createdAt;time.textContent=`Aviso gerado: ${new Date(entry.createdAt).toLocaleString('pt-BR')}`;row.append(time);
   const mark=control(entry.read?'Lida':'Marcar como lida',()=>read(entry.id));mark.setAttribute('data-focus-key',`read-notification:${entry.id}`);mark.setAttribute('aria-label',`${entry.read?'Lida':'Marcar como lida'}: ${entry.message}`);mark.disabled=entry.read;row.append(mark);if(entry.read&&dismiss){const remove=control('×',()=>dismiss(entry.id));remove.setAttribute('aria-label',`Descartar notificação lida: ${entry.message}`);remove.setAttribute('data-focus-key',`dismiss-notification:${entry.id}`);row.append(remove);}list.append(row);
  }
 }

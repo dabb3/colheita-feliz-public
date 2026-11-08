@@ -25,6 +25,7 @@ final class OnlineViews {
         for (int row = 0; row < GameState.ROWS; row++) for (int col = 0; col < GameState.COLUMNS; col++) {
             var tile = game.farm().tile(col, row);
             var crop = tile.crop();
+            var maturedAt = crop == null ? null : crop.maturedAt(now);
             var plot=game.land().at(col,row);
             tiles.add(object("column", col, "row", row, "unlocked", game.land().isUnlocked(col, row),
                     "requiredLevel",plot.requiredLevel(),"price",plot.price(),"currency",plot.currency(),
@@ -37,7 +38,9 @@ final class OnlineViews {
                     "insects", tile.insects(), "fertilized", tile.fertilized(), "protected", protectedPlots.contains(game.land().at(col, row).id()),
                     "harvestRevision", Long.toString(tile.harvestRevision()),
                     "remainingSeconds", crop == null ? 0 : crop.remainingAt(now).toSeconds(),
-                    "nominalRemainingSeconds", crop == null ? 0 : Math.max(0, crop.currentDuration().toMillis() - crop.grownMillisAt(now)) / 1000));
+                    "nominalRemainingSeconds", crop == null ? 0 : Math.max(0, crop.currentDuration().toMillis() - crop.grownMillisAt(now)) / 1000,
+                    "maturedAt", maturedAt == null ? null : maturedAt.toString(),
+                    "ownerExclusiveUntil", maturedAt == null ? null : maturedAt.plus(java.time.Duration.ofMinutes(5)).toString()));
         }
         JsonArray animals = new JsonArray();
         for (var animal : game.barn().animals()) {

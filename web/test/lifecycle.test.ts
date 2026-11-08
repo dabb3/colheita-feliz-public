@@ -551,7 +551,7 @@ test('VIP purchases require explicit confirmation and reject repeated confirmati
  assert.equal(sent.length,0);assert.match(text(elements.get('modal-content')),/Saldo: 500 verdes/);
  const confirm=descendants(elements.get('modal-content')).find(n=>n.textContent==='Confirmar compra');confirm.onclick();confirm.onclick();assert.equal(sent.length,1);assert.equal(sent[0].action,'BUY_VIP');
  pending.resolve({});await new Promise(r=>setTimeout(r,0));
- h.shop('vip');descendants(elements.get('modal-content')).find(n=>n.textContent==='Comprar Rega automática · 100 verdes').onclick();assert.match(text(elements.get('modal-content')),/não estende/);descendants(elements.get('modal-content')).find(n=>n.textContent==='Cancelar').onclick();assert.equal(sent.length,1);
+ h.shop('vip');descendants(elements.get('modal-content')).find(n=>n.attributes['aria-label']==='Comprar Rega automática por 100 verdes por 30 dias').onclick();assert.match(text(elements.get('modal-content')),/não estende/);descendants(elements.get('modal-content')).find(n=>n.textContent==='Cancelar').onclick();assert.equal(sent.length,1);
 });
 test('claimed update notes wait for the open dialog and do not repeat, but new day and version do',()=>{
  const {h,elements}=app(),notes={version:'v1',prNumber:42,date:'2026-11-08',items:['Novos cuidados VIP.']};
@@ -562,11 +562,20 @@ test('claimed update notes wait for the open dialog and do not repeat, but new d
  h.receive({farm:{...farm('alice'),revision:'5',updateNotes:{...notes,version:'v2'}}});assert.equal(elements.get('modal').open,true);
 });
 
-test('services explain suspended and expired states and block purchase without VIP',()=>{
+test('services show only the VIP requirement when locked and retain purchase rules when active',()=>{
  const {h,elements}=app(),services=['water','pests','animals'].map((id,i)=>({id,name:['Rega','Pragas','Animais'][i],description:'Cuidado automático '+id,greenPrice:100,durationDays:30}));
  h.set({own:{...farm('alice'),greenCoins:'500',vipActive:false,automations:services.map((s,i)=>({...s,expiresAt:'2026-12-08T12:00:00Z',status:['SUSPENDED','EXPIRED','NOT_PURCHASED'][i]}))},catalog:{crops:[],animals:[],fertilizers:[],vip:{greenPrice:100},automationServices:services}});h.shop('vip');
- assert.match(text(elements.get('modal-content')),/Suspenso: exige VIP ativo/);assert.match(text(elements.get('modal-content')),/Expirado/);assert.match(text(elements.get('modal-content')),/Não comprado/);
- for(const service of services)assert.equal(descendants(elements.get('modal-content')).find(n=>n.textContent==='Comprar '+service.name+' · 100 verdes').disabled,true);
+ const nodes=descendants(elements.get('modal-content'));
+ assert.equal(nodes.filter(n=>n.textContent==='Requer VIP ativo').length,3);
+ assert.equal(nodes.filter(n=>n.className==='vip-service-buy').length,0);
+ assert.equal(nodes.filter(n=>n.className==='vip-service-duration').length,3);
+ assert.doesNotMatch(text(elements.get('modal-content')),/Suspenso:|Expirado|Não comprado/);
+ h.set({own:{...farm('alice'),greenCoins:'500',vipActive:true,vipExpiresAt:'2026-12-08T12:00:00Z',automations:[{id:'water',status:'ACTIVE',expiresAt:'2026-12-08T12:00:00Z'},{id:'pests',status:'EXPIRED'}]},catalog:{crops:[],animals:[],fertilizers:[],vip:{greenPrice:100},automationServices:services}});h.shop('vip');
+ const active=descendants(elements.get('modal-content'));
+ assert.match(text(elements.get('modal-content')),/Ativo até/);assert.match(text(elements.get('modal-content')),/Expirado/);
+ assert.equal(active.filter(n=>n.className==='vip-service-buy'&&!n.disabled).length,3);
+ h.set({own:{...farm('alice'),greenCoins:'0',vipActive:true,vipExpiresAt:'2026-12-08T12:00:00Z'},catalog:{crops:[],animals:[],fertilizers:[],vip:{greenPrice:100},automationServices:services}});h.shop('vip');
+ assert.equal(descendants(elements.get('modal-content')).filter(n=>n.className==='vip-service-buy'&&n.disabled).length,3);
 });
 test('public visit profile and friends show only an active VIP badge and preserve visit URL',async()=>{
  const {h,elements}=app();const paths=[];h.set({own:farm('alice'),api:{get:async target=>{paths.push(target);return target==='/v1/friends'?[{id:'bob',name:'Bob',vipActive:true}]:{...farm('bob'),vipActive:true};}}});
