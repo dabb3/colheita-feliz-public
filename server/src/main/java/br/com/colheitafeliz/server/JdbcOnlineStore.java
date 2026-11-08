@@ -26,7 +26,7 @@ import java.util.function.Function;
 final class JdbcOnlineStore implements AutoCloseable {
     static final int RECEIPTS_PER_ACTOR = 1000;
     record Player(UUID id, String name, boolean active, Instant registeredAt) {}
-    record Friend(UUID id,String name,boolean active,br.com.colheitafeliz.game.PlayerAvatar avatar) {}
+    record Friend(UUID id,String name,boolean active,br.com.colheitafeliz.game.PlayerAvatar avatar,boolean vipActive) {}
     record Farm(GameSnapshot snapshot, long revision, Instant time, LocalDate allowanceDay) {}
     record Receipt(String hash, JsonObject response) {}
     record Invitation(UUID owner, UUID usedBy, Instant expiresAt) {}
@@ -95,8 +95,10 @@ final class JdbcOnlineStore implements AutoCloseable {
                     + "last_applied_at timestamptz NOT NULL, PRIMARY KEY(actor,kind))");
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".daily_allowances (actor uuid PRIMARY KEY REFERENCES "
                     + schema + ".players(id), last_claimed_day date NOT NULL)");
+            tx.execute("CREATE TABLE IF NOT EXISTS "+schema+".update_note_views (actor uuid PRIMARY KEY REFERENCES "+schema
+                    +".players(id), version varchar(80) NOT NULL, seen_day date NOT NULL)");
             tx.execute("REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
-            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "daily_allowances")) {
+            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "daily_allowances", "update_note_views")) {
                 tx.execute("ALTER TABLE " + schema + "." + table + " ENABLE ROW LEVEL SECURITY");
                 tx.execute("REVOKE ALL ON " + schema + "." + table + " FROM PUBLIC");
             }
@@ -220,6 +222,7 @@ final class JdbcOnlineStore implements AutoCloseable {
                 var snapshot = JsonParser.parseString(r.getString(1));
                 br.com.colheitafeliz.persistence.CropSaleJsonValidation.validate(snapshot);
                 br.com.colheitafeliz.persistence.NotificationJsonValidation.validate(snapshot);
+                br.com.colheitafeliz.persistence.AutomationJsonValidation.validate(snapshot);
                 br.com.colheitafeliz.persistence.AnimalSaleJsonValidation.validate(snapshot);
                 var state = JSON.fromJson(snapshot, GameSnapshot.class);
                 br.com.colheitafeliz.persistence.CropSaleJsonValidation.validateTerms(state);
@@ -294,11 +297,18 @@ final class JdbcOnlineStore implements AutoCloseable {
         boolean friends(UUID one, UUID two) {
             return !query("SELECT 1 FROM " + schema + ".friendships WHERE (a=? AND b=?) OR (a=? AND b=?)", r -> 1, one, two, two, one).isEmpty();
         }
-        List<Friend> friends(UUID actor) {
-            return query("SELECT p.id,p.name,p.active,g.snapshot->'avatar' FROM " + schema + ".players p JOIN " + schema
+        boolean claimUpdateNotes(UUID actor,String version,LocalDate day){
+            return !query("INSERT INTO "+schema+".update_note_views AS previous(actor,version,seen_day) VALUES (?,?,?) "
+                    +"ON CONFLICT(actor) DO UPDATE SET version=EXCLUDED.version,seen_day=EXCLUDED.seen_day "
+                    +"WHERE previous.version<>EXCLUDED.version OR previous.seen_day<EXCLUDED.seen_day RETURNING actor",
+                    r->r.getObject(1,UUID.class),actor,version,day).isEmpty();
+        }
+        List<Friend> friends(UUID actor,Instant now) {
+            return query("SELECT p.id,p.name,p.active,g.snapshot->'avatar',g.snapshot->>'vipExpiresAt' FROM " + schema + ".players p JOIN " + schema
                     + ".friendships f ON p.id=CASE WHEN f.a=? THEN f.b ELSE f.a END LEFT JOIN " + schema
                     + ".farms g ON g.owner=p.id WHERE (f.a=? OR f.b=?) AND p.active",
-                    r -> new Friend(r.getObject(1, UUID.class), r.getString(2), r.getBoolean(3),publicAvatar(r.getString(4))), actor, actor, actor);
+                    r -> new Friend(r.getObject(1, UUID.class), r.getString(2), r.getBoolean(3),publicAvatar(r.getString(4)),
+                            r.getString(5)!=null&&now.isBefore(Instant.parse(r.getString(5)))), actor, actor, actor);
         }
         private br.com.colheitafeliz.game.PlayerAvatar publicAvatar(String json){
             var avatar=json==null?com.google.gson.JsonNull.INSTANCE:JsonParser.parseString(json);

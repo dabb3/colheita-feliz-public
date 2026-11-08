@@ -543,3 +543,46 @@ test('late avatar response cannot open settings in a new session',async()=>{
  await h.connect('bob',async()=> 'token');h.dialog('Painel da nova sessão');reply.resolve({farm:{...own,revision:'2',avatar:{id:'female-3'},avatarSelected:true},result:{success:true,message:'Salvo'}});await new Promise(r=>setTimeout(r,0));
  assert.equal(h.get().own.owner,'bob');assert.equal(elements.get('modal-title').textContent,'Painel da nova sessão');
 });
+
+test('VIP purchases require explicit confirmation and reject repeated confirmation',async()=>{
+ const {h,elements}=app(),sent=[],pending=deferred();
+ h.set({own:{...farm('alice'),vipActive:true,greenCoins:'500'},catalog:{crops:[],animals:[],fertilizers:[],vip:{greenPrice:100},automationServices:[{id:'water',name:'Rega automática',description:'Rega suas plantas.',greenPrice:100,durationDays:30}]},api:{pending:null,mutate:(_path,command)=>{sent.push(command);return pending.promise;},prepareRequestId:async()=>{}}});
+ h.shop('vip');descendants(elements.get('modal-content')).find(n=>n.textContent==='Comprar cartão VIP · 100 verdes').onclick();
+ assert.equal(sent.length,0);assert.match(text(elements.get('modal-content')),/Saldo: 500 verdes/);
+ const confirm=descendants(elements.get('modal-content')).find(n=>n.textContent==='Confirmar compra');confirm.onclick();confirm.onclick();assert.equal(sent.length,1);assert.equal(sent[0].action,'BUY_VIP');
+ pending.resolve({});await new Promise(r=>setTimeout(r,0));
+ h.shop('vip');descendants(elements.get('modal-content')).find(n=>n.textContent==='Comprar Rega automática · 100 verdes').onclick();assert.match(text(elements.get('modal-content')),/não estende/);descendants(elements.get('modal-content')).find(n=>n.textContent==='Cancelar').onclick();assert.equal(sent.length,1);
+});
+test('claimed update notes wait for the open dialog and do not repeat, but new day and version do',()=>{
+ const {h,elements}=app(),notes={version:'v1',prNumber:42,date:'2026-11-08',items:['Novos cuidados VIP.']};
+ h.set({own:farm('alice')});h.dialog('Ajustes');h.receive({farm:{...farm('alice'),revision:'2',updateNotes:notes}});assert.equal(elements.get('modal-title').textContent,'Ajustes');
+ elements.get('close-modal').onclick();assert.equal(elements.get('modal-title').textContent,'Notas da atualização');assert.match(text(elements.get('modal-content')),/PR #42 · 08\/11\/2026/);
+ elements.get('close-modal').onclick();h.receive({farm:{...farm('alice'),revision:'3',updateNotes:notes}});assert.equal(elements.get('modal').open,false);
+ h.receive({farm:{...farm('alice'),revision:'4',updateNotes:{...notes,date:'2026-11-09'}}});assert.equal(elements.get('modal').open,true);elements.get('close-modal').onclick();
+ h.receive({farm:{...farm('alice'),revision:'5',updateNotes:{...notes,version:'v2'}}});assert.equal(elements.get('modal').open,true);
+});
+
+test('services explain suspended and expired states and block purchase without VIP',()=>{
+ const {h,elements}=app(),services=['water','pests','animals'].map((id,i)=>({id,name:['Rega','Pragas','Animais'][i],description:'Cuidado automático '+id,greenPrice:100,durationDays:30}));
+ h.set({own:{...farm('alice'),greenCoins:'500',vipActive:false,automations:services.map((s,i)=>({...s,expiresAt:'2026-12-08T12:00:00Z',status:['SUSPENDED','EXPIRED','NOT_PURCHASED'][i]}))},catalog:{crops:[],animals:[],fertilizers:[],vip:{greenPrice:100},automationServices:services}});h.shop('vip');
+ assert.match(text(elements.get('modal-content')),/Suspenso: exige VIP ativo/);assert.match(text(elements.get('modal-content')),/Expirado/);assert.match(text(elements.get('modal-content')),/Não comprado/);
+ for(const service of services)assert.equal(descendants(elements.get('modal-content')).find(n=>n.textContent==='Comprar '+service.name+' · 100 verdes').disabled,true);
+});
+test('public visit profile and friends show only an active VIP badge and preserve visit URL',async()=>{
+ const {h,elements}=app();const paths=[];h.set({own:farm('alice'),api:{get:async target=>{paths.push(target);return target==='/v1/friends'?[{id:'bob',name:'Bob',vipActive:true}]:{...farm('bob'),vipActive:true};}}});
+ await h.friends();assert.ok(descendants(elements.get('modal-content')).some(n=>n.className==='public-vip-badge'));
+ await descendants(elements.get('modal-content')).find(n=>n.textContent==='Visitar fazenda').onclick();await new Promise(r=>setTimeout(r,0));assert.ok(paths.includes('/v1/farms/bob/visit'));assert.ok(descendants(elements.get('wallet')).some(n=>n.className==='public-vip-badge'));
+});
+test('empty or unpublished notes are ignored and logout clears queued notes',async()=>{
+ const {h,elements}=app();h.set({own:farm('alice')});
+ for(const updateNotes of [{version:'v',prNumber:0,date:'2026-11-08',items:['x']},{version:'v',prNumber:2,date:'2026-11-08',items:[]}])h.receive({farm:{...farm('alice'),updateNotes}});
+ assert.ok(!elements.get('modal').open);h.dialog('Loja');h.receive({farm:{...farm('alice'),updateNotes:{version:'v',prNumber:2,date:'2026-11-08',items:['x']}}});await h.logout();h.set({own:farm('bob')});h.receive({});assert.equal(elements.get('modal').open,false);
+});
+
+
+test('existing farm refresh removes expired friend VIP badge while panel is open and stops when closed',async()=>{
+ const {h,elements,intervals}=app();let active=true,reads=0;const own=farm('alice');
+ h.set({own,api:{get:async path=>{if(path==='/v1/friends'){reads++;return[{id:'bob',name:'Bob',vipActive:active}];}return own;},prepareRequestId:async()=>{}}});await h.friends();assert.ok(descendants(elements.get('modal-content')).some(n=>n.className==='public-vip-badge'));
+ active=false;intervals.get(30_000)();await new Promise(r=>setTimeout(r,0));
+ assert.ok(!descendants(elements.get('modal-content')).some(n=>n.className==='public-vip-badge'));const previous=reads;elements.get('close-modal').onclick();intervals.get(30_000)();await new Promise(r=>setTimeout(r,0));assert.equal(reads,previous);
+});
