@@ -26,6 +26,10 @@ check() {
 }
 check production 0 1
 grep -Fq -- '--app colheita-feliz-public --ha=false --update-only --no-public-ips' "$DEPLOY_TEST_LOG"
+expected_version=$(node -p 'JSON.parse(require("node:fs").readFileSync("assets/data/update-notes.json","utf8")).version')
+expected_pr=$(node -p 'JSON.parse(require("node:fs").readFileSync("assets/data/update-notes.json","utf8")).prNumber')
+grep -Fq -- "--env PUBLISHED_UPDATE_NOTES_VERSION=$expected_version --env PUBLISHED_UPDATE_NOTES_PR=$expected_pr" "$DEPLOY_TEST_LOG"
+echo 'PASS: publication metadata follows the manifest'
 GITHUB_EVENT_NAME=pull_request check pull-request 0 0
 GITHUB_REF=refs/heads/feature check feature-branch 0 0
 GITHUB_REF=refs/tags/v1.0.0 check tag 0 0
@@ -35,3 +39,9 @@ FLY_API_TOKEN='' check missing-token 1 0
 MOCK_FLY_STATUS=1 check deployment-failure 1 1
 MOCK_HEALTH='{"ok":false,"development":false}' check unhealthy-api 1 1
 MOCK_HEALTH='{"ok":true,"development":true}' check development-api 1 1
+
+node() { return 1; }
+export -f node
+check invalid-notes-manifest 1 0
+unset -f node
+node --test "$(dirname "$0")/published-notes-env.test.mjs"
