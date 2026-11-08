@@ -30,7 +30,7 @@ Cursor e resultados são gravados na mesma transação. Rollback refaz o process
 
 ```text
 PUBLISHED_UPDATE_NOTES_VERSION=vip-benefits-v1
-PUBLISHED_UPDATE_NOTES_PR=PR_REAL_DO_MANIFESTO
+PUBLISHED_UPDATE_NOTES_PR=74
 ```
 
 Somente configurar após o PR estar integrado e essa versão ter sido disponibilizada aos jogadores. Não ativar em uma implantação de outra versão nem antecipar novidades de PR aberto. Ambientes locais de QA podem simular a configuração de publicação com dados sintéticos. Nenhuma configuração de provedor é alterada por esta entrega. A configuração parcial/incompatível ou a ausência do manifesto desativa apenas as notas, mantendo o jogo disponível.
