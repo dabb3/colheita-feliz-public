@@ -269,6 +269,7 @@ window.addEventListener(
 
 if(params.get('panel')==='fertilizers')market('fertilizers');
 if(params.get('panel')==='notifications')openPanel('Notificações',(root)=>renderNotifications(root,[
+ ...[false,true].map(read=>({id:`review-crop-${read}`,type:'CROP_READY' as const,message:'Ervilha da segunda temporada: planta pronta para colher após uma longa ausência do proprietário.',createdAt:'2026-11-08T14:53:07.606Z',read,metadata:{maturedAt:'2026-11-08T14:07:20.730Z',ownerExclusiveUntil:'2026-11-08T14:12:20.730Z'}})),
  {id:'review-unread',type:'THEFT',message:'Amigo furtou 1 Morango.',createdAt:'2026-11-06T12:00:00Z',read:false,metadata:{}},
  {id:'review-read',type:'CHRISTMAS_GIFT',message:'Presente de Natal recebido.',createdAt:'2026-11-06T11:00:00Z',read:true,metadata:{}}
 ],demonstration,demonstration,demonstration,demonstration));
