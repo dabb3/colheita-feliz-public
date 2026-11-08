@@ -36,12 +36,13 @@ public final class GameState {
     public static final int ROWS = 5;
     public static final int STARTING_COINS = 500;
     public static final BigDecimal VIP_PRICE = new BigDecimal("100");
+    public static final BigDecimal AUTOMATION_PRICE = new BigDecimal("100");
     private final Farm farm = new Farm(COLUMNS, ROWS);
     private final Inventory inventory = new Inventory();
     private final Wallet wallet;
     private final Market market;
     private final GameClock clock;
-    private final Clock realClock;
+    private Clock realClock;
     private final CropCatalog catalog;
     private final PestSystem pests;
     private final RandomSource random;
@@ -64,6 +65,9 @@ public final class GameState {
     private int lastHarvestAmount;
     private int lastCollected;
     private VipStatus vip = new VipStatus(null);
+    private Instant replayAt;
+    private Instant automationCursor;
+    private final Map<String,Instant> automationTerms = new java.util.LinkedHashMap<>();
     private GameSnapshot.ChristmasState christmas2026;
     private PlayerAvatar avatar;
     public PlayerAvatar avatar(){return avatar;}
@@ -75,13 +79,13 @@ public final class GameState {
     public boolean claimChristmasGift(){return claimChristmasGift(Instant.parse(christmas2026.registeredAt()));}
     public boolean claimChristmasGift(Instant registeredAt){
         christmas2026=new GameSnapshot.ChristmasState(registeredAt.toString(),christmas2026.giftGranted());
-        if(christmas2026.giftGranted()||!Christmas2026.giftDue(realClock.instant(),registeredAt))return false;
+        if(christmas2026.giftGranted()||!Christmas2026.giftDue(realNow(),registeredAt))return false;
         var type=catalog.get("mini-bis");
         if(inventory.seeds(type)==Integer.MAX_VALUE)return false;
         inventory.addSeedLot(new ItemLot(type.id(),Currency.GREEN,type.seedPrice().getValue(),1,true));
         christmas2026=new GameSnapshot.ChristmasState(registeredAt.toString(),true);
         notifications.record("christmas-gift-2026","2026",br.com.colheitafeliz.domain.notification.GameNotification.Type.CHRISTMAS_GIFT,
-                "Presente de Natal: você recebeu 1 semente VIP de Mini-Bis!",realClock.instant(),Map.of("cropId","mini-bis","quantity","1"));
+                "Presente de Natal: você recebeu 1 semente VIP de Mini-Bis!",realNow(),Map.of("cropId","mini-bis","quantity","1"));
         return true;
     }
     private br.com.colheitafeliz.domain.notification.NotificationInbox notifications = new br.com.colheitafeliz.domain.notification.NotificationInbox();
@@ -107,7 +111,8 @@ public final class GameState {
                       BigDecimal coins, BigDecimal green, int level, BigDecimal currentXp) {
         this.clock = Objects.requireNonNull(clock);
         this.realClock = Objects.requireNonNull(realClock);
-        christmas2026=new GameSnapshot.ChristmasState(realClock.instant().toString(),false);
+        automationCursor = realClock.instant();
+        christmas2026=new GameSnapshot.ChristmasState(realNow().toString(),false);
         this.catalog = Objects.requireNonNull(catalog);
         wallet = new Wallet(coins, green);
         market = new Market(wallet, inventory);
@@ -115,7 +120,7 @@ public final class GameState {
         this.random = random;
         pests = new PestSystem(random);
         progress = new PlayerProgress(ProgressionLoader.load(), level, currentXp);
-        dailyMissions = new DailyMissionBoard(LocalDate.ofInstant(realClock.instant(), java.time.ZoneOffset.UTC));
+        dailyMissions = new DailyMissionBoard(LocalDate.ofInstant(realNow(), java.time.ZoneOffset.UTC));
         seed = catalog.all().getFirst();
     }
 
@@ -130,13 +135,158 @@ public final class GameState {
     public List<AnimalType> animalTypes() { return animalTypes; }
     public Barn barn() { return barn; }
     public VipStatus vip() { return vip; }
-    public boolean vipActive() { return vip.activeAt(realClock.instant()); }
+    public boolean vipActive() { return vip.activeAt(realNow()); }
+
+    private static void requireAutomation(String id) {
+        if (id == null || !java.util.Set.of("water", "pests", "animals").contains(id))
+            throw new IllegalArgumentException("Unknown automation service: " + id);
+    }
+
+    public Instant automationExpiresAt(String id) {
+        requireAutomation(id);
+        return automationTerms.get(id);
+    }
+
+    public ActionResult buyAutomation(String id) {
+        requireAutomation(id);
+        if (!vipActive()) return report(ActionResult.fail("Ative o cartão VIP para contratar este serviço."));
+        if (wallet.balance(Currency.GREEN).compareTo(AUTOMATION_PRICE) < 0)
+            return report(ActionResult.fail("O serviço custa 100 moedas verdes."));
+        runAutomationsNow();
+        automationCursor = realNow();
+        Instant now = realNow(), previous = automationTerms.get(id);
+        Instant expiry = (previous != null && previous.isAfter(now) ? previous : now).plus(java.time.Duration.ofDays(30));
+        wallet.debit(Currency.GREEN, AUTOMATION_PRICE);
+        automationTerms.put(id, expiry);
+        return report(ActionResult.ok("Serviço contratado por 30 dias. " + recordDailyMission("purchase", 1)));
+    }
+
+    private boolean automationActive(String id) {
+        Instant expiry = automationTerms.get(id);
+        return vipActive() && expiry != null && realNow().isBefore(expiry);
+    }
+
+    private GameSnapshot.AutomationSnapshot automationSnapshot() {
+        Map<String,String> terms = new java.util.LinkedHashMap<>(), weeds = new java.util.LinkedHashMap<>(), insects = new java.util.LinkedHashMap<>();
+        automationTerms.forEach((id, expiry) -> terms.put(id, expiry.toString()));
+        for (int i = 0; i < COLUMNS * ROWS; i++) {
+            var tile = farm.tile(i % COLUMNS, i / COLUMNS);
+            if (tile.weedsSince() != null) weeds.put(Integer.toString(i), tile.weedsSince().toString());
+            if (tile.insectsSince() != null) insects.put(Integer.toString(i), tile.insectsSince().toString());
+        }
+        return new GameSnapshot.AutomationSnapshot(automationCursor.toString(), terms, weeds, insects);
+    }
+
+    /** Online clocks are identical; replay runs before the normal refresh can discard event chronology. */
+    public static GameState restoreOnline(Instant savedAt, Instant now, CropCatalog catalog,
+                                           GameSnapshot snapshot, RandomSource random) {
+        Objects.requireNonNull(savedAt); Objects.requireNonNull(now);
+        Instant start = snapshot.automations() == null ? savedAt : Instant.parse(snapshot.automations().cursor());
+        if (start.isAfter(now)) throw new IllegalArgumentException("Automation cursor is in the future");
+        var game = restore(() -> now, Clock.fixed(start, java.time.ZoneOffset.UTC), catalog, snapshot, random, false);
+        game.realClock = Clock.fixed(now, java.time.ZoneOffset.UTC);
+        game.automationCursor = start;
+        // Unknown historical arrivals must wait from this access, never from an assumed infection time.
+        for (int i = 0; i < COLUMNS * ROWS; i++) {
+            var tile = game.farm.tile(i % COLUMNS, i / COLUMNS);
+            if ((tile.weedsSince() != null && tile.weedsSince().isAfter(now))
+                    || (tile.insectsSince() != null && tile.insectsSince().isAfter(now)))
+                throw new IllegalArgumentException("Pest arrival is in the future");
+            tile.observePestArrivals(now);
+        }
+        game.replayAutomations(now);
+        return game;
+    }
+
+    public void runAutomationsNow() { replayAutomations(realNow()); }
+
+    private void replayAutomations(Instant target) {
+        if (target.isBefore(automationCursor)) return;
+        if (automationTerms.isEmpty()) { refresh(); return; }
+        Tool previousTool = tool;
+        try {
+            replayAt = automationCursor;
+            while (true) {
+                boolean active = automationActive("water") || automationActive("pests") || automationActive("animals");
+                if (!active) { replayAt = target; refresh(); break; }
+                refresh();
+                for (int i = 0; i < COLUMNS * ROWS; i++) {
+                    var tile = farm.tile(i % COLUMNS, i / COLUMNS);
+                    tile.observePestArrivals(replayAt);
+                    if (!land.isUnlocked(i % COLUMNS, i / COLUMNS) || tile.state() != TileState.GROWING
+                            || tile.crop().plantedAt().isAfter(replayAt)) continue;
+                    if (automationActive("water") && tile.crop().dryAt(replayAt)) {
+                        tool = Tool.WATER; act(i % COLUMNS, i / COLUMNS);
+                    }
+                    if (automationActive("pests")) {
+                        if (tile.weedsSince() != null && !replayAt.isBefore(tile.weedsSince().plusSeconds(900))) {
+                            tool = Tool.WEEDER; act(i % COLUMNS, i / COLUMNS);
+                        }
+                        if (tile.insectsSince() != null && !replayAt.isBefore(tile.insectsSince().plusSeconds(900))) {
+                            tool = Tool.PESTICIDE; act(i % COLUMNS, i / COLUMNS);
+                        }
+                    }
+                }
+                if (automationActive("animals")) for (int i = barn.size() - 1; i >= 0; i--) {
+                    Animal animal = barn.get(i);
+                    if (animal.acquiredAt().isAfter(replayAt) || animal.growthAnchorAt().isAfter(replayAt)) continue;
+                    if (animal.type().kind() == AnimalType.Kind.GROWING && animal.statusAt(replayAt) == Animal.Status.READY) continue;
+                    if (animal.hungryAt(replayAt) || animal.statusAt(replayAt) == Animal.Status.READY) tendAnimal(i);
+                }
+                if (!replayAt.isBefore(target)) break;
+                replayAt = nextAutomationEvent(replayAt, target);
+            }
+            automationCursor = target;
+        } finally { replayAt = null; tool = previousTool; }
+    }
+
+    private Instant nextAutomationEvent(Instant current, Instant target) {
+        Instant next = target;
+        next = earlierEvent(current, next, vip.expiresAt());
+        for (Instant expiry : automationTerms.values()) next = earlierEvent(current, next, expiry);
+        for (var animal : barn.animals()) {
+            next = earlierEvent(current, next, animal.acquiredAt());
+            next = earlierEvent(current, next, animal.growthAnchorAt());
+            if (animal.acquiredAt().isAfter(current) || animal.growthAnchorAt().isAfter(current)) continue;
+            if (animal.type().kind() == AnimalType.Kind.PROTECTOR) next = earlierEvent(current, next, animal.expiresAt());
+            next = earlierEvent(current, next, animal.fedUntil());
+            if (!animal.hungryAt(current) && animal.type().kind() != AnimalType.Kind.PROTECTOR)
+                next = earlierEvent(current, next, current.plus(animal.remainingAt(current)));
+        }
+        for (int i = 0; i < COLUMNS * ROWS; i++) {
+            var tile = farm.tile(i % COLUMNS, i / COLUMNS);
+            if (tile.state() != TileState.GROWING) continue;
+            Crop crop = tile.crop();
+            next = earlierEvent(current, next, crop.plantedAt());
+            if (crop.plantedAt().isAfter(current)) continue;
+            if (automationActive("water") && crop.watered()) next = earlierEvent(current, next, crop.wateredAt().plus(crop.moistDuration()));
+            if (automationActive("pests")) {
+                if (tile.weedsSince() != null) next = earlierEvent(current, next, tile.weedsSince().plusSeconds(900));
+                if (tile.insectsSince() != null) next = earlierEvent(current, next, tile.insectsSince().plusSeconds(900));
+            }
+            if (!crop.watered()) continue;
+            if (tile.pest() == PestState.NONE && crop.stageAt(current) >= 3) next = earlierEvent(current, next, tile.nextPestCheckAt());
+            if (tile.insects() > 0 || crop.stageAt(current) >= 2) next = earlierEvent(current, next, tile.nextInsectCheckAt());
+            if (!crop.paused()) {
+                int stage = crop.stageAt(current);
+                long threshold = (crop.currentDuration().toMillis() * stage + crop.type().stages() - 2) / (crop.type().stages() - 1);
+                long left = threshold - crop.grownMillisAt(current);
+                long moist = Math.max(0, java.time.Duration.between(current, crop.wateredAt().plus(crop.moistDuration())).toMillis());
+                next = earlierEvent(current, next, current.plusMillis(left <= moist ? left : moist + (left - moist) * 2));
+            }
+        }
+        return next;
+    }
+
+    private static Instant earlierEvent(Instant current, Instant next, Instant candidate) {
+        return candidate != null && candidate.isAfter(current) && candidate.isBefore(next) ? candidate : next;
+    }
 
     public ActionResult buyVip() {
         BigDecimal price = VIP_PRICE;
         if (wallet.balance(Currency.GREEN).compareTo(price) < 0)
             return report(ActionResult.fail("O cartão VIP custa 100 moedas verdes."));
-        VipStatus renewed = vip.purchase(realClock.instant());
+        VipStatus renewed = vip.purchase(realNow());
         wallet.debit(Currency.GREEN, price);
         vip = renewed;
         return report(ActionResult.ok("VIP ativo até " + GameText.vipExpiry(vip.expiresAt(), java.time.ZoneId.systemDefault()) + ". " + recordDailyMission("purchase", 1)));
@@ -149,7 +299,7 @@ public final class GameState {
     public Tool tool() { return tool; }
     public CropType seed() { return seed; }
     public String message() { return message; }
-    public Instant now() { return clock.now(); }
+    public Instant now() { return replayAt == null ? clock.now() : replayAt; }
     public boolean musicEnabled() { return musicEnabled; }
     public boolean effectsEnabled() { return effectsEnabled; }
     public void setMusicEnabled(boolean enabled) { musicEnabled = enabled; }
@@ -178,7 +328,7 @@ public final class GameState {
         if (!farm.contains(col, row)) return report(ActionResult.fail("Clique em um terreno da fazenda."));
         if (!land.isUnlocked(col, row)) return report(ActionResult.fail("Este lote ainda está bloqueado."));
         FarmTile tile = farm.tile(col, row);
-        Instant now = clock.now();
+        Instant now = now();
         tile.refresh(now);
         ActionResult result;
         CropType harvested = null;
@@ -371,7 +521,7 @@ public final class GameState {
 
     public ActionResult buyAnimal(AnimalType type, Currency currency) {
         AnimalType known = animalType(type.id());
-        barn.removeExpired(realClock.instant());
+        barn.removeExpired(realNow());
         if (progress.level() < known.requiredLevel())
             return report(ActionResult.fail(known.name() + " libera no nível " + known.requiredLevel() + "."));
         if (barn.full(known)) return report(ActionResult.fail("Limite do cercado: " + known.max() + " por tipo."));
@@ -379,7 +529,7 @@ public final class GameState {
         if (price == null || wallet.balance(currency).compareTo(price) < 0)
             return report(ActionResult.fail("Moedas insuficientes."));
         Animal animal = Animal.acquire(known, new ItemLot(known.id(), currency, price, 1, false)
-                .withAnimalSale(known.saleTerms(currency)), realClock.instant(), clock.now());
+                .withAnimalSale(known.saleTerms(currency)), realNow(), now());
         wallet.debit(currency, price);
         barn.add(animal);
         return report(ActionResult.ok("Comprou " + known.name() + " com alimentação cheia. " + recordDailyMission("purchase", 1)));
@@ -427,18 +577,18 @@ public final class GameState {
 
     public boolean hasAnimalForFeed(String feedId) {
         for (Animal animal : barn.animals()) {
-            if (animal.expiredAt(realClock.instant())) continue;
+            if (animal.expiredAt(realNow())) continue;
             if (animal.type().kind() == AnimalType.Kind.PROTECTOR || animal.type().feedId().equals(feedId)) return true;
         }
         return false;
     }
 
     public int activeProtectors() { return protectorSignature().size(); }
-    public Instant realNow() { return realClock.instant(); }
+    public Instant realNow() { return replayAt == null ? realClock.instant() : replayAt; }
 
     private List<String> protectorSignature() {
-        Instant realNow = realClock.instant();
-        Instant simulationNow = clock.now();
+        Instant realNow = realNow();
+        Instant simulationNow = now();
         return barn.animals().stream().filter(animal -> animalTypes.contains(animal.type()) && animal.activeAt(realNow, simulationNow))
                 .map(animal -> animal.type().id() + ":" + animal.acquiredAt() + ":" + animal.growthAnchorAt() + ":" + animal.fedUntil())
                 .sorted().toList();
@@ -468,8 +618,8 @@ public final class GameState {
         if (index < 0 || index >= barn.size()) return report(ActionResult.fail("Animal inválido."));
         Animal animal = barn.get(index);
         AnimalType type = animal.type();
-        Instant now = clock.now();
-        if (animal.expiredAt(realClock.instant())) return report(ActionResult.fail("Protetor expirado."));
+        Instant now = now();
+        if (animal.expiredAt(realNow())) return report(ActionResult.fail("Protetor expirado."));
         if (type.kind() == AnimalType.Kind.GROWING && animal.stageAt(now) == Animal.Stage.ADULT) return sellAnimal(index);
         if (type.kind() == AnimalType.Kind.PRODUCER && animal.statusAt(now) == Animal.Status.READY) {
             if (inventory.product(type.productId()) == Integer.MAX_VALUE) return report(ActionResult.fail("Depósito cheio para este produto."));
@@ -492,7 +642,7 @@ public final class GameState {
     public ActionResult sellAnimal(int index) {
         if (index < 0 || index >= barn.size()) return report(ActionResult.fail("Animal inválido."));
         Animal animal = barn.get(index);
-        if (animal.type().kind() != AnimalType.Kind.GROWING || animal.stageAt(clock.now()) != Animal.Stage.ADULT)
+        if (animal.type().kind() != AnimalType.Kind.GROWING || animal.stageAt(now()) != Animal.Stage.ADULT)
             return report(ActionResult.fail("Só animais de crescimento adultos podem ser vendidos."));
         BigDecimal total = Market.unitRevenue(animal.origin(), vipActive())
                 .setScale(1, java.math.RoundingMode.CEILING);
@@ -554,7 +704,7 @@ public final class GameState {
 
     private String recordDailyMission(String action, int amount) {
         String orientation = recordTutorial(action);
-        List<DailyMissionBoard.Mission> rewards = dailyMissions.record(action, amount, LocalDate.ofInstant(realClock.instant(), java.time.ZoneOffset.UTC));
+        List<DailyMissionBoard.Mission> rewards = dailyMissions.record(action, amount, LocalDate.ofInstant(realNow(), java.time.ZoneOffset.UTC));
         int green = rewards.stream().mapToInt(DailyMissionBoard.Mission::green).sum();
         if (green > 0) wallet.credit(Currency.GREEN, BigDecimal.valueOf(green));
         return orientation + (green == 0 ? "" : " Tarefa concluída: +" + green + " verde(s).");
@@ -592,9 +742,9 @@ public final class GameState {
 
 
     public boolean refresh() {
-        Instant now = clock.now();
-        dailyMissions.resetIfNewDay(LocalDate.ofInstant(realClock.instant(), java.time.ZoneOffset.UTC));
-        boolean removed = barn.removeExpired(realClock.instant());
+        Instant now = now();
+        dailyMissions.resetIfNewDay(LocalDate.ofInstant(realNow(), java.time.ZoneOffset.UTC));
+        boolean removed = barn.removeExpired(realNow());
         farm.refresh(now);
         lastOutbreak = pests.update(farm, now);
         if (lastOutbreak.weeds()) message = "Ervas daninhas! Use o herbicida.";
@@ -617,7 +767,7 @@ public final class GameState {
      * chamada, então um aviso some assim que o problema é resolvido.
      */
     public List<Alert> alerts() {
-        Instant now = clock.now();
+        Instant now = now();
         List<Alert> alerts = new ArrayList<>();
         for (int row = 0; row < ROWS; row++) for (int col = 0; col < COLUMNS; col++) {
             FarmTile tile = farm.tile(col, row);
@@ -662,7 +812,7 @@ public final class GameState {
                         animal.type().id(), animal.origin(), animal.acquiredAt().toString(), animal.growthAnchorAt().toString(),
                         animal.grownAtAnchorMillis(), animal.fedUntil().toString())).toList(),
                 inventory.feedSnapshot(), inventory.fertilizerSnapshot(), fertilizer.id(),
-                greenCoins(), vip.expiresAt() == null ? null : vip.expiresAt().toString(), protection, notifications.snapshot(),christmas2026,avatar);
+                greenCoins(), vip.expiresAt() == null ? null : vip.expiresAt().toString(), protection, notifications.snapshot(),christmas2026,avatar, automationSnapshot());
     }
 
     public static GameState restore(GameClock clock, CropCatalog catalog, GameSnapshot snapshot) {
@@ -676,6 +826,11 @@ public final class GameState {
 
     public static GameState restore(GameClock clock, Clock realClock, CropCatalog catalog,
                                     GameSnapshot snapshot, RandomSource random) {
+        return restore(clock, realClock, catalog, snapshot, random, true);
+    }
+
+    private static GameState restore(GameClock clock, Clock realClock, CropCatalog catalog,
+                                     GameSnapshot snapshot, RandomSource random, boolean refresh) {
         Objects.requireNonNull(snapshot);
         if (snapshot.tiles() == null || snapshot.tiles().size() != COLUMNS * ROWS
                 || snapshot.seeds() == null || snapshot.produce() == null)
@@ -744,7 +899,18 @@ public final class GameState {
         game.musicEnabled = snapshot.musicEnabled();
         game.effectsEnabled = snapshot.effectsEnabled();
         game.protection = snapshot.protection();
-        game.refresh();
+        if (snapshot.automations() != null) {
+            var metadata = snapshot.automations();
+            game.automationCursor = Instant.parse(metadata.cursor());
+            metadata.expiresAt().forEach((id, expiry) -> game.automationTerms.put(id, Instant.parse(expiry)));
+            for (int i = 0; i < COLUMNS * ROWS; i++) {
+                String key = Integer.toString(i);
+                String weeds = metadata.weedsSince().get(key), insects = metadata.insectsSince().get(key);
+                game.farm.tile(i % COLUMNS, i / COLUMNS).restorePestArrivals(
+                        weeds == null ? null : Instant.parse(weeds), insects == null ? null : Instant.parse(insects));
+            }
+        }
+        if (refresh) game.refresh();
         game.message = "Jogo carregado.";
         return game;
     }

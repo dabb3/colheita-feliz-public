@@ -34,6 +34,7 @@ final class OnlineGameService implements AutoCloseable {
     private static final Set<String> VISIT_ACTIONS = Set.of("STEAL", "LOVE", "SPREAD_INSECTS", "SPREAD_WEEDS");
     private record Loaded(UUID owner, String name, GameState game, long revision, GameSnapshot before, LocalDate allowanceDay) {}
     private final JdbcOnlineStore store;
+    private final PublishedNotes publishedNotes;
     private final Clock clock;
     private final RandomSource random;
     private final int limit;
@@ -41,8 +42,18 @@ final class OnlineGameService implements AutoCloseable {
     private final SecureRandom codes = new SecureRandom();
 
     OnlineGameService(JdbcOnlineStore store, Clock clock, RandomSource random, int limit) {
-        this.store = store; this.clock = clock; this.random = random; this.limit = limit;
+        this(store,clock,random,limit,null);
     }
+    OnlineGameService(JdbcOnlineStore store, Clock clock, RandomSource random, int limit,PublishedNotes publishedNotes) {
+        this.store = store; this.clock = clock; this.random = random; this.limit = limit;
+        this.publishedNotes=publishedNotes;
+    }
+
+    record AutomationOffer(String id,String name,String description,BigDecimal greenPrice,int durationDays) {}
+    static java.util.List<AutomationOffer> automationOffers(){return java.util.List.of(
+            new AutomationOffer("water","Regador automático","Rega suas plantas quando necessário, mesmo com você fora do jogo.",GameState.AUTOMATION_PRICE,30),
+            new AutomationOffer("pests","Removedor automático de pragas","Remove ervas e insetos 15 minutos após surgirem.",GameState.AUTOMATION_PRICE,30),
+            new AutomationOffer("animals","Cuidador automático de animais","Usa sua ração e recolhe produtos prontos quando há espaço. Não vende animais.",GameState.AUTOMATION_PRICE,30));}
 
     @Override public void close() { store.close(); }
 
@@ -53,7 +64,7 @@ final class OnlineGameService implements AutoCloseable {
         for (var type : game.animalTypes()) if (type.kind() != br.com.colheitafeliz.domain.animal.AnimalType.Kind.PROTECTOR)
             feedPrices.addProperty(type.feedId(), type.feedPrice());
         return object("crops", catalog.all(), "animals", game.animalTypes(), "fertilizers", game.fertilizers(),
-                "feedPrices", feedPrices, "vip", object("greenPrice", GameState.VIP_PRICE));
+                "feedPrices", feedPrices, "vip", object("greenPrice", GameState.VIP_PRICE),"automationServices",automationOffers());
     }
 
     JsonObject requestId() {
@@ -77,7 +88,10 @@ final class OnlineGameService implements AutoCloseable {
             tx.lockFarms(actor);
             var farm = load(tx, actor);
             farm.game().claimChristmasGift(participant.registeredAt());
-            return withRequestLease(persist(tx, farm, false, true));
+            var view=withRequestLease(persist(tx, farm, false, true));
+            if(publishedNotes!=null&&tx.claimUpdateNotes(actor,publishedNotes.version(),publishedNotes.day(clock.instant())))
+                view.add("updateNotes",publishedNotes.view(clock.instant()));
+            return view;
     }
 
     JsonObject command(UUID actor, Command command) {
@@ -144,7 +158,7 @@ final class OnlineGameService implements AutoCloseable {
 
     JsonArray friends(JdbcOnlineStore.Tx tx, UUID actor) {
         active(tx, actor);var result=new JsonArray();
-        for(var player:tx.friends(actor))result.add(object("id",player.id(),"name",player.name(),"active",player.active(),"avatar",player.avatar()));
+        for(var player:tx.friends(actor,clock.instant()))result.add(object("id",player.id(),"name",player.name(),"active",player.active(),"avatar",player.avatar(),"vipActive",player.vipActive()));
         return result;
     }
 
@@ -243,15 +257,19 @@ final class OnlineGameService implements AutoCloseable {
         Instant now = saved != null && clock.instant().isBefore(saved.time()) ? saved.time() : clock.instant();
         var fixed = Clock.fixed(now, ZoneOffset.UTC);
         GameState game = saved == null ? new GameState(fixed::instant, fixed, catalog, random)
-                : GameState.restore(fixed::instant, fixed, catalog, saved.snapshot(), random);
+                : GameState.restoreOnline(saved.time(),now,catalog,saved.snapshot(),random);
         if (saved == null) game.startNewFarm();
         game.refresh(); game.protectedPlots();
         return new Loaded(owner, participant.name(), game, saved == null ? 0 : saved.revision(), saved == null ? null : saved.snapshot(), saved == null ? null : saved.allowanceDay());
     }
 
     private JsonObject persist(JdbcOnlineStore.Tx tx, Loaded loaded, boolean force, boolean own) {
+        loaded.game().runAutomationsNow();
         var snapshot = loaded.game().snapshot();
-        long revision = force || !snapshot.equals(loaded.before()) ? Math.incrementExact(loaded.revision()) : loaded.revision();
+        var compared=snapshot;
+        if(loaded.before()!=null&&loaded.before().automations()!=null&&snapshot.automations()!=null)
+            compared=snapshot.withAutomationCursor(loaded.before().automations().cursor());
+        long revision = force || !compared.equals(loaded.before()) ? Math.incrementExact(loaded.revision()) : loaded.revision();
         tx.save(loaded.owner(), snapshot, revision, loaded.game().now());
         var view = OnlineViews.farm(loaded.owner(), loaded.name(), loaded.game(), revision, own);
         if (own) {
@@ -301,6 +319,7 @@ final class OnlineGameService implements AutoCloseable {
     private ActionResult act(GameState game, Command c) {
         Currency currency = c.currency() == null ? Currency.GOLD : Currency.valueOf(c.currency());
         return switch (c.action()) {
+            case "BUY_AUTOMATION" -> game.buyAutomation(c.requireItem());
             case "SET_AVATAR", "IMPORT_AVATAR" -> game.selectAvatar(new br.com.colheitafeliz.game.PlayerAvatar(c.requireItem(),c.photoUrl()),c.action().equals("IMPORT_AVATAR"));
             case "DISMISS_NOTIFICATION" -> game.dismissNotification(c.requireItem());
             case "DISMISS_READ_NOTIFICATIONS" -> game.dismissReadNotifications();

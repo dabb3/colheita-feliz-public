@@ -467,3 +467,8 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 .notification-entry.is-read{background:#f4f5e9;color:#626956}
 .notification-entry p{margin:0 0 8px}.notification-entry time{display:block;font-size:12px;margin-bottom:8px}
 .protection-icon{width:18px;height:18px;object-fit:contain}
+
+.public-vip-badge { display:inline-flex; align-items:center; margin-inline-start:.4em; color:#805100; background:#fff0ac; border:1px solid #c38b25; border-radius:1em; padding:.1em .45em; font-size:.72em; white-space:nowrap; vertical-align:middle; }
+.automation-offer { margin-block:12px; padding:16px; }
+.automation-offer p { overflow-wrap:anywhere; }
+.automation-offer button { max-width:100%; white-space:normal; min-height:44px; }

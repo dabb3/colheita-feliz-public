@@ -41,7 +41,7 @@ public final class ServerMain {
             throw new IllegalArgumentException("Production origins require explicit HTTPS URLs");
         store.initialize(owner);
         var server = new GameHttpServer(new InetSocketAddress(host, Integer.parseInt(env.getOrDefault("PORT", "8080"))),
-                new OnlineGameService(store, Clock.systemUTC(), java.util.concurrent.ThreadLocalRandom.current()::nextInt, PARTICIPANT_LIMIT),
+                new OnlineGameService(store, Clock.systemUTC(), java.util.concurrent.ThreadLocalRandom.current()::nextInt, PARTICIPANT_LIMIT,PublishedNotes.fromEnvironment(env)),
                 auth, origins, development, Clock.systemUTC(), !development && "true".equals(env.get("TRUST_FLY_CLIENT_IP")));
         Runtime.getRuntime().addShutdownHook(new Thread(server::close, "server-shutdown"));
         server.start();

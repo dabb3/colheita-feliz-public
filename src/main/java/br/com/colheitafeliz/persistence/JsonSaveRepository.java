@@ -66,6 +66,7 @@ public final class JsonSaveRepository implements SaveRepository {
             CropSaleJsonValidation.validate(data.get("snapshot"));
             NotificationJsonValidation.validate(data.get("snapshot"));
             AnimalSaleJsonValidation.validate(data.get("snapshot"));
+            AutomationJsonValidation.validate(data.get("snapshot"));
             GameSave save = gson.fromJson(data, GameSave.class);
             if (save.snapshot() == null) throw new IOException("Incomplete save file: " + file);
             CropSaleJsonValidation.validateTerms(save.snapshot());

@@ -13,7 +13,7 @@ record Command(UUID requestId, String expectedRevision, String action, String it
             "BUY_VIP", "BUY_PLOT", "SELL_ALL", "SELL_ITEM", "SELL_ITEM_ALL", "SELL_ANIMAL", "TEND_ANIMAL",
             "PLOW", "PLANT", "WATER", "HARVEST", "WEED", "PESTICIDE", "FERTILIZE", "STEAL", "LOVE",
             "SPREAD_INSECTS", "SPREAD_WEEDS", "CLAIM_DAILY_ALLOWANCE", "READ_NOTIFICATION", "READ_ALL_NOTIFICATIONS",
-            "SET_AVATAR", "IMPORT_AVATAR", "DISMISS_NOTIFICATION", "DISMISS_READ_NOTIFICATIONS");
+            "SET_AVATAR", "IMPORT_AVATAR", "DISMISS_NOTIFICATION", "DISMISS_READ_NOTIFICATIONS", "BUY_AUTOMATION");
     Command {
         Objects.requireNonNull(requestId);
         if (!ACTIONS.contains(action)) throw new ApiFailure(400, "Ação desconhecida.");

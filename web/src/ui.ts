@@ -24,6 +24,7 @@ export function control(label: string, action: () => void) {
   return node;
 }
 
+export function vipBadge(){const badge=text('span','♛ VIP','public-vip-badge');badge.setAttribute('aria-label','VIP ativo');return badge;}
 export function friendAvatar(friend:Friend){
  const node=image('classic/icons/avatar_masculino.png','friend-avatar');
  node.referrerPolicy='no-referrer';node.loading='lazy';node.alt=`Avatar de ${friend.name}`;
@@ -72,6 +73,7 @@ export function renderWallet(
     visitedName ? `Visitando ${visitedName}` : farm.name,
   );
   name.title = name.textContent ?? "";
+  if(farm.vipActive)name.append(vipBadge());
   heading.append(name, text("span", `Nível ${farm.level ?? 1}`, "level-badge"));
   const progress = document.createElement("progress");
   progress.max = 100;

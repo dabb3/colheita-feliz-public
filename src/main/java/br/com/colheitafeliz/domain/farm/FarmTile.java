@@ -14,6 +14,8 @@ public final class FarmTile {
     /** Minhocas (0 = nenhuma, até {@link #MAX_INSECTS}); pausam o crescimento como as ervas, sem reduzir a colheita. */
     private int insects;
     private Instant nextInsectCheckAt;
+    private Instant weedsSince;
+    private Instant insectsSince;
     /** Cultura da planta morta que fica depois da colheita, até a pá retirá-la. */
     private CropType withered;
     /** Fertilizante já usado nesta temporada; vale uma vez por temporada. */
@@ -24,6 +26,19 @@ public final class FarmTile {
     public TileState state() { return state; }
     public int insects() { return insects; }
     public Instant nextInsectCheckAt() { return nextInsectCheckAt; }
+    public Instant weedsSince() { return weedsSince; }
+    public Instant insectsSince() { return insectsSince; }
+    public void restorePestArrivals(Instant weeds, Instant worms) {
+        if ((weeds != null && (pest != PestState.WEEDS || weeds.isBefore(crop.pausedAt())))
+                || (worms != null && (insects == 0 || worms.isBefore(crop.pausedAt()))))
+            throw new IllegalArgumentException("Invalid pest arrival metadata");
+        weedsSince = weeds; insectsSince = worms;
+    }
+    /** Historical saves have no arrival: start a conservative waiting period at first observation. */
+    public void observePestArrivals(Instant now) {
+        if (pest == PestState.WEEDS && weedsSince == null) weedsSince = now;
+        if (insects > 0 && insectsSince == null) insectsSince = now;
+    }
     public Crop crop() { return crop; }
     public PestState pest() { return pest; }
     public Instant nextPestCheckAt() { return nextPestCheckAt; }
@@ -59,6 +74,8 @@ public final class FarmTile {
     private void startSeason(Crop next) {
         crop = next;
         pest = PestState.NONE;
+        weedsSince = null;
+        insectsSince = null;
         nextPestCheckAt = null;
         insects = 0;
         nextInsectCheckAt = null;
@@ -81,12 +98,14 @@ public final class FarmTile {
         if (infected) {
             crop = crop.pause(now);
             pest = PestState.WEEDS;
+            weedsSince = now;
         }
     }
 
     public void removePest(Instant now) {
         if (pest != PestState.WEEDS) throw new IllegalStateException("No weeds");
         pest = PestState.NONE;
+        weedsSince = null;
         if (insects == 0) crop = crop.resume(now);
         nextPestCheckAt = now.plus(pestCheckInterval());
     }
@@ -112,6 +131,7 @@ public final class FarmTile {
         if (infected) {
             crop = crop.pause(now);
             insects = 1;
+            insectsSince = now;
         }
     }
 
@@ -126,6 +146,7 @@ public final class FarmTile {
     public void removeInsects(Instant now) {
         if (insects == 0) throw new IllegalStateException("No insects");
         insects = 0;
+        insectsSince = null;
         if (pest == PestState.NONE) crop = crop.resume(now);
         nextInsectCheckAt = now.plus(pestCheckInterval());
     }
@@ -155,6 +176,8 @@ public final class FarmTile {
         insects = 0;
         nextInsectCheckAt = null;
         withered = done.type();
+        weedsSince = null;
+        insectsSince = null;
         fertilized = false;
         state = TileState.DEAD;
         harvestRevision = nextRevision;
@@ -198,6 +221,8 @@ public final class FarmTile {
         this.withered = withered;
         this.fertilized = fertilized && state == TileState.GROWING;
         this.harvestRevision = revision;
+        this.weedsSince = null;
+        this.insectsSince = null;
     }
 
     private void require(TileState expected) {

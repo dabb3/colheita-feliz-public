@@ -31,7 +31,11 @@ export interface Animal {
   saleCurrency?: string;
   economyVersion?: number;
 }
+export interface AutomationService {id:string; name:string; description:string; greenPrice:number; durationDays:number;}
+export interface UpdateNotes {version:string; prNumber:number; date:string; items:string[];}
 export interface Farm {
+  automations?: (AutomationService & {expiresAt:string|null;status:"ACTIVE"|"SUSPENDED"|"EXPIRED"|"NOT_PURCHASED"})[];
+  updateNotes?: UpdateNotes;
   avatar?: {id:string;photoUrl?:string|null};
   avatarSelected?: boolean;
   notifications?: GameNotification[];
@@ -78,7 +82,7 @@ export interface Farm {
   }[];
   nextPlot?: { column: number; row: number; requiredLevel?:number; price?:string|number; currency?:string; purchasable?:boolean };
 }
-export interface Friend { id:string; name:string; avatar?:Farm['avatar']; }
+export interface Friend { vipActive?:boolean; id:string; name:string; avatar?:Farm['avatar']; }
 export interface GameNotification {
   id: string;
   type: 'THEFT'|'CROP_READY'|'ANIMAL_READY'|'VIP_EXPIRED'|'CHRISTMAS_GIFT';
@@ -126,6 +130,7 @@ export interface Catalog {
   fertilizers: Fertilizer[];
   feedPrices: Record<string, number>;
   vip: { greenPrice: number };
+  automationServices?: AutomationService[];
 }
 export interface Reply {
   farm?: Farm;

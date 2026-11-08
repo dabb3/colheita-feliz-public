@@ -15,7 +15,27 @@ public record GameSnapshot(BigDecimal coins, List<br.com.colheitafeliz.domain.in
                            Map<String, Integer> feed, Map<String, Integer> fertilizers, String selectedFertilizerId,
                            BigDecimal greenCoins, String vipExpiresAt, ProtectionSnapshot protection,
                            br.com.colheitafeliz.domain.notification.NotificationInbox.Snapshot notifications,
-                           ChristmasState christmas2026, PlayerAvatar avatar) {
+                           ChristmasState christmas2026, PlayerAvatar avatar, AutomationSnapshot automations) {
+    public record AutomationSnapshot(String cursor, Map<String,String> expiresAt,
+                                     Map<String,String> weedsSince, Map<String,String> insectsSince) {
+        public AutomationSnapshot {
+            java.time.Instant.parse(cursor);
+            expiresAt = Map.copyOf(expiresAt);
+            weedsSince = Map.copyOf(weedsSince);
+            insectsSince = Map.copyOf(insectsSince);
+            for (var entry : expiresAt.entrySet()) {
+                if (!java.util.Set.of("water","pests","animals").contains(entry.getKey()))
+                    throw new IllegalArgumentException("Unknown automation service");
+                java.time.Instant.parse(entry.getValue());
+            }
+            for (var arrivals : List.of(weedsSince, insectsSince)) for (var entry : arrivals.entrySet()) {
+                int id = Integer.parseInt(entry.getKey());
+                if (id < 0 || id >= GameState.COLUMNS * GameState.ROWS || !Integer.toString(id).equals(entry.getKey()))
+                    throw new IllegalArgumentException("Invalid automation tile");
+                java.time.Instant.parse(entry.getValue());
+            }
+        }
+    }
     public record ChristmasState(String registeredAt,boolean giftGranted) {
         public ChristmasState {
             var registration=java.time.Instant.parse(registeredAt);
@@ -40,6 +60,10 @@ public record GameSnapshot(BigDecimal coins, List<br.com.colheitafeliz.domain.in
         tiles = List.copyOf(tiles);
         if (tiles.size() != GameState.COLUMNS * GameState.ROWS)
             throw new IllegalArgumentException("Invalid farm dimensions");
+        if (automations != null) {
+            validatePestArrivals(tiles, automations.weedsSince(), true);
+            validatePestArrivals(tiles, automations.insectsSince(), false);
+        }
         dailyMissionProgress = Map.copyOf(dailyMissionProgress);
         completedDailyMissions = List.copyOf(completedDailyMissions);
         unlockedPlotIds = List.copyOf(unlockedPlotIds);
@@ -49,6 +73,22 @@ public record GameSnapshot(BigDecimal coins, List<br.com.colheitafeliz.domain.in
         feed = Map.copyOf(feed);
         // Null só chega de um save v20 sem o campo; o v16 já é recusado na carga e o adubo antigo não é convertido (seção 10).
         fertilizers = fertilizers == null ? Map.of() : Map.copyOf(fertilizers);
+    }
+    private static void validatePestArrivals(List<TileSnapshot> tiles, Map<String,String> arrivals, boolean weeds) {
+        for (var entry : arrivals.entrySet()) {
+            var tile = tiles.get(Integer.parseInt(entry.getKey()));
+            if ((weeds ? !"WEEDS".equals(tile.pest()) : tile.insects() == 0) || tile.pausedAt() == null
+                    || java.time.Instant.parse(entry.getValue()).isBefore(java.time.Instant.parse(tile.pausedAt())))
+                throw new IllegalArgumentException("Inconsistent pest arrival metadata");
+        }
+    }
+    public GameSnapshot withAutomationCursor(String cursor) {
+        if (automations == null) return this;
+        return new GameSnapshot(coins, seeds, produce, tiles, selectedSeedId, tool, level, currentXp,
+                musicEnabled, effectsEnabled, dailyMissionDay, dailyMissionProgress, completedDailyMissions,
+                unlockedPlotIds, tutorialStep, animals, feed, fertilizers, selectedFertilizerId, greenCoins,
+                vipExpiresAt, protection, notifications, christmas2026, avatar,
+                new AutomationSnapshot(cursor, automations.expiresAt(), automations.weedsSince(), automations.insectsSince()));
     }
     public record ProtectionSnapshot(List<Integer> unlockedIds, List<String> activeProtectors, List<Integer> protectedIds) {
         public ProtectionSnapshot {

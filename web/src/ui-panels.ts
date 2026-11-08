@@ -1,5 +1,5 @@
 import type { Farm, Catalog, Tile, CommandFields, Friend } from "./types.ts";
-import { text, image, control, renderDailyAllowance,friendAvatar } from "./ui.ts";
+import { text, image, control, renderDailyAllowance,friendAvatar,vipBadge } from "./ui.ts";
 import { animalPath, productPath } from "./presentation.ts";
 import { durationLabel, animalCare, cropTimingText } from "./ui-presentation.ts";
 
@@ -400,6 +400,7 @@ export function renderFriends(
       text("strong", friend.name),
       control(`Visitar ${friend.name}`, () => onVisit(friend.id)),
     );
+    if(friend.vipActive)row.children[1].append(vipBadge());
     root.append(row);
   }
   if (!friends.length)

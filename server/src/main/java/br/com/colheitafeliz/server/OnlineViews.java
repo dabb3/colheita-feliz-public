@@ -59,11 +59,18 @@ final class OnlineViews {
         view.addProperty("level", game.progress().level());
         view.addProperty("currentXp", game.progress().currentXp().toPlainString());
         view.addProperty("xpToNext", game.progress().xpToNext().toPlainString());
+        view.addProperty("vipActive",game.vipActive());
         if (!own) return view;
         view.addProperty("avatarSelected",game.avatar()!=null);
         view.add("notifications",JSON.toJsonTree(game.notifications().entries()));
         view.addProperty("unreadNotifications",game.notifications().unread());
-        view.addProperty("vipActive", game.vipActive());
+        var automations=new JsonArray();
+        for(var offer:OnlineGameService.automationOffers()){
+            var expiry=game.automationExpiresAt(offer.id());
+            String status=expiry==null?"NOT_PURCHASED":!game.realNow().isBefore(expiry)?"EXPIRED":game.vipActive()?"ACTIVE":"SUSPENDED";
+            var benefit=JSON.toJsonTree(offer).getAsJsonObject();benefit.add("expiresAt",JSON.toJsonTree(expiry==null?null:expiry.toString()));benefit.addProperty("status",status);automations.add(benefit);
+        }
+        view.add("automations",automations);
         view.add("vipExpiresAt", JSON.toJsonTree(game.vip().expiresAt() == null ? null : game.vip().expiresAt().toString()));
         JsonObject seeds = new JsonObject();
         for (var crop : game.catalog().all()) seeds.addProperty(crop.id(), game.inventory().seeds(crop));

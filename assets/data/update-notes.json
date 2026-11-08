@@ -1,0 +1,14 @@
+{
+  "version": "vip-benefits-v1",
+  "prNumber": null,
+  "items": [
+    "Agora você pode contratar três ajudantes para cuidar da sua fazenda, mesmo quando estiver fora do jogo.",
+    "O regador automático mantém suas plantas regadas. Ele não colhe suas plantas.",
+    "O removedor automático limpa ervas e insetos 15 minutos depois que aparecem.",
+    "O cuidador alimenta seus animais com a ração que você já tem e guarda os produtos prontos quando houver espaço. Ele não compra ração nem vende animais.",
+    "Cada ajudante custa 100 moedas verdes e dura 30 dias. É preciso ter o Cartão VIP ativo para comprar e usar os ajudantes.",
+    "O Cartão VIP continua custando 100 moedas verdes por 30 dias. Cartão e os três ajudantes juntos custam 400 moedas verdes.",
+    "Se o VIP acabar, os ajudantes param e seus prazos continuam correndo. Ao renovar o VIP, os ajudantes ainda válidos voltam a funcionar.",
+    "Seus amigos agora veem uma coroa VIP ao lado do seu nome enquanto seu cartão estiver ativo."
+  ]
+}

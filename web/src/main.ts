@@ -3,7 +3,7 @@ import type {Farm,Catalog,Tile,Reply,CommandFields,Friend} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
 import {takeInvite} from './invite-url.ts';
-import {renderWallet,control,text,renderDailyAllowance,friendAvatar} from './ui.ts';
+import {renderWallet,control,text,renderDailyAllowance,friendAvatar,vipBadge} from './ui.ts';
 import {fertilizerDuration,durationLabel,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText} from './ui-presentation.ts';
 import {PROTECTED_ICON,notificationCount,renderNotifications} from './notifications.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,avatarImport,type AvatarChoice} from './avatar.ts';
@@ -119,6 +119,31 @@ async function fadeSoldDepositRows(fields:CommandFields,farm:Farm){
 }
 let missionsTimer:number|undefined;
 function dialog(title:string){dialogGeneration++;refreshDialog=undefined;closeHealth();element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');modal.classList.toggle('missions-dialog',title==='Missões');if(title!=='Missões'){window.clearInterval(missionsTimer);missionsTimer=undefined;}content.replaceChildren();content.scrollTop=0;modalFooter.replaceChildren();modalFooter.hidden=true;if(!modal.open)modal.showModal();}
+let pendingUpdateNotes: NonNullable<Farm['updateNotes']>[] = [], notesOwner = '';
+const shownUpdateNotes = new Set<string>();
+function collectUpdateNotes(farm:Farm){
+ if(notesOwner!==farm.owner){notesOwner=farm.owner;pendingUpdateNotes=[];shownUpdateNotes.clear();}
+ const notes=farm.updateNotes;
+ if(!notes?.version?.trim()||!Number.isInteger(notes.prNumber)||notes.prNumber<=0||!/^\d{4}-\d{2}-\d{2}$/.test(notes.date)||!notes.items?.length||!notes.items.every(item=>typeof item==='string'&&item.trim()))return;
+ const key=JSON.stringify([notes.version,notes.date]);if(shownUpdateNotes.has(key))return;
+ shownUpdateNotes.add(key);pendingUpdateNotes.push(notes);
+}
+function showUpdateNotes(){
+ if(!own||modal.open||!pendingUpdateNotes.length)return;
+ const notes=pendingUpdateNotes.shift()!;dialog('Notas da atualização');
+ paragraph('PR #'+notes.prNumber+' · '+notes.date.split('-').reverse().join('/'));
+ const list=document.createElement('ul');for(const item of notes.items){const row=document.createElement('li');row.textContent=item;list.append(row);}content.append(list);
+ button('Entendi',()=>{modal.close();showUpdateNotes();});
+}
+function confirmVipPurchase(name:string,price:number,days:number,fields:CommandFields){
+ if(!own||busy||api?.pending||(modal.open&&element('modal-title').textContent==='Confirmar compra'))return;
+ dialog('Confirmar compra');const generation=dialogGeneration,session=sessionGeneration;let submitted=false;
+ paragraph(name+' · '+price+' verdes · '+days+' dias. Saldo: '+(own.greenCoins??'0')+' verdes.');
+ paragraph(fields.action==='BUY_VIP'?'A renovação acrescenta 30 dias ao prazo vigente ou começa agora se expirado. Os serviços são opcionais e comprados separadamente.':'Exige VIP ativo para comprar e usar. Tem vencimento próprio; a renovação acrescenta a validade ao prazo vigente ou começa agora se expirado. Sem VIP, fica suspenso e isso não estende a validade. Usa os recursos disponíveis da fazenda.');
+ button('Cancelar',()=>{if(generation===dialogGeneration){modal.close();showUpdateNotes();}});
+ const confirm=button('Confirmar compra',async()=>{if(submitted||busy||!modal.open||generation!==dialogGeneration||session!==sessionGeneration)return;submitted=true;confirm.disabled=true;modal.close();await action(fields);showUpdateNotes();});
+ confirm.disabled=Number(own.greenCoins??0)<price||(fields.action==='BUY_AUTOMATION'&&!own.vipActive);
+}
 function settings(){
  dialog('Ajustes');
  paragraph('Som, perfil e conta da fazenda.',content).className='settings-intro';
@@ -133,7 +158,7 @@ function settings(){
  }
  paragraph('Preferências salvas por conta neste navegador.',audio).className='muted';
  const profile=document.createElement('section');profile.className='settings-section settings-profile';sections.append(profile);const profileTitle=document.createElement('h3');profileTitle.textContent='Seu perfil';profile.append(profileTitle);
- const player=document.createElement('div');player.className='profile-player';const avatar=document.createElement('img');avatar.className='profile-avatar';avatar.referrerPolicy='no-referrer';avatar.src=avatarSource(own?.avatar?.id as AvatarChoice,own?.avatar?.photoUrl??undefined);avatar.alt=`Avatar de ${own?.name??'jogador'}`;avatar.onerror=()=>{avatar.onerror=null;avatar.src=avatarSource('classic');};const details=document.createElement('div');details.className='profile-details';const playerName=document.createElement('strong');playerName.className='profile-name';playerName.textContent=own?.name??'Jogador';details.append(playerName);if(!visited)button('Trocar avatar',avatarSettings,details);player.append(avatar,details);profile.append(player);
+ const player=document.createElement('div');player.className='profile-player';const avatar=document.createElement('img');avatar.className='profile-avatar';avatar.referrerPolicy='no-referrer';avatar.src=avatarSource(own?.avatar?.id as AvatarChoice,own?.avatar?.photoUrl??undefined);avatar.alt=`Avatar de ${own?.name??'jogador'}`;avatar.onerror=()=>{avatar.onerror=null;avatar.src=avatarSource('classic');};const details=document.createElement('div');details.className='profile-details';const playerName=document.createElement('strong');playerName.className='profile-name';playerName.textContent=own?.name??'Jogador';if(own?.vipActive)playerName.append(vipBadge());details.append(playerName);if(!visited)button('Trocar avatar',avatarSettings,details);player.append(avatar,details);profile.append(player);
  const about=document.createElement('section');about.className='settings-section settings-about';sections.append(about);const aboutTitle=document.createElement('h3');aboutTitle.textContent='Sobre';about.append(aboutTitle);
  const repository=document.createElement('a');repository.className='settings-action repository-link';repository.href='https://github.com/dabb3/colheita-feliz-public';repository.target='_blank';repository.rel='noopener noreferrer';repository.setAttribute('aria-label','Abrir repositório do projeto no GitHub em nova aba');const repositoryName=document.createElement('strong');repositoryName.textContent='Repositório do projeto';const repositoryArrow=document.createElement('span');repositoryArrow.className='repository-external';repositoryArrow.textContent='↗';repository.append(githubIcon(),repositoryName,repositoryArrow);about.append(repository);
  const developers=document.createElement('div');developers.className='developer-links';for(const name of ['dabb3','mrlsouz']){const link=document.createElement('a');link.href=`https://github.com/${name}`;link.append(document.createTextNode(`@${name}`),githubIcon());link.target='_blank';link.rel='noopener noreferrer';developers.append(link);}about.append(developers);
@@ -151,7 +176,7 @@ function avatarSettings(){
  }
  if(!googlePhoto)paragraph('A foto do Google não está disponível nesta sessão.');
 }
-async function logout(){sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;setLoginStep('login');syncPending();if(supabase)await supabase.auth.signOut();}
+async function logout(){pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner="";sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;setLoginStep('login');syncPending();if(supabase)await supabase.auth.signOut();}
 function showConnection(message?:string){element('connection').hidden=!message;element('connection').textContent=message??'';}
 function syncPending(){element('pending').hidden=!api?.pending;element<HTMLButtonElement>('retry').disabled=!!api?.busy;}
 function display(){return visited??own;}
@@ -176,7 +201,7 @@ function render(){
  element('home').hidden=!visited;
  const tutorial=element('tutorial');tutorial.hidden=!!visited||!own.tutorial;tutorial.replaceChildren();
  if(own.tutorial){const strong=document.createElement('strong');strong.textContent=own.tutorial.title??'';tutorial.append(strong);paragraph(own.tutorial.hint??'',tutorial);}
- scene?.update(display()!);syncPending();renderTools();refreshOpenDialog();const currentHealthTile=healthTile&&display()?.tiles.find(tile=>tile.column===healthTile!.column&&tile.row===healthTile!.row);health(currentHealthTile??null,healthPoint,'refresh');layoutHud();
+ scene?.update(display()!);syncPending();renderTools();refreshOpenDialog();const currentHealthTile=healthTile&&display()?.tiles.find(tile=>tile.column===healthTile!.column&&tile.row===healthTile!.row);health(currentHealthTile??null,healthPoint,'refresh');layoutHud();showUpdateNotes();
 }
 function renderTools(){
  const toolbar=element('tools');toolbar.replaceChildren();
@@ -244,6 +269,7 @@ function handleError(error:unknown){
 function updateOwnFarm(farm:Farm){
  const previous=own;
  own=acceptFarm(own,farm);
+ if(own===farm)collectUpdateNotes(farm);
  if(previous&&own!==previous&&own.tiles.some(tile=>tile.state==='READY'&&previous.tiles.some(old=>
   old.column===tile.column&&old.row===tile.row&&old.cropId===tile.cropId&&old.season===tile.season&&old.state==='GROWING'
  )))playEffect('planta-pronta-para-colher');
@@ -414,7 +440,19 @@ function shop(category='crops',focusKey?:string){
   for(const fertilizer of catalog.fertilizers)cards.append(marketCard(fertilizer.name,`classic/icons/adubo-${fertilizer.id}.png`,`Reduz ${fertilizerDuration(fertilizer.reductionSeconds)}${fertilizer.friendsOnly?' · em amigos':''}`,fertilizer.requiredLevel,fertilizer.prices,'BUY_FERTILIZER',fertilizer.id));
  }
  if(category==='vip'){
-  const offer=document.createElement('article');offer.className='vip-offer';const image=document.createElement('img');image.src='/assets/classic/icons/cartao-vip.png';image.alt='Cartão VIP';const details=document.createElement('div');const title=document.createElement('h3');title.textContent='Cartão VIP · 30 dias';const intro=paragraph('Desbloqueie o acesso às culturas VIP respeitando o nível de cada uma.',details);intro.className='vip-intro';const benefits=document.createElement('ul');for(const benefit of ['Preços VIP de venda conforme cada item.','Renove antes de expirar para acumular mais 30 dias.']){const item=document.createElement('li');item.textContent=benefit;benefits.append(item);}details.append(benefits);const status=paragraph(own?.vipActive?`VIP ativo até ${own.vipExpiresAt}`:'VIP inativo',details);status.className='vip-status';const buy=button(`Comprar cartão VIP · ${catalog.vip.greenPrice} verdes`,()=>action({action:'BUY_VIP'}),details);buy.className='vip-buy';buy.setAttribute('aria-label',`Comprar cartão VIP por ${catalog.vip.greenPrice} verdes`);const coin=document.createElement('img');coin.src='/assets/classic/icons/moeda-verde.png';coin.alt='';buy.append(coin);details.prepend(title);offer.append(image,details);scroll.append(offer);
+  const offer=document.createElement('article');offer.className='vip-offer';const image=document.createElement('img');image.src='/assets/classic/icons/cartao-vip.png';image.alt='Cartão VIP';const details=document.createElement('div');const title=document.createElement('h3');title.textContent='Cartão VIP · 30 dias';const intro=paragraph('Desbloqueie o acesso às culturas VIP respeitando o nível de cada uma.',details);intro.className='vip-intro';const benefits=document.createElement('ul');for(const benefit of ['Preços VIP de venda conforme cada item.','Renove antes de expirar para acumular mais 30 dias.']){const item=document.createElement('li');item.textContent=benefit;benefits.append(item);}details.append(benefits);const status=paragraph(own?.vipActive?`VIP ativo até ${own.vipExpiresAt}`:'VIP inativo',details);status.className='vip-status';const buy=button(`Comprar cartão VIP · ${catalog.vip.greenPrice} verdes`,()=>confirmVipPurchase('Cartão VIP',catalog.vip.greenPrice,30,{action:'BUY_VIP'}),details);buy.className='vip-buy';buy.setAttribute('aria-label',`Comprar cartão VIP por ${catalog.vip.greenPrice} verdes`);const coin=document.createElement('img');coin.src='/assets/classic/icons/moeda-verde.png';coin.alt='';buy.append(coin);details.prepend(title);offer.append(image,details);scroll.append(offer);
+  paragraph('Cartão e três serviços: 400 verdes por 30 dias cada. Serviços opcionais, comprados separadamente.',scroll);
+  for(const service of catalog.automationServices??[]){
+   const card=document.createElement('article');card.className='card automation-offer';const state=own?.automations?.find(item=>item.id===service.id);
+   card.append(text('h3',service.name),text('p',service.description),text('p',service.greenPrice+' verdes · '+service.durationDays+' dias'));
+   const labels={ACTIVE:'Ativo',SUSPENDED:'Suspenso: exige VIP ativo',EXPIRED:'Expirado',NOT_PURCHASED:'Não comprado'};
+   card.append(text('p',labels[state?.status??'NOT_PURCHASED'],'status-badge'));
+   if(state?.expiresAt)card.append(text('p','Validade: '+new Date(state.expiresAt).toLocaleString('pt-BR')));
+   const buyService=button('Comprar '+service.name+' · '+service.greenPrice+' verdes',()=>confirmVipPurchase(service.name,service.greenPrice,service.durationDays,{action:'BUY_AUTOMATION',itemId:service.id}),card);
+   buyService.disabled=!own?.vipActive||Number(own?.greenCoins??0)<service.greenPrice;
+   if(!own?.vipActive)paragraph('Ative o cartão VIP para comprar e usar este serviço.',card);else if(Number(own?.greenCoins??0)<service.greenPrice)paragraph('Saldo de verdes insuficiente.',card);
+   scroll.append(card);
+  }
  }
  if(category==='owned'){
   const producerFeed=own?.feed?.producer??0,growthFeed=own?.feed?.growth??0,feedCount=producerFeed+growthFeed,feedStatus=document.createElement('section');feedStatus.className='owned-feed-summary';feedStatus.append(text('strong',`Ração: ${feedCount}`));for(const meta of feedDetails){const count=own?.feed?.[meta.id]??0,entry=document.createElement('span');entry.className='owned-feed-count';entry.append(feedIcon(meta.id,'small'),text('span',`${meta.id==='producer'?'Produção':'Crescimento'} ×${count}`));feedStatus.append(entry);}const buyFeed=button('Comprar ração',()=>shop('animals','buy-feed:producer'),feedStatus,'owned-buy-feed');buyFeed.className='owned-feed-link';scroll.append(feedStatus);
@@ -557,12 +595,14 @@ async function friends(){
   catch(error){handleError(error);}finally{syncPending();}
  },invites);invitationForm(invites);content.append(invites);
  const heading=document.createElement('h3');heading.className='friends-title';heading.textContent='Seus amigos';content.append(heading);const listPanel=document.createElement('div');listPanel.className='friend-list';content.append(listPanel);
- try{const list=await client.get<Friend[]>('/v1/friends');if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open)return;for(const friend of list){const row=document.createElement('article');row.className='friend-card';const badge=friendAvatar(friend);const name=document.createElement('strong');name.textContent=friend.name;const visit=button('Visitar fazenda',async()=>{const navigation=++navigationGeneration;try{const farm=await client.get<Farm>(`/v1/farms/${friend.id}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||dialogGeneration!==panelGeneration||!modal.open)return;visited=farm;tool='CURSOR';render();modal.close();}catch(error){handleError(error);}},row);row.prepend(badge,name);listPanel.append(row);}if(!list.length)paragraph('Nenhum amigo adicionado ainda.',listPanel);}
+ let friendRefresh=0;
+ refreshDialog=()=>{const request=++friendRefresh;void client.get<Friend[]>('/v1/friends').then(list=>{if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open||request!==friendRefresh)return;for(const row of Array.from(listPanel.children)){const name=row.children[1],friend=list.find(item=>item.id===(row as HTMLElement).dataset.friendId);if(name&&friend){name.replaceChildren(document.createTextNode(friend.name));if(friend.vipActive)name.append(vipBadge());}}}).catch(()=>{});};
+ try{const list=await client.get<Friend[]>('/v1/friends');if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open)return;for(const friend of list){const row=document.createElement('article');row.className='friend-card';row.dataset.friendId=friend.id;const badge=friendAvatar(friend);const name=document.createElement('strong');name.textContent=friend.name;if(friend.vipActive)name.append(vipBadge());const visit=button('Visitar fazenda',async()=>{const navigation=++navigationGeneration;try{const farm=await client.get<Farm>(`/v1/farms/${friend.id}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||dialogGeneration!==panelGeneration||!modal.open)return;visited=farm;tool='CURSOR';render();modal.close();}catch(error){handleError(error);}},row);row.prepend(badge,name);listPanel.append(row);}if(!list.length)paragraph('Nenhum amigo adicionado ainda.',listPanel);}
  catch(error){handleError(error);}
 }
 async function migrateAvatar(){const migration=own&&avatarImport(avatarStore,avatarUser,own.avatarSelected,googlePhoto);if(migration)await action(migration);}
 async function connect(user:string,token:()=>Promise<string>,photo?:unknown,displayName=''){
- sessionGeneration++;navigationGeneration++;busy=false;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;closeScene();const generation=sessionGeneration;
+ pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner='';sessionGeneration++;navigationGeneration++;busy=false;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;closeScene();const generation=sessionGeneration;
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
  avatarUser=`${config.api}:${user}`;googlePhoto=googleAvatar(photo);avatarChoice='classic';loadAudioSettings();
  scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>{if(healthPinned&&!(tool==='CURSOR'&&tile.cropId))closeHealth();void tileAction(tile);},(id,pointerType)=>{if(pointerType==='touch'&&tool==='CURSOR'){playAnimalSound(id);animalPopup(id);return;}const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health,syncMusic,()=>{if(healthPinned)closeHealth();},playAnimalSound);
@@ -600,7 +640,8 @@ async function start(){
 }
 element('notifications').onclick=notifications;
 element('shop').onclick=()=>shop();element('deposit').onclick=deposit;element('missions').onclick=missions;element('friends').onclick=()=>void friends();
-element('home').onclick=()=>{navigationGeneration++;visited=undefined;tool='PLOW';render();};element('settings').onclick=()=>shortcutPanel('Ajustes',settings);element('close-modal').onclick=()=>modal.close();
+element('home').onclick=()=>{navigationGeneration++;visited=undefined;tool='PLOW';render();};element('settings').onclick=()=>shortcutPanel('Ajustes',settings);element('close-modal').onclick=()=>{modal.close();showUpdateNotes();};
+modal.addEventListener('close',showUpdateNotes);
 element('retry').onclick=async()=>{if(!api||busy)return;const client=api,generation=sessionGeneration;busy=true;try{const reply=await client.retry();if(generation!==sessionGeneration)return;receive(reply);if(reply.code){dialog('Convite confirmado');paragraph(reply.code);}}catch(error){if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();await refresh();}}};
 window.addEventListener('offline',()=>showConnection('Sem conexão. Reconecte antes de agir.'));
 window.addEventListener('online',()=>void refresh());

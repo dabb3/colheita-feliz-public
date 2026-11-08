@@ -32,7 +32,7 @@ class UsabilityIntegrationTest {
         assertEquals("classic",service.friends(friend).get(0).getAsJsonObject().getAsJsonObject("avatar").get("id").getAsString());
         act("SET_AVATAR","female-2");reopen();
         var profile=service.friends(friend).get(0).getAsJsonObject();
-        assertEquals(java.util.Set.of("id","name","active","avatar"),profile.keySet());
+        assertEquals(java.util.Set.of("id","name","active","avatar","vipActive"),profile.keySet());
         assertEquals("female-2",profile.getAsJsonObject("avatar").get("id").getAsString());
         service.command(owner,avatar("SET_AVATAR","google","https://lh3.googleusercontent.com/a/owner-photo"));
         clock.now=Christmas2026.GIFT_START;
