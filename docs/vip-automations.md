@@ -26,14 +26,16 @@ Cursor e resultados são gravados na mesma transação. Rollback refaz o process
 
 ## Notas diárias
 
-`assets/data/update-notes.json` guarda a versão, o número real de PR e os textos. Ele não é uma autorização de publicação. O padrão de execução não mostra notas. A ativação exige os dois metadados de implantação abaixo, correspondentes exatamente ao manifesto do binário implantado:
+`assets/data/update-notes.json` guarda a versão, o número real de PR e os textos. No deploy de produção, `.github/scripts/deploy-fly.sh` valida esse manifesto e passa automaticamente os dois metadados abaixo por `flyctl deploy --env`, junto com a imagem do mesmo commit:
 
 ```text
 PUBLISHED_UPDATE_NOTES_VERSION=vip-benefits-v1
 PUBLISHED_UPDATE_NOTES_PR=74
 ```
 
-Somente configurar após o PR estar integrado e essa versão ter sido disponibilizada aos jogadores. Não ativar em uma implantação de outra versão nem antecipar novidades de PR aberto. Ambientes locais de QA podem simular a configuração de publicação com dados sintéticos. Nenhuma configuração de provedor é alterada por esta entrega. A configuração parcial/incompatível ou a ausência do manifesto desativa apenas as notas, mantendo o jogo disponível.
+Não é necessário cadastrar ou atualizar essas chaves como secrets. Para uma atualização com novas notas, editar somente o manifesto: versão inédita, número real do PR e novidades que ele entrega. PRs sem novas notas conservam o manifesto. Os testes não fixam o número 74; validam os valores presentes no arquivo. O número não é inferido do PR em revisão.
+
+O pipeline só implanta pushes da branch online após os checks, e recusa commits substituídos por um mais recente. Execuções de PR, outras branches e tags não ativam notas. Dados inválidos ou manifesto ausente interrompem o deploy antes de chamar o Fly, mantendo a versão em execução. Um rollback pelo mesmo pipeline deve usar o manifesto da versão restaurada. A execução padrão fora desse pipeline continua sem notas, a menos que os dois metadados sejam configurados explicitamente e correspondam ao manifesto. Ambientes locais de QA podem simular essa configuração com dados sintéticos; configuração parcial/incompatível no servidor desativa apenas as notas, mantendo o jogo disponível.
 
 A migração aditiva de inicialização cria a tabela privada `update_note_views(actor, version, seen_day)`, com referência ao jogador, RLS e revogação de acesso público/anon/authenticated, seguindo o esquema da API. Não cria usuários, serviços ou privilégios novos.
 
@@ -47,7 +49,7 @@ A política é de no máximo uma entrega por dia/versão: uma resposta perdida a
 2. Publicar apenas servidor e clientes compatíveis com o novo ruleset. Não manter escritores anteriores e novos simultaneamente.
 3. A inicialização cria `update_note_views` no esquema privado já pertencente à API; o usuário SQL precisa manter as permissões de DDL usadas nas migrações existentes.
 4. Conferir saúde, compras confirmadas e um caso de cuidado offline com conta de teste. Não ampliar recursos Fly.io nem adicionar agendador para isso.
-5. Depois do merge e da publicação, habilitar a versão/PR corretos das notas. Na ausência dessa ativação, os benefícios funcionam normalmente e nenhum popup anuncia a atualização.
+5. O deploy automático extrai versão/PR do manifesto e ativa as notas com a mesma implantação, sem etapa manual de secrets. Conferir o popup com conta de teste após a API e o cliente estarem publicados. Uma execução manual fora do pipeline deve passar os dois metadados explicitamente; sem eles, os benefícios funcionam normalmente, mas não há popup.
 6. Para rollback, preferir binário que preserve os novos metadados ou restaurar o backup de forma coordenada. Não usar um leitor antigo sobre dados atualizados. Conservar as linhas de visualização ao restaurar dados de jogador para evitar repetição involuntária das notas.
 
 Não há pagamento real, provedor novo ou custo de infraestrutura contratado pelo código. O consumo de CPU/SQL ocorre nas consultas já atendidas pelo servidor; não é prometido custo de hospedagem zero.

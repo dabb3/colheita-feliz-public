@@ -16,9 +16,12 @@ fi
 if [[ -z "${FLY_API_TOKEN:-}" ]]; then
  echo 'Configure the app-scoped FLY_API_TOKEN Actions secret before enabling deployment.' >&2; exit 1
 fi
+# Activate only the notes packaged in this verified production commit, without separate secrets.
+notes_metadata=$(node "$(dirname "$0")/published-notes-env.mjs" assets/data/update-notes.json)
+mapfile -t notes_args <<< "$notes_metadata"
 flyctl deploy --config fly.toml --app colheita-feliz-public --ha=false --update-only --no-public-ips \
  --remote-only --depot=false --image-label "deployment-$GITHUB_SHA" \
- --label "org.opencontainers.image.revision=$GITHUB_SHA" --yes
+ --label "org.opencontainers.image.revision=$GITHUB_SHA" "${notes_args[@]}" --yes
 curl --fail --silent --show-error --retry 8 --retry-delay 5 --retry-all-errors --max-time 15 \
  https://colheita-feliz-public.fly.dev/health | node -e '
  let body="";process.stdin.on("data",chunk=>body+=chunk);
