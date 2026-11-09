@@ -199,6 +199,7 @@ final class OnlineGameService implements AutoCloseable {
                 long season = Command.revision(command.harvestRevision());
                 var visits = new VisitService();
                 ActionResult result;
+                br.com.colheitafeliz.game.TheftAttempt theft=null;
                 if (command.action().equals("STEAL")) {
                     // The enclosing transaction holds the actor lock across cooldown, transfer and receipt.
                     Instant now = clock.instant();
@@ -207,12 +208,13 @@ final class OnlineGameService implements AutoCloseable {
                     if (now.isBefore(availableAt)) {
                         Duration remaining = Duration.between(now, availableAt);
                         long seconds = remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);
-                        result = ActionResult.fail("Você já furtou nas últimas 24 horas. Novo furto em "
+                        theft = br.com.colheitafeliz.game.TheftAttempt.blocked("Você já usou sua tentativa de furto nas últimas 24 horas. Nova tentativa em "
                                 + seconds / 3600 + "h " + seconds % 3600 / 60 + "min " + seconds % 60 + "s.");
                     } else {
-                        result = stealAfterOwnerWindow(visits, destination, visitor, command, season, now);
-                        if (result.success()) tx.recordTheft(actor, now);
+                        theft = stealAfterOwnerWindow(visits, destination, visitor, command, season, now);
+                        if (theft.consumesCooldown()) tx.recordTheft(actor, now);
                     }
+                    result=theft.result();
                 } else if (PEST_ACTIONS.contains(command.action())) {
                     Instant now = clock.instant();
                     Instant last = tx.lastPest(actor, command.action());
@@ -231,12 +233,14 @@ final class OnlineGameService implements AutoCloseable {
                 } else {
                     result = visits.fertilizeVisit(destination.game(), visitor.game(), command.column(), command.row(), "amor", season);
                 }
-                return object("result", result, "farm", persist(tx, visitor, false, true),
+                var reply=object("result", result, "farm", persist(tx, visitor, false, true),
                         "visitedFarm", persist(tx, destination, false, false));
+                if(theft!=null)reply.add("theftOutcome",object("kind",theft.kind(),"goldDebited",theft.goldDebited().toPlainString()));
+                return reply;
             });
     }
 
-    private static ActionResult stealAfterOwnerWindow(VisitService visits, Loaded destination, Loaded visitor,
+    private br.com.colheitafeliz.game.TheftAttempt stealAfterOwnerWindow(VisitService visits, Loaded destination, Loaded visitor,
                                                        Command command, long season, Instant now) {
         var crop = destination.game().farm().tile(command.column(), command.row()).crop();
         Instant matured = crop == null ? null : crop.maturedAt(destination.game().now());
@@ -245,10 +249,10 @@ final class OnlineGameService implements AutoCloseable {
             if (now.isBefore(availableAt)) {
                 Duration remaining = Duration.between(now, availableAt);
                 long seconds = remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);
-                return ActionResult.fail("Colheita reservada ao dono por mais " + seconds / 60 + "min " + seconds % 60 + "s.");
+                return br.com.colheitafeliz.game.TheftAttempt.blocked("Colheita reservada ao dono por mais " + seconds / 60 + "min " + seconds % 60 + "s.");
             }
         }
-        return visits.steal(destination.game(), visitor.game(), command.column(), command.row(), season, visitor.name());
+        return visits.attemptSteal(destination.game(), visitor.game(), command.column(), command.row(), season, visitor.name(),random);
     }
 
     private Loaded load(JdbcOnlineStore.Tx tx, UUID owner) {

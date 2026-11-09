@@ -359,7 +359,8 @@ export function animalPath(
 ) {
   if (id === "pavao" && open && !sleep)
     return "classic/animals/pavao/pavao-aberto.png";
-  const folder = id === "pombo" ? "pomba" : id === "burro" ? "burrinho" : id;
+  // The persisted identifier stays stable for animals already bought before the visual replacement.
+  const folder = id === "pombo" ? "pomba" : id === "burro" ? "burrinho" : id === "cachorro-robo" ? "cachorro" : id;
   let stem = folder;
   if (id === "pombo")
     stem = `pomba-${stage === "BABY" ? "bebe" : stage === "YOUNG" ? "jovem" : "adulta"}`;
@@ -460,7 +461,6 @@ export function beeOffset(bee: number, seconds: number) {
 export function animalFlip(id: string, facingRight: boolean) {
   const originalRight = [
     "cavalo",
-    "cachorro-robo",
     "cachorro-mastiff",
     "cabra",
     "burro",
@@ -468,6 +468,9 @@ export function animalFlip(id: string, facingRight: boolean) {
     "coelho",
   ].includes(id);
   return facingRight !== originalRight;
+}
+export function animalSoundPath(id:string) {
+  return '/assets/sounds/animals/'+(id==='cachorro-robo'?'cachorro-mastiff':id)+'.wav';
 }
 export function animalLayer(id: string): "back" | "front" {
   const layout = animalLayout[id];

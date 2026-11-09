@@ -581,3 +581,13 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
   .vip-service-description{min-height:0}
   .vip-service-purchase{align-content:center}
 }
+
+#modal.bite-dialog{width:min(580px,94vw);background:linear-gradient(#fffcef,#f7edcb);border:2px solid #b99a53}
+#modal.bite-dialog .dialog-header{background:linear-gradient(#f7e7ad,#e9d083);color:#674b21}
+#modal.bite-dialog #modal-content{text-align:center;padding:20px clamp(16px,5vw,36px)}
+.bite-dog{display:block;width:min(220px,65vw);max-width:100%;height:170px;object-fit:contain;margin:0 auto 16px}
+#bite-message{margin:0;font-size:17px;line-height:1.55;overflow-wrap:anywhere}
+#modal.bite-dialog #modal-footer{display:flex;justify-content:center;padding:0 20px 20px}
+#modal.bite-dialog #modal-footer button{min-width:110px;min-height:44px;background:linear-gradient(#fff2a5,#e9bd47)}
+#modal.bite-dialog button:focus-visible{outline:3px solid #705719;outline-offset:3px}
+@media(max-width:560px){#modal.bite-dialog .dialog-header h2{font-size:19px}.bite-dog{height:130px}#bite-message{font-size:16px}}
