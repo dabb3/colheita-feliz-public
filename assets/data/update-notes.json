@@ -1,17 +1,11 @@
 {
-  "version": "vip-benefits-v1",
-  "prNumber": 74,
+  "version": "protector-bite-v1",
+  "prNumber": 77,
   "items": [
-    "Agora você pode contratar três ajudantes para cuidar da sua fazenda, mesmo quando estiver fora do jogo.",
-    "O regador automático mantém suas plantas regadas. Ele não colhe suas plantas.",
-    "O removedor automático limpa ervas e insetos 15 minutos depois que aparecem.",
-    "O cuidador alimenta seus animais com a ração que você já tem e guarda os produtos prontos quando houver espaço. Ele não compra ração nem vende animais.",
-    "Cada ajudante custa 100 moedas verdes e dura 30 dias. É preciso ter o Cartão VIP ativo para comprar e usar os ajudantes.",
-    "O Cartão VIP continua custando 100 moedas verdes por 30 dias. Cartão e os três ajudantes juntos custam 400 moedas verdes.",
-    "Se o VIP acabar, os ajudantes param e seus prazos continuam correndo. Ao renovar o VIP, os ajudantes ainda válidos voltam a funcionar.",
-    "Seus amigos agora veem uma coroa VIP ao lado do seu nome enquanto seu cartão estiver ativo.",
-    "Para quem quiser apoiar os custos do servidor, também há recargas de moedas verdes combinadas diretamente com o responsável pelo jogo, por Pix. Não há pagamento automático dentro do jogo.",
-    "Valores das recargas: 10 moedas verdes por R$ 4,99; 50 por R$ 14,90; 100 por R$ 24,90; 200 por R$ 39,90; ou 400 por R$ 74,90.",
-    "Depois da confirmação do Pix, as moedas verdes são adicionadas manualmente à sua fazenda. As recargas são opcionais."
+    "O Cachorro normal substituiu o Cão Robô na loja e na fazenda. Quem já tinha comprado mantém seu animal, com os mesmos preços, nível, alimentação, validade e proteção.",
+    "Tentar furtar uma planta protegida continua sendo bloqueado. Agora há 30% de chance de levar uma mordida e perder de 10 a 50 moedas de ouro, até o limite do seu saldo. Suas moedas verdes não são afetadas.",
+    "Uma tentativa válida contra um terreno protegido passa a usar sua espera de 24 horas, mesmo sem mordida. Esse limite vale para todas as fazendas visitadas.",
+    "Os cinco minutos de colheita exclusiva do dono continuam valendo. Plantas ainda crescendo, tentativas durante essa proteção e outras tentativas inválidas não gastam sua vez nem provocam mordida.",
+    "Se houver mordida, um novo aviso mostra o Cachorro, quanto ouro você realmente perdeu e seu saldo atualizado. O ouro perdido não vai para o dono da fazenda."
   ]
 }
