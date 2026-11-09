@@ -118,11 +118,22 @@ async function fadeSoldDepositRows(fields:CommandFields,farm:Farm){
  await new Promise(resolve=>window.setTimeout(resolve,matchMedia('(prefers-reduced-motion: reduce)').matches?0:180));
 }
 let missionsTimer:number|undefined;
-function dialog(title:string){dialogGeneration++;refreshDialog=undefined;closeHealth();element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');modal.classList.toggle('missions-dialog',title==='Missões');if(title!=='Missões'){window.clearInterval(missionsTimer);missionsTimer=undefined;}content.replaceChildren();content.scrollTop=0;modalFooter.replaceChildren();modalFooter.hidden=true;if(!modal.open)modal.showModal();}
+function dialog(title:string){modal.classList.remove('bite-dialog');modal.removeAttribute('aria-describedby');dialogGeneration++;refreshDialog=undefined;closeHealth();element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');modal.classList.toggle('missions-dialog',title==='Missões');if(title!=='Missões'){window.clearInterval(missionsTimer);missionsTimer=undefined;}content.replaceChildren();content.scrollTop=0;modalFooter.replaceChildren();modalFooter.hidden=true;if(!modal.open)modal.showModal();}
+const shownBites=new Set<string>();
+function showBite(reply:Reply,actionName?:string){
+ if(actionName!=='STEAL'||reply.theftOutcome?.kind!=='BITTEN'||!reply.farm||reply.farm.owner!==own?.owner)return false;
+ const key=JSON.stringify([reply.farm.owner,reply.farm.revision]);
+ if(shownBites.has(key))return true;
+ shownBites.add(key);dialog('Cuidado com o cachorro!');modal.classList.add('bite-dialog');
+ content.append(image('classic/animals/cachorro-mastiff/mastiff.png','bite-dog'));
+ const message=paragraph('Você acabou de ser mordido por um cachorro porque estava tentando roubar algo! Você acaba de perder '+depositNumber.format(Number(reply.theftOutcome.goldDebited))+' moedas de ouro tentando fugir.');message.id='bite-message';modal.setAttribute('aria-describedby',message.id);
+ paragraph('Seu saldo: '+(own?.coins??'0')+' ouro.').className='bite-balance';
+ modalFooter.hidden=false;button('OK',()=>{modal.close();showUpdateNotes();},modalFooter).focus({preventScroll:true});return true;
+}
 let pendingUpdateNotes: NonNullable<Farm['updateNotes']>[] = [], notesOwner = '';
 const shownUpdateNotes = new Set<string>();
 function collectUpdateNotes(farm:Farm){
- if(notesOwner!==farm.owner){notesOwner=farm.owner;pendingUpdateNotes=[];shownUpdateNotes.clear();}
+ if(notesOwner!==farm.owner){notesOwner=farm.owner;shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();}
  const notes=farm.updateNotes;
  if(!notes?.version?.trim()||!Number.isInteger(notes.prNumber)||notes.prNumber<=0||!/^\d{4}-\d{2}-\d{2}$/.test(notes.date)||!notes.items?.length||!notes.items.every(item=>typeof item==='string'&&item.trim()))return;
  const key=JSON.stringify([notes.version,notes.date]);if(shownUpdateNotes.has(key))return;
@@ -176,7 +187,7 @@ function avatarSettings(){
  }
  if(!googlePhoto)paragraph('A foto do Google não está disponível nesta sessão.');
 }
-async function logout(){pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner="";sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;setLoginStep('login');syncPending();if(supabase)await supabase.auth.signOut();}
+async function logout(){shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner="";sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;setLoginStep('login');syncPending();if(supabase)await supabase.auth.signOut();}
 function showConnection(message?:string){element('connection').hidden=!message;element('connection').textContent=message??'';}
 function syncPending(){element('pending').hidden=!api?.pending;element<HTMLButtonElement>('retry').disabled=!!api?.busy;}
 function display(){return visited??own;}
@@ -274,17 +285,19 @@ function updateOwnFarm(farm:Farm){
   old.column===tile.column&&old.row===tile.row&&old.cropId===tile.cropId&&old.season===tile.season&&old.state==='GROWING'
  )))playEffect('planta-pronta-para-colher');
 }
-function receive(reply:Reply,announce=true){
+function receive(reply:Reply,announce=true,actionName?:string){
  if(reply.farm)updateOwnFarm(reply.farm);
  if(reply.visitedFarm&&visited?.owner===reply.visitedFarm.owner)visited=acceptFarm(visited,reply.visitedFarm);
- if(reply.result&&announce)notify(reply.result.message);
  render();
+ const bitten=showBite(reply,actionName);
+ if(reply.result&&announce&&!bitten)notify(reply.result.message);
+ return bitten;
 }
 async function action(fields:CommandFields,path='/v1/me/actions'){
  if(!api||!own||busy)return;
  if(!navigator.onLine){notify('Sem conexão. Reconecte antes de agir.');return;}
  busy=true;let stale=false;const client=api,generation=sessionGeneration,previousFarm=own,animalReady=fields.action==='TEND_ANIMAL'&&own.animals.some(animal=>animal.id===fields.itemId&&animal.status==='READY');
- try{const reply=await client.mutate(path,{...fields,expectedRevision:path==='/v1/me/actions'?own.revision:visited!.revision});if(generation===sessionGeneration){if(reply.result?.success&&reply.farm){await fadeSoldDepositRows(fields,reply.farm);if(generation!==sessionGeneration)return;}receive(reply,false);if(reply.result?.success&&own){const reward=actionRewardModel(previousFarm,own),selling=String(fields.action).startsWith('SELL_');if(selling){notifySale(reward.coins,reward.greens);if(reward.coins>0)animateGoldBalance(Number(previousFarm.coins??0),Number(own.coins??0));}else notifyAction(reply.result.message,String(fields.action),typeof fields.itemId==='string'?fields.itemId:undefined,reward);const cue=reward.leveledUp?'levelup':soundForAction(String(fields.action),animalReady);if(cue)playEffect(cue);}else if(reply.result){playEffect('acao-bloqueada');notify(reply.result.message);}}}
+ try{const reply=await client.mutate(path,{...fields,expectedRevision:path==='/v1/me/actions'?own.revision:visited!.revision});if(generation===sessionGeneration){if(reply.result?.success&&reply.farm){await fadeSoldDepositRows(fields,reply.farm);if(generation!==sessionGeneration)return;}const bitten=receive(reply,false,String(fields.action));if(reply.result?.success&&own){const reward=actionRewardModel(previousFarm,own),selling=String(fields.action).startsWith('SELL_');if(selling){notifySale(reward.coins,reward.greens);if(reward.coins>0)animateGoldBalance(Number(previousFarm.coins??0),Number(own.coins??0));}else notifyAction(reply.result.message,String(fields.action),typeof fields.itemId==='string'?fields.itemId:undefined,reward);const cue=reward.leveledUp?'levelup':soundForAction(String(fields.action),animalReady);if(cue)playEffect(cue);}else if(reply.result){playEffect('acao-bloqueada');if(!bitten)notify(reply.result.message);}}}
  catch(error){stale=error instanceof ApiError&&[409,410].includes(error.status);if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();if(stale)void refresh();else void client.prepareRequestId().catch(()=>{});}}
 }
 let animalSound:HTMLAudioElement|undefined;
@@ -666,7 +679,7 @@ async function friends(){
 }
 async function migrateAvatar(){const migration=own&&avatarImport(avatarStore,avatarUser,own.avatarSelected,googlePhoto);if(migration)await action(migration);}
 async function connect(user:string,token:()=>Promise<string>,photo?:unknown,displayName=''){
- pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner='';sessionGeneration++;navigationGeneration++;busy=false;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;closeScene();const generation=sessionGeneration;
+ shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner='';sessionGeneration++;navigationGeneration++;busy=false;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;closeScene();const generation=sessionGeneration;
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
  avatarUser=`${config.api}:${user}`;googlePhoto=googleAvatar(photo);avatarChoice='classic';loadAudioSettings();
  scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>{if(healthPinned&&!(tool==='CURSOR'&&tile.cropId))closeHealth();void tileAction(tile);},(id,pointerType)=>{if(pointerType==='touch'&&tool==='CURSOR'){playAnimalSound(id);animalPopup(id);return;}const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health,syncMusic,()=>{if(healthPinned)closeHealth();},(id,point)=>{if(id&&point){playAnimalSound(id);animalTooltip(id,point);}else animalTooltip(null);});
@@ -706,7 +719,7 @@ element('notifications').onclick=notifications;
 element('shop').onclick=()=>shop();element('deposit').onclick=deposit;element('missions').onclick=missions;element('friends').onclick=()=>void friends();
 element('home').onclick=()=>{navigationGeneration++;visited=undefined;tool='PLOW';render();};element('settings').onclick=()=>shortcutPanel('Ajustes',settings);element('close-modal').onclick=()=>{modal.close();showUpdateNotes();};
 modal.addEventListener('close',showUpdateNotes);
-element('retry').onclick=async()=>{if(!api||busy)return;const client=api,generation=sessionGeneration;busy=true;try{const reply=await client.retry();if(generation!==sessionGeneration)return;receive(reply);if(reply.code){dialog('Convite confirmado');paragraph(reply.code);}}catch(error){if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();await refresh();}}};
+element('retry').onclick=async()=>{if(!api||busy)return;const client=api,generation=sessionGeneration;busy=true;try{const actionName=client.pending?.body?JSON.parse(client.pending.body).action:undefined;const reply=await client.retry();if(generation!==sessionGeneration)return;receive(reply,true,actionName);if(reply.code){dialog('Convite confirmado');paragraph(reply.code);}}catch(error){if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();await refresh();}}};
 window.addEventListener('offline',()=>showConnection('Sem conexão. Reconecte antes de agir.'));
 window.addEventListener('online',()=>void refresh());
 document.addEventListener('pointerdown',event=>{if(healthPinned&&!element('farm').contains(event.target as Node)&&!element('plant-health').contains(event.target as Node))closeHealth();});

@@ -135,6 +135,7 @@ export interface Catalog {
 export interface Reply {
   farm?: Farm;
   visitedFarm?: Farm;
+  theftOutcome?: { kind: "STOLEN" | "PROTECTED" | "BITTEN" | "BLOCKED"; goldDebited: string };
   result?: { success: boolean; message: string };
   code?: string;
   expiresAt?: string;

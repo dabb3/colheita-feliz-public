@@ -24,7 +24,7 @@ function app(preferences=new Map()){
  const make=(tag='div')=>({tag,value:'',selectedIndex:0,hidden:false,children:[],attributes:{},dataset:{},style:{setProperty(key,value){this[key]=value;}},scrollTop:0,scrollLeft:0,classList:{add(){},remove(){},toggle(){}},
   replaceChildren(...nodes){if(this.contains(ctx.document.activeElement))ctx.document.activeElement=null;this.children=nodes;},
   append(...nodes){this.children.push(...nodes);},prepend(...nodes){this.children.unshift(...nodes);},insertBefore(node,before){this.children.splice(this.children.indexOf(before),0,node);},replaceChild(node,before){this.children.splice(this.children.indexOf(before),1,node);return before;},replaceWith(node){const parent=descendants(elements.get('modal-content')).find(candidate=>candidate.children.includes(this));parent?.replaceChild(node,this);},
-  setAttribute(key,value){this.attributes[key]=String(value);},getAttribute(key){return this.attributes[key]??null;},
+  removeAttribute(key){delete this.attributes[key];},setAttribute(key,value){this.attributes[key]=String(value);},getAttribute(key){return this.attributes[key]??null;},
   contains(target){return !!target&&(target===this||this.children.some(child=>child?.contains?.(target)));},
   get firstElementChild(){return this.children[0]??null;},get lastElementChild(){return this.children.at(-1)??null;},
   querySelectorAll(selector){return descendants(this).slice(1).filter(node=>selector==='[data-focus-key]'?node.getAttribute('data-focus-key')!==null:selector.startsWith('.')?(node.className??'').split(/\s+/).includes(selector.slice(1)):false);},
@@ -594,4 +594,48 @@ test('existing farm refresh removes expired friend VIP badge while panel is open
  h.set({own,api:{get:async path=>{if(path==='/v1/friends'){reads++;return[{id:'bob',name:'Bob',vipActive:active}];}return own;},prepareRequestId:async()=>{}}});await h.friends();assert.ok(descendants(elements.get('modal-content')).some(n=>n.className==='public-vip-badge'));
  active=false;intervals.get(30_000)();await new Promise(r=>setTimeout(r,0));
  assert.ok(!descendants(elements.get('modal-content')).some(n=>n.className==='public-vip-badge'));const previous=reads;elements.get('close-modal').onclick();intervals.get(30_000)();await new Promise(r=>setTimeout(r,0));assert.equal(reads,previous);
+});
+
+test('bitten theft shows server debit and own wallet during a visit, then never reopens its receipt',async()=>{
+ for(const debit of ['25','0','7.5']){
+  const {h,elements,ctx}=app(),own={...farm('alice'),coins:'80',greenCoins:'3'},visited={...farm('bob'),coins:'900'};
+  const reply={farm:{...own,revision:'2',coins:debit==='0'?'0':'55'},visitedFarm:{...visited,revision:'2'},result:{success:false,message:'Resposta do servidor'},theftOutcome:{kind:'BITTEN',goldDebited:debit}};
+  h.set({own,visited,api:{pending:null,mutate:async()=>reply,prepareRequestId:async()=>{}}});h.pickTool('STEAL');
+  await h.tileAction({column:0,row:0,state:'READY',harvestRevision:'1'});
+  assert.equal(elements.get('modal').open,true);assert.equal(elements.get('modal-title').textContent,'Cuidado com o cachorro!');
+  assert.equal(text(descendants(elements.get('modal-content')).find(n=>n.id==='bite-message')),`Você acabou de ser mordido por um cachorro porque estava tentando roubar algo! Você acaba de perder ${debit==='7.5'?'7,5':debit} moedas de ouro tentando fugir.`);
+  assert.ok(descendants(elements.get('modal-content')).some(n=>n.src==='/assets/classic/animals/cachorro-mastiff/mastiff.png'));
+  assert.equal(elements.get('modal').getAttribute('aria-describedby'),'bite-message');
+  assert.equal(ctx.document.activeElement.textContent,'OK');
+  assert.equal(h.get().own.coins,reply.farm.coins);assert.equal(h.get().visited.owner,'bob');
+  const wallet=text(elements.get('wallet'));assert.ok(wallet.includes('Visitando bob'));assert.ok(wallet.includes('900'));assert.match(text(elements.get('modal-content')),new RegExp('Seu saldo: '+reply.farm.coins+' ouro'));
+  ctx.document.activeElement.onclick();assert.equal(elements.get('modal').open,false);
+  await h.tileAction({column:0,row:0,state:'READY',harvestRevision:'1'});assert.equal(elements.get('modal').open,false);
+  h.receive(reply);assert.equal(elements.get('modal').open,false);
+  h.dialog('Loja');assert.equal(elements.get('modal').getAttribute('aria-describedby'),null);
+ }
+});
+
+test('protected theft and untyped bite-like text use the normal notice',async()=>{
+ for(const outcome of [{kind:'PROTECTED',goldDebited:'0'},undefined]){
+  const {h,elements}=app();h.set({own:farm('alice'),visited:farm('bob'),api:{pending:null,mutate:async()=>({result:{success:false,message:'Cachorro protegeu esta plantação.'},theftOutcome:outcome}),prepareRequestId:async()=>{}}});h.pickTool('STEAL');await h.tileAction({column:0,row:0,state:'READY'});
+  assert.ok(!elements.get('modal').open);assert.match(text(elements.get('notice')),/Cachorro protegeu/);
+ }
+});
+
+test('late bitten theft cannot open a popup in a new session',async()=>{
+ const {h,elements}=app(),reply=deferred();h.set({own:farm('alice'),visited:farm('bob'),api:{pending:null,mutate:()=>reply.promise,prepareRequestId:async()=>{}}});h.pickTool('STEAL');const action=h.tileAction({column:0,row:0,state:'READY'});await h.logout();reply.resolve({farm:{...farm('alice'),revision:'2'},result:{success:false,message:'Mordida'},theftOutcome:{kind:'BITTEN',goldDebited:'0'}});await action;assert.equal(elements.get('modal').open,false);assert.equal(h.get().own,undefined);
+});
+
+test('pending theft retry shows a bite once and keeps it stable across farm refreshes',async()=>{
+ const {h,elements,ctx}=app(),own={...farm('alice'),coins:'1'},visited=farm('bob');
+ const reply={farm:{...own,revision:'2',coins:'0'},result:{success:false,message:'Bloqueado'},theftOutcome:{kind:'BITTEN',goldDebited:'1'}};
+ const api={pending:{body:JSON.stringify({action:'STEAL',requestId:'receipt'})},retry:async()=>reply,get:async path=>path==='/v1/me/farm'?reply.farm:visited,prepareRequestId:async()=>{}};
+ h.set({own,visited,api});await elements.get('retry').onclick();assert.equal(elements.get('modal').open,true);assert.equal(ctx.document.activeElement.textContent,'OK');
+ const panel=elements.get('modal-content').children;await h.refresh();assert.equal(elements.get('modal-content').children,panel);assert.equal(ctx.document.activeElement.textContent,'OK');
+ elements.get('close-modal').onclick();assert.equal(elements.get('modal').open,false);await elements.get('retry').onclick();assert.equal(elements.get('modal').open,false);
+});
+
+test('typed bite on a different social action never opens the theft popup',async()=>{
+ const {h,elements}=app();h.set({own:farm('alice'),visited:farm('bob'),api:{pending:null,mutate:async()=>({farm:{...farm('alice'),revision:'2'},result:{success:false,message:'Ação bloqueada'},theftOutcome:{kind:'BITTEN',goldDebited:'0'}}),prepareRequestId:async()=>{}}});h.pickTool('SPREAD_WEEDS');await h.tileAction({column:0,row:0,state:'READY'});assert.ok(!elements.get('modal').open);assert.match(text(elements.get('notice')),/Ação bloqueada/);
 });

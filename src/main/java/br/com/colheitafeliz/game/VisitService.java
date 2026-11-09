@@ -6,9 +6,30 @@ import br.com.colheitafeliz.domain.farm.TileState;
 /**
  * Ensaio interno sobre dois estados autorizados pelo chamador local controlado.
  * O monitor é compartilhado com GameState.act; mutações diretas do domínio exigem serialização do chamador.
- * Identidade, amizade, autoridade de tempo e transação entre processos pertencem ao desenho online futuro.
+ * Identidade, amizade, autoridade de tempo e transação entre processos pertencem ao serviço online chamador.
  */
 public final class VisitService {
+    /** Online caller validates friendship, owner window and cooldown before this attempt. */
+    public TheftAttempt attemptSteal(GameState owner,GameState visitor,int col,int row,long revision,
+                                    String visitorName,br.com.colheitafeliz.domain.farm.RandomSource random) {
+        synchronized (GameState.class) {
+            var tile=eligibleTile(owner,visitor,col,row,revision,true);
+            if(tile==null||tile.crop()==null||!tile.crop().matureAt(owner.now())||tile.harvestRevision()==Long.MAX_VALUE)
+                return TheftAttempt.blocked("Temporada indisponível para furto.");
+            if(!owner.protectedPlots().contains(owner.land().at(col,row).id()))
+                return TheftAttempt.from(steal(owner,visitor,col,row,revision,visitorName));
+            int roll=random.nextInt(100);
+            if(roll<0||roll>=100)throw new IllegalStateException("Invalid bite roll");
+            if(roll>=30)return new TheftAttempt(ActionResult.fail("Este terreno está protegido pelos animais. Sua tentativa foi bloqueada; aguarde 24 horas para tentar novamente."),
+                TheftAttempt.Kind.PROTECTED,java.math.BigDecimal.ZERO);
+            int fine=random.nextInt(41);
+            if(fine<0||fine>=41)throw new IllegalStateException("Invalid bite fine");
+            var amount=visitor.wallet().coins().min(java.math.BigDecimal.valueOf(10L+fine));
+            if(amount.signum()>0)visitor.wallet().debit(br.com.colheitafeliz.domain.economy.Currency.GOLD,amount);
+            return new TheftAttempt(ActionResult.fail("Você foi mordido por um animal protetor e perdeu "+amount.toPlainString()+" moedas de ouro. Aguarde 24 horas para tentar novamente."),
+                TheftAttempt.Kind.BITTEN,amount);
+        }
+    }
     public ActionResult steal(GameState owner, GameState visitor, int col, int row, long expectedRevision) {
         return steal(owner,visitor,col,row,expectedRevision,"Um visitante");
     }
@@ -72,10 +93,13 @@ public final class VisitService {
     }
 
     private static FarmTile eligibleTile(GameState owner, GameState visitor, int col, int row, long revision) {
+        return eligibleTile(owner,visitor,col,row,revision,false);
+    }
+    private static FarmTile eligibleTile(GameState owner, GameState visitor, int col, int row, long revision,boolean allowProtected) {
         if (owner == null || visitor == null || owner == visitor || !owner.farm().contains(col, row)
                 || !owner.land().isUnlocked(col, row)) return null;
         FarmTile tile = owner.farm().tile(col, row);
-        if (tile.harvestRevision() != revision || owner.protectedPlots().contains(owner.land().at(col, row).id())) return null;
+        if (tile.harvestRevision() != revision || (!allowProtected&&owner.protectedPlots().contains(owner.land().at(col, row).id()))) return null;
         return tile;
     }
 }
