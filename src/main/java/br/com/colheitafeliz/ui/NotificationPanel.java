@@ -15,6 +15,7 @@ public final class NotificationPanel {
     public static final int PAGE_SIZE=5;
     private static final float W=520,H=455;
     private static final DateTimeFormatter DATE=DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZoneId.systemDefault());
+    private static final DateTimeFormatter DATE_TIME=DateTimeFormatter.ofPattern("dd/MM HH:mm:ss").withZone(ZoneId.systemDefault());
     private int page;
     public void reset(){page=0;}
     public static Rectangle bounds(){var anchor=Hud.shortcutBounds(Hud.Shortcut.ALERTS);return new Rectangle(Math.min(anchor.x,1588-W),anchor.y-H-8,W,H);}
@@ -56,7 +57,12 @@ public final class NotificationPanel {
             String text=entry.message();int split=Math.min(text.length(),50);if(split<text.length()){int space=text.lastIndexOf(' ',split);if(space>20)split=space;}
             skin.text(batch,skin.caption,text.substring(0,split),r.x+8,r.y+45,entry.read()?Palette.INK_MUTED:Palette.INK,Align.left);
             if(split<text.length())skin.text(batch,skin.caption,text.substring(split).strip(),r.x+8,r.y+29,Palette.INK,Align.left);
-            skin.text(batch,skin.micro,DATE.format(Instant.parse(entry.createdAt()))+(entry.read()?" · Lida":" · Clique para marcar lida"),r.x+8,r.y+12,Palette.SKY_INK,Align.left);
+            String timing=entry.type()==br.com.colheitafeliz.domain.notification.GameNotification.Type.CROP_READY
+                    &&entry.metadata().containsKey("maturedAt")&&entry.metadata().containsKey("ownerExclusiveUntil")
+                    ? "Maturou: "+DATE_TIME.format(Instant.parse(entry.metadata().get("maturedAt")))+" · Proteção até: "+DATE_TIME.format(Instant.parse(entry.metadata().get("ownerExclusiveUntil")))
+                    : null;
+            if(timing!=null)skin.text(batch,skin.micro,timing,r.x+8,r.y+29,Palette.SKY_INK,Align.left);
+            skin.text(batch,skin.micro,"Aviso: "+DATE.format(Instant.parse(entry.createdAt()))+(entry.read()?" · Lida":" · Clique para marcar lida"),r.x+8,r.y+12,Palette.SKY_INK,Align.left);
         }
         skin.text(batch,skin.body,"< Anterior",previous().x+8,previous().y+22,Palette.INK,Align.left);
         skin.text(batch,skin.body,(page+1)+" / "+pages,b.x+W/2,b.y+33,Palette.INK_MUTED,Align.center);

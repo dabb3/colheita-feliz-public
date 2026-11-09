@@ -79,6 +79,9 @@ public final class GameAssets implements AutoCloseable {
             "comum", load("classic/icons/adubo-comum.png"), "rapido", load("classic/icons/adubo-rapido.png"),
             "super", load("classic/icons/adubo-super.png"), "amor", load("classic/icons/adubo-amor.png"));
     public final Texture vipCard = load("classic/icons/cartao-vip.png");
+    public final Texture vipWatering = load("classic/icons/vip/upgrade_vip_regador.png");
+    public final Texture vipPestControl = load("classic/icons/vip/upgrade_vip_praga.png");
+    public final Texture vipAnimalCare = load("classic/icons/vip/upgrade_vip_animal.png");
     public final Texture bell = load("classic/icons/notificacao-icone.png");
     public final Texture protectionLock = load("classic/icons/icone-cadeado.png");
     public final Texture gear = generated(HudIcons.gear());

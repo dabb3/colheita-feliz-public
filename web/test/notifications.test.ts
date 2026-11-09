@@ -23,3 +23,19 @@ test('notification list renders safely, supports read actions and marks all with
  const dismiss=flat.filter(n=>n.textContent==='×');assert.equal(dismiss.length,1);dismiss[0].onclick();assert.deepEqual(dismissed,['two']);flat.find(n=>n.textContent==='Limpar lidas').onclick();assert.equal(cleared,1);assert.equal(items[0].read,false);assert.ok(flat.find(n=>n.textContent==='Lida').disabled);
  const empty=make('div');ctx.render(empty,[],()=>{},()=>{});assert.ok(empty.children[0].disabled);
 });
+test('late crop notices separate maturity, protection and generation and support legacy entries',()=>{
+ const make=tag=>({tag,children:[],textContent:'',append(...nodes){this.children.push(...nodes);},setAttribute(){}});
+ const ctx={document:{createElement:make}};
+ const load=name=>readFileSync(new URL('../src/'+name,import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
+ runInNewContext(stripTypeScriptTypes(load('ui.ts')+'\n'+load('notifications.ts'))+'\nglobalThis.render=renderNotifications;',ctx);
+ const createdAt='2026-11-08T14:53:07.606Z',maturedAt='2026-11-08T14:07:20.730Z',ownerExclusiveUntil='2026-11-08T14:12:20.730Z';
+ const base={id:'crop',type:'CROP_READY',message:'Ervilha: planta pronta para colher.',createdAt,read:false};
+ const nodes=node=>[node,...node.children.flatMap(nodes)];
+ for(const metadata of [{maturedAt,ownerExclusiveUntil},{},{maturedAt:'invalid',ownerExclusiveUntil:'invalid'}]){
+  const root=make('div');ctx.render(root,[{...base,metadata}],()=>{},()=>{});
+  const times=nodes(root).filter(node=>node.tag==='time'),hasTiming=metadata.maturedAt===maturedAt;
+  assert.deepEqual(times.map(node=>node.dateTime),hasTiming?[maturedAt,ownerExclusiveUntil,createdAt]:[createdAt]);
+  assert.match(times.at(-1).textContent,/^Aviso gerado:/);
+  if(hasTiming){assert.equal(times[0].textContent,`Maturou: ${new Date(maturedAt).toLocaleString('pt-BR')}`);assert.match(times[1].textContent,/^Proteção até:/);}
+ }
+});

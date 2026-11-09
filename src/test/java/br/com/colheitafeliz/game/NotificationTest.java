@@ -2,12 +2,36 @@ package br.com.colheitafeliz.game;
 
 import br.com.colheitafeliz.domain.notification.NotificationInbox;
 import br.com.colheitafeliz.domain.notification.GameNotification;
+import br.com.colheitafeliz.domain.crop.Crop;
+import br.com.colheitafeliz.domain.farm.TileState;
 import br.com.colheitafeliz.testsupport.ManualClock;
 import java.util.Map;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NotificationTest {
+    @Test void lateCropNotificationPreservesMaturityAndOwnerProtectionTimes() {
+        var maturedAt=Instant.parse("2026-11-08T14:07:20.730Z");
+        var detectedAt=Instant.parse("2026-11-08T14:53:07.606155006Z");
+        var type=CropCatalogLoader.load().get("ervilha");
+        var wateredAt=Instant.parse("2026-11-08T11:14:38Z");
+        long grown=type.growthTime(2).toMillis()-Duration.between(wateredAt,maturedAt).toMillis();
+        var crop=new Crop(type,wateredAt,wateredAt,null,wateredAt,grown,br.com.colheitafeliz.testsupport.TestCrops.origin(type),2);
+        var clock=Clock.fixed(detectedAt,ZoneOffset.UTC);
+        var game=new GameState(()->detectedAt,clock,CropCatalogLoader.load(),bound->99);
+        game.farm().tile(0,1).restore(TileState.READY,crop);
+
+        assertTrue(game.refresh());
+        var notification=game.notifications().entries().getFirst();
+        assertEquals(detectedAt.toString(),notification.createdAt());
+        assertEquals(maturedAt.toString(),notification.metadata().get("maturedAt"));
+        assertEquals(maturedAt.plus(Duration.ofMinutes(5)).toString(),notification.metadata().get("ownerExclusiveUntil"));
+    }
+
     @Test void dismissOnlyReadPreservesPermanentCursorsThroughRestore() {
         var box=new NotificationInbox();var now=new ManualClock().instant();
         box.record("christmas-gift-2026","claimed",GameNotification.Type.CROP_READY,"Presente",now,Map.of());
