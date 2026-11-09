@@ -271,7 +271,7 @@
   },
   {
     "id": "cachorro-robo",
-    "name": "Cão Robô",
+    "name": "Cachorro",
     "kind": "PROTECTOR",
     "prices": {
       "GOLD": 20000,

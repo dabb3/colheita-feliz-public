@@ -604,7 +604,7 @@ test('bitten theft shows server debit and own wallet during a visit, then never 
   await h.tileAction({column:0,row:0,state:'READY',harvestRevision:'1'});
   assert.equal(elements.get('modal').open,true);assert.equal(elements.get('modal-title').textContent,'Cuidado com o cachorro!');
   assert.equal(text(descendants(elements.get('modal-content')).find(n=>n.id==='bite-message')),`Você acabou de ser mordido por um cachorro porque estava tentando roubar algo! Você acaba de perder ${debit==='7.5'?'7,5':debit} moedas de ouro tentando fugir.`);
-  assert.ok(descendants(elements.get('modal-content')).some(n=>n.src==='/assets/classic/animals/cachorro-mastiff/mastiff.png'));
+  assert.ok(descendants(elements.get('modal-content')).some(n=>n.src==='/assets/classic/animals/cachorro/cachorro.png'));
   assert.equal(elements.get('modal').getAttribute('aria-describedby'),'bite-message');
   assert.equal(ctx.document.activeElement.textContent,'OK');
   assert.equal(h.get().own.coins,reply.farm.coins);assert.equal(h.get().visited.owner,'bob');

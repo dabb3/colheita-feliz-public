@@ -7,7 +7,7 @@ import {renderWallet,control,text,image,renderDailyAllowance,friendAvatar,vipBad
 import {fertilizerDuration,durationLabel,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText} from './ui-presentation.ts';
 import {PROTECTED_ICON,notificationCount,renderNotifications} from './notifications.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,avatarImport,type AvatarChoice} from './avatar.ts';
-import {musicArtPath,seedArtPath,periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalStatusText,animalActionLabel,animalClickCommand,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
+import {musicArtPath,seedArtPath,periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalSoundPath,animalStatusText,animalActionLabel,animalClickCommand,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
 
 const config=window.COLHEITA_CONFIG;
 const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
@@ -125,7 +125,7 @@ function showBite(reply:Reply,actionName?:string){
  const key=JSON.stringify([reply.farm.owner,reply.farm.revision]);
  if(shownBites.has(key))return true;
  shownBites.add(key);dialog('Cuidado com o cachorro!');modal.classList.add('bite-dialog');
- content.append(image('classic/animals/cachorro-mastiff/mastiff.png','bite-dog'));
+ content.append(image('classic/animals/cachorro/cachorro.png','bite-dog'));
  const message=paragraph('Você acabou de ser mordido por um cachorro porque estava tentando roubar algo! Você acaba de perder '+depositNumber.format(Number(reply.theftOutcome.goldDebited))+' moedas de ouro tentando fugir.');message.id='bite-message';modal.setAttribute('aria-describedby',message.id);
  paragraph('Seu saldo: '+(own?.coins??'0')+' ouro.').className='bite-balance';
  modalFooter.hidden=false;button('OK',()=>{modal.close();showUpdateNotes();},modalFooter).focus({preventScroll:true});return true;
@@ -304,7 +304,7 @@ let animalSound:HTMLAudioElement|undefined;
 function playAnimalSound(id:string){
  if(!effectsEnabled||tool!=='CURSOR'||modal.open||document.hidden||periodAt(new Date())==='night')return;
  animalSound?.pause();
- animalSound=new Audio('/assets/sounds/animals/'+id+'.wav');
+ animalSound=new Audio(animalSoundPath(id));
  animalSound.volume=effectsVolume;
  void animalSound.play().catch(()=>{});
 }

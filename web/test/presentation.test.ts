@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {periodAt,tileCenter,pickTile,animalPath,tileArtRect,backgroundBounds,animalShadowRect,spriteDrawRect,measureSpriteFootprint,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand} from '../src/presentation.ts';
+import {periodAt,tileCenter,pickTile,animalPath,animalSoundPath,tileArtRect,backgroundBounds,animalShadowRect,spriteDrawRect,measureSpriteFootprint,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand} from '../src/presentation.ts';
+
+test('existing robot identifier presents only the normal dog in every pose and faces its travel',()=>{
+ assert.equal(animalPath('cachorro-robo','ADULT',false,false,false),'classic/animals/cachorro/cachorro.png');
+ assert.equal(animalPath('cachorro-robo','ADULT',false,true,false),'classic/animals/cachorro/cachorro-andando.png');
+ assert.equal(animalPath('cachorro-robo','ADULT',true,false,false),'classic/animals/cachorro/cachorro-dormindo.png');
+ assert.equal(animalFlip('cachorro-robo',false),false);
+ assert.equal(animalFlip('cachorro-robo',true),true);
+ assert.equal(animalSoundPath('cachorro-robo'),'/assets/sounds/animals/cachorro-mastiff.wav');
+ assert.equal(animalSoundPath('cachorro-mastiff'),'/assets/sounds/animals/cachorro-mastiff.wav');
+});
 test('day periods use local minute boundaries',()=>{
  for(const [h,m,expected] of [[5,59,'night'],[6,0,'day'],[16,59,'day'],[17,0,'sunset'],[18,30,'sunset'],[18,31,'night']]) assert.equal(periodAt(new Date(2026,9,29,h,m)),expected);
 });
