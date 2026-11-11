@@ -532,14 +532,15 @@ function animalPopup(id:string){
   if(type.kind==='GROWING')button('Vender adulto',()=>{modal.close();void action({action:'SELL_ANIMAL',itemId:id});},detail);
  }else paragraph('Somente visualização durante a visita.',detail);
 }
-function animalDuration(type:AnimalType){return type.kind==='PRODUCER'?type.productionSeconds??0:type.kind==='GROWING'?(type.babySeconds??0)+(type.youngSeconds??0):0;}
+function animalDuration(type:AnimalType){return type.kind==='PRODUCER'?type.productionSeconds??0:type.kind==='GROWING'?(type.babySeconds??0)+(type.youngSeconds??0):type.kind==='PROTECTOR'?6*60*60:0;}
 function addAnimalProgress(parent:HTMLElement,animal:Animal,type:AnimalType){
  const duration=animalDuration(type);if(duration<=0)return;
  const remaining=Math.max(0,animal.remainingSeconds),ready=animal.status==='READY',progress=ready?1:Math.max(0,Math.min(1,1-remaining/duration));
  const section=document.createElement('section');section.className='crop-growth';
- const caption=document.createElement('div');caption.className='crop-progress-caption';caption.append(text('span',type.kind==='GROWING'?'CRESCIMENTO':'PRODUÇÃO'));
- const value=text('strong',ready?'Pronto':animal.status==='HUNGRY'?`${formatRemaining(remaining)} · com fome`:`${formatRemaining(remaining)} restantes`);caption.append(value);
- const track=document.createElement('div');track.className=`crop-growth-track${ready?' is-ready':''}`;track.setAttribute('role','progressbar');track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax','100');track.setAttribute('aria-valuenow',String(Math.round(progress*100)));track.setAttribute('aria-label',`${type.kind==='GROWING'?'Crescimento':'Produção'}: ${Math.round(progress*100)}%`);
+ const caption=document.createElement('div');caption.className='crop-progress-caption';caption.append(text('span',type.kind==='GROWING'?'CRESCIMENTO':type.kind==='PROTECTOR'?'ALIMENTAÇÃO':'PRODUÇÃO'));
+ const value=text('strong',ready?'Pronto':type.kind==='PROTECTOR'&&animal.status==='HUNGRY'?'Com fome':animal.status==='HUNGRY'?`${formatRemaining(remaining)} · com fome`:`${formatRemaining(remaining)} restantes`);caption.append(value);
+ const progressLabel=type.kind==='GROWING'?'Crescimento':type.kind==='PROTECTOR'?'Alimentação':'Produção';
+ const track=document.createElement('div');track.className=`crop-growth-track${ready?' is-ready':''}`;track.setAttribute('role','progressbar');track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax','100');track.setAttribute('aria-valuenow',String(Math.round(progress*100)));track.setAttribute('aria-label',`${progressLabel}: ${Math.round(progress*100)}%`);
  const fill=document.createElement('span');fill.className='crop-growth-fill';fill.style.width=`${progress*100}%`;track.append(fill);section.append(caption,track);parent.append(section);
 }
 function animalTooltip(id:string|null,point?:{x:number;y:number}){

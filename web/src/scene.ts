@@ -380,6 +380,9 @@ export class Scene {
     if (!layout) return;
     const [x, y, width] = layout,
       motion = animalMotion(animal.id, seconds, sleep),
+      walkingFrame = animal.id === "cachorro-robo"
+        ? motion.walking && Math.floor(seconds * 3) % 2 !== 0
+        : motion.walking,
       xAt = x + motion.dx,
       bottom = 900 - y + motion.dy,
       hungry = animal.status === "HUNGRY";
@@ -405,7 +408,7 @@ export class Scene {
         animal.id,
         animal.stage,
         sleep,
-        motion.walking,
+        walkingFrame,
         motion.open,
       ),
       sprite = this.sprite(path, true);
