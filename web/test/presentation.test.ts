@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {periodAt,tileCenter,pickTile,animalPath,animalSoundPath,tileArtRect,backgroundBounds,animalShadowRect,spriteDrawRect,measureSpriteFootprint,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand} from '../src/presentation.ts';
+import {periodAt,tileCenter,pickTile,animalPath,animalWalkingFrame,animalSoundPath,tileArtRect,backgroundBounds,animalShadowRect,spriteDrawRect,measureSpriteFootprint,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand} from '../src/presentation.ts';
 
 test('existing robot identifier presents only the normal dog in every pose and faces its travel',()=>{
  assert.equal(animalPath('cachorro-robo','ADULT',false,false,false),'classic/animals/cachorro/cachorro.png');
@@ -59,6 +59,14 @@ test('walking and sleeping animal poses use desktop asset names',()=>{
  assert.ok(Math.abs(animalMotion('cavalo',2).dx)<=27);
  assert.equal(animalFlip('cavalo',true),false);
  assert.equal(animalFlip('galinha',true),true);
+});
+test('dog alternates walking images only while moving',()=>{
+ const frame=(walking,seconds)=>animalPath('cachorro-robo','ADULT',false,animalWalkingFrame('cachorro-robo',walking,seconds),false);
+ assert.equal(frame(false,.4),'classic/animals/cachorro/cachorro.png');
+ assert.equal(frame(true,0),'classic/animals/cachorro/cachorro.png');
+ assert.equal(frame(true,.4),'classic/animals/cachorro/cachorro-andando.png');
+ assert.equal(frame(true,.8),'classic/animals/cachorro/cachorro.png');
+ assert.equal(animalWalkingFrame('galinha',true,.4),true);
 });
 test('animal walks pause and choose varied destinations within the desktop home radius',()=>{
  assert.deepEqual(animalMotion('galinha',0),{dx:0,dy:0,walking:false,facingRight:false,open:false});

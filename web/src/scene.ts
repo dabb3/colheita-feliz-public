@@ -10,6 +10,7 @@ import {
   tileArtRect,
   pickTile,
   animalPath,
+  animalWalkingFrame,
   animalLayout,
   animalShadowRect,
   spriteDrawRect,
@@ -380,6 +381,7 @@ export class Scene {
     if (!layout) return;
     const [x, y, width] = layout,
       motion = animalMotion(animal.id, seconds, sleep),
+      walkingFrame = animalWalkingFrame(animal.id, motion.walking, seconds),
       xAt = x + motion.dx,
       bottom = 900 - y + motion.dy,
       hungry = animal.status === "HUNGRY";
@@ -405,7 +407,7 @@ export class Scene {
         animal.id,
         animal.stage,
         sleep,
-        motion.walking,
+        walkingFrame,
         motion.open,
       ),
       sprite = this.sprite(path, true);

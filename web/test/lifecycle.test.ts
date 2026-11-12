@@ -37,7 +37,7 @@ function app(preferences=new Map()){
  const notificationSource=readFileSync(new URL('../src/notifications.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(notificationSource),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,missions,friends,receive,dialog,health,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
+ source+='\nglobalThis.h={refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,friends,receive,dialog,health,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:{...ctx.h,runTimeouts(){for(const [id,callback]of [...timeouts]){timeouts.delete(id);callback();}}},elements,listeners,audioClips,observers,ctx,intervals};
 }
 function text(node){return(node.textContent??'')+(node.children??[]).map(child=>typeof child==='object'?text(child):child).join('');}
@@ -414,6 +414,26 @@ test('open owned-animal screen refreshes after a successful state update',()=>{
  h.shop('owned');assert.match(text(elements.get('modal-content')),/Coletar/);
  h.receive({farm:{...farmState,revision:'2',animals:[{id:'vaca',stage:'ADULT',status:'PRODUCING',remainingSeconds:3600}]}});
  assert.doesNotMatch(text(elements.get('modal-content')),/Coletar/);assert.match(text(elements.get('modal-content')),/Produzindo/);
+});
+test('protector popup shows remaining feeding progress at 6h, 3h and hunger',()=>{
+ const {h,elements}=app(),catalog={crops:[],fertilizers:[],animals:[{id:'cachorro-robo',name:'Cachorro',kind:'PROTECTOR'}],vip:{greenPrice:20}};
+ for(const [status,remaining,expected]of [['PRODUCING',21600,100],['PRODUCING',10800,50],['HUNGRY',0,0]]){
+  h.set({own:{...farm('alice'),animals:[{id:'cachorro-robo',stage:'ADULT',status,remainingSeconds:remaining}]},catalog});
+  h.animalPopup('cachorro-robo');
+  const bar=descendants(elements.get('modal-content')).find(node=>node.getAttribute('role')==='progressbar');
+  assert.ok(bar);assert.equal(bar.getAttribute('aria-valuenow'),String(expected));
+  assert.equal(bar.getAttribute('aria-label'),`Alimentação: ${expected}%`);
+  assert.equal(bar.children[0].style.width,`${expected}%`);
+ }
+});
+test('owned animals show protector feeding progress',()=>{
+ const {h,elements}=app();
+ h.set({own:{...farm('alice'),feed:{producer:0,growth:0},animals:[{id:'cachorro-robo',stage:'ADULT',status:'PRODUCING',remainingSeconds:10800}]},catalog:{crops:[],fertilizers:[],feedPrices:{producer:10,growth:10},animals:[{id:'cachorro-robo',name:'Cachorro',kind:'PROTECTOR'}],vip:{greenPrice:20}}});
+ h.shop('owned');
+ const card=descendants(elements.get('modal-content')).find(node=>node.className==='owned-animal-card');
+ assert.ok(card);assert.ok(text(card).includes('ALIMENTAÇÃO'));assert.ok(text(card).includes('3h 0min restantes'));
+ const bar=descendants(card).find(node=>node.getAttribute('role')==='progressbar');
+ assert.ok(bar);assert.equal(bar.getAttribute('aria-valuenow'),'50');assert.equal(bar.children[0].style.width,'50%');
 });
 test('open missions screen refreshes progress after a farm update',()=>{
  const {h,elements}=app(),farmState={...farm('alice'),missions:[{id:'m',title:'Colher',green:1,progress:1,target:2,done:false}]};

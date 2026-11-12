@@ -45,7 +45,10 @@ final class OnlineViews {
         JsonArray animals = new JsonArray();
         for (var animal : game.barn().animals()) {
             var entry = object("id", animal.type().id(), "stage", animal.stageAt(now),
-                    "status", animal.statusAt(now), "remainingSeconds", animal.remainingAt(now).toSeconds());
+                    "status", animal.statusAt(now), "remainingSeconds", animal.type().kind()
+                            == br.com.colheitafeliz.domain.animal.AnimalType.Kind.PROTECTOR
+                            ? Math.max(0, java.time.Duration.between(now, animal.fedUntil()).toSeconds())
+                            : animal.remainingAt(now).toSeconds());
             if (own && animal.type().kind() != br.com.colheitafeliz.domain.animal.AnimalType.Kind.PROTECTOR) {
                 entry.addProperty("saleQuote", br.com.colheitafeliz.domain.economy.Market.unitRevenue(animal.origin(),game.vipActive())
                         .setScale(1,java.math.RoundingMode.CEILING).toPlainString());
