@@ -454,6 +454,11 @@ export function animalMotion(
     open: false,
   };
 }
+export function animalWalkingFrame(id: string, walking: boolean, seconds: number) {
+  return id === "cachorro-robo"
+    ? walking && Math.floor(seconds * 3) % 2 !== 0
+    : walking;
+}
 export function beeOffset(bee: number, seconds: number) {
   const phase = seconds * 1.4 + bee * 1.7;
   return { x: Math.sin(phase) * 28, y: Math.cos(phase * 1.3) * 12 };
