@@ -61,7 +61,30 @@ export class ApiClient {
     this.pending = saved ? JSON.parse(saved) : null;
     this.now = now;
   }
-  async prepareRequestId(): Promise<void> {
+  async push<T = unknown>(operation: 'config'|'subscribe'|'revoke'|'test', body?: unknown): Promise<T> {
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const work = async (): Promise<T> => {
+      const token = await this.token();
+      controller.signal.throwIfAborted();
+      const send = this.send;
+      const response = await send(this.base + '/v1/push/' + operation, {
+        method: body === undefined ? 'GET' : 'POST',
+        headers: {Authorization: `Bearer ${token}`, ...(body === undefined ? {} : {'Content-Type':'application/json'})},
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: controller.signal, cache:'no-store', redirect:'error',
+      });
+      controller.signal.throwIfAborted();
+      if (!response.ok) throw new ApiError(response.status, 'Serviço de notificações indisponível.');
+      if (response.status === 204) return undefined as T;
+      return await response.json() as T;
+    };
+    try {
+      return await Promise.race([work(), new Promise<T>((_resolve,reject)=>{
+        timer=setTimeout(()=>{controller.abort();reject(new Error('Tempo de notificações esgotado.'));},15_000);
+      })]);
+    } finally { clearTimeout(timer); }
+  }  async prepareRequestId(): Promise<void> {
     if (!this.pending) await this.requestId();
   }
   diagnose(info: DiagnosticInfo) {

@@ -66,6 +66,7 @@ final class JdbcOnlineStore implements AutoCloseable {
         return pool;
     }
 
+    PushStore pushStore() { return new PushStore(schema); }
     @Override public void close() { pool.close(); }
 
     void initialize(UUID owner) {
@@ -97,8 +98,9 @@ final class JdbcOnlineStore implements AutoCloseable {
                     + schema + ".players(id), last_claimed_day date NOT NULL)");
             tx.execute("CREATE TABLE IF NOT EXISTS "+schema+".update_note_views (actor uuid PRIMARY KEY REFERENCES "+schema
                     +".players(id), version varchar(80) NOT NULL, seen_day date NOT NULL)");
+            pushStore().initialize(tx);
             tx.execute("REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
-            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "daily_allowances", "update_note_views")) {
+            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "daily_allowances", "update_note_views", "push_subscriptions", "push_tests")) {
                 tx.execute("ALTER TABLE " + schema + "." + table + " ENABLE ROW LEVEL SECURITY");
                 tx.execute("REVOKE ALL ON " + schema + "." + table + " FROM PUBLIC");
             }
