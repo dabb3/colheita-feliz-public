@@ -1,4 +1,5 @@
 import type { Farm, Reply, CommandFields } from "./types.ts";
+import {runDiagnostics, type DiagnosticInfo} from './diagnostics.ts';
 
 interface StorageLike {
   getItem(key: string): string | null;
@@ -62,6 +63,10 @@ export class ApiClient {
   }
   async prepareRequestId(): Promise<void> {
     if (!this.pending) await this.requestId();
+  }
+  diagnose(info: DiagnosticInfo) {
+    // Separate transport: no lease refresh, receipt replay or pending-storage changes.
+    return runDiagnostics({...info,base:this.base,token:this.token,pending:!!this.pending,send:this.send});
   }
   private requestId(): Promise<{ requestId: string }> {
     // Keep at most one server-issued id, briefly: long-hidden tabs must acquire a fresh one.

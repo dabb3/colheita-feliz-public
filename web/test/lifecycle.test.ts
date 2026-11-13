@@ -43,6 +43,30 @@ function app(preferences=new Map()){
 function text(node){return(node.textContent??'')+(node.children??[]).map(child=>typeof child==='object'?text(child):child).join('');}
 function descendants(node){return[node,...(node.children??[]).flatMap(child=>typeof child==='object'?descendants(child):[])];}
 
+test('connection diagnostics is available with a pending action and cannot replay it',async()=>{
+ const {h,elements}=app(),result=deferred();let runs=0;
+ const pending={path:'/v1/me/actions',body:'private-pending'};
+ h.set({own:farm('alice'),api:{pending,diagnose(){runs++;return result.promise;},mutate(){assert.fail('mutation');},retry(){assert.fail('retry');}}});
+ h.settings();const open=descendants(elements.get('modal-content')).find(n=>n.textContent==='Testar conexão');assert.ok(open);open.onclick();
+ assert.equal(runs,1);const run=descendants(elements.get('modal-content')).find(n=>n.textContent==='Testar novamente');assert.equal(run.disabled,true);run.onclick();assert.equal(runs,1);
+ result.resolve({report:'Diagnóstico parcial seguro'});await new Promise(r=>setTimeout(r,0));
+ const report=descendants(elements.get('modal-content')).find(n=>n.tag==='textarea');assert.equal(report.value,'Diagnóstico parcial seguro');assert.equal(run.disabled,false);
+ assert.doesNotMatch(text(elements.get('modal-content')),/private-pending/);
+});
+test('late connection diagnostic cannot replace another panel',async()=>{
+ const {h,elements}=app(),result=deferred();
+ h.set({own:farm('alice'),api:{pending:null,diagnose:()=>result.promise}});h.settings();descendants(elements.get('modal-content')).find(n=>n.textContent==='Testar conexão').onclick();
+ h.dialog('Outro painel');result.resolve({report:'late report'});await new Promise(r=>setTimeout(r,0));assert.equal(elements.get('modal-title').textContent,'Outro painel');assert.doesNotMatch(text(elements.get('modal-content')),/late report/);
+});
+test('connection diagnostic copy has a manual fallback and ignores stale-account results',async()=>{
+ const {h,elements,ctx}=app();let selected=false;
+ h.set({own:farm('alice'),api:{pending:null,diagnose:async()=>({report:'safe report'})}});h.settings();descendants(elements.get('modal-content')).find(n=>n.textContent==='Testar conexão').onclick();await new Promise(r=>setTimeout(r,0));
+ const report=descendants(elements.get('modal-content')).find(n=>n.tag==='textarea');report.select=()=>{selected=true;};
+ await descendants(elements.get('modal-content')).find(n=>n.textContent==='Copiar diagnóstico').onclick();assert.equal(selected,true);assert.equal(ctx.document.activeElement,report);assert.match(text(elements.get('modal-content')),/Cópia automática indisponível/);
+ const pending=deferred();h.set({own:farm('alice'),api:{pending:null,diagnose:()=>pending.promise}});h.settings();descendants(elements.get('modal-content')).find(n=>n.textContent==='Testar conexão').onclick();
+ h.set({own:farm('bob'),api:{pending:null}});pending.resolve({report:'previous account'});await new Promise(r=>setTimeout(r,0));assert.doesNotMatch(text(elements.get('modal-content')),/previous account/);
+});
+
 test('notification badge and panel follow own state during a visit and retain list scroll on refresh',()=>{
  const {h,elements}=app();
  const notes=[{id:'one',type:'THEFT',message:'João furtou 1 Morango.',createdAt:'2026-11-06T12:00:00Z',read:false,metadata:{}},{id:'two',type:'VIP_EXPIRED',message:'VIP expirou',createdAt:'2026-11-06T11:00:00Z',read:false,metadata:{}}];

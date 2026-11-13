@@ -88,6 +88,10 @@ final class GameHttpServer implements AutoCloseable {
             try { identity = auth.authenticate(exchange.getRequestHeaders().getFirst("Authorization")); }
             finally { RequestTimings.auth(authStarted); }
             UUID actor = identity.id(); rate("actor:" + actor, 120);
+            if (method.equals("GET") && path.equals("/v1/diagnostics")) {
+                send(exchange, 200, object("ok", true, "serverTime", clock.instant().toString(), "originAllowed", origin != null));
+                return;
+            }
             Object response;
             if (method.equals("GET") && path.equals("/v1/request-id")) response = service.requestId();
             else if (method.equals("GET") && path.equals("/v1/me/farm")) response = service.farm(actor, identity.name());

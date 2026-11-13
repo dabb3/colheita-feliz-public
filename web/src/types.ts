@@ -142,6 +142,7 @@ export interface Reply {
 }
 export type CommandFields = Record<string, string | number>;
 export interface Config {
+  buildVersion?: string;
   api: string;
   development: boolean;
   supabaseUrl: string;

@@ -168,12 +168,37 @@ function settings(){
   volume.oninput=()=>updateAudioSettings(channel,true,Number(volume.value)/100);row.append(label,volume,value,mute);audio.append(row);syncAudioRow(channel);
  }
  paragraph('Preferências salvas por conta neste navegador.',audio).className='muted';
+ const connection=document.createElement('section');connection.className='settings-section';sections.append(connection);
+ const connectionTitle=document.createElement('h3');connectionTitle.textContent='Conexão';connection.append(connectionTitle);
+ paragraph('Teste seguro para enviar ao suporte. Não executa ações nem reenvia uma ação pendente.',connection);
+ button('Testar conexão',connectionDiagnostics,connection);
  const profile=document.createElement('section');profile.className='settings-section settings-profile';sections.append(profile);const profileTitle=document.createElement('h3');profileTitle.textContent='Seu perfil';profile.append(profileTitle);
  const player=document.createElement('div');player.className='profile-player';const avatar=document.createElement('img');avatar.className='profile-avatar';avatar.referrerPolicy='no-referrer';avatar.src=avatarSource(own?.avatar?.id as AvatarChoice,own?.avatar?.photoUrl??undefined);avatar.alt=`Avatar de ${own?.name??'jogador'}`;avatar.onerror=()=>{avatar.onerror=null;avatar.src=avatarSource('classic');};const details=document.createElement('div');details.className='profile-details';const playerName=document.createElement('strong');playerName.className='profile-name';playerName.textContent=own?.name??'Jogador';if(own?.vipActive)playerName.append(vipBadge());details.append(playerName);if(!visited)button('Trocar avatar',avatarSettings,details);player.append(avatar,details);profile.append(player);
  const about=document.createElement('section');about.className='settings-section settings-about';sections.append(about);const aboutTitle=document.createElement('h3');aboutTitle.textContent='Sobre';about.append(aboutTitle);
  const repository=document.createElement('a');repository.className='settings-action repository-link';repository.href='https://github.com/dabb3/colheita-feliz-public';repository.target='_blank';repository.rel='noopener noreferrer';repository.setAttribute('aria-label','Abrir repositório do projeto no GitHub em nova aba');const repositoryName=document.createElement('strong');repositoryName.textContent='Repositório do projeto';const repositoryArrow=document.createElement('span');repositoryArrow.className='repository-external';repositoryArrow.textContent='↗';repository.append(githubIcon(),repositoryName,repositoryArrow);about.append(repository);
  const developers=document.createElement('div');developers.className='developer-links';for(const name of ['dabb3','mrlsouz']){const link=document.createElement('a');link.href=`https://github.com/${name}`;link.append(document.createTextNode(`@${name}`),githubIcon());link.target='_blank';link.rel='noopener noreferrer';developers.append(link);}about.append(developers);
  const logoutButton=button('Sair da conta',logout,modalFooter);logoutButton.className='settings-logout';modalFooter.hidden=false;
+}
+function connectionDiagnostics(){
+ const client=api;if(!client)return;
+ dialog('Diagnóstico de conexão');const panel=dialogGeneration,session=sessionGeneration;
+ paragraph('O teste é somente leitura e pode levar até 16 segundos. A ação pendente será preservada.');
+ const status=paragraph('Preparando teste…');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+ const report=document.createElement('textarea');report.className='connection-report';report.readOnly=true;report.rows=12;report.setAttribute('aria-label','Relatório de diagnóstico para suporte');report.hidden=true;content.append(report);
+ let running=false;
+ const current=()=>api===client&&sessionGeneration===session&&dialogGeneration===panel&&modal.open;
+ const execute=async()=>{
+  if(running||!current())return;running=true;run.disabled=true;copy.disabled=true;status.textContent='Testando API e sessão…';
+  try{const result=await client.diagnose({browser:navigator.userAgent??'',version:config.buildVersion});if(!current())return;report.value=result.report;report.hidden=false;copy.disabled=false;status.textContent='Teste concluído. Copie o relatório para enviar ao suporte.';}
+  catch{if(current())status.textContent='Não foi possível concluir o diagnóstico. Nenhuma ação foi reenviada.';}
+  finally{running=false;if(current())run.disabled=false;}
+ };
+ const run=button('Testar novamente',execute);
+ const copy=button('Copiar diagnóstico',async()=>{
+  if(!current()||!report.value)return;
+  try{if(!navigator.clipboard?.writeText)throw new Error();await navigator.clipboard.writeText(report.value);if(current())status.textContent='Diagnóstico copiado.';}
+  catch{if(current()){report.focus();report.select();status.textContent='Cópia automática indisponível. Selecione e copie o relatório acima.';}}
+ });copy.disabled=true;void execute();
 }
 function closeScene(){stopEffects();animalSound?.pause();for(const clip of ambience)clip.pause();sceneResize?.disconnect();sceneResize=undefined;scene?.close();health(null,null);}
 function avatarSettings(){
@@ -724,7 +749,7 @@ window.addEventListener('offline',()=>showConnection('Sem conexão. Reconecte an
 window.addEventListener('online',()=>void refresh());
 document.addEventListener('pointerdown',event=>{if(healthPinned&&!element('farm').contains(event.target as Node)&&!element('plant-health').contains(event.target as Node))closeHealth();});
 modal.addEventListener('close',()=>{health(healthTile,healthPoint);window.clearInterval(missionsTimer);missionsTimer=undefined;});
-document.addEventListener('keydown',event=>{if(!own||event.repeat||event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement)return;const shortcut=gameShortcut(event.key,!!visited);if(!shortcut)return;if(shortcut.action==='tool'){if(!modal.open)pickTool(shortcut.tool);return;}if(shortcut.action==='shop')shortcutPanel('Loja',()=>shop());else if(shortcut.action==='deposit')shortcutPanel('Depósito',deposit);else if(shortcut.action==='missions')shortcutPanel('Missões',missions);else if(shortcut.action==='plots')shortcutPanel('Terras da fazenda',tileList);else if(shortcut.action==='music')toggleMusic();else if(shortcut.action==='effects')toggleEffects();});
+document.addEventListener('keydown',event=>{if(!own||event.repeat||event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement||(event.target as HTMLElement)?.tagName==='TEXTAREA')return;const shortcut=gameShortcut(event.key,!!visited);if(!shortcut)return;if(shortcut.action==='tool'){if(!modal.open)pickTool(shortcut.tool);return;}if(shortcut.action==='shop')shortcutPanel('Loja',()=>shop());else if(shortcut.action==='deposit')shortcutPanel('Depósito',deposit);else if(shortcut.action==='missions')shortcutPanel('Missões',missions);else if(shortcut.action==='plots')shortcutPanel('Terras da fazenda',tileList);else if(shortcut.action==='music')toggleMusic();else if(shortcut.action==='effects')toggleEffects();});
 document.addEventListener('visibilitychange',()=>{syncMusic();if(!document.hidden)void refresh();});
 window.setInterval(()=>{if(!document.hidden)void refresh();},30_000);
 void start();
