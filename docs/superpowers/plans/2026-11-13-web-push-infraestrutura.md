@@ -24,7 +24,7 @@
 - [x] Navegador: módulo independente do fluxo econômico, IndexedDB compartilhado com worker, ativação por gesto, suspensão local antes de logout, reconciliação posterior, manifesto e testes. Arquivos novos Web Push e worker; integração em main/api/build.
 - [x] Transporte/HTTP: avaliar biblioteca oficial publicada, licença/dependências/vulnerabilidades, validação de endpoint e SSRF, chaves opcionais, timeout e destinos restritos; rotas autenticadas sem chamar ações de fazenda.
 - [x] Integração: revisar contratos, executar testes Java/PostgreSQL/web, TypeScript, builds e SpotBugs, revisar privacidade e evidência visual.
-- [ ] Documentar configuração e limitações; commit, branch e PR para `codex/online-core-compartilhado`, sem merge/deploy/configuração remota.
+- [x] Documentar configuração e limitações; commit, branch e PR para `codex/online-core-compartilhado`, sem merge/deploy/configuração remota. PR #80 aberto.
 
 ## Decisões e limites
 

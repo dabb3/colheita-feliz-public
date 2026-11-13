@@ -1,9 +1,9 @@
 {
-  "version": "connection-diagnostics-v1",
-  "prNumber": 79,
+  "version": "web-push-infra-v1",
+  "prNumber": 80,
   "items": [
-    "Está com dificuldade para jogar? Abra Ajustes e toque em Testar conexão. O jogo verifica a resposta do servidor e se sua sessão está disponível.",
-    "Use Copiar diagnóstico para enviar o resultado ao suporte. O relatório não inclui senhas, dados da sua fazenda ou informações de outros jogadores. Se a cópia automática não funcionar, você pode selecionar e copiar o texto.",
-    "O teste não compra, não gasta moedas e não repete ações. Se uma ação estiver aguardando confirmação, ela continua preservada. O teste também mostra resultados parciais quando a conexão falha."
+    "Preparamos uma área de notificações no dispositivo em Ajustes. A ativação depende da configuração do servidor e da sua permissão no navegador. Avisos automáticos de colheitas, animais e amigos ainda não estão disponíveis nesta etapa.",
+    "Quando o recurso estiver configurado e ativado, você poderá enviar uma notificação de teste para o próprio dispositivo. A mensagem Enviado ao serviço de notificações confirma o envio, mas não garante que o aparelho exibiu o aviso.",
+    "Ao sair ou trocar de conta, o jogo desativa os avisos da conta anterior neste dispositivo. Se estiver sem internet, a desativação no servidor fica pendente para quando a conexão voltar. Nenhuma moeda ou ação da fazenda é alterada."
   ]
 }
