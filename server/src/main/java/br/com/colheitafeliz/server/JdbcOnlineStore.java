@@ -124,8 +124,10 @@ final class JdbcOnlineStore implements AutoCloseable {
             pushStore().initialize(tx);
             cropPushStore().initialize(tx);
             socialPushStore().initialize(tx);
+            tx.execute("CREATE TABLE IF NOT EXISTS "+schema+".away_reports (owner uuid PRIMARY KEY REFERENCES "+schema
+                    +".players(id), last_seen_at timestamptz NOT NULL, ledger jsonb NOT NULL)");
             tx.execute("REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
-            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "pest_origins", "daily_allowances", "login_reward_progress", "cooperative_xp", "update_note_views", "seed_gifts", "push_subscriptions", "push_tests", "push_events", "crop_push_jobs", "crop_push_deliveries", "social_push_devices", "social_push_cursors", "social_push_deliveries")) {
+            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "pest_origins", "daily_allowances", "login_reward_progress", "cooperative_xp", "update_note_views", "seed_gifts", "push_subscriptions", "push_tests", "push_events", "crop_push_jobs", "crop_push_deliveries", "social_push_devices", "social_push_cursors", "social_push_deliveries", "away_reports")) {
                 tx.execute("ALTER TABLE " + schema + "." + table + " ENABLE ROW LEVEL SECURITY");
                 tx.execute("REVOKE ALL ON " + schema + "." + table + " FROM PUBLIC");
             }
@@ -225,6 +227,15 @@ final class JdbcOnlineStore implements AutoCloseable {
         }
         void deletePestOrigin(UUID owner, int plotId, String kind) {
             execute("DELETE FROM " + schema + ".pest_origins WHERE owner=? AND plot_id=? AND kind=?", owner, plotId, kind);
+        }
+        AwayLedger awayLedger(UUID owner) {
+            return first(query("SELECT last_seen_at,ledger FROM " + schema + ".away_reports WHERE owner=?",
+                    r -> AwayLedger.fromJson(r.getTimestamp(1).toInstant(), JsonParser.parseString(r.getString(2)).getAsJsonObject()), owner));
+        }
+        void saveAwayLedger(UUID owner, AwayLedger ledger) {
+            execute("INSERT INTO " + schema + ".away_reports (owner,last_seen_at,ledger) VALUES (?,?,?::jsonb) "
+                    + "ON CONFLICT(owner) DO UPDATE SET last_seen_at=EXCLUDED.last_seen_at,ledger=EXCLUDED.ledger",
+                    owner, java.sql.Timestamp.from(ledger.lastSeenAt()), ledger.toJson().toString());
         }
         void recordTheft(UUID actor, Instant now) {
             execute("INSERT INTO " + schema + ".theft_cooldowns (actor,last_stolen_at) VALUES (?,?) "
