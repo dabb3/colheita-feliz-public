@@ -43,6 +43,7 @@ await build({
   target: "es2022",
   sourcemap: false,
 });
+await build({entryPoints:[resolve(root,"src/push-worker.ts")],outfile:resolve(dist,"push-worker.js"),bundle:true,minify:true,target:"es2022"});
 for (const name of ["index.html", "style.css"])
   await cp(resolve(root, name), resolve(dist, name));
 await cp(resolve(root, "../assets/classic"), resolve(dist, "assets/classic"), {
@@ -60,7 +61,7 @@ await writeFile(
 );
 await writeFile(
   resolve(dist, "_headers"),
-  `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://lh3.googleusercontent.com; connect-src 'self' ${config.api} ${config.supabaseUrl}; base-uri 'none'; frame-ancestors 'none'; form-action 'self'\n/config.js\n  Cache-Control: no-store\n/index.html\n  Cache-Control: no-cache\n`,
+  `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://lh3.googleusercontent.com; connect-src 'self' ${config.api} ${config.supabaseUrl}; base-uri 'none'; frame-ancestors 'none'; form-action 'self'\n/config.js\n  Cache-Control: no-store\n/index.html\n  Cache-Control: no-cache\n/push-worker.js\n  Cache-Control: no-cache\n`,
 );
 await checkAssetSizes(dist);
 console.log(

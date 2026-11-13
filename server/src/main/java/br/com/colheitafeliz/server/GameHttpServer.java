@@ -39,6 +39,7 @@ final class GameHttpServer implements AutoCloseable {
     private final AtomicInteger admitted = new AtomicInteger();
     private final Map<String, Rate> rates = new LinkedHashMap<>();
     private final Clock clock;
+    private final PushService push;
     private record Rate(long minute, int count) {}
 
     GameHttpServer(InetSocketAddress address, OnlineGameService service, Authenticator auth,
@@ -47,6 +48,11 @@ final class GameHttpServer implements AutoCloseable {
     }
     GameHttpServer(InetSocketAddress address, OnlineGameService service, Authenticator auth,
                    Set<String> origins, boolean development, Clock clock, boolean trustFlyClientIp) throws IOException {
+        this(address,service,auth,origins,development,clock,trustFlyClientIp,null);
+    }
+    GameHttpServer(InetSocketAddress address, OnlineGameService service, Authenticator auth,
+                   Set<String> origins, boolean development, Clock clock, boolean trustFlyClientIp, PushService push) throws IOException {
+        this.push=push;
         this.trustFlyClientIp = trustFlyClientIp;
         if (development && !address.getAddress().isLoopbackAddress()) throw new IllegalArgumentException("Development auth requires loopback");
         this.service = service; this.auth = auth; this.origins = Set.copyOf(origins); this.development = development; this.clock = clock;
@@ -91,6 +97,16 @@ final class GameHttpServer implements AutoCloseable {
             if (method.equals("GET") && path.equals("/v1/diagnostics")) {
                 send(exchange, 200, object("ok", true, "serverTime", clock.instant().truncatedTo(java.time.temporal.ChronoUnit.MILLIS).toString(), "originPresent", origin != null));
                 return;
+            }
+            if(path.startsWith("/v1/push/")){
+                if(push==null)throw new ApiFailure(503,"Notificações indisponíveis.");
+                JsonObject result;
+                if(method.equals("GET")&&path.equals("/v1/push/config"))result=push.config(actor);
+                else if(method.equals("POST")&&path.equals("/v1/push/subscribe"))result=push.subscribe(actor,read(exchange,raw,Set.of("endpoint","keys","deviceToken","bindingId","deviceRevision","preferences")));
+                else if(method.equals("POST")&&path.equals("/v1/push/revoke"))result=push.revoke(actor,read(exchange,raw,Set.of("endpoint","deviceToken","deviceRevision")));
+                else if(method.equals("POST")&&path.equals("/v1/push/test"))result=push.test(actor,read(exchange,raw,Set.of("endpoint","deviceToken","bindingId","deviceRevision","testId")));
+                else throw new ApiFailure(404,"Rota indisponível.");
+                send(exchange,200,result);return;
             }
             Object response;
             if (method.equals("GET") && path.equals("/v1/request-id")) response = service.requestId();
