@@ -34,9 +34,19 @@ export interface Animal {
 }
 export interface AutomationService {id:string; name:string; description:string; greenPrice:number; durationDays:number;}
 export interface UpdateNotes {version:string; prNumber:number; date:string; items:string[];}
+export interface AwayReport {
+  awaySeconds:number;
+  harvests:{cropId:string;name:string;stem:string;quantity:number}[];
+  products:{productId:string;name:string;animalId:string;quantity:number}[];
+  thefts:{at:string;actor:string;itemId:string;name:string;stem:string;quantity:number}[];
+  defenses:{at:string;actor:string;protectorId:string|null;protectorName:string}[];
+  care:{waterings:number;pestsRemoved:number;animalCares:number};
+  pending:({kind:'AUTOMATION';serviceId:string;name:string;expiredAt:string}|{kind:'VIP';expiredAt:string}|{kind:'FEED';animalId:string;name:string;stock:number})[];
+}
 export interface Farm {
   automations?: (AutomationService & {expiresAt:string|null;status:"ACTIVE"|"SUSPENDED"|"EXPIRED"|"NOT_PURCHASED"})[];
   updateNotes?: UpdateNotes;
+  awayReport?: AwayReport;
   avatar?: {id:string;photoUrl?:string|null};
   avatarSelected?: boolean;
   notifications?: GameNotification[];
