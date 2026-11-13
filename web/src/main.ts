@@ -18,7 +18,7 @@ let sceneResize:ResizeObserver|undefined;
 let avatarUser='',googlePhoto:string|undefined,avatarChoice:AvatarChoice='classic',avatarStore:Storage|undefined;
 try{avatarStore=window.localStorage;}catch{/* Playing remains available when browser preferences are blocked. */}
 let musicTrack='';
-let tool='CURSOR',selectedSeed='nabo',selectedFertilizer='comum',trayOpen=false,effectsEnabled=false,musicEnabled=false,effectsVolume=.65,musicVolume=.25,music:HTMLAudioElement|undefined,busy=false,seedMarketGroup:'common'|'vip'='common',refreshDialog:(()=>void)|undefined;
+let tool='CURSOR',selectedSeed='nabo',selectedFertilizer='comum',selectedLoveFertilizer='amor',trayOpen=false,effectsEnabled=false,musicEnabled=false,effectsVolume=.65,musicVolume=.25,music:HTMLAudioElement|undefined,busy=false,seedMarketGroup:'common'|'vip'='common',refreshDialog:(()=>void)|undefined;
 let toastTimer:number,loginTransitionTimer:number,sessionGeneration=0,navigationGeneration=0,dialogGeneration=0,healthTile:Tile|null=null,healthPoint:{x:number;y:number}|null=null,animalTooltipId='',animalTooltipPoint:{x:number;y:number}|null=null;
 let goldAnimationFrame=0;
 const depositNumber=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1});
@@ -256,14 +256,14 @@ function renderTools(){
    const crop=catalog.crops.find(item=>item.id===selectedSeed),seedCount=own?.seedCounts?.[selectedSeed]??0;
    if(crop){const seed=document.createElement('img');seed.className='tool-selected-item';seed.alt='';seed.src=`/assets/${seedArtPath(crop.spriteStem)}`;b.append(seed);const count=document.createElement('span');count.className='tool-count';count.textContent=`x${seedCount}`;b.append(count);}
   }
-  if(id==='FERTILIZE'||id==='LOVE'){const count=document.createElement('span');count.className='tool-count';count.textContent=`x${own?.fertilizers?.[id==='LOVE'?loveFertilizer():selectedFertilizer]??0}`;b.append(count);}
+  if(id==='FERTILIZE'||id==='LOVE'){const count=document.createElement('span');count.className='tool-count';count.textContent=`x${own?.fertilizers?.[id==='LOVE'?selectedLoveFertilizer:selectedFertilizer]??0}`;b.append(count);}
   if(!visited){const key=document.createElement('span');key.className='tool-key';key.textContent=String(index+1);b.append(key);}
  }
  renderToolTray();
 }
-// The love button counts a friends-only fertilizer even before LOVE is picked.
-function loveFertilizer(){return catalog.fertilizers.some(f=>f.id===selectedFertilizer&&f.friendsOnly)?selectedFertilizer:'amor';}
-function pickTool(id:string){const previous=tool;trayOpen=toolbarTrayToggle(previous,id,trayOpen);tool=id;if(id==='LOVE')selectedFertilizer=loveFertilizer();renderTools();if(healthTile&&healthPoint)renderHealth(healthTile,healthPoint,true);if(id==='SPREAD_INSECTS'||id==='SPREAD_WEEDS')notify('Escolha uma planta de um amigo, em crescimento e sem proteção. Limite: uma aplicação deste tipo a cada 6h.');}
+// Friends-only fertilizers keep their own selection so a visit never changes the home Adubar tool.
+function toolFertilizer(){return tool==='LOVE'?selectedLoveFertilizer:selectedFertilizer;}
+function pickTool(id:string){const previous=tool;trayOpen=toolbarTrayToggle(previous,id,trayOpen);tool=id;renderTools();if(healthTile&&healthPoint)renderHealth(healthTile,healthPoint,true);if(id==='SPREAD_INSECTS'||id==='SPREAD_WEEDS')notify('Escolha uma planta de um amigo, em crescimento e sem proteção. Limite: uma aplicação deste tipo a cada 6h.');}
 function renderToolTray(){
  const tray=element('tool-tray');tray.replaceChildren();const seeds=tool==='PLANT',fertilizers=tool==='FERTILIZE'||tool==='LOVE';
  tray.hidden=!trayOpen||(!seeds&&!fertilizers);if(tray.hidden)return;
@@ -279,16 +279,16 @@ function renderToolTray(){
    item.onmouseleave=()=>{const caption=document.getElementById('tool-tray-caption');if(caption)caption.textContent=selected?`${selected} · ${detail}`:'';};
   }
  }else{
-  for(const fertilizer of catalog.fertilizers.filter(item=>tool==='LOVE'?item.friendsOnly:true)){
-   const count=own?.fertilizers?.[fertilizer.id]??0,item=button('',()=>{selectedFertilizer=fertilizer.id;trayOpen=false;renderTools();notify(`Fertilizante selecionado: ${fertilizer.name}.`);},grid);
-   item.className='tray-item';item.setAttribute('aria-pressed',String(selectedFertilizer===fertilizer.id));item.setAttribute('aria-label',`${fertilizer.name}, ${count} no estoque`);
+  for(const fertilizer of catalog.fertilizers.filter(item=>tool==='LOVE'?item.friendsOnly:!item.friendsOnly)){
+   const count=own?.fertilizers?.[fertilizer.id]??0,item=button('',()=>{if(tool==='LOVE')selectedLoveFertilizer=fertilizer.id;else selectedFertilizer=fertilizer.id;trayOpen=false;renderTools();notify(`Fertilizante selecionado: ${fertilizer.name}.`);},grid);
+   item.className='tray-item';item.setAttribute('aria-pressed',String(toolFertilizer()===fertilizer.id));item.setAttribute('aria-label',`${fertilizer.name}, ${count} no estoque`);
    const image=document.createElement('img');image.alt='';image.src=`/assets/classic/icons/adubo-${fertilizer.id}.png`;item.append(image);const badge=document.createElement('span');badge.textContent=`x${count}`;item.append(badge);
    item.onmouseenter=()=>{const caption=document.getElementById('tool-tray-caption');if(caption)caption.textContent=`${fertilizer.name} · reduz ${formatToolDuration(fertilizer.reductionSeconds)}${fertilizer.friendsOnly?' · plantação de amigos':` · ${count} no estoque`}`;};
    item.onmouseleave=()=>{const caption=document.getElementById('tool-tray-caption');if(caption)caption.textContent=selected?`${selected} · ${detail}`:'';};
   }
  }
- const selected=seeds?catalog.crops.find(item=>item.id===selectedSeed)?.name:catalog.fertilizers.find(item=>item.id===selectedFertilizer)?.name;
- const count=seeds?own?.seedCounts?.[selectedSeed]??0:own?.fertilizers?.[selectedFertilizer]??0,selectedFertilizerType=catalog.fertilizers.find(item=>item.id===selectedFertilizer);
+ const selected=seeds?catalog.crops.find(item=>item.id===selectedSeed)?.name:catalog.fertilizers.find(item=>item.id===toolFertilizer())?.name;
+ const count=seeds?own?.seedCounts?.[selectedSeed]??0:own?.fertilizers?.[toolFertilizer()]??0,selectedFertilizerType=catalog.fertilizers.find(item=>item.id===toolFertilizer());
  const detail=seeds?`${count} sementes`:selectedFertilizerType?.friendsOnly?'plantação de amigos':`reduz ${formatToolDuration(selectedFertilizerType?.reductionSeconds??0)} · ${count} no estoque`;
  const caption=document.createElement('span');caption.id='tool-tray-caption';caption.className='tray-caption';caption.textContent=selected?`${selected} · ${detail}`:'';tray.append(caption);
 }
@@ -366,7 +366,7 @@ function confirmPlot(tile:Tile){
 async function tileAction(tile:Tile){
  if(tool==='CURSOR'&&tile.cropId){health(tile,tileCenter(tile.column,tile.row),'tap');return;}
  if(visited&&tool==='CURSOR')return;
- if(visited){await action(tileCommand(tool,tile,selectedSeed,selectedFertilizer,true),`/v1/farms/${visited.owner}/visit-actions`);return;}
+ if(visited){await action(tileCommand(tool,tile,selectedSeed,toolFertilizer(),true),`/v1/farms/${visited.owner}/visit-actions`);return;}
  if(!tile.unlocked){confirmPlot(tile);return;}
  if(tool==='CURSOR')return;
  await action(tileCommand(tool,tile,selectedSeed,selectedFertilizer));

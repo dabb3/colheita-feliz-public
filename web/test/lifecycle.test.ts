@@ -391,6 +391,15 @@ test('love fertilizer button shows the love stock when visiting before it is pic
  h.pickTool('LOVE');assert.equal(text(love()),'x1');
 });
 
+test('love fertilizer selection does not replace the own farm fertilizer after a visit',()=>{
+ const {h,elements}=app(),own={...farm('alice'),fertilizers:{comum:22,amor:1}};
+ h.set({own,visited:farm('bob'),catalog:{crops:[],fertilizers:[{id:'comum',name:'Comum'},{id:'amor',name:'Fertilizante do amor',friendsOnly:true}],animals:[]}});h.receive({});
+ h.pickTool('LOVE');h.set({own,visited:undefined});h.receive({});
+ const fertilize=elements.get('tools').children.find(node=>node.title==='Adubar');
+ assert.equal(fertilize.children.find(node=>node.className==='tool-count').textContent,'x22');assert.equal(fertilize.children[0].src,'/assets/classic/icons/adubo-comum.png');
+ h.pickTool('FERTILIZE');assert.ok(!descendants(elements.get('tool-tray')).some(node=>node.getAttribute?.('aria-label')?.startsWith('Fertilizante do amor')));
+});
+
 test('resize observer repositions the active tooltip and disconnects when the session closes',async()=>{
  const {h,elements,ctx,observers}=app();
  ctx.Scene=class{update(){}close(){}};
