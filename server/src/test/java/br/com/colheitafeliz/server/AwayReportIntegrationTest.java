@@ -107,4 +107,49 @@ class AwayReportIntegrationTest {
         store.transaction(owner, tx -> { tx.saveAwayLedger(owner, reset); return null; });
         assertEquals(reset, store.transaction(owner, tx -> tx.awayLedger(owner)));
     }
+
+    private boolean hasReport(UUID player) { return service.farm(player).has("awayReport"); }
+
+    @Test void firstGetOnlyRecordsLastSeen() {
+        var fresh = UUID.randomUUID();
+        var invite = service.createInvitation(owner, RequestIds.issue(clock.instant())).get("code").getAsString();
+        service.acceptInvitation(fresh, "Nova", invite, RequestIds.issue(clock.instant()));
+        assertNull(ledger(fresh));
+        assertFalse(hasReport(fresh));
+        assertEquals(clock.instant(), ledger(fresh).lastSeenAt());
+    }
+
+    @Test void deliversOnceAfterThreeHours() {
+        service.farm(owner);
+        clock.advance(3 * 3600); matureCrop(false);
+        var view = service.farm(owner);
+        assertTrue(view.has("awayReport"));
+        assertEquals(3 * 3600, view.getAsJsonObject("awayReport").get("awaySeconds").getAsLong());
+        assertFalse(hasReport(owner));
+    }
+
+    @Test void underThreeHoursDiscards() {
+        service.farm(owner);
+        clock.advance(2 * 3600 + 59 * 60); matureCrop(false);
+        assertFalse(hasReport(owner));
+        clock.advance(3 * 3600);
+        assertFalse(hasReport(owner));
+    }
+
+    @Test void concurrentGetsDeliverOnce() throws Exception {
+        service.farm(owner);
+        clock.advance(3 * 3600); matureCrop(false);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var first = pool.submit(() -> hasReport(owner)); var second = pool.submit(() -> hasReport(owner));
+            assertEquals(1, (first.get() ? 1 : 0) + (second.get() ? 1 : 0));
+        } finally { pool.shutdownNow(); }
+    }
+
+    @Test void friendVisitNeverDelivers() {
+        service.farm(owner);
+        clock.advance(3 * 3600); matureCrop(false);
+        assertFalse(service.visit(friend, owner).has("awayReport"));
+        assertTrue(hasReport(owner));
+    }
 }

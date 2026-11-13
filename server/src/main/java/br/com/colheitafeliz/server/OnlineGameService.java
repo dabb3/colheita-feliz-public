@@ -97,6 +97,14 @@ final class OnlineGameService implements AutoCloseable {
             var farm = load(tx, actor);
             farm.game().claimChristmasGift(participant.registeredAt());
             var view=withRequestLease(persist(tx, farm, false, true));
+            Instant now = clock.instant();
+            var ledger = tx.awayLedger(actor);
+            if (ledger != null && Duration.between(ledger.lastSeenAt(), now).compareTo(AwayReports.MIN_ABSENCE) >= 0) {
+                var report = AwayReports.build(farm.game(), ledger, now);
+                if (report != null) view.add("awayReport", report);
+            }
+            // Every own visit starts a new window; shorter absences are seen in the farm itself.
+            tx.saveAwayLedger(actor, AwayLedger.empty(now));
             if(publishedNotes!=null&&tx.claimUpdateNotes(actor,publishedNotes.version(),publishedNotes.day(clock.instant())))
                 view.add("updateNotes",publishedNotes.view(clock.instant()));
             return view;
