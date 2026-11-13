@@ -383,6 +383,14 @@ test('scene pointer follows tools and selected fertilizer across visits and retu
  assert.equal(elements.get('tools').children[0].children[0].src,'/assets/classic/icons/hud/cursor-ui.png');
 });
 
+test('love fertilizer button shows the love stock when visiting before it is picked',()=>{
+ const {h,elements}=app(),own={...farm('alice'),fertilizers:{comum:22,amor:1}};
+ h.set({own,visited:farm('bob'),catalog:{crops:[],fertilizers:[{id:'comum',name:'Comum'},{id:'amor',name:'Fertilizante do amor',friendsOnly:true}],animals:[]}});h.receive({});
+ const love=()=>elements.get('tools').children.find(node=>node.title==='Fertilizante do amor');
+ assert.equal(text(love()),'x1');
+ h.pickTool('LOVE');assert.equal(text(love()),'x1');
+});
+
 test('resize observer repositions the active tooltip and disconnects when the session closes',async()=>{
  const {h,elements,ctx,observers}=app();
  ctx.Scene=class{update(){}close(){}};
