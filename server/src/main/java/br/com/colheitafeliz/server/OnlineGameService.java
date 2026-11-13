@@ -31,6 +31,8 @@ import static br.com.colheitafeliz.server.OnlineViews.object;
 final class OnlineGameService implements AutoCloseable {
     private static final BigDecimal DAILY_ALLOWANCE = BigDecimal.valueOf(100);
     private static final Set<String> PEST_ACTIONS = Set.of("SPREAD_INSECTS", "SPREAD_WEEDS");
+    // Decisão de 2026-11-13: furto e cada tipo de praga liberam uma nova tentativa a cada 6 horas.
+    static final Duration THEFT_COOLDOWN = Duration.ofHours(6), PEST_COOLDOWN = Duration.ofHours(6);
     private static final Set<String> VISIT_ACTIONS = Set.of("STEAL", "LOVE", "SPREAD_INSECTS", "SPREAD_WEEDS");
     private record Loaded(UUID owner, String name, GameState game, long revision, GameSnapshot before, LocalDate allowanceDay) {}
     private final JdbcOnlineStore store;
@@ -204,11 +206,11 @@ final class OnlineGameService implements AutoCloseable {
                     // The enclosing transaction holds the actor lock across cooldown, transfer and receipt.
                     Instant now = clock.instant();
                     Instant lastTheft = tx.lastTheft(actor);
-                    Instant availableAt = lastTheft == null ? now : lastTheft.plus(Duration.ofHours(24));
+                    Instant availableAt = lastTheft == null ? now : lastTheft.plus(THEFT_COOLDOWN);
                     if (now.isBefore(availableAt)) {
                         Duration remaining = Duration.between(now, availableAt);
                         long seconds = remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);
-                        theft = br.com.colheitafeliz.game.TheftAttempt.blocked("Você já usou sua tentativa de furto nas últimas 24 horas. Nova tentativa em "
+                        theft = br.com.colheitafeliz.game.TheftAttempt.blocked("Você já usou sua tentativa de furto nas últimas 6 horas. Nova tentativa em "
                                 + seconds / 3600 + "h " + seconds % 3600 / 60 + "min " + seconds % 60 + "s.");
                     } else {
                         theft = stealAfterOwnerWindow(visits, destination, visitor, command, season, now);
@@ -218,11 +220,11 @@ final class OnlineGameService implements AutoCloseable {
                 } else if (PEST_ACTIONS.contains(command.action())) {
                     Instant now = clock.instant();
                     Instant last = tx.lastPest(actor, command.action());
-                    Instant availableAt = last == null ? now : last.plus(Duration.ofHours(12));
+                    Instant availableAt = last == null ? now : last.plus(PEST_COOLDOWN);
                     if (now.isBefore(availableAt)) {
                         Duration remaining = Duration.between(now, availableAt);
                         long seconds = remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);
-                        result = ActionResult.fail("Você já lançou esse tipo de praga nas últimas 12 horas. Disponível em "
+                        result = ActionResult.fail("Você já lançou esse tipo de praga nas últimas 6 horas. Disponível em "
                                 + seconds / 3600 + "h " + seconds % 3600 / 60 + "min " + seconds % 60 + "s.");
                     } else {
                         result = command.action().equals("SPREAD_INSECTS")

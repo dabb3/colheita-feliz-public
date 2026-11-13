@@ -472,7 +472,7 @@ class OnlineGameIntegrationTest {
         assertEquals("200", service.farm(alice).get("coins").getAsString());
     }
 
-    @Test void theftCooldownIsGlobalSurvivesRestartAndExpiresAtExactlyTwentyFourHours() {
+    @Test void theftCooldownIsGlobalSurvivesRestartAndExpiresAtExactlySixHours() {
         UUID carol = prepareTheftFriends();
         var first = theftCommand(bob, alice);
         var success = service.visitAction(bob, alice, first);
@@ -487,10 +487,10 @@ class OnlineGameIntegrationTest {
         var ownerBefore = service.farm(carol);
         var refused = service.visitAction(bob, carol, theftCommand(bob, carol));
         assertFalse(refused.getAsJsonObject("result").get("success").getAsBoolean());
-        assertTrue(refused.getAsJsonObject("result").get("message").getAsString().contains("23h 0min 0s"));
+        assertTrue(refused.getAsJsonObject("result").get("message").getAsString().contains("5h 0min 0s"));
         assertEquals(before.get("revision"), service.farm(bob).get("revision"));
         assertEquals(ownerBefore.get("revision"), service.farm(carol).get("revision"));
-        clock.advanceSeconds(82799);
+        clock.advanceSeconds(17999);
         assertFalse(service.visitAction(bob, carol, theftCommand(bob, carol)).getAsJsonObject("result").get("success").getAsBoolean());
         clock.advanceSeconds(1);
         assertTrue(service.visitAction(bob, carol, theftCommand(bob, carol)).getAsJsonObject("result").get("success").getAsBoolean());
@@ -637,8 +637,8 @@ class OnlineGameIntegrationTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.CsvSource({"SPREAD_INSECTS,43140,false","SPREAD_INSECTS,43200,true","SPREAD_INSECTS,43260,true","SPREAD_WEEDS,43140,false","SPREAD_WEEDS,43200,true","SPREAD_WEEDS,43260,true"})
-    void historicalPestTimestampUsesTwelveHoursWithoutResettingIt(String kind,long elapsed,boolean allowed){
+    @org.junit.jupiter.params.provider.CsvSource({"SPREAD_INSECTS,21540,false","SPREAD_INSECTS,21600,true","SPREAD_INSECTS,21660,true","SPREAD_WEEDS,21540,false","SPREAD_WEEDS,21600,true","SPREAD_WEEDS,21660,true"})
+    void historicalPestTimestampUsesSixHoursWithoutResettingIt(String kind,long elapsed,boolean allowed){
         preparePestFriends(false);var historical=clock.instant().minusSeconds(elapsed);
         store.transaction(bob,tx->{tx.recordPest(bob,kind,historical);return null;});
         store.close();store=new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"),"postgres","",testSchema);store.initialize(alice);
@@ -650,7 +650,7 @@ class OnlineGameIntegrationTest {
         assertNull(store.transaction(bob,tx->tx.lastPest(bob,kind.equals("SPREAD_WEEDS")?"SPREAD_INSECTS":"SPREAD_WEEDS")));
         assertNull(store.transaction(bob,tx->tx.lastTheft(bob)));
     }
-    @Test void pestLimitsAreIndependentGlobalPersistedAndExpireAfterExactlyTwelveHours() {
+    @Test void pestLimitsAreIndependentGlobalPersistedAndExpireAfterExactlySixHours() {
         UUID carol = preparePestFriends(false);
         var before = service.farm(bob);
         var insect = pestCommand(bob, alice, "SPREAD_INSECTS");
@@ -666,7 +666,7 @@ class OnlineGameIntegrationTest {
         store = new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"), "postgres", "", testSchema);
         store.initialize(alice);
         service = new OnlineGameService(store, clock, bound -> bound - 1, 5);
-        clock.advanceSeconds(43199);
+        clock.advanceSeconds(21599);
         for (String kind : java.util.List.of("SPREAD_INSECTS", "SPREAD_WEEDS")) {
             var refused = service.visitAction(bob, carol, pestCommand(bob, carol, kind));
             assertFalse(refused.getAsJsonObject("result").get("success").getAsBoolean());

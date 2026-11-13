@@ -131,9 +131,9 @@ test('visit defaults to inspection and a touch or cursor click never sends a soc
 test('pest tools exist only in visits and send the selected plot with its revisions',async()=>{
  const {h,elements}=app(),own=farm('alice'),visited={...farm('bob'),revision:'42'},sent=[];
  const api={pending:null,mutate:async(path,command)=>{sent.push({path,command});return{result:{success:false,message:'Disponível em 1h 0min 0s.'}};},prepareRequestId:()=>Promise.resolve()};
- h.set({own,api});h.receive({});assert.ok(!text(elements.get('tools')).includes('1/12h'));
+ h.set({own,api});h.receive({});assert.ok(!text(elements.get('tools')).includes('1/6h'));
  h.set({own,visited,api});h.receive({});
- for(const [action,label,asset]of [['SPREAD_INSECTS','Lançar inseto · 1/12h','verme_1'],['SPREAD_WEEDS','Lançar erva · 1/12h','erva_daninha_1']]){
+ for(const [action,label,asset]of [['SPREAD_INSECTS','Lançar inseto · 1/6h','verme_1'],['SPREAD_WEEDS','Lançar erva · 1/6h','erva_daninha_1']]){
   const choice=descendants(elements.get('tools')).find(n=>n.getAttribute?.('aria-label')===label);assert.ok(choice);assert.ok(choice.children.some(n=>n.src===`/assets/classic/effects/${asset}.png`));
   choice.onclick();await h.tileAction({column:2,row:1,harvestRevision:'9'});
   assert.equal(text(elements.get('notice')),'Disponível em 1h 0min 0s.');
