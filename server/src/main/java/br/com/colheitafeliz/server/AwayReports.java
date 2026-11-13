@@ -26,13 +26,16 @@ final class AwayReports {
             var item = new JsonObject();
             item.addProperty("at", event.at()); item.addProperty("actor", event.actor());
             if (event.kind().equals("THEFT")) {
-                var crop = game.catalog().get(event.itemId());
+                // A crop retired from the catalog is skipped instead of failing the owner's farm.
+                var crop = game.catalog().all().stream().filter(type -> type.id().equals(event.itemId())).findFirst().orElse(null);
+                if (crop == null) continue;
                 item.addProperty("itemId", event.itemId()); item.addProperty("name", crop.name());
                 item.addProperty("stem", crop.spriteStem()); item.addProperty("quantity", event.quantity());
                 thefts.add(item);
             } else {
                 item.addProperty("protectorId", event.protectorId());
-                item.addProperty("protectorName", event.protectorId() == null ? "Protetor" : game.animalType(event.protectorId()).name());
+                item.addProperty("protectorName", game.animalTypes().stream().filter(type -> type.id().equals(event.protectorId()))
+                        .map(type -> type.name()).findFirst().orElse("Protetor"));
                 defenses.add(item);
             }
         }

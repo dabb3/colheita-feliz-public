@@ -83,4 +83,13 @@ class AwayReportsTest {
         assertEquals("Carol", defense.get("actor").getAsString());
         assertEquals(dog.name(), defense.get("protectorName").getAsString());
     }
+
+    @Test void unknownCatalogIdsNeverBreakTheFarm() {
+        var ledger = AwayLedger.empty(ago(4 * 3600))
+                .withEvent(new AwayLedger.Event("THEFT", ago(3600).toString(), "Bob", "fruta-removida", 1, null))
+                .withEvent(new AwayLedger.Event("DEFENDED", ago(1800).toString(), "Carol", null, 0, "protetor-removido"));
+        var report = assertDoesNotThrow(() -> AwayReports.build(game, ledger, clock.instant()));
+        assertEquals(0, report.getAsJsonArray("thefts").size());
+        assertEquals("Protetor", report.getAsJsonArray("defenses").get(0).getAsJsonObject().get("protectorName").getAsString());
+    }
 }
