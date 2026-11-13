@@ -3,6 +3,7 @@ import { checkAssetSizes } from "./check-assets.mjs";
 import { mkdir, cp, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const local = process.argv.includes("--local");
 function required(key) {
@@ -23,6 +24,9 @@ const config = local
       supabaseUrl: required("PUBLIC_SUPABASE_URL"),
       supabaseKey: required("PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
     };
+let buildVersion=process.env.CF_PAGES_COMMIT_SHA;
+if (!buildVersion) try { buildVersion=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim(); } catch { /* Source archives may not include Git metadata. */ }
+if (/^[a-f0-9]{7,40}$/.test(buildVersion??'')) config.buildVersion=buildVersion;
 if (!local)
   for (const value of [config.api, config.supabaseUrl]) {
     const url = new URL(value);

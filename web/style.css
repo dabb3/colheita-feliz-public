@@ -591,3 +591,4 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 #modal.bite-dialog #modal-footer button{min-width:110px;min-height:44px;background:linear-gradient(#fff2a5,#e9bd47)}
 #modal.bite-dialog button:focus-visible{outline:3px solid #705719;outline-offset:3px}
 @media(max-width:560px){#modal.bite-dialog .dialog-header h2{font-size:19px}.bite-dog{height:130px}#bite-message{font-size:16px}}
+.connection-report { box-sizing:border-box; width:100%; max-width:100%; min-height:16rem; font:inherit; font-size:.85rem; overflow-wrap:anywhere; resize:vertical; }
