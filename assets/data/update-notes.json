@@ -1,11 +1,9 @@
 {
-  "version": "protector-bite-v1",
-  "prNumber": 77,
+  "version": "connection-diagnostics-v1",
+  "prNumber": 79,
   "items": [
-    "O Cachorro normal substituiu o Cão Robô na loja e na fazenda. Quem já tinha comprado mantém seu animal, com os mesmos preços, nível, alimentação, validade e proteção.",
-    "Tentar furtar uma planta protegida continua sendo bloqueado. Agora há 30% de chance de levar uma mordida e perder de 10 a 50 moedas de ouro, até o limite do seu saldo. Suas moedas verdes não são afetadas.",
-    "Uma tentativa válida contra um terreno protegido passa a usar sua espera de 24 horas, mesmo sem mordida. Esse limite vale para todas as fazendas visitadas.",
-    "Os cinco minutos de colheita exclusiva do dono continuam valendo. Plantas ainda crescendo, tentativas durante essa proteção e outras tentativas inválidas não gastam sua vez nem provocam mordida.",
-    "Se houver mordida, um novo aviso mostra o Cachorro, quanto ouro você realmente perdeu e seu saldo atualizado. O ouro perdido não vai para o dono da fazenda."
+    "Está com dificuldade para jogar? Abra Ajustes e toque em Testar conexão. O jogo verifica a resposta do servidor e se sua sessão está disponível.",
+    "Use Copiar diagnóstico para enviar o resultado ao suporte. O relatório não inclui senhas, dados da sua fazenda ou informações de outros jogadores. Se a cópia automática não funcionar, você pode selecionar e copiar o texto.",
+    "O teste não compra, não gasta moedas e não repete ações. Se uma ação estiver aguardando confirmação, ela continua preservada. O teste também mostra resultados parciais quando a conexão falha."
   ]
 }
