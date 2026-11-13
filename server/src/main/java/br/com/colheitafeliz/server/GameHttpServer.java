@@ -89,7 +89,7 @@ final class GameHttpServer implements AutoCloseable {
             finally { RequestTimings.auth(authStarted); }
             UUID actor = identity.id(); rate("actor:" + actor, 120);
             if (method.equals("GET") && path.equals("/v1/diagnostics")) {
-                send(exchange, 200, object("ok", true, "serverTime", clock.instant().toString(), "originAllowed", origin != null));
+                send(exchange, 200, object("ok", true, "serverTime", clock.instant().truncatedTo(java.time.temporal.ChronoUnit.MILLIS).toString(), "originPresent", origin != null));
                 return;
             }
             Object response;
@@ -198,5 +198,5 @@ final class GameHttpServer implements AutoCloseable {
         exchange.sendResponseHeaders(status, bytes.length);
         exchange.getResponseBody().write(bytes);
     }
-    @Override public void close() { http.stop(1); threads.shutdownNow(); auth.close(); service.close(); }
+    @Override public void close() { http.stop(1); threads.shutdownNow(); auth.close(); if (service != null) service.close(); }
 }

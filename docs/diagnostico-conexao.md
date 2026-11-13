@@ -5,11 +5,11 @@ Em Ajustes, “Testar conexão” abre o painel e executa duas consultas indepen
 ## Contrato e privacidade
 
 - GET `/health`: disponibilidade pública, sem autenticação.
-- GET `/v1/diagnostics`: autenticação e origem pelos mesmos validadores das rotas do jogo. Retorna somente `ok`, `serverTime` e `originAllowed`. Aplica os limites por IP/conta existentes e `Cache-Control: no-store`.
+- GET `/v1/diagnostics`: autenticação e origem pelos mesmos validadores das rotas do jogo. Retorna somente `ok`, `serverTime` (precisão de milissegundos) e `originPresent`. Esse último campo indica a presença do cabeçalho Origin; uma origem presente já passou pela validação anterior, que rejeita origens proibidas com HTTP 403. Aplica os limites por IP/conta existentes e `Cache-Control: no-store`.
 - A rota não chama `OnlineGameService`, banco, fazendas, automações, notas, reservas de identificador ou recibos. Não mede a disponibilidade do PostgreSQL.
 - A sonda usa transporte separado do fluxo de comandos. Não chama `retry()`, não grava/remove armazenamento, não substitui o identificador reservado e não altera a intenção pendente. A autenticação reutiliza o provedor de sessão existente.
 - Cada etapa tem prazo de oito segundos, incluindo obtenção da sessão e leitura do corpo; o resultado parcial é retornado mesmo se uma delas falhar. O teste é limitado a duas consultas, não a tentativas contínuas.
-- O relatório inclui horário do navegador, commit web quando disponível, família/versão do navegador, status, durações e diferença estimada de relógio pelo ponto médio da consulta autenticada. A incerteza de rede é indicada; isso não constitui sincronização precisa do relógio.
+- O relatório inclui horário do navegador, commit web quando disponível, família/versão do navegador, status, durações e diferença estimada de relógio pelo ponto médio da consulta autenticada. O intervalo do relógio começa imediatamente antes do envio, excluindo a obtenção/renovação da sessão; a duração total da etapa continua incluindo essa espera. A incerteza de rede é indicada; isso não constitui sincronização precisa do relógio. Tokens específicos de Edge, Opera, Samsung Internet e navegadores iOS têm prioridade sobre os tokens de compatibilidade Chrome/Safari.
 - Não copia token, cookie, nome, e-mail, ID de jogador, URL completa, conteúdo da ação pendente, mensagens brutas de erro ou respostas da API. Não envia automaticamente o relatório ao suporte.
 - Fechar o painel ou trocar a conta impede um resultado atrasado de atualizar a interface. Uma sonda já iniciada pode terminar, limitada pelo timeout.
 

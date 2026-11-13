@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class DiagnosticsTest {
     @Test void diagnosticAuthenticatesWithoutLoadingFarmOrExposingIdentity() throws Exception {
-        var clock = Clock.fixed(Instant.parse("2026-11-13T12:00:00Z"), ZoneOffset.UTC);
+        var clock = Clock.fixed(Instant.parse("2026-11-13T12:00:00.123456789Z"), ZoneOffset.UTC);
         Authenticator auth = token -> {
             if (!"Bearer test".equals(token)) throw new ApiFailure(401, "Sessão inválida.");
             return new Authenticator.Identity(UUID.fromString("00000000-0000-0000-0000-000000000001"), "Private Name");
@@ -27,7 +27,7 @@ class DiagnosticsTest {
             var uri = URI.create("http://127.0.0.1:" + server.port() + "/v1/diagnostics");
             var response = client.send(HttpRequest.newBuilder(uri).header("Origin", "https://game.example").header("Authorization", "Bearer test").GET().build(), HttpResponse.BodyHandlers.ofString());
             assertEquals(200, response.statusCode());
-            assertEquals("{\"ok\":true,\"serverTime\":\"2026-11-13T12:00:00Z\",\"originAllowed\":true}", response.body());
+            assertEquals("{\"ok\":true,\"serverTime\":\"2026-11-13T12:00:00.123Z\",\"originPresent\":true}", response.body());
             assertEquals("https://game.example", response.headers().firstValue("Access-Control-Allow-Origin").orElseThrow());
             assertEquals("no-store", response.headers().firstValue("Cache-Control").orElseThrow());
             var preflight = client.send(HttpRequest.newBuilder(uri).header("Origin", "https://game.example").header("Access-Control-Request-Method", "GET").header("Access-Control-Request-Headers", "authorization").method("OPTIONS", HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.discarding());
@@ -35,12 +35,12 @@ class DiagnosticsTest {
             assertTrue(preflight.headers().firstValue("Access-Control-Allow-Headers").orElseThrow().contains("Authorization"));
             var direct = client.send(HttpRequest.newBuilder(uri).header("Authorization", "Bearer test").GET().build(), HttpResponse.BodyHandlers.ofString());
             assertEquals(200, direct.statusCode());
-            assertTrue(direct.body().contains("\"originAllowed\":false"));
+            assertTrue(direct.body().contains("\"originPresent\":false"));
             assertEquals(401, client.send(HttpRequest.newBuilder(uri).GET().build(), HttpResponse.BodyHandlers.discarding()).statusCode());
             assertEquals(403, client.send(HttpRequest.newBuilder(uri).header("Origin", "https://bad.example").header("Authorization", "Bearer test").GET().build(), HttpResponse.BodyHandlers.discarding()).statusCode());
             assertNotEquals(200, client.send(HttpRequest.newBuilder(uri).header("Authorization", "Bearer test").POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.discarding()).statusCode());
         } finally {
-            assertThrows(NullPointerException.class, server::close); // No service to close.
+            server.close();
         }
     }
 }
