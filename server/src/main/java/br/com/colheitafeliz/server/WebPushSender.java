@@ -13,7 +13,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
+import java.time.Clock;
 import nl.martijndwars.webpush.AbstractPushService;
 import nl.martijndwars.webpush.Encoding;
 import nl.martijndwars.webpush.Notification;
@@ -25,7 +25,7 @@ final class WebPushSender implements PushService.Sender, AutoCloseable {
     private final Encoder encoder;
     private final String publicKey;
     private final Semaphore concurrent=new Semaphore(2);
-    private final AtomicReference<Instant> retryAfter=new AtomicReference<>(Instant.EPOCH);
+    private final ProviderBackoff backoff=new ProviderBackoff(Clock.systemUTC());
     private final ThreadPoolExecutor dns;
     private WebPushSender(String publicKey,String privateKey,String subject) throws GeneralSecurityException {
         this.publicKey=publicKey;this.encoder=new Encoder(publicKey,privateKey,subject);
@@ -52,7 +52,7 @@ final class WebPushSender implements PushService.Sender, AutoCloseable {
         PushValidation.validateEndpoint(request.getUrl());return request;
     }
     @Override public int send(String endpoint,String p256dh,String auth,String payload) throws Exception {
-        if(Instant.now().isBefore(retryAfter.get())||!concurrent.tryAcquire())throw new ApiFailure(503,"Envio temporariamente indisponível.");
+        if(backoff.blocked(endpoint)||!concurrent.tryAcquire())throw new ApiFailure(503,"Envio temporariamente indisponível.");
         try{
             var prepared=prepare(endpoint,p256dh,auth,payload);var uri=URI.create(prepared.getUrl());
             var resolution=dns.submit(()->InetAddress.getAllByName(uri.getHost()));
@@ -60,16 +60,16 @@ final class WebPushSender implements PushService.Sender, AutoCloseable {
             try{addresses=resolution.get(2,TimeUnit.SECONDS);}finally{resolution.cancel(true);}
             var response=PinnedPushTransport.execute(prepared,addresses);
             if(response.status()==429||response.status()==503){
-                var until=retryDeadline(response.retryAfter(),Instant.now());
-                retryAfter.accumulateAndGet(until,(a,b)->a.isAfter(b)?a:b);
+                backoff.record(prepared.getUrl(),response.status(),response.retryAfter());
             }
             return response.status();
         }finally{concurrent.release();}
     }
     static Instant retryDeadline(String value,Instant now){
+        if(value==null)return now.plusSeconds(60);
         try{long seconds=Long.parseLong(value);return now.plusSeconds(Math.max(60,Math.min(86400,seconds)));}
         catch(NumberFormatException ignored){
-            try{var deadline=ZonedDateTime.parse(value,DateTimeFormatter.RFC_1123_DATE_TIME).toInstant();return deadline.isAfter(now)?deadline:now.plusSeconds(60);}
+            try{var deadline=ZonedDateTime.parse(value,DateTimeFormatter.RFC_1123_DATE_TIME).toInstant();return now.plusSeconds(Math.max(60,Math.min(86400,java.time.Duration.between(now,deadline).getSeconds())));}
             catch(java.time.format.DateTimeParseException invalid){return now.plusSeconds(60);}
         }
     }

@@ -1,4 +1,4 @@
-import type {ApiClient} from './api.ts';
+import {ApiError,type ApiClient} from './api.ts';
 import {changeBinding,pushState} from './push-state.ts';
 export function testMessage(status:string):string{return status==='accepted'?'Enviado ao serviço de notificações':status==='pending'?'Envio ainda pendente. Não tente novamente agora.':status==='expired'?'Inscrição expirada. Desative e ative novamente.':'Serviço de notificações indisponível.';}
 let lifecycle=0;
@@ -39,7 +39,13 @@ export async function connectPush(account:string,api:ApiClient):Promise<void>{
  await reconcile(api);
 }
 export async function reconcilePush(account:string,api:ApiClient){if(typeof indexedDB!=='undefined'&&(await pushState())?.account===account)await reconcile(api);}
-async function reconcile(api:ApiClient){for(const item of (await pushState())?.pending??[]){await api.push('revoke',item);await pushState(state=>({...state!,pending:state!.pending.filter(p=>p.endpoint!==item.endpoint||p.deviceRevision!==item.deviceRevision)}));}}
+function definitive(error:unknown){return error instanceof ApiError&&[400,403,404,409].includes(error.status);}
+async function reconcile(api:ApiClient){
+ for(const item of (await pushState())?.pending??[]){
+  try{await api.push('revoke',item);}catch(error){if(!definitive(error))throw error;}
+  await pushState(state=>({...state!,pending:state!.pending.filter(p=>p.endpoint!==item.endpoint||p.deviceRevision!==item.deviceRevision||p.deviceToken!==item.deviceToken)}));
+ }
+}
 export function renderPushSettings(parent:HTMLElement,account:string,api:ApiClient){
  const section=document.createElement('section');section.className='settings-section push-settings';parent.append(section);
  const title=document.createElement('h3');title.textContent='Notificações no dispositivo';section.append(title);
@@ -69,23 +75,25 @@ export function renderPushSettings(parent:HTMLElement,account:string,api:ApiClie
  activate.onclick=async()=>{
   if(busy||!publicKey||activate.disabled)return;
   busy=true;activate.disabled=true;
-  const started=lifecycle;let revision:number|undefined;
+  const started=lifecycle;let revision:number|undefined,subscription:PushSubscription|null=null,rejectedSubscription=false;
   try{
+   // Safari requires this call in the synchronous click stack. Account ownership
+   // is checked in IndexedDB afterwards; permission belongs to the origin.
+   if(navigator.userActivation&&!navigator.userActivation.isActive){status.textContent='Toque novamente em Ativar notificações para permitir no navegador.';return;}
+   if(await Notification.requestPermission()!=='granted'){await refresh();return;}
+   if(started!==lifecycle)return;
    let reserved=false;
    const intent=await pushState(state=>{
-    if(state?.account!==account)return state!;
+    if(started!==lifecycle||state?.account!==account)return state!;
     reserved=true;return changeBinding(state);
    });
    if(!reserved||started!==lifecycle){await refresh();return;}
    revision=intent!.revision;
-   // The explicit click may ask only while its transient browser activation remains valid.
-   if(navigator.userActivation&&!navigator.userActivation.isActive){status.textContent='Toque novamente em Ativar notificações para permitir no navegador.';return;}
-   if(await Notification.requestPermission()!=='granted'){await refresh();return;}
    if(started!==lifecycle||(await pushState())?.revision!==revision)return;
    await reconcile(api);
    const registration=await navigator.serviceWorker.register('/push-worker.js');
    await navigator.serviceWorker.ready;
-   let subscription=await registration.pushManager.getSubscription();
+   subscription=await registration.pushManager.getSubscription();
    subscription??=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:keyBytes(publicKey)});
    const endpoint=subscription.endpoint,deviceToken=intent?.deviceToken??randomToken(),bindingId=randomToken();
    let installed=false;
@@ -94,11 +102,22 @@ export function renderPushSettings(parent:HTMLElement,account:string,api:ApiClie
     installed=true;return {...current!,deviceToken,active:{account,endpoint,deviceToken,bindingId}};
    });
    if(!installed)return;
-   await api.push('subscribe',{endpoint,keys:subscription.toJSON().keys,deviceToken,bindingId,deviceRevision:state!.revision,preferences});
+   try{await api.push('subscribe',{endpoint,keys:subscription.toJSON().keys,deviceToken,bindingId,deviceRevision:state!.revision,preferences});}
+   catch(error){rejectedSubscription=definitive(error);throw error;}
    if((await pushState())?.revision!==state!.revision)return;
    await refresh();
   }catch{
-   await pushState(current=>current?.revision===revision?changeBinding(current):current!);
+   let cleared=false;
+   const clearedState=await pushState(current=>{
+    if(current?.account!==account||current?.revision!==revision)return current!;
+    cleared=true;return changeBinding(current);
+   });
+   if(rejectedSubscription&&subscription&&cleared){
+    const current=await pushState();
+    if(started===lifecycle&&current?.account===account&&current.revision===clearedState?.revision&&!current.active){
+     try{await subscription.unsubscribe();}catch{/* Local suppression and its pending revocation remain authoritative. */}
+    }
+   }
    fail();
   }finally{busy=false;const state=await pushState();activate.disabled=state?.account!==account||!publicKey||Notification.permission==='denied';}
  };

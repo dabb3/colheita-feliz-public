@@ -34,7 +34,7 @@ final class PushService {
                     if(!same(old,candidate))throw conflict();return status("subscribed");
                 }
             }
-            if((old==null||!old.owner().equals(actor))&&push.totalCount(tx,actor)>=50)throw new ApiFailure(409,"Limite de registros de dispositivos atingido.");
+            if((old==null||!old.owner().equals(actor))&&push.totalCount(tx,actor,clock.instant())>=50)throw new ApiFailure(409,"Limite de registros de dispositivos atingido.");
             if((old==null||!old.active()||!old.owner().equals(actor))&&push.activeCount(tx,actor)>=5)throw new ApiFailure(409,"Limite de dispositivos atingido.");
             push.save(tx,candidate,clock.instant());return status("subscribed");
         });
@@ -43,7 +43,7 @@ final class PushService {
         String endpoint=text(request,"endpoint");PushValidation.validateEndpoint(endpoint);String proof=hash(PushValidation.token(text(request,"deviceToken")));long revision=PushValidation.revision(request);
         return store.transaction(actor,tx->{
             active(tx,actor);var old=push.find(tx,endpoint);
-            if(old==null){if(push.totalCount(tx,actor)>=50)throw new ApiFailure(409,"Limite de registros de dispositivos atingido.");push.save(tx,new PushStore.Subscription(actor,endpoint,proof,"",revision,"","","{}",false),clock.instant());return status("revoked");}
+            if(old==null){if(push.totalCount(tx,actor,clock.instant())>=50)throw new ApiFailure(409,"Limite de registros de dispositivos atingido.");push.save(tx,new PushStore.Subscription(actor,endpoint,proof,"",revision,"","","{}",false),clock.instant());return status("revoked");}
             possession(old,proof);if(revision<old.revision()||(revision==old.revision()&&old.active()))throw conflict();
             push.deactivate(tx,endpoint,old.binding(),revision,clock.instant());return status("revoked");
         });
@@ -60,22 +60,24 @@ final class PushService {
             if(!current.owner().equals(actor)||!current.binding().equals(binding))throw new ApiFailure(403,"Dispositivo não autorizado.");
             if(current.revision()!=revision)throw conflict();
             var previous=push.attempt(tx,testId);
-            if(previous!=null){if(!previous.requestHash().equals(requestHash))throw conflict();return new Reservation(null,previous.status());}
+            if(previous!=null){if(!previous.requestHash().equals(requestHash))throw conflict();if(previous.status().equals("pending")&&!clock.instant().isBefore(previous.reservedAt().plusSeconds(60)))push.finish(tx,testId,"unavailable");return new Reservation(null,push.attempt(tx,testId).status());}
             if(!current.active())throw new ApiFailure(409,"Inscrição desativada.");
             if(push.coolingDown(tx,actor,endpoint,clock.instant()))throw new ApiFailure(429,"Aguarde antes de testar novamente.");
-            push.reserve(tx,testId,new PushStore.Attempt(actor,endpoint,binding,revision,requestHash,"pending"),clock.instant());return new Reservation(current,null);
+            push.reserve(tx,testId,new PushStore.Attempt(actor,endpoint,binding,revision,requestHash,"pending",clock.instant()),clock.instant());return new Reservation(current,null);
         });
         if(reserved.result()!=null)return status(reserved.result());
         String result;
         try{var s=reserved.subscription();result=deliveryStatus(sender.send(s.endpoint(),s.p256dh(),s.auth(),payload(s.binding()).toString()));}
         catch(Exception failure){if(failure instanceof InterruptedException)Thread.currentThread().interrupt();result="unavailable";}
         String finalResult=result;
-        store.transaction(actor,tx->{
+        String persistedResult=store.transaction(actor,tx->{
             var current=push.find(tx,endpoint);
+            var attempt=push.attempt(tx,testId);
+            if(!attempt.status().equals("pending"))return attempt.status();
             if(finalResult.equals("expired")&&current!=null&&current.binding().equals(binding)&&current.revision()==revision)push.deactivate(tx,endpoint,binding,revision,clock.instant());
-            push.finish(tx,testId,finalResult);return null;
+            push.finish(tx,testId,finalResult);return push.attempt(tx,testId).status();
         });
-        return status(result);
+        return status(persistedResult);
     }
     private static boolean same(PushStore.Subscription a,PushStore.Subscription b){return a.active()&&a.owner().equals(b.owner())&&a.binding().equals(b.binding())&&a.p256dh().equals(b.p256dh())&&a.auth().equals(b.auth())&&JsonParser.parseString(a.preferences()).equals(JsonParser.parseString(b.preferences()));}
     private static void possession(PushStore.Subscription old,String proof){if(!MessageDigest.isEqual(old.proof().getBytes(StandardCharsets.US_ASCII),proof.getBytes(StandardCharsets.US_ASCII)))throw new ApiFailure(403,"Dispositivo não autorizado.");}

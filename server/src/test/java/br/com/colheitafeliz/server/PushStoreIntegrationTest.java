@@ -129,7 +129,64 @@ class PushStoreIntegrationTest {
         assertEquals(other,store.transaction(owner,tx->store.pushStore().find(tx,external.get("endpoint").getAsString()).owner()));
         var own=subscription(1,2);assertEquals("subscribed",service.subscribe(owner,own).get("status").getAsString());
     }
-    private static final class TestClock extends Clock {Instant now=Instant.parse("2026-11-13T12:00:00Z");@Override public Instant instant(){return now;}@Override public ZoneId getZone(){return ZoneOffset.UTC;}@Override public Clock withZone(ZoneId zone){return this;}}
+    @Test void registrationQuotaRenewsAtThirtyDaysWithoutErasingReplayProtection(){
+        for(int i=1;i<=50;i++)service.revoke(owner,subscription(i,2));
+        Instant created=clock.instant();
+        clock.now=created.plus(Duration.ofDays(30)).minusSeconds(1);
+        failure(409,()->service.subscribe(owner,subscription(51,1)));
+        failure(409,()->service.revoke(owner,subscription(51,1)));
+        service.subscribe(owner,subscription(1,3));
+        clock.now=created.plus(Duration.ofDays(30));
+        assertEquals("subscribed",service.subscribe(owner,subscription(51,1)).get("status").getAsString());
+        assertEquals("revoked",service.revoke(owner,subscription(52,1)).get("status").getAsString());
+        failure(409,()->service.subscribe(owner,subscription(2,1)));
+        var retained=store.transaction(owner,tx->store.pushStore().find(tx,subscription(2,1).get("endpoint").getAsString()));
+        assertFalse(retained.active());assertEquals(2,retained.revision());assertEquals(PushService.hash(token(2)),retained.proof());
+        assertEquals(created,store.transaction(owner,tx->tx.query("SELECT created_at FROM "+schema+".push_subscriptions WHERE endpoint=?",r->r.getTimestamp(1).toInstant(),subscription(1,1).get("endpoint").getAsString()).getFirst()));
+        assertEquals(52,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".push_subscriptions",r->r.getInt(1)).getFirst()).intValue());
+    }
+    @Test void abandonedPendingBecomesDurablyUnavailableAfterRestart(){
+        var request=subscription(1,1);service.subscribe(owner,request);var test=test(request);
+        UUID id=UUID.fromString(test.get("testId").getAsString());String endpoint=request.get("endpoint").getAsString(),binding=request.get("bindingId").getAsString();
+        String requestHash=PushService.hash(owner+"\n"+endpoint+"\n"+PushService.hash(token(1))+"\n"+binding+"\n1");
+        store.transaction(owner,tx->{tx.execute("INSERT INTO "+schema+".push_tests(id,actor,endpoint,binding,device_revision,request_hash,status,reserved_at) VALUES(?,?,?,?,?,?,?,?)",id,owner,endpoint,binding,1L,requestHash,"pending",java.sql.Timestamp.from(clock.instant()));return null;});
+        store.close();store=new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"),"postgres","",schema);store.initialize(owner,clock.instant());
+        service=new PushService(store,clock,(e,p,a,b)->{sends.incrementAndGet();return 201;},"public");
+        clock.now=clock.now.plusSeconds(59);assertEquals("pending",service.test(owner,test).get("status").getAsString());
+        var second=subscription(2,1);service.subscribe(owner,second);failure(429,()->service.test(owner,test(second)));
+        clock.now=clock.now.plusSeconds(1);assertEquals("unavailable",service.test(owner,test).get("status").getAsString());
+        assertEquals("unavailable",service.test(owner,test).get("status").getAsString());assertEquals(0,sends.get());
+        assertEquals("unavailable",store.transaction(owner,tx->store.pushStore().attempt(tx,id).status()));
+        assertEquals("accepted",service.test(owner,test(second)).get("status").getAsString());assertEquals(1,sends.get());
+    }
+    @Test void transferAfterQuotaWindowPreservesOwnershipAndCreationTime(){
+        for(int i=1;i<=50;i++)service.revoke(owner,subscription(i,1));
+        var external=subscription(51,1);service.subscribe(other,external);Instant created=clock.instant();
+        var transfer=external.deepCopy();transfer.addProperty("deviceRevision",2);transfer.addProperty("bindingId",token(90));
+        failure(409,()->service.subscribe(owner,transfer));
+        clock.now=clock.now.plus(Duration.ofDays(30));
+        assertEquals("subscribed",service.subscribe(owner,transfer).get("status").getAsString());
+        var row=store.transaction(owner,tx->store.pushStore().find(tx,external.get("endpoint").getAsString()));
+        assertEquals(owner,row.owner());assertEquals(2,row.revision());
+        failure(409,()->service.subscribe(other,external));
+        assertEquals(created,store.transaction(owner,tx->tx.query("SELECT created_at FROM "+schema+".push_subscriptions WHERE endpoint=?",r->r.getTimestamp(1).toInstant(),external.get("endpoint").getAsString()).getFirst()));
+    }
+    @Test void lateSenderCannotOverwriteExpiredPendingOrDeactivateSubscription() throws Exception {
+        var request=subscription(1,1);service.subscribe(owner,request);var test=test(request);
+        var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
+        var blocked=new PushService(store,clock,(e,p,a,b)->{sends.incrementAndGet();entered.countDown();assertTrue(release.await(10,TimeUnit.SECONDS));return 410;},"public");
+        try(var executor=Executors.newSingleThreadExecutor()){
+            var future=executor.submit(()->blocked.test(owner,test));assertTrue(entered.await(10,TimeUnit.SECONDS));
+            try{
+                clock.now=clock.now.plusSeconds(60);
+                assertEquals("unavailable",service.test(owner,test).get("status").getAsString());
+                release.countDown();assertEquals("unavailable",future.get(10,TimeUnit.SECONDS).get("status").getAsString());
+                assertEquals("unavailable",service.test(owner,test).get("status").getAsString());assertEquals(1,sends.get());
+                assertTrue(store.transaction(owner,tx->store.pushStore().find(tx,request.get("endpoint").getAsString()).active()).booleanValue());
+            }finally{release.countDown();}
+        }
+    }
+    private static final class TestClock extends Clock {volatile Instant now=Instant.parse("2026-11-13T12:00:00Z");@Override public Instant instant(){return now;}@Override public ZoneId getZone(){return ZoneOffset.UTC;}@Override public Clock withZone(ZoneId zone){return this;}}
 }
 
 

@@ -30,6 +30,11 @@ class WebPushSenderTest {
         var env=Map.of("VAPID_PUBLIC_KEY",publicKey,"VAPID_PRIVATE_KEY",encode(scalar),"VAPID_SUBJECT","mailto:test@example.com");
         try(var sender=WebPushSender.fromEnvironment(env)){
             assertNotNull(sender);assertEquals(publicKey,sender.publicKey());
+            var field=WebPushSender.class.getDeclaredField("backoff");field.setAccessible(true);
+            var backoff=(ProviderBackoff)field.get(sender);
+            backoff.record("https://fcm.googleapis.com/wp/test",429,"600");
+            assertEquals(503,assertThrows(ApiFailure.class,()->sender.send("https://fcm.googleapis.com/wp/test","invalid","invalid","test")).status());
+            assertEquals(400,assertThrows(ApiFailure.class,()->sender.send("https://web.push.apple.com/test","invalid","invalid","test")).status());
             var request=sender.prepare("https://fcm.googleapis.com/wp/test",encodePublic((ECPublicKey)client.getPublic()),encode(new byte[16]),"generic test");
             assertEquals("aes128gcm",request.getHeaders().get("Content-Encoding"));
             assertTrue(request.getHeaders().get("Authorization").startsWith("vapid t="));
