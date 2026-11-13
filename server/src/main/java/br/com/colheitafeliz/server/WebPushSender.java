@@ -2,13 +2,9 @@ package br.com.colheitafeliz.server;
 
 import java.net.InetAddress;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.Security;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -28,14 +24,12 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 final class WebPushSender implements PushService.Sender, AutoCloseable {
     private final Encoder encoder;
     private final String publicKey;
-    private final HttpClient client;
     private final Semaphore concurrent=new Semaphore(2);
     private final AtomicReference<Instant> retryAfter=new AtomicReference<>(Instant.EPOCH);
     private final ThreadPoolExecutor dns;
     private WebPushSender(String publicKey,String privateKey,String subject) throws GeneralSecurityException {
         this.publicKey=publicKey;this.encoder=new Encoder(publicKey,privateKey,subject);
         if(!Utils.verifyKeyPair(encoder.getPrivateKey(),encoder.getPublicKey()))throw new IllegalArgumentException("Invalid VAPID key pair");
-        this.client=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).followRedirects(HttpClient.Redirect.NEVER).build();
         this.dns=new ThreadPoolExecutor(2,2,0,TimeUnit.SECONDS,new ArrayBlockingQueue<>(2),task->{var thread=new Thread(task,"push-dns");thread.setDaemon(true);return thread;},new ThreadPoolExecutor.AbortPolicy());
     }
     static WebPushSender fromEnvironment(Map<String,String> env){
@@ -62,15 +56,14 @@ final class WebPushSender implements PushService.Sender, AutoCloseable {
         try{
             var prepared=prepare(endpoint,p256dh,auth,payload);var uri=URI.create(prepared.getUrl());
             var resolution=dns.submit(()->InetAddress.getAllByName(uri.getHost()));
-            try{PushValidation.validateAddresses(resolution.get(2,TimeUnit.SECONDS));}finally{resolution.cancel(true);}
-            var builder=HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(5)).POST(HttpRequest.BodyPublishers.ofByteArray(prepared.getBody()));
-            prepared.getHeaders().forEach(builder::header);
-            var response=client.send(builder.build(),HttpResponse.BodyHandlers.discarding());
-            if(response.statusCode()==429||response.statusCode()==503){
-                var until=retryDeadline(response.headers().firstValue("Retry-After").orElse("60"),Instant.now());
+            final InetAddress[] addresses;
+            try{addresses=resolution.get(2,TimeUnit.SECONDS);}finally{resolution.cancel(true);}
+            var response=PinnedPushTransport.execute(prepared,addresses);
+            if(response.status()==429||response.status()==503){
+                var until=retryDeadline(response.retryAfter(),Instant.now());
                 retryAfter.accumulateAndGet(until,(a,b)->a.isAfter(b)?a:b);
             }
-            return response.statusCode();
+            return response.status();
         }finally{concurrent.release();}
     }
     static Instant retryDeadline(String value,Instant now){
@@ -80,7 +73,7 @@ final class WebPushSender implements PushService.Sender, AutoCloseable {
             catch(java.time.format.DateTimeParseException invalid){return now.plusSeconds(60);}
         }
     }
-    @Override public void close(){dns.shutdownNow();client.shutdownNow();}
+    @Override public void close(){dns.shutdownNow();}
     private static final class Encoder extends AbstractPushService<Encoder>{
         Encoder(String publicKey,String privateKey,String subject)throws GeneralSecurityException{super(publicKey,privateKey,subject);}
         nl.martijndwars.webpush.HttpRequest encode(Notification notification)throws Exception{return prepareRequest(notification,Encoding.AES128GCM);}
