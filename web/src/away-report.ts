@@ -80,10 +80,10 @@ function task(parent:HTMLElement,art:string,title:string,detail:string,actionLab
 
 export function renderAwayReport(parent:HTMLElement,footer:HTMLElement,report:AwayReport,handlers:AwayHandlers){
  const best=[...report.harvests].sort((a,b)=>b.quantity-a.quantity)[0],bestProduct=[...report.products].sort((a,b)=>b.quantity-a.quantity)[0];
- const header=document.createElement('header');header.className='away-header';
+ const header=document.createElement('div');header.className='away-header';
  const basket=document.createElement('div');basket.className='away-basket';basket.append(image('classic/animals/ovelha/cesta-vazia.png','away-basket-base'));
  if(best||bestProduct)basket.append(image(best?cropArt(best.stem):productArt(bestProduct!.animalId),'away-basket-fill'));
- const titleRow=document.createElement('div');titleRow.className='away-title-row';
+ const titleRow=document.createElement('div');titleRow.className='away-title-row';titleRow.setAttribute('aria-hidden','true');
  const title=text('h2','Sua fazenda rendeu!');title.id='away-title';titleRow.append(sprig(true),title,sprig(false));
  const subtitle=text('p','Enquanto você esteve fora por ');subtitle.append(text('b',awayDuration(report.awaySeconds)),'.');
  header.append(basket,titleRow,subtitle);parent.append(header);

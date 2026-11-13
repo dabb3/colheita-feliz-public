@@ -726,3 +726,77 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 #game.inspection-flow #plant-health{grid-row:2;justify-self:center;margin:12px}
 #game.inspection-flow #tool-tray{position:relative;grid-row:3;justify-self:center;inset:auto;transform:none;width:calc(100% - 24px);max-height:none;margin:0 12px 12px}
 #game.inspection-flow footer{position:relative;grid-row:4;justify-self:stretch;inset:auto;transform:none;width:auto;max-width:100%;margin:0}
+/* Relatório do período offline */
+@font-face{font-family:'Fredoka';src:url('/fonts/fredoka-latin.woff2') format('woff2');font-weight:500 600;font-style:normal;font-display:swap}
+#modal.away-dialog{width:min(540px,94vw);border:3px solid #c08a3c;border-radius:22px;box-shadow:0 0 0 6px #6b4524,0 24px 60px #000a;background:linear-gradient(#fffbe8,#f7eecb);padding:0}
+#modal.away-dialog[open]{max-height:calc(100dvh - 32px)}
+#modal.away-dialog .dialog-header{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#modal.away-dialog #modal-content{padding:0;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#modal.away-dialog #modal-footer{flex:none;position:relative;display:flex;justify-content:center;padding:14px 18px 18px;border-top:1px solid #e6d6a6;background:linear-gradient(#0000 55%,#6fae3b 55%,#4f8f2a)}
+.away-header{flex:none;padding:12px 20px;text-align:center;border-bottom:1px dashed #d9c38a;background:linear-gradient(#fff6d6,#fffbe8)}
+.away-basket{position:relative;width:112px;height:72px;margin:0 auto}
+.away-basket img{position:absolute}
+.away-basket-base{left:0;top:-10px;width:112px;height:86px;object-fit:fill;filter:drop-shadow(0 3px 2px #0003)}
+.away-basket-fill{left:20px;top:13px;width:72px;height:46px;object-fit:cover;object-position:50% 20%;clip-path:inset(0 0 22% 0)}
+.away-title-row{display:flex;align-items:center;justify-content:center;gap:10px}
+.away-title-row h2{margin:0;font:600 32px/1.05 'Fredoka',Georgia,serif;color:#2f6a1f;letter-spacing:.2px;text-shadow:0 2px 0 #fff,0 3px 0 #0001}
+.away-sprig{width:48px;height:30px;flex:none}.away-sprig.is-left{transform:scaleX(-1)}
+.away-header p{margin:4px 0 0;font-size:16px;color:#4a3b1c}.away-header p b{color:#2f2410}
+.away-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:14px 18px 6px;display:grid;gap:12px;align-content:start;scrollbar-color:#c08a3c #0000}
+.away-card{border:2px solid;border-radius:14px;padding:12px 14px;color:#3e331a}
+.away-card h3{margin:0 0 8px;font:700 14.5px system-ui,sans-serif}
+.away-card img{object-fit:contain}
+.away-card.is-reward{background:#f3f9e9;border-color:#9cc46a}
+.away-card.is-theft{background:#fdebe4;border-color:#e3a08a}.away-card.is-theft h3{color:#9a3b22}
+.away-card.is-guard{background:#fffbe8;border-color:#9cc46a}.away-card.is-guard h3{color:#2f6a1f}
+.away-card.is-vip{background:#fff4cf;border-color:#e0b94a}
+.away-card.is-todo{background:#fff;border-color:#e3c27a}.away-card.is-todo h3{color:#7a5418}
+.away-hero{display:flex;align-items:center;gap:12px}
+.away-hero-art{display:flex;flex:none}.away-hero-art img{width:62px;height:62px;filter:drop-shadow(0 3px 2px #0003)}.away-hero-art img+img{margin-left:-18px}
+.away-big{font:700 34px/1 Georgia,serif;color:#2f6a1f}
+.away-label{font:600 18px/1.2 system-ui,sans-serif;color:#3e331a}
+.away-items{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:6px}
+.away-item{display:inline-flex;align-items:center;gap:5px;font:600 15px system-ui,sans-serif}
+.away-item img{width:26px;height:26px}
+.away-item+.away-item::before{content:"·";margin-right:5px;color:#6b5a36;font-weight:700}
+.away-sub{display:flex;align-items:center;gap:12px;margin-top:12px;padding-top:10px;border-top:1px dashed #9cc46a}
+.away-card.is-reward>.away-sub:first-child{margin-top:0;padding-top:0;border-top:0}
+.away-sub>img{width:52px;height:52px;flex:none}
+.away-sub .away-big{font-size:24px}.away-sub .away-label{font-size:16px}
+.away-event{display:grid;grid-template-columns:40px minmax(0,1fr) 3.4rem;align-items:center;gap:10px;margin:6px 0 0;font-size:15px;line-height:1.35}
+.away-event img{width:34px;height:34px}.away-event.is-defense img{width:48px;height:48px;margin:-4px}
+.away-event b{display:block;font-weight:650}.away-event small{display:block;color:#6b5a36;font-size:13.5px;margin-top:1px}
+.away-event time{text-align:right;color:#6b5a36;font-size:13px}
+.away-card.is-theft .away-event b{font-weight:500}
+.away-card details summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;font-size:15px;color:#3e331a}
+.away-card details summary::-webkit-details-marker{display:none}
+.away-card details summary img{width:34px;height:34px}
+.away-chevron{margin-left:auto;width:9px;height:9px;border-right:2px solid #7a5418;border-bottom:2px solid #7a5418;rotate:45deg;transition:rotate .2s cubic-bezier(.2,0,0,1)}
+.away-card details[open] .away-chevron{rotate:-135deg}
+.away-care{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;overflow:hidden}
+.away-care div{background:#fff;border:1px solid #e0b94a;border-radius:10px;padding:10px 6px;text-align:center;font:600 14px/1.25 'Fredoka',system-ui,sans-serif;color:#5a4520}
+.away-care img{display:block;margin:0 auto 2px;width:30px;height:30px}
+.away-care b{display:block;font:600 26px/1.05 'Fredoka',system-ui,sans-serif;color:#2f6a1f;margin:2px 0}
+.away-care.is-entering div{animation:awayCareIn .26s cubic-bezier(.2,0,0,1) both}
+.away-care.is-entering div:nth-child(2){animation-delay:40ms}.away-care.is-entering div:nth-child(3){animation-delay:80ms}
+@keyframes awayCareIn{from{opacity:0;transform:translateY(-6px) scale(.97)}}
+.away-task{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;padding:6px 0;font-size:15px}
+.away-task+.away-task{border-top:1px solid #f0e2bd}
+.away-task>img{width:34px;height:34px}
+.away-task-text b{display:block;font-weight:650}.away-task-text small{display:block;color:#6b5a36;font-size:13px}
+.away-task-action{display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.away-task-action button{min-width:7.5rem;background:#fffbe8;border:1.5px solid #d8ad4a;color:#6b4a12}
+.away-task-action .away-confirm{background:linear-gradient(#fff6b8,#f0b93a);border-color:#8a5a17;color:#3e2a08}
+.away-task-action .away-cancel{min-width:0;background:none;border:0;color:#6b5a36;text-decoration:underline;padding:.3rem}
+.away-task.is-asking .away-task-action{grid-column:1/-1;padding:4px 0 2px;border-top:1px dashed #f0e2bd}
+.away-cost{margin-right:auto;font-size:13px;color:#6b5a36}
+.away-done{color:#2f6a1f;font-weight:700;font-size:14px;white-space:nowrap}
+.away-task-error{font-size:13px;color:#9a3b22;margin-right:auto}
+#modal.away-dialog .away-close{width:min(320px,100%);padding:.85rem 1rem;border-radius:14px;border:2px solid #8a5a17;background:linear-gradient(#fff6b8,#f0b93a);color:#3e2a08;font:700 17px system-ui,sans-serif;box-shadow:0 4px 0 #8a5a17,0 10px 18px #0004;transition:transform .12s cubic-bezier(.2,0,0,1),box-shadow .12s}
+#modal.away-dialog .away-close:active{transform:translateY(3px);box-shadow:0 1px 0 #8a5a17,0 4px 8px #0004}
+#modal.away-dialog :is(button,summary):focus-visible{outline:3px solid #1668cd;outline-offset:3px}
+.away-leaves{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+.away-leaves i{position:absolute;top:-30px;width:16px;height:10px;border-radius:0 100% 0 100%;opacity:.8;animation:awayLeafFall linear infinite}
+@keyframes awayLeafFall{to{transform:translate(var(--dx),110vh) rotate(540deg)}}
+@media (prefers-reduced-motion:reduce){.away-leaves{display:none}.away-care.is-entering div{animation:none}#modal.away-dialog .away-close{transition:none}}
+@media (max-width:560px){#modal.away-dialog{width:calc(100vw - 16px)}#modal.away-dialog[open]{max-height:calc(100dvh - 16px)}.away-title-row h2{font-size:27px}.away-sprig{width:26px}.away-event time{display:none}.away-event{grid-template-columns:40px minmax(0,1fr)}}
