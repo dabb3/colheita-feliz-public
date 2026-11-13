@@ -1,5 +1,14 @@
 package br.com.colheitafeliz.server;
 
+import br.com.colheitafeliz.domain.animal.Animal;
+import br.com.colheitafeliz.domain.animal.AnimalType;
+import br.com.colheitafeliz.domain.crop.Crop;
+import br.com.colheitafeliz.domain.economy.Currency;
+import br.com.colheitafeliz.domain.farm.PestState;
+import br.com.colheitafeliz.domain.farm.TileState;
+import br.com.colheitafeliz.domain.inventory.ItemLot;
+import br.com.colheitafeliz.game.CropCatalogLoader;
+import br.com.colheitafeliz.game.GameState;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +34,68 @@ class AwayReportIntegrationTest {
         service.farm(friend);
     }
     @AfterEach void close() { if (store != null) store.close(); }
+
+    private void edit(UUID player, java.util.function.Consumer<GameState> change) {
+        store.transaction(player, tx -> { tx.lockFarms(player); var saved = tx.farm(player);
+            var game = GameState.restore(clock::instant, clock, CropCatalogLoader.load(), saved.snapshot(), bound -> bound - 1);
+            change.accept(game); tx.save(player, game.snapshot(), saved.revision() + 1, clock.instant()); return null; });
+    }
+    private AwayLedger ledger(UUID player) { return store.transaction(player, tx -> tx.awayLedger(player)); }
+    /** A carrot on plot 0 matured ten minutes ago, past the owner's exclusive window; optionally guarded. */
+    private void matureCrop(boolean guarded) {
+        edit(owner, game -> {
+            var type = game.catalog().get("cenoura");
+            var origin = type.plantingOrigin(new ItemLot(type.id(), Currency.GOLD, type.seedPrices().get(Currency.GOLD), 1, false));
+            var at = clock.instant().minusSeconds(600);
+            var crop = new Crop(type, at, origin).water(at).advance(at, type.growthTime(1).toMillis());
+            var tile = game.farm().tile(0, 0);
+            tile.restore(TileState.READY, crop, PestState.NONE, null, 0, null, null, false, tile.harvestRevision() + 1);
+            game.barn().restore(List.of());
+            if (guarded) game.animalTypes().stream().filter(t -> t.kind() == AnimalType.Kind.PROTECTOR).limit(5).forEach(t ->
+                    game.barn().add(Animal.acquire(t, new ItemLot(t.id(), Currency.GOLD, t.prices().get(Currency.GOLD), 1, false), at, clock.instant())));
+        });
+    }
+    private com.google.gson.JsonObject steal() {
+        var farm = service.visit(friend, owner);
+        return service.visitAction(friend, owner, new Command(RequestIds.issue(clock.instant()), farm.get("revision").getAsString(), "STEAL", null, null, 0, 0,
+                farm.getAsJsonArray("tiles").get(0).getAsJsonObject().get("harvestRevision").getAsString()));
+    }
+
+    @Test void friendVisitAccumulatesAutomationCareForOwner() {
+        edit(owner, game -> {
+            game.wallet().credit(Currency.GREEN, new java.math.BigDecimal("1000"));
+            game.buyVip(); game.buyAutomation("water");
+            var tile = game.farm().tile(0, 0); tile.plow(); tile.plant(game.catalog().get("nabo"), clock.instant());
+        });
+        clock.advance(2 * 3600);
+        service.visit(friend, owner);
+        assertTrue(ledger(owner).waterings() > 0);
+        var friendLedger = ledger(friend);
+        assertTrue(friendLedger == null || friendLedger.waterings() == 0);
+    }
+
+    @Test void theftAndDefenseAreRecordedForOwner() {
+        matureCrop(false);
+        assertTrue(steal().getAsJsonObject("result").get("success").getAsBoolean());
+        var theft = ledger(owner).events().getFirst();
+        assertEquals(new AwayLedger.Event("THEFT", clock.instant().toString(), "Amiga", "cenoura", 1, null), theft);
+        clock.advance(24 * 3600 + 1); // past the theft cooldown on this base
+        matureCrop(true);
+        assertEquals("PROTECTED", steal().getAsJsonObject("theftOutcome").get("kind").getAsString());
+        var defense = ledger(owner).events().getLast();
+        assertEquals("DEFENDED", defense.kind()); assertEquals("Amiga", defense.actor()); assertNotNull(defense.protectorId());
+    }
+
+    @Test void rolledBackVisitDoesNotDoubleCount() {
+        matureCrop(false);
+        var farm = service.visit(friend, owner);
+        var command = new Command(RequestIds.issue(clock.instant()), farm.get("revision").getAsString(), "STEAL", null, null, 0, 0,
+                farm.getAsJsonArray("tiles").get(0).getAsJsonObject().get("harvestRevision").getAsString());
+        assertThrows(IllegalStateException.class, () -> store.transaction(friend, tx -> {
+            service.visitAction(tx, friend, owner, command); throw new IllegalStateException("rollback probe"); }));
+        var after = ledger(owner);
+        assertTrue(after == null || after.events().isEmpty());
+    }
 
     @Test void awayLedgerPersistsAndUpserts() {
         Instant seen = clock.instant();
