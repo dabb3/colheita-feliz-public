@@ -609,7 +609,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
  #game #farm-menu>.farm-menu-button{position:relative;flex:1 1 0;width:auto;max-width:92px;min-width:48px;height:64px}
  #game #farm-menu>.farm-menu-button:not(:first-child)::before{content:'';position:absolute;left:-2px;top:20%;width:1px;height:60%;background:#ffffff38}
  #game #farm-menu>.farm-menu-button span:last-child{font-size:12px;font-weight:700}
- #game .more-menu .farm-menu-button{position:relative;flex-direction:row;justify-content:flex-start;align-items:center;gap:12px;width:100%;height:52px;padding:0 12px 0 8px;border-radius:9px}
+ #game .more-menu .farm-menu-button{position:relative;flex-direction:row;justify-content:flex-start;align-items:center;gap:12px;width:100%;max-width:none;height:52px;padding:0 12px 0 8px;border-radius:9px}
  #game .more-menu .farm-menu-button:hover,#game .more-menu .farm-menu-button:focus-visible{background:#ffffff1f;filter:none}
  #game .more-menu .farm-menu-button img,#game .more-menu .settings-icon{flex:none;width:36px;height:36px;font-size:32px;line-height:36px}
  #game .more-menu .farm-menu-button span:last-child{order:1;font-size:15px;font-weight:700}
