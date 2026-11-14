@@ -1,4 +1,4 @@
-export interface Binding {account:string;bindingId:string;endpoint:string;deviceToken:string;plants?:boolean;plantsPending?:boolean}
+export interface Binding {account:string;bindingId:string;endpoint:string;deviceToken:string;plants?:boolean;animals?:boolean;thefts?:boolean;pests?:boolean;plantsPending?:boolean}
 export interface Revocation {endpoint:string;deviceToken:string;deviceRevision:number}
 export interface PushState {revision:number;account?:string;deviceToken?:string;active?:Binding;pending:Revocation[]}
 export function changeBinding(previous:PushState|undefined,active?:Binding):PushState {
@@ -8,7 +8,7 @@ export function changeBinding(previous:PushState|undefined,active?:Binding):Push
  if(s.active)pending.push({endpoint:s.active.endpoint,deviceToken:s.active.deviceToken,deviceRevision:revision});
  return {revision,account:active?.account??s.account,deviceToken:active?.deviceToken??s.deviceToken,active,pending};
 }
-export function acceptsPush(state:PushState|undefined,payload:{type?:string;bindingId?:string}):boolean{return !!state?.active&&typeof state.active.account==='string'&&state.account===state.active.account&&typeof payload.bindingId==='string'&&payload.bindingId.length>0&&state.active.bindingId===payload.bindingId&&(payload.type==='TEST'||payload.type==='CROP_READY'&&state.active.plants===true);}
+export function acceptsPush(state:PushState|undefined,payload:{type?:string;bindingId?:string}):boolean{if(!state?.active||typeof state.active.account!=='string'||state.account!==state.active.account||typeof payload.bindingId!=='string'||payload.bindingId.length===0||state.active.bindingId!==payload.bindingId)return false;const required=({CROP_READY:'plants',ANIMAL_READY:'animals',THEFT:'thefts',PEST:'pests'} as Record<string,'plants'|'animals'|'thefts'|'pests'|undefined>)[payload.type??''];return payload.type==='TEST'||(required!==undefined&&state.active[required]===true);}
 export async function pushState(update?:(state:PushState|undefined)=>PushState):Promise<PushState|undefined>{
  return new Promise((resolve,reject)=>{
   const open=indexedDB.open('colheita-device-push',1);
