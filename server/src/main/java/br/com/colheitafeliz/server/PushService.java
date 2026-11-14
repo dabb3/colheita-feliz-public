@@ -18,7 +18,7 @@ final class PushService {
     private final Sender sender;
     private final String publicKey;
     PushService(JdbcOnlineStore store,Clock clock,Sender sender,String publicKey){this.store=store;this.push=store.pushStore();this.clock=clock;this.sender=sender;this.publicKey=publicKey;}
-    JsonObject config(UUID actor){return store.transaction(actor,tx->{active(tx,actor);var result=new JsonObject();result.addProperty("enabled",publicKey!=null);if(publicKey==null)result.add("publicKey",com.google.gson.JsonNull.INSTANCE);else result.addProperty("publicKey",publicKey);result.addProperty("automaticEventsEnabled",false);result.addProperty("plantEventsEnabled",publicKey!=null);return result;});}
+    JsonObject config(UUID actor){return store.transaction(actor,tx->{active(tx,actor);var result=new JsonObject();result.addProperty("enabled",publicKey!=null);if(publicKey==null)result.add("publicKey",com.google.gson.JsonNull.INSTANCE);else result.addProperty("publicKey",publicKey);result.addProperty("automaticEventsEnabled",false);result.addProperty("plantEventsEnabled",publicKey!=null);result.addProperty("animalEventsEnabled",false);result.addProperty("theftEventsEnabled",false);result.addProperty("pestEventsEnabled",false);return result;});}
     JsonObject subscribe(UUID actor,JsonObject request){
         PushValidation.validateSubscription(request);
         String endpoint=text(request,"endpoint"),proof=hash(PushValidation.token(text(request,"deviceToken"))),binding=PushValidation.binding(text(request,"bindingId"));

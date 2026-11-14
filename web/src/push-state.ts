@@ -1,4 +1,5 @@
-export interface Binding {account:string;bindingId:string;endpoint:string;deviceToken:string;plants?:boolean;animals?:boolean;thefts?:boolean;pests?:boolean;plantsPending?:boolean}
+export type PushCategory='plants'|'animals'|'thefts'|'pests';
+export interface Binding {account:string;bindingId:string;endpoint:string;deviceToken:string;plants?:boolean;animals?:boolean;thefts?:boolean;pests?:boolean;plantsPending?:boolean;animalsPending?:boolean;theftsPending?:boolean;pestsPending?:boolean}
 export interface Revocation {endpoint:string;deviceToken:string;deviceRevision:number}
 export interface PushState {revision:number;account?:string;deviceToken?:string;active?:Binding;pending:Revocation[]}
 export function changeBinding(previous:PushState|undefined,active?:Binding):PushState {
