@@ -304,3 +304,21 @@ Na própria fazenda e nas visitas, toque ou clique numa planta com o cursor sele
 Clique ou toque fora da planta para fechar o popup. Selecionar outra planta troca a inspeção.
 
 A visita começa com o cursor Inspecionar plantas. Tocar numa planta abre e fixa o popup de crescimento, inclusive em celular; clicar com o cursor também inspeciona. A inspeção não envia ações sociais, mesmo em plantas prontas. Furto, amor e pragas exigem selecionar a ferramenta correspondente. As restrições continuam verificadas pelo servidor.
+
+## Web Push: animais, eventos sociais e lote compartilhado
+
+Furtos e pragas bem-sucedidos registram eventos privados na mesma transação da ação. O consumidor interno lê até 100 eventos por proprietário em ordem persistente, reservando entregas e avançando o cursor atomicamente. Reinício não repete reservas; rollback desfaz reserva e cursor.
+
+Cada dispositivo possui baseline separado por categoria e vínculo. Opt-in, novo vínculo e reativação ignoram eventos anteriores; consentimento de plantas não habilita furtos ou pragas. A reserva verifica conta ativa, proprietário, vínculo, revisão e consentimento explícito. As tabelas privadas `social_push_devices`, `social_push_cursors` e `social_push_deliveries` usam RLS e revogação dos papéis públicos. `push_events.event_order` é aditivo; emissão e consumo usam o mesmo bloqueio por fazenda para preservar a ordem de commits.
+
+Repetir a desativação de uma preferência na mesma revisão é idempotente. O marcador de confirmação permanece registrado; somente a combinação de categoria habilitada e marcador verdadeiro autoriza a reserva. Antes de ativar consumo em uma futura publicação, atualizar todos os produtores: versões antigas não usam o novo bloqueio de alocação. Preservar eventos, baselines, cursores e reservas em backup e rollback.
+
+O trabalhador existente agenda plantas e animais com o navegador fechado e consome os eventos sociais. Antes de reservar, executa o avanço normal e o cuidador já contratado; produto recolhido pelo cuidador não gera aviso. Protetores não geram avisos de maturação. Alimentação insuficiente suspende a previsão sem inventar crescimento; alimentação, compras, coleta e mudanças de automação reconciliam o agendamento na gravação da fazenda.
+
+`crop_push_jobs.last_batch_at` limita todas as categorias a um lote por proprietário a cada 60 segundos. A mesma transação grava cursores e reservas; cada dispositivo recebe no máximo uma tentativa por lote, contendo somente categorias consentidas. `crop_push_deliveries.types` identifica os tipos do envio e `social_push_deliveries.batch_id` associa os recibos sociais à reserva compartilhada. Falha de transporte ou reserva incerta não provoca reenvio após reinício. Reservas pendentes expiram em lotes limitados; respostas tardias não sobrescrevem estados terminais.
+
+Com VAPID válido, a API disponibiliza as quatro categorias e inicia o mesmo trabalhador, limitado a dez fazendas por consulta de 30 segundos. Sem VAPID, inscrições/testes continuam indisponíveis e o trabalhador não inicia. Cada categoria começa desativada e exige escolha explícita. Nenhuma chave ou configuração de produção foi alterada nesta implementação.
+
+Mensagens de uma categoria preservam o formato anterior; lotes mistos usam `BATCH`, tipos conhecidos e binding. O Service Worker exige consentimento literal para todos os tipos, revalida o vínculo antes/depois de exibir e assume as abas abertas após instalar a atualização. Logout offline e troca de conta continuam suprimindo mensagens antigas. Mensagens não incluem detalhes econômicos, identificação de amigos ou metadados dos eventos.
+
+Antes de publicar, usar API e frontend compatíveis e atualizar todos os produtores. Não misturar servidores antigos com o consumo habilitado. No rollback, desligar primeiro os envios e preservar tabelas e cursores. Testes locais usam PostgreSQL descartável e transporte simulado; aceite do provedor não comprova entrega no aparelho.

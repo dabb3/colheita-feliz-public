@@ -12,7 +12,8 @@ final class PushStore {
         boolean preferenceEnabled(String key){var prefs=com.google.gson.JsonParser.parseString(preferences).getAsJsonObject();return isBooleanTrue(prefs,key)&&isBooleanTrue(prefs,key+"Confirmed");}
     }
     static boolean plantsConfirmed(com.google.gson.JsonObject preferences){return isConfirmed(preferences,"plants");}
-    static boolean isConfirmed(com.google.gson.JsonObject preferences,String key){return isBooleanTrue(preferences,key)&&isBooleanTrue(preferences,key+"Confirmed");}
+    static boolean isConfirmed(com.google.gson.JsonObject preferences,String key){return isBooleanTrue(preferences,key)&&hasConfirmation(preferences,key);}
+    static boolean hasConfirmation(com.google.gson.JsonObject preferences,String key){return isBooleanTrue(preferences,key+"Confirmed");}
     private static boolean isBooleanTrue(com.google.gson.JsonObject preferences,String name){var value=preferences.get(name);return value!=null&&value.isJsonPrimitive()&&value.getAsJsonPrimitive().isBoolean()&&value.getAsBoolean();}
     record Attempt(UUID actor,String endpoint,String binding,long revision,String requestHash,String status,Instant reservedAt) {}
     private final String schema;
@@ -31,6 +32,8 @@ final class PushStore {
         tx.execute("CREATE UNIQUE INDEX IF NOT EXISTS push_events_id_idx ON "+schema+".push_events(id)");
         tx.execute("DO $$ DECLARE pk text; definition text; BEGIN SELECT c.conname, pg_get_constraintdef(c.oid) INTO pk, definition FROM pg_constraint c WHERE c.conrelid='"+schema+".push_events'::regclass AND c.contype='p'; IF pk IS NOT NULL AND definition NOT LIKE '%(actor, request_id)%' THEN EXECUTE format('ALTER TABLE %I.push_events DROP CONSTRAINT %I', '"+schema+"', pk); pk := NULL; END IF; IF pk IS NULL THEN EXECUTE 'ALTER TABLE "+schema+".push_events ADD CONSTRAINT push_events_pkey PRIMARY KEY(actor,request_id)'; END IF; END $$");
         tx.execute("CREATE INDEX IF NOT EXISTS push_events_owner_time_idx ON "+schema+".push_events(owner,created_at)");
+        tx.execute("ALTER TABLE "+schema+".push_events ADD COLUMN IF NOT EXISTS event_order bigserial");
+        tx.execute("CREATE UNIQUE INDEX IF NOT EXISTS push_events_owner_order_idx ON "+schema+".push_events(owner,event_order)");
     }
     Subscription find(JdbcOnlineStore.Tx tx,String endpoint){
         tx.lock("push-endpoint:"+endpoint);
@@ -51,6 +54,11 @@ final class PushStore {
     boolean coolingDown(JdbcOnlineStore.Tx tx,UUID actor,String endpoint,Instant now){return !tx.query("SELECT 1 FROM "+schema+".push_tests WHERE (actor=? OR endpoint=?) AND reserved_at>? LIMIT 1",r->r.getInt(1),actor,endpoint,Timestamp.from(now.minusSeconds(60))).isEmpty();}
     void reserve(JdbcOnlineStore.Tx tx,UUID id,Attempt a,Instant now){tx.execute("INSERT INTO "+schema+".push_tests(id,actor,endpoint,binding,device_revision,request_hash,status,reserved_at) VALUES(?,?,?,?,?,?,?,?)",id,a.actor(),a.endpoint(),a.binding(),a.revision(),a.requestHash(),"pending",Timestamp.from(now));}
     void finish(JdbcOnlineStore.Tx tx,UUID id,String status){tx.execute("UPDATE "+schema+".push_tests SET status=? WHERE id=? AND status='pending'",status,id);}
-    void recordEvent(JdbcOnlineStore.Tx tx,UUID requestId,UUID owner,UUID actor,String type,String metadata,Instant now){tx.execute("INSERT INTO "+schema+".push_events(id,owner,actor,request_id,type,metadata,created_at) VALUES(?,?,?,?,?,?::jsonb,?) ON CONFLICT(actor,request_id) DO NOTHING",UUID.randomUUID(),owner,actor,requestId,type,metadata,Timestamp.from(now));}
+    void recordEvent(JdbcOnlineStore.Tx tx,UUID requestId,UUID owner,UUID actor,String type,String metadata,Instant now){
+        // Serialize allocation with consent and consumption; a sequence alone does not order commits.
+        tx.lockFarms(owner);
+        tx.execute("INSERT INTO "+schema+".push_events(id,owner,actor,request_id,type,metadata,created_at) VALUES(?,?,?,?,?,?::jsonb,?) ON CONFLICT(actor,request_id) DO NOTHING",UUID.randomUUID(),owner,actor,requestId,type,metadata,Timestamp.from(now));
+        tx.execute("UPDATE "+schema+".crop_push_jobs SET next_at=CASE WHEN next_at IS NULL OR next_at>? THEN ? ELSE next_at END WHERE owner=? AND enabled",Timestamp.from(now),Timestamp.from(now),owner);
+    }
 }
 

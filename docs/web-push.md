@@ -1,5 +1,7 @@
 # Web Push: infraestrutura e teste por dispositivo
 
+A infraestrutura abaixo também serve às [plantas](web-push-plantas.md) e à [etapa 3 de animais/eventos sociais](web-push-eventos.md), que compartilham um único lote por proprietário/minuto. As categorias exigem consentimentos independentes; o teste de dispositivo não os habilita.
+
 ## Entrega
 
 O PR #80 adicionou transporte, inscrição e teste manual em Ajustes. A segunda entrega adiciona [avisos de plantas prontas](web-push-plantas.md), com preferência privada por dispositivo e fila persistente. Animais, furtos e pragas continuam em breve. O histórico de validações abaixo distingue as duas entregas.

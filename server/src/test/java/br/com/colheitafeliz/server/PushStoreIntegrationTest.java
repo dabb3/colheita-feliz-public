@@ -64,6 +64,8 @@ class PushStoreIntegrationTest {
     @Test void eventMigrationPreservesLegacyRowsAndIsRepeatable(){
         UUID request=UUID.randomUUID();
         store.transaction(owner,tx->{
+            // Recreate the pre-consumer schema without its new dependent delivery table.
+            tx.execute("DROP TABLE "+schema+".social_push_deliveries");
             tx.execute("DROP TABLE "+schema+".push_events");
             tx.execute("CREATE TABLE "+schema+".push_events (id uuid PRIMARY KEY,owner uuid NOT NULL,actor uuid NOT NULL,type text NOT NULL,metadata jsonb NOT NULL,created_at timestamptz NOT NULL)");
             tx.execute("INSERT INTO "+schema+".push_events VALUES(?,?,?,'THEFT','{}'::jsonb,?)",request,owner,other,java.sql.Timestamp.from(clock.instant()));

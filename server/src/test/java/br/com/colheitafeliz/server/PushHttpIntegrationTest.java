@@ -61,6 +61,17 @@ class PushHttpIntegrationTest {
                 assertEquals(200,send(client,base,"/v1/push/preferences","owner",preferences).statusCode());assertTrue(JsonParser.parseString(send(client,base,"/v1/push/preferences","owner",preferences).body()).getAsJsonObject().get("plants").getAsBoolean());
                 preferences.addProperty("plants",false);preferences.addProperty("deviceRevision",3);
                 assertEquals(200,send(client,base,"/v1/push/preferences","owner",preferences).statusCode());assertEquals(200,send(client,base,"/v1/push/preferences","owner",preferences).statusCode());
+                preferences.remove("plants");long revision=3;
+                for(String category:java.util.List.of("animals","thefts","pests")){
+                    for(boolean value:java.util.List.of(true,false)){
+                        preferences.addProperty(category,value);preferences.addProperty("deviceRevision",++revision);
+                        var changed=send(client,base,"/v1/push/preferences","owner",preferences);assertEquals(200,changed.statusCode());
+                        assertEquals(value,JsonParser.parseString(changed.body()).getAsJsonObject().get(category).getAsBoolean());
+                        assertEquals(200,send(client,base,"/v1/push/preferences","owner",preferences).statusCode());
+                    }
+                    preferences.remove(category);
+                }
+                preferences.addProperty("plants",false);
                 preferences.addProperty("animals",true);assertEquals(400,send(client,base,"/v1/push/preferences","owner",preferences).statusCode());
             }
         }

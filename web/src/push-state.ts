@@ -9,7 +9,14 @@ export function changeBinding(previous:PushState|undefined,active?:Binding):Push
  if(s.active)pending.push({endpoint:s.active.endpoint,deviceToken:s.active.deviceToken,deviceRevision:revision});
  return {revision,account:active?.account??s.account,deviceToken:active?.deviceToken??s.deviceToken,active,pending};
 }
-export function acceptsPush(state:PushState|undefined,payload:{type?:string;bindingId?:string}):boolean{if(!state?.active||typeof state.active.account!=='string'||state.account!==state.active.account||typeof payload.bindingId!=='string'||payload.bindingId.length===0||state.active.bindingId!==payload.bindingId)return false;const required=({CROP_READY:'plants',ANIMAL_READY:'animals',THEFT:'thefts',PEST:'pests'} as Record<string,'plants'|'animals'|'thefts'|'pests'|undefined>)[payload.type??''];return payload.type==='TEST'||(required!==undefined&&state.active[required]===true);}
+export function acceptsPush(state:PushState|undefined,payload:{type?:unknown;types?:unknown;bindingId?:unknown}):boolean{
+ if(!payload||!state?.active||typeof state.active.account!=='string'||state.account!==state.active.account||typeof payload.bindingId!=='string'||payload.bindingId.length===0||state.active.bindingId!==payload.bindingId)return false;
+ if(payload.type==='TEST')return true;
+ const categories:Record<string,PushCategory>={CROP_READY:'plants',ANIMAL_READY:'animals',THEFT:'thefts',PEST:'pests'};
+ const types=payload.type==='BATCH'?payload.types:[payload.type];
+ if(!Array.isArray(types)||types.length===0||types.length>4||new Set(types).size!==types.length)return false;
+ return types.every(type=>typeof type==='string'&&Object.hasOwn(categories,type)&&state.active![categories[type]]===true);
+}
 export async function pushState(update?:(state:PushState|undefined)=>PushState):Promise<PushState|undefined>{
  return new Promise((resolve,reject)=>{
   const open=indexedDB.open('colheita-device-push',1);

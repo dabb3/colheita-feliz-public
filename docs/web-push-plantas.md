@@ -2,6 +2,8 @@
 
 Esta etapa acrescenta avisos automáticos de plantas prontas à infraestrutura da etapa 1. Animais, furtos e pragas continuam reservados à terceira entrega. A implementação é uma proposta em PR: configuração e publicação em produção precisam de aprovação separada.
 
+A [etapa 3](web-push-eventos.md) integra essas categorias ao mesmo trabalhador, com limite compartilhado de um lote por proprietário/minuto. As evidências abaixo registram a entrega de plantas; os novos contratos e testes estão no documento da etapa 3.
+
 ## O que o jogador recebe
 
 Em Ajustes, o jogador precisa escolher explicitamente Plantas para o dispositivo inscrito. A preferência é privada, persistida no servidor e recuperada ao reabrir o painel. Ativar notificações ou enviar o teste não ativa Plantas; os outros tipos continuam desativados e marcados como em breve. A inscrição exige permissão por clique; no iPhone/iPad, pode exigir instalar o jogo na Tela de Início.

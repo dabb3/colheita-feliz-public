@@ -18,7 +18,7 @@ final class PushService {
     private final Sender sender;
     private final String publicKey;
     PushService(JdbcOnlineStore store,Clock clock,Sender sender,String publicKey){this.store=store;this.push=store.pushStore();this.clock=clock;this.sender=sender;this.publicKey=publicKey;}
-    JsonObject config(UUID actor){return store.transaction(actor,tx->{active(tx,actor);var result=new JsonObject();result.addProperty("enabled",publicKey!=null);if(publicKey==null)result.add("publicKey",com.google.gson.JsonNull.INSTANCE);else result.addProperty("publicKey",publicKey);result.addProperty("automaticEventsEnabled",false);result.addProperty("plantEventsEnabled",publicKey!=null);result.addProperty("animalEventsEnabled",false);result.addProperty("theftEventsEnabled",false);result.addProperty("pestEventsEnabled",false);return result;});}
+    JsonObject config(UUID actor){return store.transaction(actor,tx->{active(tx,actor);var result=new JsonObject();result.addProperty("enabled",publicKey!=null);if(publicKey==null)result.add("publicKey",com.google.gson.JsonNull.INSTANCE);else result.addProperty("publicKey",publicKey);for(String key:new String[]{"automaticEventsEnabled","plantEventsEnabled","animalEventsEnabled","theftEventsEnabled","pestEventsEnabled"})result.addProperty(key,publicKey!=null);return result;});}
     JsonObject subscribe(UUID actor,JsonObject request){
         PushValidation.validateSubscription(request);
         String endpoint=text(request,"endpoint"),proof=hash(PushValidation.token(text(request,"deviceToken"))),binding=PushValidation.binding(text(request,"bindingId"));
@@ -36,7 +36,9 @@ final class PushService {
             }
             if((old==null||!old.owner().equals(actor))&&push.totalCount(tx,actor,clock.instant())>=50)throw new ApiFailure(409,"Limite de registros de dispositivos atingido.");
             if((old==null||!old.active()||!old.owner().equals(actor))&&push.activeCount(tx,actor)>=5)throw new ApiFailure(409,"Limite de dispositivos atingido.");
+            tx.lockFarms(actor,old==null?actor:old.owner());
             push.save(tx,candidate,clock.instant());store.cropPushStore().reconcileSubscription(tx,actor,clock.instant());
+            store.socialPushStore().reconcile(tx,actor);
             if(old!=null&&!old.owner().equals(actor))disableCropJob(tx,old.owner());
             return status("subscribed");
         });
@@ -52,6 +54,7 @@ final class PushService {
     }
     private void disableCropJob(JdbcOnlineStore.Tx tx,UUID owner){
         store.cropPushStore().suspendIfIneligible(tx,owner);
+        store.socialPushStore().reconcile(tx,owner);
     }
     JsonObject preferences(UUID actor,JsonObject request){
         String endpoint=text(request,"endpoint");PushValidation.validateEndpoint(endpoint);
@@ -66,13 +69,14 @@ final class PushService {
             var prefs=JsonParser.parseString(old.preferences()).getAsJsonObject();
             if(preferenceKey==null){if(revision!=old.revision())throw conflict();}
             else{
-                boolean desired=request.get(preferenceKey).getAsBoolean();boolean current=old.preferenceEnabled(preferenceKey);boolean confirmed=PushStore.isConfirmed(prefs,preferenceKey);
+                boolean desired=request.get(preferenceKey).getAsBoolean();boolean current=old.preferenceEnabled(preferenceKey);boolean confirmed=PushStore.hasConfirmation(prefs,preferenceKey);
                 if(revision<old.revision()||revision>old.revision()+1||(revision==old.revision()&&(!confirmed||current!=desired)))throw conflict();
                 if(revision>old.revision()){
-                    if(preferenceKey.equals("plants"))store.cropPushStore().suspendIfIneligible(tx,actor);
+                    store.cropPushStore().suspendIfIneligible(tx,actor);
                     prefs.addProperty(preferenceKey,desired);prefs.addProperty(preferenceKey+"Confirmed",true);
                     push.save(tx,new PushStore.Subscription(actor,endpoint,old.proof(),binding,revision,old.p256dh(),old.auth(),prefs.toString(),true),clock.instant());
-                    if(preferenceKey.equals("plants"))store.cropPushStore().reconcileSubscription(tx,actor,clock.instant());
+                    store.socialPushStore().reconcile(tx,actor);
+                    store.cropPushStore().reconcileSubscription(tx,actor,clock.instant());
                 }
             }
             var result=new JsonObject();for(String key:new String[]{"plants","animals","thefts","pests"})result.addProperty(key,PushStore.isConfirmed(prefs,key));result.addProperty("deviceRevision",revision);result.addProperty("bindingId",binding);return result;

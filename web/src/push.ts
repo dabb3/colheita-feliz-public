@@ -69,7 +69,7 @@ export function renderPushSettings(parent:HTMLElement,account:string,api:ApiClie
   const pending=bound&&(Object.keys(labels) as (keyof typeof labels)[]).some(key=>state?.active?.[`${key}Pending` as keyof typeof state.active]===true);
   retry.hidden=!bound||!publicKey||!eventsEnabled||!pending&&!preferenceFailed;retry.disabled=busy||loadingPreferences;
   const pendingKey=bound&&(Object.keys(labels) as (keyof typeof labels)[]).find(key=>state?.active?.[`${key}Pending` as keyof typeof state.active]===true);
-  retry.textContent=pendingKey?`Repetir alteração de ${labels[pendingKey]}`:'Recarregar preferência de Plantas';
+  retry.textContent=pendingKey?`Repetir alteração de ${labels[pendingKey]}`:'Recarregar preferências';
   status.textContent=!current?'A conta deste dispositivo mudou. Entre novamente para configurar notificações.':!publicKey?configurationMessage:bound?'Notificações ativadas neste dispositivo.':Notification.permission==='denied'?'Permissão negada. Altere nas configurações do navegador se desejar.':'Permissão: '+Notification.permission+'. Notificações desativadas.';
   if(bound&&publicKey&&eventsEnabled&&(preferenceFailed||pending))status.textContent='Não foi possível confirmar uma preferência. Confira a conexão e tente novamente.';
  } if(!supported){status.textContent='Notificações indisponíveis neste navegador. No iPhone/iPad, adicione o jogo à Tela de Início e abra por lá.';return;}
@@ -143,7 +143,7 @@ export function renderPushSettings(parent:HTMLElement,account:string,api:ApiClie
    let installed=false;
    const state=await pushState(current=>{
     if(started!==lifecycle||current?.account!==account||current?.revision!==revision)return current!;
-    installed=true;return {...current!,deviceToken,active:{account,endpoint,deviceToken,bindingId,plants:preferences.plants}};
+    installed=true;return {...current!,deviceToken,active:{account,endpoint,deviceToken,bindingId,...preferences}};
    });
    if(!installed)return;
    try{await api.push('subscribe',{endpoint,keys:subscription.toJSON().keys,deviceToken,bindingId,deviceRevision:state!.revision,preferences});}
