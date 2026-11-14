@@ -208,7 +208,9 @@ function setupMoreMenu(media: MediaQueryList) {
     if (open) (menu.querySelector('button:not([hidden])') as HTMLButtonElement | null)?.focus();
   });
   menu.addEventListener('click', event => {if ((event.target as HTMLElement).closest('button')) close();});
-  menu.addEventListener('keydown', event => {if (event.key === 'Escape') {event.stopPropagation(); close(true);}});
+  const escape = (event: KeyboardEvent) => {if (event.key === 'Escape' && !menu.hidden) {event.stopPropagation(); close(true);}};
+  menu.addEventListener('keydown', escape);
+  more.addEventListener('keydown', escape);
   document.addEventListener('pointerdown', event => {
     if (!menu.hidden && !menu.contains(event.target as Node) && !more.contains(event.target as Node)) close();
   });
