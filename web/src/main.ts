@@ -3,6 +3,7 @@ import {createClient} from '@supabase/supabase-js';
 import type {Farm,Catalog,Tile,Animal,AnimalType,Reply,CommandFields,Friend} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
+import './mobile.ts';
 import {takeInvite} from './invite-url.ts';
 import {renderWallet,control,text,image,renderDailyAllowance,friendAvatar,vipBadge} from './ui.ts';
 import {fertilizerDuration,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText} from './ui-presentation.ts';
@@ -233,6 +234,7 @@ function refreshOpenDialog(){
 function render(){
  if(!own)return;
  const badge=element('notification-badge'),unread=own.unreadNotifications??notificationCount(own.notifications??[]);badge.textContent=String(unread);badge.hidden=unread===0;element('notifications').setAttribute('aria-label',`Notificações, ${unread} não lidas`);
+ const moreBadge=element('more-badge');moreBadge.textContent=String(unread);moreBadge.hidden=unread===0;element('more').setAttribute('aria-label',unread?`Mais opções, ${unread} avisos não lidos`:'Mais opções');
  syncMusic();
  element('welcome').hidden=true;element('game').hidden=false;
  const profile=display()!;renderWallet(element('wallet'),profile,visited?.name,avatarSource(profile.avatar?.id as AvatarChoice,profile.avatar?.photoUrl??undefined),visited?undefined:avatarSettings);
@@ -254,9 +256,10 @@ function renderTools(){
   if(pest){const limit=document.createElement('span');limit.className='tool-count';limit.textContent='1/6h';b.append(limit);}
   if(id==='PLANT'){
    const crop=catalog.crops.find(item=>item.id===selectedSeed),seedCount=own?.seedCounts?.[selectedSeed]??0;
-   if(crop){const seed=document.createElement('img');seed.className='tool-selected-item';seed.alt='';seed.src=`/assets/${seedArtPath(crop.spriteStem)}`;b.append(seed);const count=document.createElement('span');count.className='tool-count';count.textContent=`x${seedCount}`;b.append(count);}
+   if(crop){const seed=document.createElement('img');seed.className='tool-selected-item';seed.alt='';seed.src=`/assets/${seedArtPath(crop.spriteStem)}`;b.append(seed);const count=document.createElement('span');count.className='tool-count';count.textContent=`x${seedCount}`;b.append(count);b.classList.toggle('empty',seedCount===0);}
   }
-  if(id==='FERTILIZE'||id==='LOVE'){const count=document.createElement('span');count.className='tool-count';count.textContent=`x${own?.fertilizers?.[id==='LOVE'?selectedLoveFertilizer:selectedFertilizer]??0}`;b.append(count);}
+  if(id==='FERTILIZE'||id==='LOVE'){const stock=own?.fertilizers?.[id==='LOVE'?selectedLoveFertilizer:selectedFertilizer]??0,count=document.createElement('span');count.className='tool-count';count.textContent=`x${stock}`;b.append(count);b.classList.toggle('empty',stock===0);}
+  if(id===tool)element('tool-name').textContent=label;
   if(!visited){const key=document.createElement('span');key.className='tool-key';key.textContent=String(index+1);b.append(key);}
  }
  renderToolTray();
@@ -712,7 +715,7 @@ async function connect(user:string,token:()=>Promise<string>,photo?:unknown,disp
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
  avatarUser=`${config.api}:${user}`;void connectPush(avatarUser,api).catch(()=>{});googlePhoto=googleAvatar(photo);avatarChoice='classic';loadAudioSettings();
  scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>{if(healthPinned&&!(tool==='CURSOR'&&tile.cropId))closeHealth();void tileAction(tile);},(id,pointerType)=>{if(pointerType==='touch'&&tool==='CURSOR'){playAnimalSound(id);animalPopup(id);return;}const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health,syncMusic,()=>{if(healthPinned)closeHealth();},(id,point)=>{if(id&&point){playAnimalSound(id);animalTooltip(id,point);}else animalTooltip(null);});
-sceneResize=new ResizeObserver(()=>{layoutHud();health(healthTile,healthPoint,'resize');});for(const id of ['farm','farm-header','tools-bar','notice'])sceneResize.observe(element(id));
+sceneResize=new ResizeObserver(()=>{layoutHud();health(healthTile,healthPoint,'resize');});element('farm').addEventListener('camerachange',()=>health(healthTile,healthPoint,'resize'));for(const id of ['farm','farm-header','tools-bar','notice'])sceneResize.observe(element(id));
  try{await refresh();if(generation===sessionGeneration)await migrateAvatar();if(generation===sessionGeneration&&!own)setLoginStep('invite',displayName||user);}
  catch(error){handleError(error);}
 }

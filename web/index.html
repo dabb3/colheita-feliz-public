@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="pt-BR">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#376b36"><title>Colheita Feliz</title><link rel="icon" type="image/png" href="/assets/classic/animals/galinha/galinha.png"><link rel="stylesheet" href="/style.css"><script src="/config.js" defer></script><script src="/app.js" defer></script>  <link rel="manifest" href="/manifest.webmanifest">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#376b36"><title>Colheita Feliz</title><link rel="icon" type="image/png" href="/assets/classic/animals/galinha/galinha.png"><link rel="stylesheet" href="/style.css"><script src="/config.js" defer></script><script src="/app.js" defer></script>  <link rel="manifest" href="/manifest.webmanifest">
 </head>
 <body>
  <div id="app">
@@ -67,7 +67,7 @@
    <a href="https://github.com/dabb3/colheita-feliz-public" target="_blank" rel="noopener noreferrer">Repositório ↗</a>
   </footer>
   <section id="game" hidden aria-label="Fazenda">
-   <div id="scene"><canvas id="farm" aria-label="Fazenda. Pressione T para selecionar terras pelo teclado."></canvas></div>
+   <div id="scene"><canvas id="farm" aria-label="Fazenda. Pressione T para selecionar terras pelo teclado."></canvas><div id="camera-controls" class="camera-controls" role="group" aria-label="Zoom da fazenda" hidden><button id="zoom-in" type="button" aria-label="Aproximar">+</button><button id="zoom-out" type="button" aria-label="Afastar">−</button></div></div>
    <header id="farm-header"><div class="player-panel"><div id="wallet" class="panel"></div><aside id="tutorial" class="panel"></aside></div><nav id="farm-menu" aria-label="Menu da fazenda">
     <button id="notifications" class="farm-menu-button" aria-label="Notificações"><img src="/assets/classic/icons/notificacao-icone.png" alt=""><span id="notification-badge" class="notification-badge" hidden></span><span>Avisos</span></button>
     <button id="shop" class="farm-menu-button"><img src="/assets/classic/icons/icon-shop.png" alt=""><span>Loja</span></button>
@@ -76,10 +76,12 @@
     <button id="friends" class="farm-menu-button"><img src="/assets/classic/icons/amigos.png" alt=""><span>Amigos</span></button>
     <button id="home" class="farm-menu-button" hidden><img src="/assets/classic/icons/icone-minha-fazenda.png" alt=""><span>Minha fazenda</span></button>
     <button id="settings" class="farm-menu-button" aria-label="Ajustes"><span class="settings-icon" aria-hidden="true">⚙</span><span>Ajustes</span></button>
+    <button id="more" class="farm-menu-button" type="button" aria-expanded="false" aria-controls="more-menu"><span class="more-icon" aria-hidden="true"><i></i><i></i><i></i></span><span id="more-badge" class="notification-badge" hidden></span><span>Mais</span></button>
+    <div id="more-menu" class="more-menu" hidden></div>
    </nav></header>
    <div id="plant-health" class="panel crop-tooltip" role="tooltip" hidden></div>
    <div id="tool-tray" class="tool-tray" role="group" aria-label="Seleção da ferramenta" hidden></div>
-   <footer id="tools-bar"><div id="tools" role="toolbar" aria-label="Ferramentas"></div></footer>
+   <footer id="tools-bar"><div id="tools" role="toolbar" aria-label="Ferramentas"></div><span id="tool-name" class="tool-name" aria-hidden="true"></span></footer>
   </section>
   <div id="connection" class="panel" role="status" hidden></div>
   <div id="pending" class="panel" hidden><span>Uma ação aguarda confirmação.</span><button id="retry">Confirmar ação pendente</button></div>
