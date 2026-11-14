@@ -3,7 +3,7 @@ import {createClient} from '@supabase/supabase-js';
 import type {Farm,Catalog,Tile,Animal,AnimalType,Reply,CommandFields,Friend} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
-import './mobile.ts';
+import {syncMobileCamera} from './mobile.ts';
 import {takeInvite} from './invite-url.ts';
 import {renderWallet,control,text,image,renderDailyAllowance,friendAvatar,vipBadge} from './ui.ts';
 import {fertilizerDuration,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText} from './ui-presentation.ts';
@@ -715,7 +715,8 @@ async function connect(user:string,token:()=>Promise<string>,photo?:unknown,disp
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
  avatarUser=`${config.api}:${user}`;void connectPush(avatarUser,api).catch(()=>{});googlePhoto=googleAvatar(photo);avatarChoice='classic';loadAudioSettings();
  scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>{if(healthPinned&&!(tool==='CURSOR'&&tile.cropId))closeHealth();void tileAction(tile);},(id,pointerType)=>{if(pointerType==='touch'&&tool==='CURSOR'){playAnimalSound(id);animalPopup(id);return;}const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health,syncMusic,()=>{if(healthPinned)closeHealth();},(id,point)=>{if(id&&point){playAnimalSound(id);animalTooltip(id,point);}else animalTooltip(null);});
-sceneResize=new ResizeObserver(()=>{layoutHud();health(healthTile,healthPoint,'resize');});element('farm').addEventListener('camerachange',()=>health(healthTile,healthPoint,'resize'));for(const id of ['farm','farm-header','tools-bar','notice'])sceneResize.observe(element(id));
+syncMobileCamera();
+sceneResize=new ResizeObserver(()=>{layoutHud();health(healthTile,healthPoint,'resize');});for(const id of ['farm','farm-header','tools-bar','notice'])sceneResize.observe(element(id));
  try{await refresh();if(generation===sessionGeneration)await migrateAvatar();if(generation===sessionGeneration&&!own)setLoginStep('invite',displayName||user);}
  catch(error){handleError(error);}
 }
@@ -751,6 +752,7 @@ element('notifications').onclick=notifications;
 element('shop').onclick=()=>shop();element('deposit').onclick=deposit;element('missions').onclick=missions;element('friends').onclick=()=>void friends();
 element('home').onclick=()=>{navigationGeneration++;visited=undefined;tool='PLOW';render();};element('settings').onclick=()=>shortcutPanel('Ajustes',settings);element('close-modal').onclick=()=>{modal.close();showUpdateNotes();};
 modal.addEventListener('close',showUpdateNotes);
+element('farm').addEventListener('camerachange',()=>health(healthTile,healthPoint,'resize'));
 element('retry').onclick=async()=>{if(!api||busy)return;const client=api,generation=sessionGeneration;busy=true;try{const actionName=client.pending?.body?JSON.parse(client.pending.body).action:undefined;const reply=await client.retry();if(generation!==sessionGeneration)return;receive(reply,true,actionName);if(reply.code){dialog('Convite confirmado');paragraph(reply.code);}}catch(error){if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();await refresh();}}};
 window.addEventListener('offline',()=>showConnection('Sem conexão. Reconecte antes de agir.'));
 window.addEventListener('online',()=>{void refresh();if(api)void reconcilePush(avatarUser,api).catch(()=>{});});

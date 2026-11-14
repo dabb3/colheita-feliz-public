@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cameraLayout,canvasResolution,coverScale,initialCamera,zoomAround} from '../src/mobile.ts';
+import {anchorCamera,cameraLayout,canvasResolution,coverScale,initialCamera,setupCamera,syncMobileCamera,worldAt,zoomAround} from '../src/mobile.ts';
 
 test('the mobile camera always covers the viewport without empty bands',()=>{
  for(const [width,height]of [[360,420],[390,480],[430,560],[340,700]]){
@@ -33,4 +33,52 @@ test('the backing store grows with zoom but stays capped for phones',()=>{
  assert.equal(canvasResolution(0.25,1),1);
  assert.equal(canvasResolution(0.5,3),1.5);
  assert.equal(canvasResolution(1.25,3),2);
+});
+
+test('pinch moving both fingers zooms and pans together',()=>{
+ const camera={zoom:1.2,centerX:700,centerY:500},start={x:150,y:220},end={x:230,y:160};
+ const anchor=worldAt(390,480,camera,start),moved=cameraLayout(390,480,anchorCamera(390,480,anchor,1.8,end));
+ assert.ok(Math.abs(anchor.x*moved.scale+moved.x-end.x)<1e-6,'world point follows the fingers horizontally');
+ assert.ok(Math.abs(anchor.y*moved.scale+moved.y-end.y)<1e-6,'world point follows the fingers vertically');
+ assert.ok(Math.abs(moved.camera.zoom-1.8)<1e-9);
+});
+
+function harness(){
+ globalThis.ResizeObserver??=class{observe(){}};
+ globalThis.devicePixelRatio=3;
+ const scene=Object.assign(new EventTarget(),{classList:{add(){},remove(){}},contains:()=>true,getBoundingClientRect:()=>({left:0,top:0,width:390,height:480})});
+ const canvas=Object.assign(new EventTarget(),{width:1600,height:900,style:{removeProperty(){}}});
+ const button=()=>Object.assign(new EventTarget(),{disabled:false});
+ const root=new EventTarget(),media=Object.assign(new EventTarget(),{matches:true});
+ setupCamera(media,{scene,canvas,controls:{hidden:true,contains:()=>false},zoomIn:button(),zoomOut:button(),root});
+ const pointer=(target,type,pointerId,clientX,clientY)=>target.dispatchEvent(Object.assign(new Event(type),{pointerId,clientX,clientY}));
+ const click=()=>{const event=new Event('click',{cancelable:true});scene.dispatchEvent(event);return event.defaultPrevented;};
+ return{scene,canvas,root,pointer,click};
+}
+
+test('a drag or pinch never reaches the farm, a tap does',()=>{
+ const {scene,root,pointer,click}=harness();
+ pointer(scene,'pointerdown',1,100,100);pointer(root,'pointerup',1,102,101);
+ assert.equal(click(),false,'tap executes the tool');
+ pointer(scene,'pointerdown',1,100,100);pointer(scene,'pointermove',1,160,140);pointer(root,'pointerup',1,160,140);
+ assert.equal(click(),true,'drag click is swallowed');
+ pointer(scene,'pointerdown',1,100,100);pointer(scene,'pointerdown',2,200,200);pointer(scene,'pointermove',2,240,240);
+ pointer(root,'pointerup',1,100,100);pointer(root,'pointerup',2,240,240);
+ assert.equal(click(),true,'pinch click is swallowed');
+});
+
+test('a pointer released outside the scene does not stick',()=>{
+ const {scene,canvas,root,pointer}=harness();
+ pointer(scene,'pointerdown',1,100,100);pointer(root,'pointerup',1,500,500);
+ pointer(scene,'pointerdown',2,100,100);
+ const before=canvas.style.transform;pointer(scene,'pointermove',2,160,100);
+ assert.notEqual(canvas.style.transform,before,'next finger pans instead of starting a pinch with a stale pointer');
+});
+
+test('the camera restores the sharp backing store after a new Scene resets the canvas',()=>{
+ const {canvas}=harness();
+ const sharp=canvas.width;assert.ok(sharp>1600);
+ canvas.width=1600;canvas.height=900;
+ syncMobileCamera();
+ assert.equal(canvas.width,sharp);
 });
