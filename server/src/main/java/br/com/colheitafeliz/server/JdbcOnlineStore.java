@@ -105,7 +105,7 @@ final class JdbcOnlineStore implements AutoCloseable {
             pushStore().initialize(tx);
             cropPushStore().initialize(tx);
             tx.execute("REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
-            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "daily_allowances", "update_note_views", "push_subscriptions", "push_tests", "crop_push_jobs", "crop_push_deliveries")) {
+            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "daily_allowances", "update_note_views", "push_subscriptions", "push_tests", "push_events", "crop_push_jobs", "crop_push_deliveries")) {
                 tx.execute("ALTER TABLE " + schema + "." + table + " ENABLE ROW LEVEL SECURITY");
                 tx.execute("REVOKE ALL ON " + schema + "." + table + " FROM PUBLIC");
             }

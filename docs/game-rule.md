@@ -479,6 +479,10 @@ O save permanece no formato v20, com ruleset game-rules-2026-11-vip-services-v1.
 
 ## 15. Confirmação, perfil público e notificações
 
+### 15.3 Web Push — eventos sociais (em preparação)
+
+As inscrições mantêm consentimento independente para Plantas, Animais, Furtos e Pragas. Nesta etapa, ações sociais bem-sucedidas registram eventos privados `THEFT` ou `PEST` na mesma transação da ação, usando o identificador do pedido como chave de deduplicação. O registro contém apenas o proprietário, o autor, o tipo e a posição/temporada da ação; não inclui saldo, produto ou dados públicos de terceiros. Repetições do mesmo recibo não criam novo evento. Os envios automáticos e o agendamento de animais permanecem desativados até a fila compartilhada e a validação Java/PostgreSQL serem concluídas.
+
 Clicar em um terreno bloqueado abre a confirmação com coordenadas, nível exigido, preço e moeda do catálogo e saldo disponível. Cancelar, fechar ou pressionar Escape não compra o terreno. Somente Confirmar compra envia BUY_PLOT. O servidor revalida a ordem de expansão, nível e saldo naquele momento e mantém os recibos e locks existentes contra repetição e concorrência. Essa confirmação existe no navegador e no desktop; não muda o preço de 50 verdes nem os requisitos de expansão.
 
 O avatar é uma preferência do proprietário persistida no snapshot. Os IDs permitidos são classic, male-2, male-3, female-1, female-2, female-3 e google. Ausência do campo em saves anteriores significa nenhuma escolha explícita; a apresentação usa o avatar clássico. SET_AVATAR altera somente a própria conta autenticada. IMPORT_AVATAR migra uma preferência válida já salva no navegador apenas se ainda não houver escolha no servidor, sem sobrescrever uma escolha explícita feita em outro dispositivo. Ambos seguem revisão, idempotência e transação das ações próprias.

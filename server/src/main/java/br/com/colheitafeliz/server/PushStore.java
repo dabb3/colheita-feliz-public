@@ -24,6 +24,8 @@ final class PushStore {
         tx.execute("CREATE TABLE IF NOT EXISTS "+schema+".push_tests (id uuid PRIMARY KEY, actor uuid NOT NULL REFERENCES "+schema+".players(id), endpoint text NOT NULL, binding text NOT NULL, device_revision bigint NOT NULL, request_hash text NOT NULL, status text NOT NULL, reserved_at timestamptz NOT NULL)");
         tx.execute("CREATE INDEX IF NOT EXISTS push_tests_actor_time_idx ON "+schema+".push_tests(actor,reserved_at)");
         tx.execute("CREATE INDEX IF NOT EXISTS push_tests_endpoint_time_idx ON "+schema+".push_tests(endpoint,reserved_at)");
+        tx.execute("CREATE TABLE IF NOT EXISTS "+schema+".push_events (id uuid PRIMARY KEY, owner uuid NOT NULL REFERENCES "+schema+".players(id), actor uuid NOT NULL REFERENCES "+schema+".players(id), type text NOT NULL CHECK(type IN ('THEFT','PEST')), metadata jsonb NOT NULL, created_at timestamptz NOT NULL)");
+        tx.execute("CREATE INDEX IF NOT EXISTS push_events_owner_time_idx ON "+schema+".push_events(owner,created_at)");
     }
     Subscription find(JdbcOnlineStore.Tx tx,String endpoint){
         tx.lock("push-endpoint:"+endpoint);
@@ -44,5 +46,6 @@ final class PushStore {
     boolean coolingDown(JdbcOnlineStore.Tx tx,UUID actor,String endpoint,Instant now){return !tx.query("SELECT 1 FROM "+schema+".push_tests WHERE (actor=? OR endpoint=?) AND reserved_at>? LIMIT 1",r->r.getInt(1),actor,endpoint,Timestamp.from(now.minusSeconds(60))).isEmpty();}
     void reserve(JdbcOnlineStore.Tx tx,UUID id,Attempt a,Instant now){tx.execute("INSERT INTO "+schema+".push_tests(id,actor,endpoint,binding,device_revision,request_hash,status,reserved_at) VALUES(?,?,?,?,?,?,?,?)",id,a.actor(),a.endpoint(),a.binding(),a.revision(),a.requestHash(),"pending",Timestamp.from(now));}
     void finish(JdbcOnlineStore.Tx tx,UUID id,String status){tx.execute("UPDATE "+schema+".push_tests SET status=? WHERE id=? AND status='pending'",status,id);}
+    void recordEvent(JdbcOnlineStore.Tx tx,UUID id,UUID owner,UUID actor,String type,String metadata,Instant now){tx.execute("INSERT INTO "+schema+".push_events(id,owner,actor,type,metadata,created_at) VALUES(?,?,?,? ,?::jsonb,?) ON CONFLICT(id) DO NOTHING",id,owner,actor,type,metadata,Timestamp.from(now));}
 }
 

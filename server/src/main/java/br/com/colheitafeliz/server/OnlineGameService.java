@@ -233,6 +233,15 @@ final class OnlineGameService implements AutoCloseable {
                 } else {
                     result = visits.fertilizeVisit(destination.game(), visitor.game(), command.column(), command.row(), "amor", season);
                 }
+                if (result.success() && (command.action().equals("STEAL") || PEST_ACTIONS.contains(command.action()))) {
+                    String type = command.action().equals("STEAL") ? "THEFT" : "PEST";
+                    var metadata = new JsonObject();
+                    metadata.addProperty("column", command.column());
+                    metadata.addProperty("row", command.row());
+                    metadata.addProperty("action", command.action());
+                    metadata.addProperty("season", season);
+                    store.pushStore().recordEvent(tx, command.requestId(), owner, actor, type, metadata.toString(), clock.instant());
+                }
                 var reply=object("result", result, "farm", persist(tx, visitor, false, true),
                         "visitedFarm", persist(tx, destination, false, false));
                 if(theft!=null)reply.add("theftOutcome",object("kind",theft.kind(),"goldDebited",theft.goldDebited().toPlainString()));
