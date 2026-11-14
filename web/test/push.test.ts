@@ -89,6 +89,14 @@ test('crop ready requires the current account binding and respects the local pla
  assert.equal(acceptsPush(state,{type:'UNKNOWN',bindingId:'current'}),false);
  assert.equal(acceptsPush({...state,active:{...active,plants:false}},{type:'TEST',bindingId:'current'}),true);
 });
+test('social push types require their own confirmed category',()=>{
+ const state={revision:1,account:'a',pending:[],active:{account:'a',bindingId:'b',endpoint:'https://push',deviceToken:'d',plants:true,animals:false,thefts:true,pests:false}};
+ assert.equal(acceptsPush(state,{type:'ANIMAL_READY',bindingId:'b'}),false);
+ assert.equal(acceptsPush(state,{type:'THEFT',bindingId:'b'}),true);
+ assert.equal(acceptsPush(state,{type:'PEST',bindingId:'b'}),false);
+ assert.equal(acceptsPush({...state,active:{...state.active,animals:true,pests:true}},{type:'ANIMAL_READY',bindingId:'b'}),true);
+ assert.equal(acceptsPush({...state,active:{...state.active,animals:true,pests:true}},{type:'PEST',bindingId:'b'}),true);
+});
 
 function boundHarness(){const x=harness();x.write({revision:3,account:'a',deviceToken:'private',pending:[],active:{account:'a',bindingId:'current',endpoint:'https://push',deviceToken:'private'}});return x;}
 const plantsInput=x=>x.parent.children.at(-1).children.find(n=>n.tag==='label').children[0];

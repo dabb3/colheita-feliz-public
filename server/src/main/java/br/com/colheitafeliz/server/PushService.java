@@ -114,6 +114,9 @@ final class PushService {
         var preferences=JsonParser.parseString(a.preferences()).getAsJsonObject();
         // A registration replay cannot grant or erase the later, explicit preference consent.
         preferences.remove("plantsConfirmed");
+        preferences.remove("animalsConfirmed");
+        preferences.remove("theftsConfirmed");
+        preferences.remove("pestsConfirmed");
         return a.active()&&a.owner().equals(b.owner())&&a.binding().equals(b.binding())&&a.p256dh().equals(b.p256dh())&&a.auth().equals(b.auth())&&preferences.equals(JsonParser.parseString(b.preferences()));
     }
     private static void possession(PushStore.Subscription old,String proof){if(!MessageDigest.isEqual(old.proof().getBytes(StandardCharsets.US_ASCII),proof.getBytes(StandardCharsets.US_ASCII)))throw new ApiFailure(403,"Dispositivo não autorizado.");}
