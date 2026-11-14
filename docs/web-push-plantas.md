@@ -58,7 +58,7 @@ Os testes locais usam PostgreSQL descartável, relógio controlado e transporte 
 - `crop_push_jobs`: proprietário, habilitação, próxima verificação, horário do último lote e cursores JSON por terreno, incluindo o ponto inicial de ativação. Uma linha por fazenda; índice parcial em `next_at` para trabalhos habilitados.
 - `crop_push_deliveries`: identificador, proprietário, endpoint, binding/revisão, estado e horário da reserva. Índice parcial nas reservas pendentes. Recibos incertos expiram sem reenvio; o histórico permanece privado e exige acompanhamento de volume.
 
-As entregas mantêm o endpoint privado apenas pelo período necessário para validar binding e replay. A tabela ainda requer uma rotina de retenção em lote para estados terminais; essa limpeza não deve remover reservas pendentes nem recibos de deduplicação ativos. Até essa rotina ser publicada, acompanhar o volume e não executar limpeza manual em produção.
+As entregas mantêm o endpoint privado apenas pelo período necessário para validar binding e replay. A etapa 3 acrescenta retenção limitada para entregas terminais com mais de 30 dias desde a reserva; eventos e cursores anti-replay permanecem. O contrato completo está em [Web Push 3](web-push-eventos.md). Acompanhar o volume e não executar limpeza manual em produção.
 
 Não há coluna nova no snapshot nem mudança de ruleset. A inicialização idempotente cria tabelas/índices e aplica RLS/revogações no schema privado. Apenas a API acessa esses registros.
 

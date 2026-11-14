@@ -10,6 +10,7 @@ import java.util.List;
 
 /** Private acquisition cursors; feeding changes progress, never the notification identity. */
 final class AnimalPushSchedule {
+    // shortcut: catalog max=1 permits one observed acquisition per type; use acquisition keys if limits increase.
     private final List<AnimalType> catalog=AnimalCatalogLoader.load();
 
     JsonObject reconcile(GameSnapshot snapshot,JsonObject previous,Instant now,boolean enabled){

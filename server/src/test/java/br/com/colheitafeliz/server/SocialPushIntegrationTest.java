@@ -27,8 +27,9 @@ class SocialPushIntegrationTest {
         long revision=device.get("deviceRevision").getAsLong()+1;device.addProperty("deviceRevision",revision);
         var request=PushStoreIntegrationTest.test(device);request.remove("testId");request.addProperty(key,value);push.preferences(owner,request);
     }
-    private UUID event(String type){UUID id=UUID.randomUUID();store.transaction(actor,tx->{store.pushStore().recordEvent(tx,id,owner,actor,type,"{}",now);return null;});return id;}
+    private UUID event(String type){UUID id=UUID.randomUUID();store.transaction(actor,tx->{store.pushStore().recordEvent(tx,id,owner,actor,type,now);return null;});return id;}
     private List<SocialPushStore.Delivery> consume(){return store.transaction(owner,tx->store.socialPushStore().consume(tx,owner,now));}
+    private boolean current(SocialPushStore.Delivery d){return store.transaction(owner,tx->store.cropPushStore().current(tx,new CropPushStore.Delivery(d.id(),d.owner(),d.subscription(),List.of(d.type()))));}
     @Test void optInSkipsHistoryAndReservesNewEventsOnceAcrossRestart(){
         event("THEFT");consent("thefts",true);UUID fresh=event("THEFT");
         var deliveries=consume();assertEquals(1,deliveries.size());assertEquals("THEFT",deliveries.getFirst().type());
@@ -45,12 +46,12 @@ class SocialPushIntegrationTest {
     }
     @Test void reactivationSkipsDisabledPeriodAndAccountOrRevisionChangesInvalidateReservations(){
         consent("thefts",true);event("THEFT");var reserved=consume().getFirst();
-        assertTrue(store.transaction(owner,tx->store.socialPushStore().current(tx,reserved)).booleanValue());
-        consent("thefts",false);assertFalse(store.transaction(owner,tx->store.socialPushStore().current(tx,reserved)).booleanValue());
+        assertTrue(current(reserved));
+        consent("thefts",false);assertFalse(current(reserved));
         event("THEFT");consent("thefts",true);assertTrue(consume().isEmpty());
         event("THEFT");final var latest=consume().getFirst();
         store.transaction(owner,tx->{tx.setActive(owner,false);return null;});
-        assertFalse(store.transaction(owner,tx->store.socialPushStore().current(tx,latest)).booleanValue());
+        assertFalse(current(latest));
     }
     @Test void rollbackDoesNotConsumeAndOwnerIsolationIsPreserved(){
         consent("thefts",true);event("THEFT");
@@ -67,7 +68,7 @@ class SocialPushIntegrationTest {
     @Test void transferInvalidatesReservationAndDoesNotCarryConsent(){
         consent("thefts",true);event("THEFT");var delivery=consume().getFirst();
         var transfer=device.deepCopy();transfer.addProperty("deviceRevision",3);transfer.addProperty("bindingId",PushStoreIntegrationTest.token(25));push.subscribe(actor,transfer);
-        assertFalse(store.transaction(owner,tx->store.socialPushStore().current(tx,delivery)).booleanValue());
+        assertFalse(current(delivery));
         event("THEFT");assertTrue(consume().isEmpty());
     }
     @Test void concurrentConsumersReserveOnce() throws Exception {
@@ -81,7 +82,7 @@ class SocialPushIntegrationTest {
     }
     @Test void boundedPagesPreserveOrderEvenWhenEventClockMovesBackwards(){
         consent("thefts",true);
-        store.transaction(actor,tx->{for(int i=0;i<101;i++)store.pushStore().recordEvent(tx,UUID.randomUUID(),owner,actor,i%2==0?"THEFT":"PEST","{}",now.minusSeconds(i));return null;});
+        store.transaction(actor,tx->{for(int i=0;i<101;i++)store.pushStore().recordEvent(tx,UUID.randomUUID(),owner,actor,i%2==0?"THEFT":"PEST",now.minusSeconds(i));return null;});
         assertEquals(50,consume().size());assertEquals(1,consume().size());assertTrue(consume().isEmpty());
     }
     @Test void migrationProtectsPrivateConsumerTables(){
@@ -101,11 +102,11 @@ class SocialPushIntegrationTest {
         var entered=new java.util.concurrent.CountDownLatch(1);var release=new java.util.concurrent.CountDownLatch(1);
         try(var executor=java.util.concurrent.Executors.newFixedThreadPool(2)){
             var first=executor.submit(()->store.transaction(actor,tx->{
-                store.pushStore().recordEvent(tx,UUID.randomUUID(),owner,actor,"THEFT","{}",now);
+                store.pushStore().recordEvent(tx,UUID.randomUUID(),owner,actor,"THEFT",now);
                 entered.countDown();try{assertTrue(release.await(10,java.util.concurrent.TimeUnit.SECONDS));}catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}return null;
             }));
             assertTrue(entered.await(10,java.util.concurrent.TimeUnit.SECONDS));
-            var second=executor.submit(()->store.transaction(third,tx->{store.pushStore().recordEvent(tx,UUID.randomUUID(),owner,third,"THEFT","{}",now.minusSeconds(1));return null;}));
+            var second=executor.submit(()->store.transaction(third,tx->{store.pushStore().recordEvent(tx,UUID.randomUUID(),owner,third,"THEFT",now.minusSeconds(1));return null;}));
             try{assertThrows(java.util.concurrent.TimeoutException.class,()->second.get(200,java.util.concurrent.TimeUnit.MILLISECONDS));}
             finally{release.countDown();}
             first.get(10,java.util.concurrent.TimeUnit.SECONDS);second.get(10,java.util.concurrent.TimeUnit.SECONDS);

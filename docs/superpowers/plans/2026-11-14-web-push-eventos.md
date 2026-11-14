@@ -62,3 +62,18 @@ Base conferida por fetch e GitHub: `codex/online-core-compartilhado` em `207e1e4
 Conclusão em 14/11/2026: 593 testes Java, incluindo 195 integrações PostgreSQL 17, mais 271 testes web; zero falhas/skips. Build, installDist, TypeScript e SpotBugs main/test aprovados, zero achados. A conferência dos callers reproduziu a allowlist HTTP antiga que recusava novas categorias com 400; o teste end-to-end agora cobre true/false e replay para animais/furtos/pragas. Corrigida a fronteira e repetida a suíte integral em seis minutos. A correção também recebeu revisão estática independente, sem achados pendentes.
 
 Chromium 147.0.7727.15 confirmou atualização do worker antigo com duas abas abertas, lote misto de quatro categorias, consentimento estrito, logout offline e troca de conta. Notificações foram simuladas; nenhuma permissão ou entrega real. Evidências locais: `.tools/push3-release-java.log`, `.tools/push3-complete-web.log`, `.tools/push3-complete-web-build.log` e `.tools/push3-browser-evidence.json`. Agentes usaram modelo herdado, sem troca de configuração; integração e verificação final executadas pelo coordenador.
+
+## Comentários do PR #82 — 14/11/2026
+
+- Manter o lock global do protocolo existente e documentar a contenção e a necessidade de alteração coordenada das transferências/mutadores.
+- Reter entregas terminais por 30 dias desde a reserva, limpando até 100 por tabela/consulta. Recibo social exige cursor cobrindo o evento. Preservar eventos, cursores, baselines e testes anti-replay, inclusive antes do opt-in; filtrar a persistência ou apagá-la mudaria a garantia já validada.
+- Remover metadados de ação das novas gravações, preservando a coluna legada sem migração destrutiva.
+- Documentar descarte integral do lote após revogação e o limite atual `max=1` do cursor animal, sem adicionar suporte especulativo a vários animais do mesmo tipo.
+- Remover métodos usados só por testes e migrar os testes para `reserveBatch`/`CropPushStore.current`.
+- Manter a migração compatível e suas regressões de preservação de dados.
+- Usar o mesmo conjunto filtrado de eventos para os tipos e o vínculo de `batch_id`.
+- Reutilizar uma instância de `SocialPushStore` no agendamento.
+
+Aceitação: limpeza limitada e sem reabertura de pedidos após reinício, cursor atrasado/ausente preservado, resposta tardia inofensiva, revisão antiga sem associação ao lote novo e metadados de push vazios numa ação social real. Comando final: `test build :server:integrationTest :server:spotbugsMain :server:spotbugsTest :server:installDist`. Não alterar frontend, chaves, configuração de produção ou realizar merge/deploy.
+
+Validação: regressões de associação, retenção e metadados falharam antes das correções. Suíte final aprovada em 6 min 4 s: 599 testes Java, incluindo 201 integrações PostgreSQL 17, sem falhas/skips; build, installDist e SpotBugs aprovados, zero achados. Revisão independente somente leitura não encontrou problemas pendentes; apontamentos de documentação foram incorporados. Modelo herdado, sem alteração de configuração. Logs locais: `.tools/push3-review-match-red.log`, `.tools/push3-review-retention-red.log`, `.tools/push3-review-focused.log` e `.tools/push3-review-final.log`.

@@ -32,7 +32,7 @@ class PushBatchIntegrationTest {
     private void modify(java.util.function.Consumer<GameState> change){store.transaction(owner,tx->{tx.lockFarms(owner);var farm=tx.farm(owner);var state=GameState.restore(clock::instant,clock,CropCatalogLoader.load(),farm.snapshot(),b->b-1);change.accept(state);tx.save(owner,state.snapshot(),farm.revision()+1,clock.now);return null;});}
     private void animal(){modify(state->{var type=AnimalCatalogLoader.load().stream().filter(t->t.id().equals("galinha")).findFirst().orElseThrow();state.barn().add(Animal.acquire(type,new ItemLot(type.id(),Currency.GOLD,type.prices().get(Currency.GOLD),1,false),clock.now));});}
     private void plant(){modify(state->{var tile=state.farm().tile(0,0);tile.plow();tile.plant(CropCatalogLoader.load().get("nabo"),clock.now);tile.water(clock.now);});}
-    private void event(String type){store.transaction(actor,tx->{store.pushStore().recordEvent(tx,UUID.randomUUID(),owner,actor,type,"{}",clock.now);return null;});}
+    private void event(String type){store.transaction(actor,tx->{store.pushStore().recordEvent(tx,UUID.randomUUID(),owner,actor,type,clock.now);return null;});}
     private CropPushService worker(){return new CropPushService(store,game,clock,(e,p,a,b)->{sent.add(JsonParser.parseString(b).getAsJsonObject());return 201;});}
     private Set<String> types(JsonObject payload){if(!payload.get("type").getAsString().equals("BATCH"))return Set.of(payload.get("type").getAsString());var result=new HashSet<String>();payload.getAsJsonArray("types").forEach(t->result.add(t.getAsString()));return result;}
     @Test void animalMaturitySchedulesOfflineAndSurvivesRestart(){
@@ -116,6 +116,54 @@ class PushBatchIntegrationTest {
         }
         assertTrue(store.transaction(actor,tx->store.pushStore().find(tx,device.get("endpoint").getAsString()).active()).booleanValue());
     }
+    @Test void staleSocialReceiptCannotJoinANewerDeviceRevision(){
+        plant();consent("plants",true);consent("thefts",true);clock.now=clock.now.plusSeconds(72000);event("THEFT");
+        var events=store.transaction(owner,tx->store.socialPushStore().consume(tx,owner,clock.now));assertEquals(1,events.size());
+        consent("animals",true);
+        var batch=store.transaction(owner,tx->{tx.lock("push-subscriptions");tx.lockFarms(owner);return store.cropPushStore().reserveBatch(tx,owner,clock.now,true,false,events);});
+        assertEquals(List.of("CROP_READY"),batch.getFirst().types());
+        assertNull(store.transaction(owner,tx->tx.query("SELECT batch_id FROM "+schema+".social_push_deliveries WHERE id=?",r->r.getObject(1,UUID.class),events.getFirst().id()).getFirst()));
+    }
+    @Test void terminalDeliveryRetentionIsBoundedAndKeepsRecentOrUnknownStates(){
+        Instant old=clock.now.minus(Duration.ofDays(31));
+        store.transaction(owner,tx->{
+            for(int i=0;i<101;i++)seedDelivery(tx,"accepted",old);
+            seedDelivery(tx,"accepted",clock.now);seedDelivery(tx,"accepted",clock.now.minus(Duration.ofDays(30)));seedDelivery(tx,"pending",clock.now);seedDelivery(tx,"unknown",old);
+            store.cropPushStore().expire(tx,clock.now);return null;
+        });
+        assertEquals(5,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".crop_push_deliveries",r->r.getInt(1)).getFirst()).intValue());
+        store.transaction(owner,tx->{store.cropPushStore().expire(tx,clock.now);return null;});
+        assertEquals(List.of("accepted","accepted","pending","unknown"),store.transaction(owner,tx->tx.query("SELECT status FROM "+schema+".crop_push_deliveries ORDER BY status",r->r.getString(1))));
+    }
+    @Test void socialRetentionIsBoundedAndKeepsPermanentEventDeduplication(){
+        consent("thefts",true);
+        store.transaction(actor,tx->{for(int i=0;i<101;i++)store.pushStore().recordEvent(tx,UUID.randomUUID(),owner,actor,"THEFT",clock.now);return null;});
+        store.transaction(owner,tx->{assertEquals(100,store.socialPushStore().consume(tx,owner,clock.now).size());assertEquals(1,store.socialPushStore().consume(tx,owner,clock.now).size());tx.execute("UPDATE "+schema+".social_push_deliveries SET status='accepted',reserved_at=?",java.sql.Timestamp.from(clock.now.minus(Duration.ofDays(31))));store.cropPushStore().expire(tx,clock.now);return null;});
+        assertEquals(1,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".social_push_deliveries",r->r.getInt(1)).getFirst()).intValue());
+        store.transaction(owner,tx->{store.cropPushStore().expire(tx,clock.now);assertTrue(store.socialPushStore().consume(tx,owner,clock.now).isEmpty());return null;});
+        assertEquals(0,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".social_push_deliveries",r->r.getInt(1)).getFirst()).intValue());
+        assertEquals(101,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".push_events",r->r.getInt(1)).getFirst()).intValue());
+    }
+    @Test void deletingOldDeliveriesPreservesEventReplayAndCannotDisableCurrentBinding(){
+        consent("thefts",true);UUID request=UUID.randomUUID();
+        store.transaction(actor,tx->{store.pushStore().recordEvent(tx,request,owner,actor,"THEFT",clock.now);return null;});
+        var delivery=store.transaction(owner,tx->{var events=store.socialPushStore().consume(tx,owner,clock.now);var batch=store.cropPushStore().reserveBatch(tx,owner,clock.now,false,false,events).getFirst();store.cropPushStore().finish(tx,batch,"accepted",clock.now);return batch;});
+        store.transaction(owner,tx->{var old=java.sql.Timestamp.from(clock.now.minus(Duration.ofDays(31)));tx.execute("UPDATE "+schema+".crop_push_deliveries SET reserved_at=?",old);tx.execute("UPDATE "+schema+".social_push_deliveries SET reserved_at=?",old);store.cropPushStore().expire(tx,clock.now);store.cropPushStore().finish(tx,delivery,"expired",clock.now);return null;});
+        assertEquals(0,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".social_push_deliveries",r->r.getInt(1)).getFirst()).intValue());
+        assertEquals(0,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".crop_push_deliveries",r->r.getInt(1)).getFirst()).intValue());
+        store.transaction(actor,tx->{store.pushStore().recordEvent(tx,request,owner,actor,"THEFT",clock.now);return null;});
+        assertEquals(1,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".push_events",r->r.getInt(1)).getFirst()).intValue());
+        assertTrue(store.transaction(owner,tx->store.pushStore().find(tx,device.get("endpoint").getAsString()).active()).booleanValue());
+        store.close();store=new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"),"postgres","",schema);store.initialize(owner,clock.now);game=new OnlineGameService(store,clock,b->b-1,20);clock.now=clock.now.plusSeconds(60);
+        try(var worker=worker()){worker.tick();}assertTrue(sent.isEmpty());
+    }
+    @Test void retentionDoesNotRemoveSocialReceiptAheadOfOrWithoutCursor(){
+        consent("thefts",true);event("THEFT");store.transaction(owner,tx->{store.socialPushStore().consume(tx,owner,clock.now);tx.execute("UPDATE "+schema+".social_push_deliveries SET status='accepted',reserved_at=?",java.sql.Timestamp.from(clock.now.minus(Duration.ofDays(31))));tx.execute("UPDATE "+schema+".social_push_cursors SET last_event=0");store.cropPushStore().expire(tx,clock.now);return null;});
+        assertEquals(1,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".social_push_deliveries",r->r.getInt(1)).getFirst()).intValue());
+        store.transaction(owner,tx->{tx.execute("DELETE FROM "+schema+".social_push_cursors");store.cropPushStore().expire(tx,clock.now);return null;});
+        assertEquals(1,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".social_push_deliveries",r->r.getInt(1)).getFirst()).intValue());
+    }
+    private void seedDelivery(JdbcOnlineStore.Tx tx,String status,Instant at){tx.execute("INSERT INTO "+schema+".crop_push_deliveries(id,owner,endpoint,binding,device_revision,status,reserved_at) VALUES(?,?,?,?,?,?,?)",UUID.randomUUID(),owner,device.get("endpoint").getAsString(),device.get("bindingId").getAsString(),device.get("deviceRevision").getAsLong(),status,java.sql.Timestamp.from(at));}
     private static final class TestClock extends Clock {
         Instant now=Instant.parse("2026-11-13T12:00:00Z");
         @Override public Instant instant(){return now;}

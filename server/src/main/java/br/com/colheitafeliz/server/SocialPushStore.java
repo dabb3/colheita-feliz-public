@@ -20,6 +20,7 @@ final class SocialPushStore {
         tx.execute("ALTER TABLE "+schema+".social_push_deliveries ADD COLUMN IF NOT EXISTS batch_id uuid");
         tx.execute("CREATE INDEX IF NOT EXISTS social_push_batch_idx ON "+schema+".social_push_deliveries(batch_id) WHERE batch_id IS NOT NULL");
         tx.execute("CREATE INDEX IF NOT EXISTS social_push_pending_idx ON "+schema+".social_push_deliveries(reserved_at) WHERE status='pending'");
+        tx.execute("CREATE INDEX IF NOT EXISTS social_push_terminal_idx ON "+schema+".social_push_deliveries(reserved_at) WHERE status IN ('accepted','expired','unavailable')");
     }
     Instant next(JdbcOnlineStore.Tx tx,UUID owner,Instant now){
         return tx.query("SELECT 1 FROM "+schema+".push_events e JOIN "+schema+".social_push_devices d ON d.owner=e.owner AND d.type=e.type AND e.event_order>d.baseline WHERE e.owner=? AND e.event_order>COALESCE((SELECT last_event FROM "+schema+".social_push_cursors WHERE owner=?),0) LIMIT 1",r->1,owner,owner).isEmpty()?null:now;
@@ -54,10 +55,6 @@ final class SocialPushStore {
         }
         tx.execute("UPDATE "+schema+".social_push_cursors SET last_event=? WHERE owner=?",cursor,owner);
         return deliveries;
-    }
-    boolean current(JdbcOnlineStore.Tx tx,Delivery delivery){
-        var s=delivery.subscription();var current=new PushStore(schema).find(tx,s.endpoint());var owner=tx.player(delivery.owner());
-        return owner!=null&&owner.active()&&current!=null&&current.active()&&current.owner().equals(delivery.owner())&&current.binding().equals(s.binding())&&current.revision()==s.revision()&&current.preferenceEnabled(key(delivery.type()));
     }
     private List<PushStore.Subscription> subscriptions(JdbcOnlineStore.Tx tx,UUID owner){
         return tx.query("SELECT s.owner,s.endpoint,s.proof,s.binding,s.device_revision,s.p256dh,s.auth,s.preferences::text,s.active FROM "+schema+".push_subscriptions s JOIN "+schema+".players p ON p.id=s.owner WHERE s.owner=? AND p.active AND s.active ORDER BY s.endpoint",r->new PushStore.Subscription(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getString(4),r.getLong(5),r.getString(6),r.getString(7),r.getString(8),r.getBoolean(9)),owner);

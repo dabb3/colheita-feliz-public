@@ -86,8 +86,8 @@ class PushStoreIntegrationTest {
     }
     @Test void eventDeduplicationIsScopedToActorAndRequest(){
         UUID request=UUID.randomUUID();
-        store.transaction(owner,tx->{store.pushStore().recordEvent(tx,request,owner,owner,"THEFT","{\"column\":0}",clock.instant());store.pushStore().recordEvent(tx,request,owner,owner,"THEFT","{\"column\":1}",clock.instant());return null;});
-        store.transaction(other,tx->{store.pushStore().recordEvent(tx,request,other,other,"PEST","{\"column\":0}",clock.instant());return null;});
+        store.transaction(owner,tx->{store.pushStore().recordEvent(tx,request,owner,owner,"THEFT",clock.instant());store.pushStore().recordEvent(tx,request,owner,owner,"PEST",clock.instant());return null;});
+        store.transaction(other,tx->{store.pushStore().recordEvent(tx,request,other,other,"PEST",clock.instant());return null;});
         assertEquals(2,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".push_events",r->r.getInt(1)).getFirst()).intValue());
         assertEventPrimaryKey();
     }

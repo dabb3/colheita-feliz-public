@@ -54,10 +54,10 @@ final class PushStore {
     boolean coolingDown(JdbcOnlineStore.Tx tx,UUID actor,String endpoint,Instant now){return !tx.query("SELECT 1 FROM "+schema+".push_tests WHERE (actor=? OR endpoint=?) AND reserved_at>? LIMIT 1",r->r.getInt(1),actor,endpoint,Timestamp.from(now.minusSeconds(60))).isEmpty();}
     void reserve(JdbcOnlineStore.Tx tx,UUID id,Attempt a,Instant now){tx.execute("INSERT INTO "+schema+".push_tests(id,actor,endpoint,binding,device_revision,request_hash,status,reserved_at) VALUES(?,?,?,?,?,?,?,?)",id,a.actor(),a.endpoint(),a.binding(),a.revision(),a.requestHash(),"pending",Timestamp.from(now));}
     void finish(JdbcOnlineStore.Tx tx,UUID id,String status){tx.execute("UPDATE "+schema+".push_tests SET status=? WHERE id=? AND status='pending'",status,id);}
-    void recordEvent(JdbcOnlineStore.Tx tx,UUID requestId,UUID owner,UUID actor,String type,String metadata,Instant now){
+    void recordEvent(JdbcOnlineStore.Tx tx,UUID requestId,UUID owner,UUID actor,String type,Instant now){
         // Serialize allocation with consent and consumption; a sequence alone does not order commits.
         tx.lockFarms(owner);
-        tx.execute("INSERT INTO "+schema+".push_events(id,owner,actor,request_id,type,metadata,created_at) VALUES(?,?,?,?,?,?::jsonb,?) ON CONFLICT(actor,request_id) DO NOTHING",UUID.randomUUID(),owner,actor,requestId,type,metadata,Timestamp.from(now));
+        tx.execute("INSERT INTO "+schema+".push_events(id,owner,actor,request_id,type,metadata,created_at) VALUES(?,?,?,?,?,'{}'::jsonb,?) ON CONFLICT(actor,request_id) DO NOTHING",UUID.randomUUID(),owner,actor,requestId,type,Timestamp.from(now));
         tx.execute("UPDATE "+schema+".crop_push_jobs SET next_at=CASE WHEN next_at IS NULL OR next_at>? THEN ? ELSE next_at END WHERE owner=? AND enabled",Timestamp.from(now),Timestamp.from(now),owner);
     }
 }

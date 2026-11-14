@@ -15,21 +15,21 @@ import java.util.UUID;
 final class CropPushStore {
     record Job(boolean enabled, Instant due, Instant lastBatch, JsonObject cursors) {}
     record Delivery(UUID id, UUID owner, PushStore.Subscription subscription,List<String> types) {
-        Delivery(UUID id,UUID owner,PushStore.Subscription subscription){this(id,owner,subscription,List.of("CROP_READY"));}
         Delivery {types=List.copyOf(types);}
     }
     private final String schema;
+    private final SocialPushStore social;
     private final br.com.colheitafeliz.domain.crop.CropCatalog catalog=CropCatalogLoader.load();
     private final AnimalPushSchedule animals=new AnimalPushSchedule();
-    CropPushStore(String schema){this.schema=schema;}
+    CropPushStore(String schema){this.schema=schema;this.social=new SocialPushStore(schema);}
     void initialize(JdbcOnlineStore.Tx tx){
         tx.execute("CREATE TABLE IF NOT EXISTS "+schema+".crop_push_jobs (owner uuid PRIMARY KEY REFERENCES "+schema+".players(id), enabled boolean NOT NULL, next_at timestamptz, last_batch_at timestamptz, cursors jsonb NOT NULL)");
         tx.execute("CREATE INDEX IF NOT EXISTS crop_push_due_idx ON "+schema+".crop_push_jobs(next_at) WHERE enabled AND next_at IS NOT NULL");
         tx.execute("CREATE TABLE IF NOT EXISTS "+schema+".crop_push_deliveries (id uuid PRIMARY KEY, owner uuid NOT NULL REFERENCES "+schema+".players(id), endpoint text NOT NULL, binding text NOT NULL, device_revision bigint NOT NULL, status text NOT NULL, reserved_at timestamptz NOT NULL)");
         tx.execute("ALTER TABLE "+schema+".crop_push_deliveries ADD COLUMN IF NOT EXISTS types jsonb NOT NULL DEFAULT '[\"CROP_READY\"]'::jsonb");
         tx.execute("CREATE INDEX IF NOT EXISTS crop_push_pending_idx ON "+schema+".crop_push_deliveries(reserved_at) WHERE status='pending'");
+        tx.execute("CREATE INDEX IF NOT EXISTS crop_push_terminal_idx ON "+schema+".crop_push_deliveries(reserved_at) WHERE status IN ('accepted','expired','unavailable')");
     }
-    boolean eligible(JdbcOnlineStore.Tx tx,UUID owner){return !tx.query("SELECT 1 FROM "+schema+".push_subscriptions s JOIN "+schema+".players p ON p.id=s.owner WHERE s.owner=? AND p.active AND s.active AND s.preferences @> '{\"plants\":true,\"plantsConfirmed\":true}'::jsonb LIMIT 1",r->1,owner).isEmpty();}
     boolean anyEligible(JdbcOnlineStore.Tx tx,UUID owner){return !enabledCategories(tx,owner).isEmpty();}
     private java.util.Set<String> enabledCategories(JdbcOnlineStore.Tx tx,UUID owner){
         var result=new java.util.HashSet<String>();
@@ -68,7 +68,7 @@ final class CropPushStore {
         current.add("animals",animalState);
         Instant next=plants?next(snapshot,current,now,last):null;
         next=earlier(next,animals.next(snapshot,animalState,now));
-        next=earlier(next,new SocialPushStore(schema).next(tx,owner,now));
+        next=earlier(next,social.next(tx,owner,now));
         if(next!=null&&last!=null&&next.isBefore(last.plusSeconds(60)))next=last.plusSeconds(60);
         save(tx,owner,new Job(true,next,last,current));
     }
@@ -121,10 +121,6 @@ final class CropPushStore {
         if(next!=null&&last!=null&&next.isBefore(last.plusSeconds(60)))next=last.plusSeconds(60);
         return next;
     }
-    List<Delivery> reserve(JdbcOnlineStore.Tx tx,UUID owner,Instant now){
-        var subscriptions=tx.query("SELECT owner,endpoint,proof,binding,device_revision,p256dh,auth,preferences::text,active FROM "+schema+".push_subscriptions WHERE owner=? AND active AND preferences @> '{\"plants\":true,\"plantsConfirmed\":true}'::jsonb ORDER BY endpoint",r->new PushStore.Subscription(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getString(4),r.getLong(5),r.getString(6),r.getString(7),r.getString(8),r.getBoolean(9)),owner);
-        return subscriptions.stream().map(s->{UUID id=UUID.randomUUID();tx.execute("INSERT INTO "+schema+".crop_push_deliveries(id,owner,endpoint,binding,device_revision,status,reserved_at) VALUES(?,?,?,?,?,'pending',?)",id,owner,s.endpoint(),s.binding(),s.revision(),stamp(now));return new Delivery(id,owner,s);}).toList();
-    }
     List<Delivery> reserveBatch(JdbcOnlineStore.Tx tx,UUID owner,Instant now,boolean plants,boolean animalReady,List<SocialPushStore.Delivery> events){
         var subscriptions=tx.query("SELECT owner,endpoint,proof,binding,device_revision,p256dh,auth,preferences::text,active FROM "+schema+".push_subscriptions WHERE owner=? AND active ORDER BY endpoint",r->new PushStore.Subscription(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getString(4),r.getLong(5),r.getString(6),r.getString(7),r.getString(8),r.getBoolean(9)),owner);
         var result=new java.util.ArrayList<Delivery>();
@@ -132,11 +128,12 @@ final class CropPushStore {
             var types=new java.util.LinkedHashSet<String>();
             if(plants&&s.plantsEnabled())types.add("CROP_READY");
             if(animalReady&&s.preferenceEnabled("animals"))types.add("ANIMAL_READY");
-            for(var event:events)if(event.subscription().endpoint().equals(s.endpoint())&&event.subscription().binding().equals(s.binding())&&event.subscription().revision()==s.revision())types.add(event.type());
+            var deviceEvents=events.stream().filter(event->event.subscription().owner().equals(s.owner())&&event.subscription().endpoint().equals(s.endpoint())&&event.subscription().binding().equals(s.binding())&&event.subscription().revision()==s.revision()).toList();
+            for(var event:deviceEvents)types.add(event.type());
             if(types.isEmpty())continue;
             UUID id=UUID.randomUUID();var json=new com.google.gson.JsonArray();types.forEach(json::add);
             tx.execute("INSERT INTO "+schema+".crop_push_deliveries(id,owner,endpoint,binding,device_revision,status,reserved_at,types) VALUES(?,?,?,?,?,'pending',?,?::jsonb)",id,owner,s.endpoint(),s.binding(),s.revision(),stamp(now),json.toString());
-            for(var event:events)if(event.subscription().endpoint().equals(s.endpoint()))tx.execute("UPDATE "+schema+".social_push_deliveries SET batch_id=? WHERE id=? AND status='pending'",id,event.id());
+            for(var event:deviceEvents)tx.execute("UPDATE "+schema+".social_push_deliveries SET batch_id=? WHERE id=? AND status='pending'",id,event.id());
             result.add(new Delivery(id,owner,s,List.copyOf(types)));
         }
         return result;
@@ -156,6 +153,9 @@ final class CropPushStore {
     void expire(JdbcOnlineStore.Tx tx,Instant now){
         tx.execute("UPDATE "+schema+".crop_push_deliveries SET status='unavailable' WHERE id IN (SELECT id FROM "+schema+".crop_push_deliveries WHERE status='pending' AND reserved_at<=? ORDER BY reserved_at LIMIT 100 FOR UPDATE SKIP LOCKED)",stamp(now.minusSeconds(60)));
         tx.execute("UPDATE "+schema+".social_push_deliveries SET status='unavailable' WHERE id IN (SELECT id FROM "+schema+".social_push_deliveries WHERE status='pending' AND reserved_at<=? ORDER BY reserved_at LIMIT 100 FOR UPDATE SKIP LOCKED)",stamp(now.minusSeconds(60)));
+        Instant cutoff=now.minus(java.time.Duration.ofDays(30));
+        tx.execute("DELETE FROM "+schema+".crop_push_deliveries WHERE id IN (SELECT id FROM "+schema+".crop_push_deliveries WHERE status IN ('accepted','expired','unavailable') AND reserved_at<? ORDER BY reserved_at,id LIMIT 100 FOR UPDATE SKIP LOCKED)",stamp(cutoff));
+        tx.execute("DELETE FROM "+schema+".social_push_deliveries WHERE id IN (SELECT d.id FROM "+schema+".social_push_deliveries d WHERE d.status IN ('accepted','expired','unavailable') AND d.reserved_at<? AND EXISTS (SELECT 1 FROM "+schema+".push_events e JOIN "+schema+".social_push_cursors c ON c.owner=e.owner WHERE e.id=d.event_id AND c.owner=d.owner AND c.last_event>=e.event_order) ORDER BY d.reserved_at,d.id LIMIT 100 FOR UPDATE OF d SKIP LOCKED)",stamp(cutoff));
     }
     private static String category(String type){return switch(type){case "CROP_READY"->"plants";case "ANIMAL_READY"->"animals";case "THEFT"->"thefts";case "PEST"->"pests";default->throw new IllegalArgumentException("Unsupported push type");};}
     private Crop crop(GameSnapshot.TileSnapshot t){return new Crop(catalog.get(t.cropId()),Instant.parse(t.plantedAt()),parse(t.wateredAt()),parse(t.pausedAt()),parse(t.growthAnchorAt()),t.grownAtAnchorMillis(),t.origin(),t.season());}
