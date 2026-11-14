@@ -68,7 +68,8 @@ export function renderPushSettings(parent:HTMLElement,account:string,api:ApiClie
   for(const key of Object.keys(labels) as (keyof typeof labels)[]){inputs[key].checked=bound&&state.active![key]===true;inputs[key].disabled=busy||loadingPreferences||!bound||!publicKey||!categoryEnabled[key]||loadedRevision!==state?.revision||state?.active?.[`${key}Pending` as keyof typeof state.active]===true;}
   const pending=bound&&(Object.keys(labels) as (keyof typeof labels)[]).some(key=>state?.active?.[`${key}Pending` as keyof typeof state.active]===true);
   retry.hidden=!bound||!publicKey||!eventsEnabled||!pending&&!preferenceFailed;retry.disabled=busy||loadingPreferences;
-  retry.textContent=pending?'Repetir alteração de Plantas':'Recarregar preferência de Plantas';
+  const pendingKey=bound&&(Object.keys(labels) as (keyof typeof labels)[]).find(key=>state?.active?.[`${key}Pending` as keyof typeof state.active]===true);
+  retry.textContent=pendingKey?`Repetir alteração de ${labels[pendingKey]}`:'Recarregar preferência de Plantas';
   status.textContent=!current?'A conta deste dispositivo mudou. Entre novamente para configurar notificações.':!publicKey?configurationMessage:bound?'Notificações ativadas neste dispositivo.':Notification.permission==='denied'?'Permissão negada. Altere nas configurações do navegador se desejar.':'Permissão: '+Notification.permission+'. Notificações desativadas.';
   if(bound&&publicKey&&eventsEnabled&&(preferenceFailed||pending))status.textContent='Não foi possível confirmar uma preferência. Confira a conexão e tente novamente.';
  } if(!supported){status.textContent='Notificações indisponíveis neste navegador. No iPhone/iPad, adicione o jogo à Tela de Início e abra por lá.';return;}
