@@ -61,11 +61,33 @@ class PushStoreIntegrationTest {
         assertNull(store.transaction(owner,tx->push.find(tx,"endpoint")));
         store.transaction(owner,tx->{tx.setActive(other,false);return null;});failure(403,()->service.config(other));failure(403,()->service.subscribe(other,subscription(1,1)));failure(403,()->service.revoke(other,subscription(1,2)));failure(403,()->service.test(other,test(subscription(1,1))));
     }
+    @Test void eventMigrationPreservesLegacyRowsAndIsRepeatable(){
+        UUID request=UUID.randomUUID();
+        store.transaction(owner,tx->{
+            tx.execute("DROP TABLE "+schema+".push_events");
+            tx.execute("CREATE TABLE "+schema+".push_events (id uuid PRIMARY KEY,owner uuid NOT NULL,actor uuid NOT NULL,type text NOT NULL,metadata jsonb NOT NULL,created_at timestamptz NOT NULL)");
+            tx.execute("INSERT INTO "+schema+".push_events VALUES(?,?,?,'THEFT','{}'::jsonb,?)",request,owner,other,java.sql.Timestamp.from(clock.instant()));
+            return null;
+        });
+        store.initialize(owner,clock.instant());store.initialize(owner,clock.instant());
+        assertEquals(request,store.transaction(owner,tx->tx.query("SELECT request_id FROM "+schema+".push_events",r->r.getObject(1,UUID.class)).getFirst()));
+        assertEventPrimaryKey();
+    }
+    @Test void emptyEventSchemaInitializesTwice(){
+        store.initialize(owner,clock.instant());store.initialize(owner,clock.instant());
+        assertEventPrimaryKey();
+        assertEquals(0,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".push_events",r->r.getInt(1)).getFirst()).intValue());
+    }
+    private void assertEventPrimaryKey(){
+        var definitions=store.transaction(owner,tx->tx.query("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid=?::regclass AND contype='p'",r->r.getString(1),schema+".push_events"));
+        assertEquals(List.of("PRIMARY KEY (actor, request_id)"),definitions);
+    }
     @Test void eventDeduplicationIsScopedToActorAndRequest(){
         UUID request=UUID.randomUUID();
         store.transaction(owner,tx->{store.pushStore().recordEvent(tx,request,owner,owner,"THEFT","{\"column\":0}",clock.instant());store.pushStore().recordEvent(tx,request,owner,owner,"THEFT","{\"column\":1}",clock.instant());return null;});
         store.transaction(other,tx->{store.pushStore().recordEvent(tx,request,other,other,"PEST","{\"column\":0}",clock.instant());return null;});
         assertEquals(2,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".push_events",r->r.getInt(1)).getFirst()).intValue());
+        assertEventPrimaryKey();
     }
     @Test void concurrentClaimsSerializeAndQuotaIsAtomic() throws Exception {
         for(int i=1;i<=4;i++)service.subscribe(owner,subscription(i,1));
