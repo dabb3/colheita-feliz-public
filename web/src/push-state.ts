@@ -8,7 +8,7 @@ export function changeBinding(previous:PushState|undefined,active?:Binding):Push
  if(s.active)pending.push({endpoint:s.active.endpoint,deviceToken:s.active.deviceToken,deviceRevision:revision});
  return {revision,account:active?.account??s.account,deviceToken:active?.deviceToken??s.deviceToken,active,pending};
 }
-export function acceptsPush(state:PushState|undefined,payload:{type?:string;bindingId?:string}):boolean{return !!state?.active&&typeof state.active.account==='string'&&state.account===state.active.account&&typeof payload.bindingId==='string'&&payload.bindingId.length>0&&state.active.bindingId===payload.bindingId&&(payload.type==='TEST'||payload.type==='CROP_READY'&&state.active.plants!==false);}
+export function acceptsPush(state:PushState|undefined,payload:{type?:string;bindingId?:string}):boolean{return !!state?.active&&typeof state.active.account==='string'&&state.account===state.active.account&&typeof payload.bindingId==='string'&&payload.bindingId.length>0&&state.active.bindingId===payload.bindingId&&(payload.type==='TEST'||payload.type==='CROP_READY'&&state.active.plants===true);}
 export async function pushState(update?:(state:PushState|undefined)=>PushState):Promise<PushState|undefined>{
  return new Promise((resolve,reject)=>{
   const open=indexedDB.open('colheita-device-push',1);

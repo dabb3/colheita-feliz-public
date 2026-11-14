@@ -4,7 +4,9 @@ Esta etapa acrescenta avisos automáticos de plantas prontas à infraestrutura d
 
 ## O que o jogador recebe
 
-Em Ajustes, o jogador pode escolher Plantas para o dispositivo inscrito. A preferência é privada, persistida no servidor e recuperada ao reabrir o painel. Os outros tipos continuam marcados como em breve. A inscrição exige permissão por clique; no iPhone/iPad, pode exigir instalar o jogo na Tela de Início.
+Em Ajustes, o jogador precisa escolher explicitamente Plantas para o dispositivo inscrito. A preferência é privada, persistida no servidor e recuperada ao reabrir o painel. Ativar notificações ou enviar o teste não ativa Plantas; os outros tipos continuam desativados e marcados como em breve. A inscrição exige permissão por clique; no iPhone/iPad, pode exigir instalar o jogo na Tela de Início.
+
+Inscrições da primeira entrega que contenham `plants=true` sem `plantsConfirmed=true` são tratadas como desativadas. A leitura dessa preferência é somente leitura e nunca cria o marcador. O marcador só é gravado após uma alteração autenticada com revisão nova; a atualização suspende um agendamento antigo antes de reconciliar o estado. O Service Worker também exige o booleano literal `true`, de modo que ausência, `false`, strings e outros tipos falham fechados. Uma nova associação de dispositivo precisa repetir o opt-in.
 
 A mensagem é fixa: “Há plantas prontas para colher na sua fazenda. Toque para voltar ao jogo.” Não contém nome, saldo, cultura nem informações de amigos. O clique abre somente a origem do jogo.
 
@@ -56,7 +58,7 @@ Não há coluna nova no snapshot nem mudança de ruleset. A inicialização idem
 
 ## Evidências locais
 
-A revisão visual isolada usou o componente real de Ajustes, API simulada e vínculo fictício em origem localhost separada. Conferidos 1280 × 800 e 390 × 844, com texto legível, checkbox Plantas habilitado, outros tipos indisponíveis e ausência de transbordamento horizontal. Evidências fora do Git: `.tools/push2-visual/desktop.png` e `mobile.png`. Nenhuma permissão nativa foi solicitada.
+A revisão visual isolada usou o componente real de Ajustes, API simulada e vínculo fictício em origem localhost separada. Conferidos 1280 × 800 e 390 × 844, com texto legível, Plantas desmarcado até o opt-in, outros tipos indisponíveis e ausência de transbordamento horizontal. Evidências fora do Git: `.tools/push2-visual/desktop.png` e `mobile.png`. Nenhuma permissão nativa foi solicitada.
 
 Rodada final em 13/11/2026: `gradlew.bat test build :server:integrationTest :server:capacityTest :server:spotbugsMain :server:spotbugsTest :server:installDist` passou em 4 min 20 s. Relatórios: 322 testes domínio/save, um core, 62 unitários servidor, 163 integrações PostgreSQL 17 completas e quatro de capacidade, sem falhas ou skips. SpotBugs main/test servidor: zero achados. Frontend: 245 testes, TypeScript e build local aprovados.
 

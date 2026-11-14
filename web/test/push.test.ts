@@ -173,3 +173,52 @@ test('successful activation restores the disable control and offline revoke keep
  const x=harness();let offline=false;const api={push:async op=>{if(op==='config')return{enabled:true,publicKey:'AA',plantEventsEnabled:true};if(offline)throw Error('offline');return{};}};
  x.h.renderPushSettings(x.parent,'a',api);await tick();await x.buttons()[0].onclick();assert.equal(x.buttons()[1].disabled,false);offline=true;await x.buttons()[1].onclick();assert.equal(x.read().active,undefined);assert.equal(x.buttons()[0].disabled,false);assert.match(panelText(x),/vinculação será reconciliada/);
 });
+
+test('a PR80 binding permits tests but cannot display crops without an explicit boolean opt-in',async()=>{
+ const handlers={},shown=[];let state;
+ const ctx={pushState:async()=>state,acceptsPush,URL,location:{origin:'https://game.invalid'},registration:{showNotification:async(title,options)=>shown.push([title,options]),getNotifications:async()=>[]},clients:{matchAll:async()=>[],openWindow:async()=>{}},addEventListener:(type,handler)=>handlers[type]=handler};
+ const source=readFileSync(new URL('../src/push-worker.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'');runInNewContext(stripTypeScriptTypes(source),ctx);
+ async function push(type){let work;handlers.push({data:{json:()=>({type,bindingId:'current'})},waitUntil:p=>work=p});await work;}
+ for(const plants of [undefined,false,null,0,1,'true',{},[]]){
+  state={revision:3,account:'a',pending:[],active:{account:'a',bindingId:'current',...(plants===undefined?{}:{plants})}};
+  const before=shown.length;await push('CROP_READY');assert.equal(shown.length,before,'crop suppressed for '+JSON.stringify(plants));await push('TEST');assert.equal(shown.length,before+1);
+ }
+ state.active.plants=true;await push('CROP_READY');assert.equal(shown.at(-1)[1].body,'Há plantas prontas para colher na sua fazenda. Toque para voltar ao jogo.');
+});
+
+test('opening PR80 settings reads effective false without opting in or activating the device',async()=>{
+ const x=boundHarness(),calls=[];let complete;
+ x.h.renderPushSettings(x.parent,'a',{push:async(op,body)=>{calls.push([op,body]);if(op==='config')return{enabled:true,publicKey:'AA',plantEventsEnabled:true};return new Promise(r=>complete=()=>r({bindingId:'current',deviceRevision:3,plants:false}));}});
+ assert.equal(plantsInput(x).checked,false);await tick();assert.equal(plantsInput(x).checked,false);assert.equal(plantsInput(x).disabled,true);
+ complete();await tick();assert.equal(plantsInput(x).checked,false);assert.equal(plantsInput(x).disabled,false);assert.equal(x.read().active.plants,false);assert.equal(x.read().revision,3);
+ assert.deepEqual(calls.map(([op])=>op),['config','preferences']);assert.equal('plants'in calls[1][1],false);assert.equal(x.permissionCalls(),0);assert.equal(x.subscribeCalls(),0);
+});
+
+test('activation and a test leave plants off until the checkbox explicitly opts in',async()=>{
+ const x=harness(),calls=[],api=preferencesApi(calls,false);x.h.renderPushSettings(x.parent,'a',api);
+ assert.equal(plantsInput(x).checked,false);await tick();await x.buttons()[0].onclick();
+ const subscribe=calls.find(([op])=>op==='subscribe')[1];assert.deepEqual(JSON.parse(JSON.stringify(subscribe.preferences)),{plants:false,animals:false,thefts:false,pests:false});assert.equal(x.read().active.plants,false);assert.equal(plantsInput(x).checked,false);assert.equal(plantsInput(x).disabled,false);
+ await x.buttons().find(n=>n.textContent==='Enviar notificação de teste').onclick();assert.equal(x.read().active.plants,false);assert.equal(calls.filter(([op])=>op==='preferences').length,0);
+ const revision=x.read().revision,plants=plantsInput(x);plants.checked=true;await plants.onchange();assert.equal(x.read().revision,revision+1);assert.equal(x.read().active.plants,true);
+ const writes=calls.filter(([op])=>op==='preferences');assert.equal(writes.length,1);assert.equal(writes[0][1].plants,true);assert.equal(writes[0][1].deviceRevision,revision+1);
+ x.h.renderPushSettings(x.parent,'a',api);await tick();assert.equal(plantsInput(x).checked,true);assert.equal(plantsInput(x).disabled,false);
+ const buttons=x.parent.children.at(-1).children.filter(n=>typeof n==='object'&&n.tag==='button');await buttons[1].onclick();await buttons[0].onclick();assert.equal(x.read().active.plants,false);assert.equal(plantsInput(x).checked,false);assert.equal(calls.filter(([op])=>op==='subscribe').at(-1)[1].preferences.plants,false);
+});
+
+test('unavailable notification types remain unchecked and disabled',async()=>{
+ const x=harness();x.h.renderPushSettings(x.parent,'a',preferencesApi());await tick();
+ for(const row of x.parent.children[0].children.filter(n=>n.tag==='label')){assert.equal(row.children[0].checked,false);assert.equal(row.children[0].disabled,true);}
+});
+
+for(const plants of [undefined,false,null,0,1,'true',{},[]])test('settings fail closed for persisted plants '+JSON.stringify(plants),async()=>{
+ const x=boundHarness();if(plants!==undefined)x.write({...x.read(),active:{...x.read().active,plants}});
+ x.h.renderPushSettings(x.parent,'a',{push:async()=>{throw Error('offline');}});await tick();assert.equal(plantsInput(x).checked,false);assert.equal(plantsInput(x).disabled,true);assert.equal(acceptsPush(x.read(),{type:'CROP_READY',bindingId:'current'}),false);
+});
+
+test('a lost opt-in response repeats the explicit intent at exactly the same revision',async()=>{
+ const x=boundHarness(),calls=[],base=preferencesApi(calls,false);let lost=true;
+ const api={push:async(op,body)=>{const result=await base.push(op,body);if(op==='preferences'&&body.plants===true&&lost){lost=false;throw Error('response lost');}return result;}};
+ x.h.renderPushSettings(x.parent,'a',api);await tick();const plants=plantsInput(x);plants.checked=true;await plants.onchange();assert.equal(x.read().active.plantsPending,true);assert.equal(x.read().revision,4);
+ await x.buttons().find(n=>n.textContent==='Repetir alteração de Plantas').onclick();assert.equal(x.read().active.plants,true);assert.equal(x.read().active.plantsPending,undefined);assert.equal(x.read().revision,4);
+ assert.deepEqual(calls.filter(([op,b])=>op==='preferences'&&'plants'in b).map(([,b])=>[b.deviceRevision,b.plants]),[[4,true],[4,true]]);
+});

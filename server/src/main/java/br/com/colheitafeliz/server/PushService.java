@@ -63,13 +63,15 @@ final class PushService {
             active(tx,actor);tx.lock("push-subscriptions");tx.lockFarms(actor);var old=push.find(tx,endpoint);
             if(old==null)throw new ApiFailure(403,"Dispositivo não autorizado.");possession(old,proof);
             if(!old.active()||!old.owner().equals(actor)||!old.binding().equals(binding))throw new ApiFailure(403,"Dispositivo não autorizado.");
-            var prefs=JsonParser.parseString(old.preferences()).getAsJsonObject();boolean plants=prefs.get("plants").getAsBoolean();
+            var prefs=JsonParser.parseString(old.preferences()).getAsJsonObject();boolean plants=old.plantsEnabled();
             if(!write){if(revision!=old.revision())throw conflict();}
             else{
                 boolean desired=request.get("plants").getAsBoolean();
-                if(revision<old.revision()||revision>old.revision()+1||(revision==old.revision()&&plants!=desired))throw conflict();
+                if(revision<old.revision()||revision>old.revision()+1||(revision==old.revision()&&(!PushStore.plantsConfirmed(prefs)||plants!=desired)))throw conflict();
                 if(revision>old.revision()){
+                    store.cropPushStore().suspendIfIneligible(tx,actor);
                     prefs.addProperty("plants",desired);
+                    prefs.addProperty("plantsConfirmed",true);
                     push.save(tx,new PushStore.Subscription(actor,endpoint,old.proof(),binding,revision,old.p256dh(),old.auth(),prefs.toString(),true),clock.instant());
                     store.cropPushStore().reconcileSubscription(tx,actor,clock.instant());
                 }
@@ -110,7 +112,12 @@ final class PushService {
         });
         return status(persistedResult);
     }
-    private static boolean same(PushStore.Subscription a,PushStore.Subscription b){return a.active()&&a.owner().equals(b.owner())&&a.binding().equals(b.binding())&&a.p256dh().equals(b.p256dh())&&a.auth().equals(b.auth())&&JsonParser.parseString(a.preferences()).equals(JsonParser.parseString(b.preferences()));}
+    private static boolean same(PushStore.Subscription a,PushStore.Subscription b){
+        var preferences=JsonParser.parseString(a.preferences()).getAsJsonObject();
+        // A registration replay cannot grant or erase the later, explicit preference consent.
+        preferences.remove("plantsConfirmed");
+        return a.active()&&a.owner().equals(b.owner())&&a.binding().equals(b.binding())&&a.p256dh().equals(b.p256dh())&&a.auth().equals(b.auth())&&preferences.equals(JsonParser.parseString(b.preferences()));
+    }
     private static void possession(PushStore.Subscription old,String proof){if(!MessageDigest.isEqual(old.proof().getBytes(StandardCharsets.US_ASCII),proof.getBytes(StandardCharsets.US_ASCII)))throw new ApiFailure(403,"Dispositivo não autorizado.");}
     private static void active(JdbcOnlineStore.Tx tx,UUID actor){var player=tx.player(actor);if(player==null||!player.active())throw new ApiFailure(403,"Jogador indisponível.");}
     private void enabled(){if(publicKey==null)throw new ApiFailure(503,"Notificações indisponíveis.");}

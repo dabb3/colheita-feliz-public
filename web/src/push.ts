@@ -50,10 +50,10 @@ export function renderPushSettings(parent:HTMLElement,account:string,api:ApiClie
  const section=document.createElement('section');section.className='settings-section push-settings';parent.append(section);
  const title=document.createElement('h3');title.textContent='Notificações no dispositivo';section.append(title);
  const status=document.createElement('p');status.setAttribute('role','status');status.textContent='Consultando disponibilidade…';section.append(status);
- const note=document.createElement('p');note.textContent='Plantas prontas são agrupadas em até um aviso por minuto. Os horários são aproximados; a entrega depende do navegador e da conexão. Animais, furtos e pragas estarão disponíveis nas próximas entregas.';section.append(note);
- const preferences={plants:true,animals:true,thefts:true,pests:true};
+ const note=document.createElement('p');note.textContent='Ativar notificações permite enviar um teste. Para receber avisos de Plantas, marque Plantas em Ajustes após ativar. Ativar ou testar não habilita esses avisos. Plantas prontas são agrupadas em até um aviso por minuto. Os horários são aproximados; a entrega depende do navegador e da conexão. Animais, furtos e pragas estarão disponíveis nas próximas entregas.';section.append(note);
+ const preferences={plants:false,animals:false,thefts:false,pests:false};
  let plants!:HTMLInputElement;
- for(const [key,label]of [['plants','Plantas'],['animals','Animais'],['thefts','Furtos'],['pests','Pragas']]as const){const row=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=true;input.disabled=true;if(key==='plants')plants=input;row.append(input,document.createTextNode(label+(key==='plants'?'':' (em breve)')));section.append(row);}
+ for(const [key,label]of [['plants','Plantas'],['animals','Animais'],['thefts','Furtos'],['pests','Pragas']]as const){const row=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=preferences[key];input.disabled=true;if(key==='plants')plants=input;row.append(input,document.createTextNode(label+(key==='plants'?'':' (em breve)')));section.append(row);}
  const activate=document.createElement('button'),disable=document.createElement('button'),test=document.createElement('button');activate.textContent='Ativar notificações';disable.textContent='Desativar notificações';test.textContent='Enviar notificação de teste';activate.disabled=true;test.hidden=true;disable.hidden=true;section.append(activate,disable,test);
  const retry=document.createElement('button');retry.textContent='Repetir alteração de Plantas';retry.hidden=true;section.append(retry);
  const supported=typeof Notification!=='undefined'&&typeof PushManager!=='undefined'&&'serviceWorker'in navigator&&typeof indexedDB!=='undefined'&&globalThis.isSecureContext;
@@ -64,7 +64,7 @@ export function renderPushSettings(parent:HTMLElement,account:string,api:ApiClie
   const state=await pushState(),current=state?.account===account,bound=current&&state?.active?.account===account;
   test.hidden=!bound||!publicKey;disable.hidden=!bound;activate.hidden=bound;
   activate.disabled=busy||!current||!publicKey||Notification.permission==='denied';disable.disabled=busy;
-  plants.checked=bound?state.active!.plants!==false:preferences.plants;
+  plants.checked=bound?state.active!.plants===true:preferences.plants;
   plants.disabled=busy||loadingPreferences||!bound||!publicKey||!plantEventsEnabled||loadedRevision!==state?.revision||!!state?.active?.plantsPending;
   retry.hidden=!bound||!publicKey||!plantEventsEnabled||!state?.active?.plantsPending&&!preferenceFailed;retry.disabled=busy||loadingPreferences;
   retry.textContent=state?.active?.plantsPending?'Repetir alteração de Plantas':'Recarregar preferência de Plantas';

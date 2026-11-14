@@ -24,7 +24,7 @@ final class CropPushStore {
         tx.execute("CREATE TABLE IF NOT EXISTS "+schema+".crop_push_deliveries (id uuid PRIMARY KEY, owner uuid NOT NULL REFERENCES "+schema+".players(id), endpoint text NOT NULL, binding text NOT NULL, device_revision bigint NOT NULL, status text NOT NULL, reserved_at timestamptz NOT NULL)");
         tx.execute("CREATE INDEX IF NOT EXISTS crop_push_pending_idx ON "+schema+".crop_push_deliveries(reserved_at) WHERE status='pending'");
     }
-    boolean eligible(JdbcOnlineStore.Tx tx,UUID owner){return !tx.query("SELECT 1 FROM "+schema+".push_subscriptions s JOIN "+schema+".players p ON p.id=s.owner WHERE s.owner=? AND p.active AND s.active AND s.preferences->>'plants'='true' LIMIT 1",r->1,owner).isEmpty();}
+    boolean eligible(JdbcOnlineStore.Tx tx,UUID owner){return !tx.query("SELECT 1 FROM "+schema+".push_subscriptions s JOIN "+schema+".players p ON p.id=s.owner WHERE s.owner=? AND p.active AND s.active AND s.preferences @> '{\"plants\":true,\"plantsConfirmed\":true}'::jsonb LIMIT 1",r->1,owner).isEmpty();}
     void suspendIfIneligible(JdbcOnlineStore.Tx tx,UUID owner){if(!eligible(tx,owner)){var job=job(tx,owner);if(job!=null)save(tx,owner,new Job(false,null,job.lastBatch(),job.cursors()));}}
     Job job(JdbcOnlineStore.Tx tx,UUID owner){
         var rows=tx.query("SELECT enabled,next_at,last_batch_at,cursors::text FROM "+schema+".crop_push_jobs WHERE owner=? FOR UPDATE",r->new Job(r.getBoolean(1),r.getTimestamp(2)==null?null:r.getTimestamp(2).toInstant(),r.getTimestamp(3)==null?null:r.getTimestamp(3).toInstant(),JsonParser.parseString(r.getString(4)).getAsJsonObject()),owner);
@@ -55,7 +55,7 @@ final class CropPushStore {
         var farm=tx.farm(owner);
         if(farm!=null)reconcile(tx,owner,farm.snapshot(),now.isBefore(farm.time())?farm.time():now);
     }
-    List<UUID> uninitialized(JdbcOnlineStore.Tx tx){return tx.query("SELECT DISTINCT s.owner FROM "+schema+".push_subscriptions s JOIN "+schema+".players p ON p.id=s.owner JOIN "+schema+".farms f ON f.owner=s.owner LEFT JOIN "+schema+".crop_push_jobs j ON j.owner=s.owner WHERE p.active AND s.active AND s.preferences->>'plants'='true' AND j.owner IS NULL ORDER BY s.owner LIMIT 10",r->r.getObject(1,UUID.class));}
+    List<UUID> uninitialized(JdbcOnlineStore.Tx tx){return tx.query("SELECT DISTINCT s.owner FROM "+schema+".push_subscriptions s JOIN "+schema+".players p ON p.id=s.owner JOIN "+schema+".farms f ON f.owner=s.owner LEFT JOIN "+schema+".crop_push_jobs j ON j.owner=s.owner WHERE p.active AND s.active AND s.preferences @> '{\"plants\":true,\"plantsConfirmed\":true}'::jsonb AND j.owner IS NULL ORDER BY s.owner LIMIT 10",r->r.getObject(1,UUID.class));}
     List<UUID> due(JdbcOnlineStore.Tx tx,Instant now,int limit){return tx.query("SELECT owner FROM "+schema+".crop_push_jobs WHERE enabled AND next_at<=? ORDER BY next_at,owner LIMIT ?",r->r.getObject(1,UUID.class),stamp(now),limit);}
     boolean ready(GameSnapshot snapshot,JsonObject cursors,Instant now){
         for(int i=0;i<snapshot.tiles().size();i++){
@@ -96,12 +96,12 @@ final class CropPushStore {
         return next;
     }
     List<Delivery> reserve(JdbcOnlineStore.Tx tx,UUID owner,Instant now){
-        var subscriptions=tx.query("SELECT owner,endpoint,proof,binding,device_revision,p256dh,auth,preferences::text,active FROM "+schema+".push_subscriptions WHERE owner=? AND active AND preferences->>'plants'='true' ORDER BY endpoint",r->new PushStore.Subscription(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getString(4),r.getLong(5),r.getString(6),r.getString(7),r.getString(8),r.getBoolean(9)),owner);
+        var subscriptions=tx.query("SELECT owner,endpoint,proof,binding,device_revision,p256dh,auth,preferences::text,active FROM "+schema+".push_subscriptions WHERE owner=? AND active AND preferences @> '{\"plants\":true,\"plantsConfirmed\":true}'::jsonb ORDER BY endpoint",r->new PushStore.Subscription(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getString(4),r.getLong(5),r.getString(6),r.getString(7),r.getString(8),r.getBoolean(9)),owner);
         return subscriptions.stream().map(s->{UUID id=UUID.randomUUID();tx.execute("INSERT INTO "+schema+".crop_push_deliveries(id,owner,endpoint,binding,device_revision,status,reserved_at) VALUES(?,?,?,?,?,'pending',?)",id,owner,s.endpoint(),s.binding(),s.revision(),stamp(now));return new Delivery(id,owner,s);}).toList();
     }
     boolean current(JdbcOnlineStore.Tx tx,Delivery delivery){
         var s=delivery.subscription();var current=new PushStore(schema).find(tx,s.endpoint());var owner=tx.player(delivery.owner());
-        return owner!=null&&owner.active()&&current!=null&&current.active()&&current.owner().equals(delivery.owner())&&current.binding().equals(s.binding())&&current.revision()==s.revision()&&JsonParser.parseString(current.preferences()).getAsJsonObject().get("plants").getAsBoolean();
+        return owner!=null&&owner.active()&&current!=null&&current.active()&&current.owner().equals(delivery.owner())&&current.binding().equals(s.binding())&&current.revision()==s.revision()&&current.plantsEnabled();
     }
     void finish(JdbcOnlineStore.Tx tx,Delivery d,String status,Instant now){
         if(status.equals("expired"))tx.lock("push-subscriptions");
