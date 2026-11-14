@@ -601,8 +601,6 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 
 /* Mobile portrait: "Mais" menu, farm camera and labelled tool panel. Desktop and landscape keep the original bar and scene. */
 #more,.camera-controls,.tools-head{display:none}
-.more-icon{display:flex;align-items:center;justify-content:center;gap:5px;width:40px;height:40px}
-.more-icon i{width:7px;height:7px;border-radius:2px;background:#fff;box-shadow:0 1px 3px #172b13}
 .more-menu{position:absolute;top:100%;right:0;z-index:7;display:grid;gap:2px;min-width:210px;margin-top:6px;padding:6px;border:1px solid #a2b56c;border-radius:13px;background:rgba(16,51,44,.94);box-shadow:0 8px 22px #0006}
 .more-menu[hidden]{display:none}
 @media(max-width:700px) and (orientation:portrait){
