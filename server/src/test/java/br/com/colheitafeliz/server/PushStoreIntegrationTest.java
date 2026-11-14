@@ -61,6 +61,12 @@ class PushStoreIntegrationTest {
         assertNull(store.transaction(owner,tx->push.find(tx,"endpoint")));
         store.transaction(owner,tx->{tx.setActive(other,false);return null;});failure(403,()->service.config(other));failure(403,()->service.subscribe(other,subscription(1,1)));failure(403,()->service.revoke(other,subscription(1,2)));failure(403,()->service.test(other,test(subscription(1,1))));
     }
+    @Test void eventDeduplicationIsScopedToActorAndRequest(){
+        UUID request=UUID.randomUUID();
+        store.transaction(owner,tx->{store.pushStore().recordEvent(tx,request,owner,owner,"THEFT","{\"column\":0}",clock.instant());store.pushStore().recordEvent(tx,request,owner,owner,"THEFT","{\"column\":1}",clock.instant());return null;});
+        store.transaction(other,tx->{store.pushStore().recordEvent(tx,request,other,other,"PEST","{\"column\":0}",clock.instant());return null;});
+        assertEquals(2,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".push_events",r->r.getInt(1)).getFirst()).intValue());
+    }
     @Test void concurrentClaimsSerializeAndQuotaIsAtomic() throws Exception {
         for(int i=1;i<=4;i++)service.subscribe(owner,subscription(i,1));
         var barrier=new CyclicBarrier(2);try(var executor=Executors.newFixedThreadPool(2)){
