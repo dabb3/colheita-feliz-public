@@ -65,8 +65,8 @@ class ProtectorBiteIntegrationTest {
         var reply=service.visitAction(visitor,owner,command);assertEquals("PROTECTED",kind(reply));assertEquals("0",reply.getAsJsonObject("theftOutcome").get("goldDebited").getAsString());
         assertEquals(before,farm(visitor));assertEquals(ownerBefore,farm(owner));assertEquals(clock.instant(),store.transaction(visitor,tx->tx.lastTheft(visitor)));
         assertEquals("BLOCKED",kind(service.visitAction(visitor,owner,request())));assertEquals(1,rolls.get());
-        clock.advance(86399);assertEquals("BLOCKED",kind(service.visitAction(visitor,owner,request())));assertEquals(1,rolls.get());
-        clock.advance(1);assertEquals("STOLEN",kind(service.visitAction(visitor,owner,request()))); // Guards are hungry after 24h.
+        clock.advance(21599);assertEquals("BLOCKED",kind(service.visitAction(visitor,owner,request())));assertEquals(1,rolls.get());
+        clock.advance(1);assertEquals("STOLEN",kind(service.visitAction(visitor,owner,request()))); // The global attempt is available again after 6h.
     }
     @Test void exclusiveWindowPrecedesProtectionAndUsesExactFiveMinutes(){
         prepare(5,299,false);var before=farm(visitor);

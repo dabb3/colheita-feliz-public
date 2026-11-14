@@ -18,7 +18,7 @@ let sceneResize:ResizeObserver|undefined;
 let avatarUser='',googlePhoto:string|undefined,avatarChoice:AvatarChoice='classic',avatarStore:Storage|undefined;
 try{avatarStore=window.localStorage;}catch{/* Playing remains available when browser preferences are blocked. */}
 let musicTrack='';
-let tool='CURSOR',selectedSeed='nabo',selectedFertilizer='comum',trayOpen=false,effectsEnabled=false,musicEnabled=false,effectsVolume=.65,musicVolume=.25,music:HTMLAudioElement|undefined,busy=false,seedMarketGroup:'common'|'vip'='common',refreshDialog:(()=>void)|undefined;
+let tool='CURSOR',selectedSeed='nabo',selectedFertilizer='comum',selectedLoveFertilizer='amor',trayOpen=false,effectsEnabled=false,musicEnabled=false,effectsVolume=.65,musicVolume=.25,music:HTMLAudioElement|undefined,busy=false,seedMarketGroup:'common'|'vip'='common',refreshDialog:(()=>void)|undefined;
 let toastTimer:number,loginTransitionTimer:number,sessionGeneration=0,navigationGeneration=0,dialogGeneration=0,healthTile:Tile|null=null,healthPoint:{x:number;y:number}|null=null,animalTooltipId='',animalTooltipPoint:{x:number;y:number}|null=null;
 let goldAnimationFrame=0;
 const depositNumber=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1});
@@ -243,25 +243,27 @@ function render(){
 }
 function renderTools(){
  const toolbar=element('tools');toolbar.replaceChildren();
- const definitions=visited?[['CURSOR','Inspecionar plantas','cursor-ui'],['STEAL','Furtar colheita','mao-restaurada'],['LOVE','Fertilizante do amor','adubo-amor'],['SPREAD_INSECTS','Lançar inseto · 1/12h','verme_1'],['SPREAD_WEEDS','Lançar erva · 1/12h','erva_daninha_1']]:toolDefinitions;
+ const definitions=visited?[['CURSOR','Inspecionar plantas','cursor-ui'],['STEAL','Furtar colheita','mao-restaurada'],['LOVE','Fertilizante do amor','adubo-amor'],['SPREAD_INSECTS','Lançar inseto · 1/6h','verme_1'],['SPREAD_WEEDS','Lançar erva · 1/6h','erva_daninha_1']]:toolDefinitions;
  if(!definitions.some(d=>d[0]===tool)){tool=definitions[0][0];trayOpen=false;}
  element('farm').style.cursor='url("/assets/classic/icons/cursor-action.png") 1 1, auto';
  for(const [index,[id,label,icon]] of definitions.entries()){
   const b=button(label,()=>pickTool(id),toolbar);b.classList.add('tool-button');b.title=label;b.setAttribute('aria-label',label);b.setAttribute('aria-pressed',String(tool===id));b.textContent='';
   const pest=id==='SPREAD_INSECTS'||id==='SPREAD_WEEDS';
-  const selectedIcon=id==='FERTILIZE'?`adubo-${selectedFertilizer}`:icon,image=document.createElement('img');image.alt='';image.src=pest?`/assets/classic/effects/${icon}.png`:`/assets/classic/icons/${selectedIcon.startsWith('adubo-')?'':'hud/'}${selectedIcon}.png`;b.append(image);
+  const selectedIcon=id==='FERTILIZE'?`adubo-${selectedFertilizer}`:id==='LOVE'?`adubo-${selectedLoveFertilizer}`:icon,image=document.createElement('img');image.alt='';image.src=pest?`/assets/classic/effects/${icon}.png`:`/assets/classic/icons/${selectedIcon.startsWith('adubo-')?'':'hud/'}${selectedIcon}.png`;b.append(image);
   if(id===tool&&id!=='CURSOR'&&!pest)element('farm').style.cursor=`url("/assets/classic/icons/cursors/${selectedIcon}.png") 16 16, auto`;
-  if(pest){const limit=document.createElement('span');limit.className='tool-count';limit.textContent='1/12h';b.append(limit);}
+  if(pest){const limit=document.createElement('span');limit.className='tool-count';limit.textContent='1/6h';b.append(limit);}
   if(id==='PLANT'){
    const crop=catalog.crops.find(item=>item.id===selectedSeed),seedCount=own?.seedCounts?.[selectedSeed]??0;
    if(crop){const seed=document.createElement('img');seed.className='tool-selected-item';seed.alt='';seed.src=`/assets/${seedArtPath(crop.spriteStem)}`;b.append(seed);const count=document.createElement('span');count.className='tool-count';count.textContent=`x${seedCount}`;b.append(count);}
   }
-  if(id==='FERTILIZE'||id==='LOVE'){const count=document.createElement('span');count.className='tool-count';count.textContent=`x${own?.fertilizers?.[selectedFertilizer]??0}`;b.append(count);}
+  if(id==='FERTILIZE'||id==='LOVE'){const count=document.createElement('span');count.className='tool-count';count.textContent=`x${own?.fertilizers?.[id==='LOVE'?selectedLoveFertilizer:selectedFertilizer]??0}`;b.append(count);}
   if(!visited){const key=document.createElement('span');key.className='tool-key';key.textContent=String(index+1);b.append(key);}
  }
  renderToolTray();
 }
-function pickTool(id:string){const previous=tool;trayOpen=toolbarTrayToggle(previous,id,trayOpen);tool=id;if(id==='LOVE'&&!catalog.fertilizers.some(f=>f.id===selectedFertilizer&&f.friendsOnly))selectedFertilizer='amor';renderTools();if(healthTile&&healthPoint)renderHealth(healthTile,healthPoint,true);if(id==='SPREAD_INSECTS'||id==='SPREAD_WEEDS')notify('Escolha uma planta de um amigo, em crescimento e sem proteção. Limite: uma aplicação deste tipo a cada 12h.');}
+// Friends-only fertilizers keep their own selection so a visit never changes the home Adubar tool.
+function toolFertilizer(){return tool==='LOVE'?selectedLoveFertilizer:selectedFertilizer;}
+function pickTool(id:string){const previous=tool;trayOpen=toolbarTrayToggle(previous,id,trayOpen);tool=id;renderTools();if(healthTile&&healthPoint)renderHealth(healthTile,healthPoint,true);if(id==='SPREAD_INSECTS'||id==='SPREAD_WEEDS')notify('Escolha uma planta de um amigo, em crescimento e sem proteção. Limite: uma aplicação deste tipo a cada 6h.');}
 function renderToolTray(){
  const tray=element('tool-tray');tray.replaceChildren();const seeds=tool==='PLANT',fertilizers=tool==='FERTILIZE'||tool==='LOVE';
  tray.hidden=!trayOpen||(!seeds&&!fertilizers);if(tray.hidden)return;
@@ -277,16 +279,16 @@ function renderToolTray(){
    item.onmouseleave=()=>{const caption=document.getElementById('tool-tray-caption');if(caption)caption.textContent=selected?`${selected} · ${detail}`:'';};
   }
  }else{
-  for(const fertilizer of catalog.fertilizers.filter(item=>tool==='LOVE'?item.friendsOnly:true)){
-   const count=own?.fertilizers?.[fertilizer.id]??0,item=button('',()=>{selectedFertilizer=fertilizer.id;trayOpen=false;renderTools();notify(`Fertilizante selecionado: ${fertilizer.name}.`);},grid);
-   item.className='tray-item';item.setAttribute('aria-pressed',String(selectedFertilizer===fertilizer.id));item.setAttribute('aria-label',`${fertilizer.name}, ${count} no estoque`);
+  for(const fertilizer of catalog.fertilizers.filter(item=>tool==='LOVE'?item.friendsOnly:!item.friendsOnly)){
+   const count=own?.fertilizers?.[fertilizer.id]??0,item=button('',()=>{if(tool==='LOVE')selectedLoveFertilizer=fertilizer.id;else selectedFertilizer=fertilizer.id;trayOpen=false;renderTools();notify(`Fertilizante selecionado: ${fertilizer.name}.`);},grid);
+   item.className='tray-item';item.setAttribute('aria-pressed',String(toolFertilizer()===fertilizer.id));item.setAttribute('aria-label',`${fertilizer.name}, ${count} no estoque`);
    const image=document.createElement('img');image.alt='';image.src=`/assets/classic/icons/adubo-${fertilizer.id}.png`;item.append(image);const badge=document.createElement('span');badge.textContent=`x${count}`;item.append(badge);
    item.onmouseenter=()=>{const caption=document.getElementById('tool-tray-caption');if(caption)caption.textContent=`${fertilizer.name} · reduz ${formatToolDuration(fertilizer.reductionSeconds)}${fertilizer.friendsOnly?' · plantação de amigos':` · ${count} no estoque`}`;};
    item.onmouseleave=()=>{const caption=document.getElementById('tool-tray-caption');if(caption)caption.textContent=selected?`${selected} · ${detail}`:'';};
   }
  }
- const selected=seeds?catalog.crops.find(item=>item.id===selectedSeed)?.name:catalog.fertilizers.find(item=>item.id===selectedFertilizer)?.name;
- const count=seeds?own?.seedCounts?.[selectedSeed]??0:own?.fertilizers?.[selectedFertilizer]??0,selectedFertilizerType=catalog.fertilizers.find(item=>item.id===selectedFertilizer);
+ const selected=seeds?catalog.crops.find(item=>item.id===selectedSeed)?.name:catalog.fertilizers.find(item=>item.id===toolFertilizer())?.name;
+ const count=seeds?own?.seedCounts?.[selectedSeed]??0:own?.fertilizers?.[toolFertilizer()]??0,selectedFertilizerType=catalog.fertilizers.find(item=>item.id===toolFertilizer());
  const detail=seeds?`${count} sementes`:selectedFertilizerType?.friendsOnly?'plantação de amigos':`reduz ${formatToolDuration(selectedFertilizerType?.reductionSeconds??0)} · ${count} no estoque`;
  const caption=document.createElement('span');caption.id='tool-tray-caption';caption.className='tray-caption';caption.textContent=selected?`${selected} · ${detail}`:'';tray.append(caption);
 }
@@ -364,7 +366,7 @@ function confirmPlot(tile:Tile){
 async function tileAction(tile:Tile){
  if(tool==='CURSOR'&&tile.cropId){health(tile,tileCenter(tile.column,tile.row),'tap');return;}
  if(visited&&tool==='CURSOR')return;
- if(visited){await action(tileCommand(tool,tile,selectedSeed,selectedFertilizer,true),`/v1/farms/${visited.owner}/visit-actions`);return;}
+ if(visited){await action(tileCommand(tool,tile,selectedSeed,toolFertilizer(),true),`/v1/farms/${visited.owner}/visit-actions`);return;}
  if(!tile.unlocked){confirmPlot(tile);return;}
  if(tool==='CURSOR')return;
  await action(tileCommand(tool,tile,selectedSeed,selectedFertilizer));
@@ -422,7 +424,7 @@ function updateHealthDisplay(tile:Tile,remaining=healthRemaining(tile),ready=til
 }
 function formatRemaining(seconds:number){const total=Math.max(0,Math.ceil(seconds));if(total<60)return `${total}s`;const minutes=Math.ceil(total/60),hours=Math.floor(minutes/60),days=Math.floor(hours/24);if(days)return `${days}d ${hours%24}h`;return hours?`${hours}h ${minutes%60}min`:`${minutes}min`;}
 function addChip(parent:HTMLElement,label:string,iconPath:string,kind:'problem'|'benefit'){const chip=document.createElement('span');chip.className=`crop-status-chip is-${kind}`;const icon=document.createElement('img');icon.src=iconPath;icon.alt='';chip.append(icon,document.createTextNode(label));parent.append(chip);}
-function healthAction(tile:Tile,ready:boolean,dead:boolean){if(visited){if(tool==='CURSOR')return undefined;if(tool==='SPREAD_INSECTS'||tool==='SPREAD_WEEDS'){if(ready||dead||!tile.watered||tile.protected||(tool==='SPREAD_INSECTS'?tile.insects>0:tile.weeds))return undefined;return tool==='SPREAD_INSECTS'?{label:'Lançar inseto nesta planta · 1/12h',icon:'/assets/classic/effects/verme_1.png'}:{label:'Lançar erva nesta planta · 1/12h',icon:'/assets/classic/effects/erva_daninha_1.png'};}return ready?{label:'Furtar colheita',icon:'/assets/classic/icons/hud/mao-restaurada.png'}:undefined;}if(dead)return{label:'Remover com a pá',icon:'/assets/classic/icons/hud/pa-ui.png',key:'2'};if(tile.weeds)return{label:'Tirar ervas',icon:'/assets/classic/icons/hud/herbicida-ui.png',key:'5'};if(tile.insects>0)return{label:'Matar insetos',icon:'/assets/classic/icons/hud/pesticida-ui.png',key:'6'};if(tile.dry&&tile.state==='GROWING')return{label:'Regar',icon:'/assets/classic/icons/hud/regador-ui.png',key:'4'};if(ready)return{label:'Colher com a luvinha',icon:'/assets/classic/icons/hud/mao-restaurada.png',key:'7'};return undefined;}
+function healthAction(tile:Tile,ready:boolean,dead:boolean){if(visited){if(tool==='CURSOR')return undefined;if(tool==='SPREAD_INSECTS'||tool==='SPREAD_WEEDS'){if(ready||dead||!tile.watered||tile.protected||(tool==='SPREAD_INSECTS'?tile.insects>0:tile.weeds))return undefined;return tool==='SPREAD_INSECTS'?{label:'Lançar inseto nesta planta · 1/6h',icon:'/assets/classic/effects/verme_1.png'}:{label:'Lançar erva nesta planta · 1/6h',icon:'/assets/classic/effects/erva_daninha_1.png'};}return ready?{label:'Furtar colheita',icon:'/assets/classic/icons/hud/mao-restaurada.png'}:undefined;}if(dead)return{label:'Remover com a pá',icon:'/assets/classic/icons/hud/pa-ui.png',key:'2'};if(tile.weeds)return{label:'Tirar ervas',icon:'/assets/classic/icons/hud/herbicida-ui.png',key:'5'};if(tile.insects>0)return{label:'Matar insetos',icon:'/assets/classic/icons/hud/pesticida-ui.png',key:'6'};if(tile.dry&&tile.state==='GROWING')return{label:'Regar',icon:'/assets/classic/icons/hud/regador-ui.png',key:'4'};if(ready)return{label:'Colher com a luvinha',icon:'/assets/classic/icons/hud/mao-restaurada.png',key:'7'};return undefined;}
 function positionHealth(panel:HTMLElement,game:HTMLElement,point:{x:number;y:number}){const bounds=game.getBoundingClientRect(),canvas=element('farm').getBoundingClientRect(),projected=worldToScreen(point,sceneTransform(canvas.width,canvas.height)),x=canvas.left-bounds.left+projected.x,y=canvas.top-bounds.top+projected.y,width=Math.max(0,Math.min(360,bounds.width-24)),margin=12,tileTop=54,tileSide=54;panel.style.width=`${width}px`;const height=panel.getBoundingClientRect().height;let left=x-width/2,top=y-height-tileTop-12,placement='above';if(top<margin){if(y+tileTop+height+12<=bounds.height-margin){top=y+tileTop+12;placement='below';}else if(x+tileSide+width+12<=bounds.width-margin){left=x+tileSide+12;top=Math.max(margin,Math.min(bounds.height-height-margin,y-height/2));placement='right';}else if(x-tileSide-width-12>=margin){left=x-tileSide-width-12;top=Math.max(margin,Math.min(bounds.height-height-margin,y-height/2));placement='left';}else{top=Math.max(margin,Math.min(bounds.height-height-margin,y-height-tileTop-12));}}if(placement==='above'||placement==='below')left=Math.max(margin,Math.min(bounds.width-width-margin,left));panel.style.left=`${left}px`;panel.style.top=`${top}px`;panel.dataset.placement=placement;panel.style.setProperty('--caret-x',`${Math.max(16,Math.min(width-16,x-left))}px`);panel.style.setProperty('--caret-y',`${Math.max(16,Math.min(height-16,y-top))}px`);}
 function scheduleHealthClock(){window.clearTimeout(healthClockTimer);const tile=healthTile,panel=element('plant-health');if(panel.hidden||!tile||tile.state!=='GROWING'||!tile.watered||tile.paused||healthRemaining(tile)<=0)return;const remaining=healthRemaining(tile),delay=remaining<60?1000:Math.min(60_000,Math.max(1000,(remaining-59)*1000));healthClockTimer=window.setTimeout(()=>{if(!healthTile||!healthPoint)return;const current=healthTile,point=healthPoint,left=healthRemaining(current);updateHealthDisplay(current,left);if(left<=0)renderHealth(current,point,true);else scheduleHealthClock();},delay);}
 function tileList(){dialog('Terras da fazenda');const states:Record<string,string>={GRASS:'grama',PLOWED:'arada',DEAD:'planta morta',READY:'pronta',GROWING:'crescendo'};const grid=document.createElement('div');grid.className='tile-list';content.append(grid);for(const tile of display()?.tiles??[]){const crop=catalog.crops.find(c=>c.id===tile.cropId);const b=button(`Terra ${tile.column+1}, ${tile.row+1}: ${!tile.unlocked?'bloqueada':crop?.name??states[tile.state]}`,async()=>{modal.close();await tileAction(tile);},grid);b.title='Aplicar a ferramenta selecionada';}}

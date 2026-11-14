@@ -20,13 +20,13 @@ public final class VisitService {
                 return TheftAttempt.from(steal(owner,visitor,col,row,revision,visitorName));
             int roll=random.nextInt(100);
             if(roll<0||roll>=100)throw new IllegalStateException("Invalid bite roll");
-            if(roll>=30)return new TheftAttempt(ActionResult.fail("Este terreno está protegido pelos animais. Sua tentativa foi bloqueada; aguarde 24 horas para tentar novamente."),
+            if(roll>=30)return new TheftAttempt(ActionResult.fail("Este terreno está protegido pelos animais. Sua tentativa foi bloqueada; aguarde 6 horas para tentar novamente."),
                 TheftAttempt.Kind.PROTECTED,java.math.BigDecimal.ZERO);
             int fine=random.nextInt(41);
             if(fine<0||fine>=41)throw new IllegalStateException("Invalid bite fine");
             var amount=visitor.wallet().coins().min(java.math.BigDecimal.valueOf(10L+fine));
             if(amount.signum()>0)visitor.wallet().debit(br.com.colheitafeliz.domain.economy.Currency.GOLD,amount);
-            return new TheftAttempt(ActionResult.fail("Você foi mordido por um animal protetor e perdeu "+amount.toPlainString()+" moedas de ouro. Aguarde 24 horas para tentar novamente."),
+            return new TheftAttempt(ActionResult.fail("Você foi mordido por um animal protetor e perdeu "+amount.toPlainString()+" moedas de ouro. Aguarde 6 horas para tentar novamente."),
                 TheftAttempt.Kind.BITTEN,amount);
         }
     }

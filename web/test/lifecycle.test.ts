@@ -131,9 +131,9 @@ test('visit defaults to inspection and a touch or cursor click never sends a soc
 test('pest tools exist only in visits and send the selected plot with its revisions',async()=>{
  const {h,elements}=app(),own=farm('alice'),visited={...farm('bob'),revision:'42'},sent=[];
  const api={pending:null,mutate:async(path,command)=>{sent.push({path,command});return{result:{success:false,message:'Disponível em 1h 0min 0s.'}};},prepareRequestId:()=>Promise.resolve()};
- h.set({own,api});h.receive({});assert.ok(!text(elements.get('tools')).includes('1/12h'));
+ h.set({own,api});h.receive({});assert.ok(!text(elements.get('tools')).includes('1/6h'));
  h.set({own,visited,api});h.receive({});
- for(const [action,label,asset]of [['SPREAD_INSECTS','Lançar inseto · 1/12h','verme_1'],['SPREAD_WEEDS','Lançar erva · 1/12h','erva_daninha_1']]){
+ for(const [action,label,asset]of [['SPREAD_INSECTS','Lançar inseto · 1/6h','verme_1'],['SPREAD_WEEDS','Lançar erva · 1/6h','erva_daninha_1']]){
   const choice=descendants(elements.get('tools')).find(n=>n.getAttribute?.('aria-label')===label);assert.ok(choice);assert.ok(choice.children.some(n=>n.src===`/assets/classic/effects/${asset}.png`));
   choice.onclick();await h.tileAction({column:2,row:1,harvestRevision:'9'});
   assert.equal(text(elements.get('notice')),'Disponível em 1h 0min 0s.');
@@ -381,6 +381,23 @@ test('scene pointer follows tools and selected fertilizer across visits and retu
  h.pickTool('LOVE');assert.match(elements.get('farm').style.cursor,/adubo-amor.png/);
  h.set({own:initial});h.receive({});assert.equal(elements.get('farm').style.cursor,'url("/assets/classic/icons/cursor-action.png") 1 1, auto');
  assert.equal(elements.get('tools').children[0].children[0].src,'/assets/classic/icons/hud/cursor-ui.png');
+});
+
+test('love fertilizer button shows the love stock when visiting before it is picked',()=>{
+ const {h,elements}=app(),own={...farm('alice'),fertilizers:{comum:22,amor:1}};
+ h.set({own,visited:farm('bob'),catalog:{crops:[],fertilizers:[{id:'comum',name:'Comum'},{id:'amor',name:'Fertilizante do amor',friendsOnly:true}],animals:[]}});h.receive({});
+ const love=()=>elements.get('tools').children.find(node=>node.title==='Fertilizante do amor');
+ assert.equal(text(love()),'x1');
+ h.pickTool('LOVE');assert.equal(text(love()),'x1');
+});
+
+test('love fertilizer selection does not replace the own farm fertilizer after a visit',()=>{
+ const {h,elements}=app(),own={...farm('alice'),fertilizers:{comum:22,amor:1}};
+ h.set({own,visited:farm('bob'),catalog:{crops:[],fertilizers:[{id:'comum',name:'Comum'},{id:'amor',name:'Fertilizante do amor',friendsOnly:true}],animals:[]}});h.receive({});
+ h.pickTool('LOVE');h.set({own,visited:undefined});h.receive({});
+ const fertilize=elements.get('tools').children.find(node=>node.title==='Adubar');
+ assert.equal(fertilize.children.find(node=>node.className==='tool-count').textContent,'x22');assert.equal(fertilize.children[0].src,'/assets/classic/icons/adubo-comum.png');
+ h.pickTool('FERTILIZE');assert.ok(!descendants(elements.get('tool-tray')).some(node=>node.getAttribute?.('aria-label')?.startsWith('Fertilizante do amor')));
 });
 
 test('resize observer repositions the active tooltip and disconnects when the session closes',async()=>{

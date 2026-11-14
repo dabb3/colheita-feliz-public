@@ -180,11 +180,11 @@ class CropEconomyFaithfulSimulationTest {
                 String message = result.get("message").getAsString();
                 if (result.get("success").getAsBoolean()) {
                     var last = lastTheft.put(actor, clock.instant());
-                    assertTrue(last == null || !clock.instant().isBefore(last.plus(Duration.ofHours(24))));
+                    assertTrue(last == null || !clock.instant().isBefore(last.plus(OnlineGameService.THEFT_COOLDOWN)));
                     thefts++; break;
                 }
                 if (message.contains("reservada ao dono")) windowDenied++;
-                else if (message.contains("últimas 24 horas")) { cooldownDenied++; break; }
+                else if (message.contains("últimas 6 horas")) { cooldownDenied++; break; }
                 else if (target.get("protected").getAsBoolean()) protectionDenied++;
                 else fail("Unexpected theft refusal: " + message);
             }
