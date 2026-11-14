@@ -1,9 +1,9 @@
 {
-  "version": "web-push-plantas-v1",
-  "prNumber": 81,
+  "version": "furto-pragas-6h-v1",
+  "prNumber": 83,
   "items": [
-    "Agora você pode escolher explicitamente receber avisos de plantas prontas neste aparelho, em Ajustes. Ativar as notificações e enviar o teste não ativa esse aviso automaticamente. O recurso depende da configuração do servidor e da sua permissão no navegador. No iPhone, pode ser necessário abrir o jogo pela Tela de Início.",
-    "Os avisos de plantas são agrupados para evitar uma sequência de mensagens. Ao tocar no aviso, você volta ao jogo. A entrega pode atrasar ou não acontecer; o aviso não colhe nem vende suas plantas.",
-    "Sua escolha de receber avisos de plantas fica salva por dispositivo. Você pode desativar essa opção e manter o teste de notificações; inscrições antigas precisam confirmar a escolha novamente. Avisos de animais, furtos e pragas ainda estarão disponíveis em uma próxima atualização."
+    "A espera para furtar de novo e para soltar pragas na fazenda de amigos caiu de 24 e 12 horas para 6 horas.",
+    "Ao visitar um amigo, o fertilizante do amor já mostra a quantidade certa, sem precisar clicar nele antes.",
+    "Depois de uma visita, o botão Adubar da sua fazenda volta a usar o seu fertilizante normal."
   ]
 }
