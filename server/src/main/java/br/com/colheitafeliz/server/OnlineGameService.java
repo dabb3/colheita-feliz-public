@@ -267,6 +267,15 @@ final class OnlineGameService implements AutoCloseable {
         return new Loaded(owner, participant.name(), game, saved == null ? 0 : saved.revision(), saved == null ? null : saved.snapshot(), saved == null ? null : saved.allowanceDay());
     }
 
+    /** Normal online replay without owner-only gifts, notes, request leases or economic actions. */
+    GameSnapshot advanceForCropPush(JdbcOnlineStore.Tx tx,UUID owner){
+        var loaded=load(tx,owner);loaded.game().runAutomationsNow();
+        var snapshot=loaded.game().snapshot();var compared=snapshot;
+        if(loaded.before()!=null&&loaded.before().automations()!=null&&snapshot.automations()!=null)compared=snapshot.withAutomationCursor(loaded.before().automations().cursor());
+        long revision=!compared.equals(loaded.before())?Math.incrementExact(loaded.revision()):loaded.revision();
+        tx.save(owner,snapshot,revision,loaded.game().now());return snapshot;
+    }
+
     private JsonObject persist(JdbcOnlineStore.Tx tx, Loaded loaded, boolean force, boolean own) {
         loaded.game().runAutomationsNow();
         var snapshot = loaded.game().snapshot();

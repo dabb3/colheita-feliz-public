@@ -1,5 +1,5 @@
 import {ApiError,type ApiClient} from './api.ts';
-import {changeBinding,pushState} from './push-state.ts';
+import {changeBinding,pushState,type PushState} from './push-state.ts';
 export function testMessage(status:string):string{return status==='accepted'?'Enviado ao serviço de notificações':status==='pending'?'Envio ainda pendente. Não tente novamente agora.':status==='expired'?'Inscrição expirada. Desative e ative novamente.':'Serviço de notificações indisponível.';}
 let lifecycle=0;
 function randomToken(){return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
@@ -50,24 +50,64 @@ export function renderPushSettings(parent:HTMLElement,account:string,api:ApiClie
  const section=document.createElement('section');section.className='settings-section push-settings';parent.append(section);
  const title=document.createElement('h3');title.textContent='Notificações no dispositivo';section.append(title);
  const status=document.createElement('p');status.setAttribute('role','status');status.textContent='Consultando disponibilidade…';section.append(status);
- const note=document.createElement('p');note.textContent='Avisos automáticos de plantas, animais, furtos e pragas estarão disponíveis nas próximas entregas. A entrega depende do navegador e da conexão.';section.append(note);
+ const note=document.createElement('p');note.textContent='Plantas prontas são agrupadas em até um aviso por minuto. Os horários são aproximados; a entrega depende do navegador e da conexão. Animais, furtos e pragas estarão disponíveis nas próximas entregas.';section.append(note);
  const preferences={plants:true,animals:true,thefts:true,pests:true};
- for(const [key,label]of [['plants','Plantas'],['animals','Animais'],['thefts','Furtos'],['pests','Pragas']]as const){const row=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=true;input.disabled=true;row.append(input,document.createTextNode(label+' (em breve)'));section.append(row);}
+ let plants!:HTMLInputElement;
+ for(const [key,label]of [['plants','Plantas'],['animals','Animais'],['thefts','Furtos'],['pests','Pragas']]as const){const row=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=true;input.disabled=true;if(key==='plants')plants=input;row.append(input,document.createTextNode(label+(key==='plants'?'':' (em breve)')));section.append(row);}
  const activate=document.createElement('button'),disable=document.createElement('button'),test=document.createElement('button');activate.textContent='Ativar notificações';disable.textContent='Desativar notificações';test.textContent='Enviar notificação de teste';activate.disabled=true;test.hidden=true;disable.hidden=true;section.append(activate,disable,test);
+ const retry=document.createElement('button');retry.textContent='Repetir alteração de Plantas';retry.hidden=true;section.append(retry);
  const supported=typeof Notification!=='undefined'&&typeof PushManager!=='undefined'&&'serviceWorker'in navigator&&typeof indexedDB!=='undefined'&&globalThis.isSecureContext;
- let publicKey='',configurationMessage='Consultando disponibilidade…',busy=false,nextTest=0;
+ let publicKey='',configurationMessage='Consultando disponibilidade…',busy=false,nextTest=0,plantEventsEnabled=false,loadedRevision:number|undefined,preferenceFailed=false,loadingPreferences=false;
  const fail=()=>{status.textContent='Não foi possível concluir. Confira a conexão e tente novamente.';};
+ function matches(current:PushState|undefined,expected:PushState){return current?.account===account&&current.revision===expected.revision&&current.active?.account===account&&current.active.bindingId===expected.active?.bindingId&&current.active.endpoint===expected.active?.endpoint&&current.active.deviceToken===expected.active?.deviceToken;}
  async function refresh(){
   const state=await pushState(),current=state?.account===account,bound=current&&state?.active?.account===account;
   test.hidden=!bound||!publicKey;disable.hidden=!bound;activate.hidden=bound;
-  activate.disabled=!current||!publicKey||Notification.permission==='denied';
+  activate.disabled=busy||!current||!publicKey||Notification.permission==='denied';disable.disabled=busy;
+  plants.checked=bound?state.active!.plants!==false:preferences.plants;
+  plants.disabled=busy||loadingPreferences||!bound||!publicKey||!plantEventsEnabled||loadedRevision!==state?.revision||!!state?.active?.plantsPending;
+  retry.hidden=!bound||!publicKey||!plantEventsEnabled||!state?.active?.plantsPending&&!preferenceFailed;retry.disabled=busy||loadingPreferences;
+  retry.textContent=state?.active?.plantsPending?'Repetir alteração de Plantas':'Recarregar preferência de Plantas';
   status.textContent=!current?'A conta deste dispositivo mudou. Entre novamente para configurar notificações.':!publicKey?configurationMessage:bound?'Notificações ativadas neste dispositivo.':Notification.permission==='denied'?'Permissão negada. Altere nas configurações do navegador se desejar.':'Permissão: '+Notification.permission+'. Notificações desativadas.';
+  if(bound&&publicKey&&plantEventsEnabled&&(preferenceFailed||state?.active?.plantsPending))status.textContent='Não foi possível confirmar a preferência de Plantas. Confira a conexão e tente novamente.';
  } if(!supported){status.textContent='Notificações indisponíveis neste navegador. No iPhone/iPad, adicione o jogo à Tela de Início e abra por lá.';return;}
+ async function loadPreferences(){
+  if(loadingPreferences)return;loadingPreferences=true;retry.disabled=true;plants.disabled=true;
+  try{
+   const expected=await pushState();
+   if(!publicKey||!plantEventsEnabled||expected?.account!==account||expected.active?.account!==account||expected.active.plantsPending)return;
+   const active=expected.active,result=await api.push<{bindingId:string;deviceRevision:number;plants:boolean}>('preferences',{endpoint:active.endpoint,deviceToken:active.deviceToken,bindingId:active.bindingId,deviceRevision:expected.revision});
+   if(result.bindingId!==active.bindingId||result.deviceRevision!==expected.revision||typeof result.plants!=='boolean')throw Error('Preferência inválida.');
+   await pushState(current=>{if(!matches(current,expected)||current!.active!.plantsPending)return current!;loadedRevision=current!.revision;preferenceFailed=false;return {...current!,active:{...current!.active!,plants:result.plants}};});
+  }catch{preferenceFailed=true;}
+  finally{loadingPreferences=false;await refresh();}
+ }
+ async function savePlants(repeat=false){
+  if(busy||!publicKey||!plantEventsEnabled||(!repeat&&plants.disabled))return;
+  const desired=plants.checked,started=lifecycle;busy=true;plants.disabled=true;retry.disabled=true;
+  try{
+   let reserved=false;
+   const expected=await pushState(current=>{
+    if(started!==lifecycle||current?.account!==account||current.active?.account!==account)return current!;
+    if(repeat){if(!current.active.plantsPending)return current;reserved=true;return current;}
+    if(current.revision!==loadedRevision||current.active.plantsPending)return current;
+    if(!Number.isSafeInteger(current.revision+1))throw Error('Revisão indisponível.');
+    reserved=true;return {...current,revision:current.revision+1,active:{...current.active,plants:desired,plantsPending:true}};
+   });
+   if(!reserved||started!==lifecycle||!expected?.active)return;
+   const active=expected.active,result=await api.push<{bindingId:string;deviceRevision:number;plants:boolean}>('preferences',{endpoint:active.endpoint,deviceToken:active.deviceToken,bindingId:active.bindingId,deviceRevision:expected.revision,plants:active.plants});
+   if(result.bindingId!==active.bindingId||result.deviceRevision!==expected.revision||result.plants!==active.plants)throw Error('Preferência inválida.');
+   await pushState(current=>{if(started!==lifecycle||!matches(current,expected))return current!;loadedRevision=current!.revision;preferenceFailed=false;const {plantsPending,...binding}=current!.active!;return {...current!,active:binding};});
+  }catch{preferenceFailed=true;}
+  finally{busy=false;await refresh();}
+ }
+ plants.onchange=()=>savePlants();retry.onclick=async()=>{if(busy)return;if((await pushState())?.active?.plantsPending)await savePlants(true);else await loadPreferences();};
  void refresh().catch(fail);
- void api.push<{enabled:boolean;publicKey:string}>('config').then(async config=>{
-  if(config.enabled&&config.publicKey)publicKey=config.publicKey;
+ void api.push<{enabled:boolean;publicKey:string;plantEventsEnabled?:boolean}>('config').then(async config=>{
+  if(config.enabled&&config.publicKey){publicKey=config.publicKey;plantEventsEnabled=config.plantEventsEnabled===true;}
   else configurationMessage='Notificações ainda não configuradas no servidor. Você pode desativar a vinculação local.';
   await refresh();
+  await loadPreferences();
  }).catch(()=>{
   configurationMessage='Serviço de notificações indisponível. Você pode desativar a vinculação local.';
   void refresh().catch(fail);
@@ -99,12 +139,13 @@ export function renderPushSettings(parent:HTMLElement,account:string,api:ApiClie
    let installed=false;
    const state=await pushState(current=>{
     if(started!==lifecycle||current?.account!==account||current?.revision!==revision)return current!;
-    installed=true;return {...current!,deviceToken,active:{account,endpoint,deviceToken,bindingId}};
+    installed=true;return {...current!,deviceToken,active:{account,endpoint,deviceToken,bindingId,plants:preferences.plants}};
    });
    if(!installed)return;
    try{await api.push('subscribe',{endpoint,keys:subscription.toJSON().keys,deviceToken,bindingId,deviceRevision:state!.revision,preferences});}
    catch(error){rejectedSubscription=definitive(error);throw error;}
    if((await pushState())?.revision!==state!.revision)return;
+   loadedRevision=state!.revision;
    await refresh();
   }catch{
    let cleared=false;
@@ -119,12 +160,12 @@ export function renderPushSettings(parent:HTMLElement,account:string,api:ApiClie
     }
    }
    fail();
-  }finally{busy=false;const state=await pushState();activate.disabled=state?.account!==account||!publicKey||Notification.permission==='denied';}
+  }finally{busy=false;const state=await pushState();disable.disabled=false;activate.disabled=state?.account!==account||!publicKey||Notification.permission==='denied';plants.disabled=state?.active?.account!==account||!publicKey||!plantEventsEnabled||loadedRevision!==state.revision||!!state.active.plantsPending;}
  };
  disable.onclick=async()=>{
-  if(busy)return;busy=true;
+  if(busy)return;busy=true;let failed=false;
   try{await clearBinding(account);await refresh();await reconcile(api);}
-  catch{status.textContent='Notificações locais desativadas. A vinculação será reconciliada quando a conexão e o armazenamento se recuperarem.';}
-  finally{busy=false;}
+  catch{failed=true;}
+  finally{busy=false;await refresh();if(failed)status.textContent='Notificações locais desativadas. A vinculação será reconciliada quando a conexão e o armazenamento se recuperarem.';}
  }; test.onclick=async()=>{if(busy||!publicKey||test.hidden||Date.now()<nextTest)return;busy=true;test.disabled=true;nextTest=Date.now()+60_000;try{const s=await pushState();if(s?.active?.account!==account)return;const result=await api.push<{status:string}>('test',{endpoint:s.active.endpoint,deviceToken:s.active.deviceToken,bindingId:s.active.bindingId,deviceRevision:s.revision,testId:crypto.randomUUID()});status.textContent=testMessage(result.status);}catch{status.textContent='Não foi possível confirmar o envio. Aguarde um minuto antes de tentar novamente.';}finally{busy=false;setTimeout(()=>{test.disabled=false;},60_000);}};
 }

@@ -505,10 +505,12 @@ Os serviços usam o campo opcional automations no snapshot v20: cursor de proces
 
 Em Ajustes, “Testar conexão” permite copiar um relatório sem executar ações econômicas, reenviar ou remover a ação pendente. As consultas são somente leitura e não processam fazendas ou recibos. O relatório não contém credenciais nem dados de jogadores. Resultados parciais e limitações estão em [Diagnóstico de conexão](diagnostico-conexao.md). Essa ferramenta não modifica regras de jogo.
 
-## 18. Notificações no dispositivo — infraestrutura
+## 18. Notificações no dispositivo
 
 A primeira entrega de Web Push permite ativar ou desativar inscrições por dispositivo e enviar uma notificação genérica de teste para a própria inscrição. A permissão depende de clique explícito. “Enviado ao serviço de notificações” confirma apenas o aceite pelo provedor, não o recebimento no aparelho. O teste tem limite de frequência e proteção contra repetição.
 
 Trocar de conta exige comprovar a posse do dispositivo e reassociar o endpoint atomicamente no servidor. Sair da conta suspende a vinculação local mesmo offline; a revogação remota é reconciliada posteriormente. As inscrições e seus comprovantes permanecem privados e separados dos snapshots econômicos. Sem configuração VAPID, o jogo continua funcionando e não oferece ativação ou envio.
 
-Esta entrega não dispara avisos automáticos de colheita, animais ou eventos sociais e não altera nenhuma regra econômica ou de crescimento. Configuração, limites, migração aditiva e cuidados de implantação estão em [Web Push](web-push.md).
+A segunda entrega acrescenta avisos de plantas prontas para dispositivos inscritos que optaram por Plantas. O servidor agenda e revalida o estado real mesmo sem navegador aberto. Maturações são agrupadas por jogador, com no máximo um lote por minuto e uma tentativa por dispositivo/lote; não há garantia de entrega ou horário exato. Depois de uma parada da API, o envio depende de a planta ainda estar disponível. Ativação e reativação sem inscrições elegíveis começam no estado atual, sem enviar histórico. Apagar avisos internos não reinicia a deduplicação do push.
+
+O agendador não colhe, vende, furta ou concede presentes/notas. Reutiliza o processamento normal da fazenda, inclusive cuidados automáticos já contratados; não adiciona ticks de pragas nem altera fórmulas de crescimento ou economia. Mensagens são genéricas e vinculadas ao dispositivo. Animais e eventos sociais continuam fora desta entrega. Configuração, limites e implantação estão em [Web Push](web-push.md) e [Plantas prontas](web-push-plantas.md).

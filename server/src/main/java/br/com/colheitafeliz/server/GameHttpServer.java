@@ -105,6 +105,7 @@ final class GameHttpServer implements AutoCloseable {
                 else if(method.equals("POST")&&path.equals("/v1/push/subscribe"))result=push.subscribe(actor,read(exchange,raw,Set.of("endpoint","keys","deviceToken","bindingId","deviceRevision","preferences")));
                 else if(method.equals("POST")&&path.equals("/v1/push/revoke"))result=push.revoke(actor,read(exchange,raw,Set.of("endpoint","deviceToken","deviceRevision")));
                 else if(method.equals("POST")&&path.equals("/v1/push/test"))result=push.test(actor,read(exchange,raw,Set.of("endpoint","deviceToken","bindingId","deviceRevision","testId")));
+                else if(method.equals("POST")&&path.equals("/v1/push/preferences"))result=push.preferences(actor,read(exchange,raw,Set.of("endpoint","deviceToken","bindingId","deviceRevision","plants")));
                 else throw new ApiFailure(404,"Rota indisponível.");
                 send(exchange,200,result);return;
             }

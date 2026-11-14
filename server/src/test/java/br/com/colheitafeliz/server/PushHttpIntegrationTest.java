@@ -54,6 +54,12 @@ class PushHttpIntegrationTest {
                 var blocked=client.send(HttpRequest.newBuilder(URI.create(base+"/v1/push/config")).header("Authorization","Bearer owner").header("Origin","https://bad.example").GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(403,blocked.statusCode());
                 assertEquals(0,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".farms",r->r.getInt(1)).getFirst()).intValue());
                 assertEquals(0,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".receipts",r->r.getInt(1)).getFirst()).intValue());
+                var preferences=PushStoreIntegrationTest.test(subscription);preferences.remove("testId");
+                var ownPreferences=send(client,base,"/v1/push/preferences","owner",preferences);assertEquals(200,ownPreferences.statusCode());assertTrue(JsonParser.parseString(ownPreferences.body()).getAsJsonObject().get("plants").getAsBoolean());
+                assertEquals(403,send(client,base,"/v1/push/preferences","other",preferences).statusCode());
+                preferences.addProperty("plants",false);preferences.addProperty("deviceRevision",2);
+                assertEquals(200,send(client,base,"/v1/push/preferences","owner",preferences).statusCode());assertEquals(200,send(client,base,"/v1/push/preferences","owner",preferences).statusCode());
+                preferences.addProperty("animals",true);assertEquals(400,send(client,base,"/v1/push/preferences","owner",preferences).statusCode());
             }
         }
     }

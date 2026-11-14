@@ -42,11 +42,14 @@ public final class ServerMain {
         store.initialize(owner);
         var pushSender=WebPushSender.fromEnvironment(env);
         var push=new PushService(store,Clock.systemUTC(),pushSender==null?(endpoint,key,secret,payload)->{throw new ApiFailure(503,"Notificações indisponíveis.");}:pushSender,pushSender==null?null:pushSender.publicKey());
+        var game=new OnlineGameService(store, Clock.systemUTC(), java.util.concurrent.ThreadLocalRandom.current()::nextInt, PARTICIPANT_LIMIT,PublishedNotes.fromEnvironment(env));
+        var cropPush=pushSender==null?null:new CropPushService(store,game,Clock.systemUTC(),pushSender);
         var server = new GameHttpServer(new InetSocketAddress(host, Integer.parseInt(env.getOrDefault("PORT", "8080"))),
-                new OnlineGameService(store, Clock.systemUTC(), java.util.concurrent.ThreadLocalRandom.current()::nextInt, PARTICIPANT_LIMIT,PublishedNotes.fromEnvironment(env)),
+                game,
                 auth, origins, development, Clock.systemUTC(), !development && "true".equals(env.get("TRUST_FLY_CLIENT_IP")),push);
-        Runtime.getRuntime().addShutdownHook(new Thread(()->{try{server.close();}finally{if(pushSender!=null)pushSender.close();}}, "server-shutdown"));
+        Runtime.getRuntime().addShutdownHook(new Thread(()->{try{if(cropPush!=null)cropPush.close();server.close();}finally{if(pushSender!=null)pushSender.close();}}, "server-shutdown"));
         server.start();
+        if(cropPush!=null)cropPush.start();
         System.out.println("Colheita API listening on " + host + ":" + server.port() + (development ? " (local development only)" : ""));
         if ("once".equals(env.get("LATENCY_BENCHMARK"))) {
             Thread.ofPlatform().name("latency-benchmark").daemon(true).start(() -> {
