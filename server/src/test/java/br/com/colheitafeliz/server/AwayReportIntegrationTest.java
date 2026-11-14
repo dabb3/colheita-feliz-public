@@ -74,6 +74,17 @@ class AwayReportIntegrationTest {
         assertTrue(friendLedger == null || friendLedger.waterings() == 0);
     }
 
+    @Test void backgroundPushAdvanceAccumulatesAutomationCareForOwner() {
+        edit(owner, game -> {
+            game.wallet().credit(Currency.GREEN, new java.math.BigDecimal("1000"));
+            game.buyVip(); game.buyAutomation("water");
+            var tile = game.farm().tile(0, 0); tile.plow(); tile.plant(game.catalog().get("nabo"), clock.instant());
+        });
+        clock.advance(2 * 3600);
+        store.transaction(owner, tx -> { tx.lockFarms(owner); service.advanceForCropPush(tx, owner); return null; });
+        assertTrue(ledger(owner).waterings() > 0);
+    }
+
     @Test void theftAndDefenseAreRecordedForOwner() {
         matureCrop(false);
         assertTrue(steal().getAsJsonObject("result").get("success").getAsBoolean());

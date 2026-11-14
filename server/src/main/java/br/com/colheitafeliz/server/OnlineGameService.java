@@ -388,6 +388,7 @@ final class OnlineGameService implements AutoCloseable {
     /** Normal online replay without owner-only gifts, notes, request leases or economic actions. */
     GameSnapshot advanceForCropPush(JdbcOnlineStore.Tx tx,UUID owner){
         var loaded=load(tx,owner);loaded.game().runAutomationsNow();
+        accumulate(tx,loaded,java.util.List.of());
         var snapshot=loaded.game().snapshot();
         // Avanço temporal em segundo plano não é uma ação do jogador: preservar a
         // revisão evita invalidar um clique feito com a projeção ainda aberta.
