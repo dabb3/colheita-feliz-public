@@ -29,7 +29,7 @@ final class PushStore {
         tx.execute("UPDATE "+schema+".push_events SET request_id=id WHERE request_id IS NULL");
         tx.execute("ALTER TABLE "+schema+".push_events ALTER COLUMN request_id SET NOT NULL");
         tx.execute("CREATE UNIQUE INDEX IF NOT EXISTS push_events_id_idx ON "+schema+".push_events(id)");
-        tx.execute("DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='"+schema+".push_events'::regclass AND conname='push_events_pkey' AND pg_get_constraintdef(oid) NOT LIKE '%actor, request_id%') THEN ALTER TABLE "+schema+".push_events DROP CONSTRAINT push_events_pkey; END IF; IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='"+schema+".push_events'::regclass AND conname='push_events_actor_request_key') THEN ALTER TABLE "+schema+".push_events ADD CONSTRAINT push_events_actor_request_key PRIMARY KEY(actor,request_id); END IF; END $$");
+        tx.execute("DO $$ DECLARE pk text; definition text; BEGIN SELECT c.conname, pg_get_constraintdef(c.oid) INTO pk, definition FROM pg_constraint c WHERE c.conrelid='"+schema+".push_events'::regclass AND c.contype='p'; IF pk IS NOT NULL AND definition NOT LIKE '%(actor, request_id)%' THEN EXECUTE format('ALTER TABLE %I.push_events DROP CONSTRAINT %I', '"+schema+"', pk); pk := NULL; END IF; IF pk IS NULL THEN EXECUTE 'ALTER TABLE "+schema+".push_events ADD CONSTRAINT push_events_pkey PRIMARY KEY(actor,request_id)'; END IF; END $$");
         tx.execute("CREATE INDEX IF NOT EXISTS push_events_owner_time_idx ON "+schema+".push_events(owner,created_at)");
     }
     Subscription find(JdbcOnlineStore.Tx tx,String endpoint){
