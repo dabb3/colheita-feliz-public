@@ -61,7 +61,7 @@ export class ApiClient {
     this.pending = saved ? JSON.parse(saved) : null;
     this.now = now;
   }
-  async push<T = unknown>(operation: 'config'|'subscribe'|'revoke'|'test', body?: unknown): Promise<T> {
+  async push<T = unknown>(operation: 'config'|'subscribe'|'revoke'|'test'|'preferences', body?: unknown): Promise<T> {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const work = async (): Promise<T> => {

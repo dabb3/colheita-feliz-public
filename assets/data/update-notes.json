@@ -1,9 +1,9 @@
 {
-  "version": "web-push-infra-v1",
-  "prNumber": 80,
+  "version": "web-push-plantas-v1",
+  "prNumber": 81,
   "items": [
-    "Preparamos uma área de notificações no dispositivo em Ajustes. A ativação depende da configuração do servidor e da sua permissão no navegador. Avisos automáticos de colheitas, animais e amigos ainda não estão disponíveis nesta etapa.",
-    "Quando o recurso estiver configurado e ativado, você poderá enviar uma notificação de teste para o próprio dispositivo. A mensagem Enviado ao serviço de notificações confirma o envio, mas não garante que o aparelho exibiu o aviso.",
-    "Ao sair ou trocar de conta, o jogo desativa os avisos da conta anterior neste dispositivo. Se estiver sem internet, a desativação no servidor fica pendente para quando a conexão voltar. Nenhuma moeda ou ação da fazenda é alterada."
+    "Agora você pode escolher explicitamente receber avisos de plantas prontas neste aparelho, em Ajustes. Ativar as notificações e enviar o teste não ativa esse aviso automaticamente. O recurso depende da configuração do servidor e da sua permissão no navegador. No iPhone, pode ser necessário abrir o jogo pela Tela de Início.",
+    "Os avisos de plantas são agrupados para evitar uma sequência de mensagens. Ao tocar no aviso, você volta ao jogo. A entrega pode atrasar ou não acontecer; o aviso não colhe nem vende suas plantas.",
+    "Sua escolha de receber avisos de plantas fica salva por dispositivo. Você pode desativar essa opção e manter o teste de notificações; inscrições antigas precisam confirmar a escolha novamente. Avisos de animais, furtos e pragas ainda estarão disponíveis em uma próxima atualização."
   ]
 }

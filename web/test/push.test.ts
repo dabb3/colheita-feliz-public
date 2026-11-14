@@ -24,7 +24,7 @@ test('late server response after offline logout cannot reinstall binding and kee
 test('another tab account switch invalidates a waiting activation and reconciles old proofs',async()=>{const x=harness();let resolve;x.ctx.Notification.requestPermission=()=>new Promise(r=>resolve=r);const api={push:async()=>({enabled:true,publicKey:'AA'})};x.h.renderPushSettings(x.parent,'a',api);await tick();const operation=x.buttons()[0].onclick();await tick();await x.h.connectPush('b',api);resolve('granted');await operation;assert.equal(x.read().account,'b');assert.equal(x.read().active,undefined);assert.equal(x.subscribeCalls(),0);});
 test('push transport does not adopt leases, mutate pending state, retry, or follow redirects',async()=>{const calls=[],storage={getItem:()=>null,setItem(){throw Error('unexpected');},removeItem(){throw Error('unexpected');}};const api=new ApiClient('https://api.invalid','a',async()=>'private',storage,async(url,options)=>{calls.push({url,options});return new Response('{"enabled":false,"requestLease":{"requestId":"ignored"}}');});await api.push('config');await api.push('revoke',{endpoint:'private'});assert.equal(api.pending,null);assert.equal(calls.length,2);assert.equal(calls[1].options.redirect,'error');assert.equal(calls[1].options.cache,'no-store');assert.equal(calls[1].options.method,'POST');assert.ok(calls[1].options.signal);});
 test('worker rejects old bindings after offline logout and only opens its own origin',async()=>{
- const handlers={},shown=[],opened=[],notifications=[];let active={revision:2,pending:[],active:{bindingId:'current'}};
+ const handlers={},shown=[],opened=[],notifications=[];let active={revision:2,account:'a',pending:[],active:{account:'a',bindingId:'current'}};
  const ctx={pushState:async()=>active,acceptsPush,URL,location:{origin:'https://game.invalid'},registration:{showNotification:async(title,options)=>shown.push([title,options]),getNotifications:async()=>notifications},clients:{matchAll:async()=>[],openWindow:async url=>opened.push(url)},addEventListener:(type,handler)=>handlers[type]=handler};
  let source=readFileSync(new URL('../src/push-worker.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'');runInNewContext(stripTypeScriptTypes(source),ctx);
  assert.equal(handlers.fetch,undefined);
@@ -33,6 +33,15 @@ test('worker rejects old bindings after offline logout and only opens its own or
  await push({type:'TEST',bindingId:'current',title:'Private',url:'https://evil.invalid'});assert.equal(shown.length,1);assert.equal(shown[0][0],'Colheita Feliz');assert.doesNotMatch(JSON.stringify(shown),/Private|evil/);
  active={revision:3,pending:[]};await push({type:'TEST',bindingId:'current'});assert.equal(shown.length,1);
  let work;handlers.notificationclick({notification:{close(){}},waitUntil:p=>work=p});await work;assert.deepEqual(opened,['https://game.invalid/']);
+});
+test('legacy worker migrates to crop-ready only after explicit consent and logout suppresses it',async()=>{
+ const handlers={},shown=[];let state={revision:2,account:'a',pending:[],active:{account:'a',bindingId:'current'}};
+ const ctx={pushState:async()=>state,acceptsPush,URL,location:{origin:'https://game.invalid'},registration:{showNotification:async(...args)=>shown.push(args),getNotifications:async()=>[]},clients:{matchAll:async()=>[],openWindow:async()=>{}},addEventListener:(type,handler)=>handlers[type]=handler};
+ const source=readFileSync(new URL('../src/push-worker.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'');runInNewContext(stripTypeScriptTypes(source),ctx);
+ async function push(payload){let work;handlers.push({data:{json:()=>payload},waitUntil:p=>work=p});await work;}
+ await push({type:'CROP_READY',bindingId:'current'});assert.equal(shown.length,0);
+ state={...state,active:{...state.active,plants:true}};await push({type:'CROP_READY',bindingId:'current'});assert.equal(shown.length,1);
+ state=changeBinding(state);await push({type:'CROP_READY',bindingId:'current'});assert.equal(shown.length,1);
 });
 test('IndexedDB read-modify-write intents serialize revisions and preserve pending revocations',async()=>{
  let saved,tail=Promise.resolve();
@@ -69,3 +78,156 @@ test('rejected old subscribe cannot unsubscribe or clear a newer account binding
 test('a rejected endpoint is replaced only on the next explicit activation',async()=>{const x=harness();let current={endpoint:'https://invalid',toJSON:()=>({keys:{}}),unsubscribe:async()=>{current=null;return true;}},sends=0;const registration=await x.ctx.navigator.serviceWorker.getRegistration();registration.pushManager.getSubscription=async()=>current;x.h.renderPushSettings(x.parent,'a',{push:async op=>{if(op==='config')return{enabled:true,publicKey:'AA'};if(op==='subscribe'&&++sends===1)throw new ApiError(403,'proof changed');return{};}});await tick();await x.buttons()[0].onclick();assert.equal(x.subscribeCalls(),0);assert.equal(current,null);await x.buttons()[0].onclick();assert.equal(x.subscribeCalls(),1);assert.equal(sends,2);assert.equal(x.read().active.endpoint,'https://push');assert.equal(x.read().pending.length,0);});
 
 test('failed browser unsubscribe keeps local suppression and reports a recoverable failure',async()=>{const x=harness();const registration=await x.ctx.navigator.serviceWorker.getRegistration();registration.pushManager.getSubscription=async()=>({endpoint:'https://invalid',toJSON:()=>({keys:{}}),unsubscribe:async()=>{throw Error('browser unavailable');}});x.h.renderPushSettings(x.parent,'a',{push:async op=>{if(op==='config')return{enabled:true,publicKey:'AA'};throw new ApiError(403,'proof rejected');}});await tick();await assert.doesNotReject(x.buttons()[0].onclick());assert.equal(x.read().active,undefined);assert.equal(x.read().pending.length,1);assert.equal(x.read().pending[0].endpoint,'https://invalid');assert.equal(x.buttons()[0].disabled,false);assert.match(x.parent.children[0].children.map(n=>n.textContent).join(' '),/Não foi possível concluir/);});
+
+test('crop ready requires the current account binding and respects the local plants preference',()=>{
+ const active={account:'a',bindingId:'current',endpoint:'https://push',deviceToken:'private',plants:true};
+ const state={revision:3,account:'a',pending:[],active};
+ assert.equal(acceptsPush(state,{type:'CROP_READY',bindingId:'current'}),true);
+ assert.equal(acceptsPush({...state,active:{...active,plants:false}},{type:'CROP_READY',bindingId:'current'}),false);
+ assert.equal(acceptsPush({...state,account:'b'},{type:'CROP_READY',bindingId:'current'}),false);
+ assert.equal(acceptsPush(changeBinding(state),{type:'CROP_READY',bindingId:'current'}),false);
+ assert.equal(acceptsPush(state,{type:'UNKNOWN',bindingId:'current'}),false);
+ assert.equal(acceptsPush({...state,active:{...active,plants:false}},{type:'TEST',bindingId:'current'}),true);
+});
+
+function boundHarness(){const x=harness();x.write({revision:3,account:'a',deviceToken:'private',pending:[],active:{account:'a',bindingId:'current',endpoint:'https://push',deviceToken:'private'}});return x;}
+const plantsInput=x=>x.parent.children.at(-1).children.find(n=>n.tag==='label').children[0];
+const panelText=x=>x.parent.children.at(-1).children.map(n=>n.textContent).join(' ');
+function preferencesApi(calls=[],plants=false){return{push:async(op,body)=>{calls.push([op,body]);if(op==='config')return{enabled:true,publicKey:'AA',plantEventsEnabled:true};if(op==='preferences'){if(typeof body.plants==='boolean')plants=body.plants;return{bindingId:body.bindingId,deviceRevision:body.deviceRevision,plants};}return{};}};}
+
+test('plants restores the device preference on reopening settings and leaves other types disabled',async()=>{
+ const x=boundHarness(),calls=[],api=preferencesApi(calls,false);x.h.renderPushSettings(x.parent,'a',api);await tick();
+ const plants=plantsInput(x);assert.equal(plants.checked,false);assert.equal(plants.disabled,false);
+ for(const row of x.parent.children[0].children.filter(n=>n.tag==='label').slice(1))assert.equal(row.children[0].disabled,true);
+ plants.checked=true;await plants.onchange();assert.equal(x.read().revision,4);assert.equal(x.read().active.plants,true);assert.equal(x.read().active.deviceToken,'private');assert.equal(x.read().pending.length,0);
+ assert.deepEqual(calls.filter(([op])=>op==='preferences').map(([,body])=>JSON.parse(JSON.stringify(body))),[{endpoint:'https://push',deviceToken:'private',bindingId:'current',deviceRevision:3},{endpoint:'https://push',deviceToken:'private',bindingId:'current',deviceRevision:4,plants:true}]);
+ x.h.renderPushSettings(x.parent,'a',api);await tick();assert.equal(plantsInput(x).checked,true);assert.equal(plantsInput(x).disabled,false);
+ assert.match(panelText(x),/aproximados/);
+});
+
+test('plants update is reserved once and a late reply cannot change a new account',async()=>{
+ const x=boundHarness(),calls=[];let finish;const base=preferencesApi(calls,false),api={push:async(op,body)=>op==='preferences'&&typeof body.plants==='boolean'?new Promise(r=>{calls.push([op,body]);finish=r;}):base.push(op,body)};
+ x.h.renderPushSettings(x.parent,'a',api);await tick();const plants=plantsInput(x);plants.checked=true;const work=plants.onchange();await tick();await plants.onchange();
+ assert.equal(calls.filter(([op,b])=>op==='preferences'&&'plants'in b).length,1);assert.equal(x.read().revision,4);
+ await x.h.connectPush('b',api);const current=structuredClone(x.read());finish({bindingId:'current',deviceRevision:4,plants:true});await work;assert.deepEqual(structuredClone(x.read()),current);assert.equal(plants.disabled,true);
+});
+
+test('uncertain plants update keeps a retriable revision and logout revokes a newer revision',async()=>{
+ const x=boundHarness(),calls=[];let fail=true;const base=preferencesApi(calls,true),api={push:async(op,body)=>{if(op==='preferences'&&typeof body.plants==='boolean'&&fail){calls.push([op,body]);throw Error('offline');}return base.push(op,body);}};
+ x.h.renderPushSettings(x.parent,'a',api);await tick();const plants=plantsInput(x);plants.checked=false;await plants.onchange();
+ assert.equal(x.read().revision,4);assert.equal(x.read().active.plants,false);assert.match(panelText(x),/tente novamente|Repetir/);
+ const retry=x.buttons().find(n=>n.textContent==='Repetir alteração de Plantas');assert.ok(retry);assert.equal(retry.hidden,false);fail=false;await retry.onclick();
+ assert.equal(x.read().revision,4);assert.equal(x.read().active.plantsPending,undefined);assert.equal(plants.checked,false);
+ assert.deepEqual(calls.filter(([op,b])=>op==='preferences'&&'plants'in b).map(([,b])=>b.deviceRevision),[4,4]);
+ await x.h.suspendPush();assert.equal(x.read().pending[0].deviceRevision,5);assert.equal(acceptsPush(x.read(),{type:'CROP_READY',bindingId:'current'}),false);
+});
+
+for(const mode of ['unconfigured','offline','plants-disabled'])test('plants cannot update when config is '+mode,async()=>{
+ const x=boundHarness(),sent=[];x.h.renderPushSettings(x.parent,'a',{push:async(op)=>{sent.push(op);if(mode==='offline')throw Error('offline');return mode==='unconfigured'?{enabled:false}:{enabled:true,publicKey:'AA',plantEventsEnabled:false};}});await tick();
+ assert.equal(plantsInput(x).disabled,true);assert.equal(sent.includes('preferences'),false);assert.equal(x.read().revision,3);assert.equal(x.permissionCalls(),0);
+});
+
+test('late preference read cannot overwrite a newer binding revision',async()=>{
+ const x=boundHarness();let complete;x.h.renderPushSettings(x.parent,'a',{push:async op=>op==='config'?{enabled:true,publicKey:'AA',plantEventsEnabled:true}:new Promise(r=>complete=r)});await tick();
+ x.write({...x.read(),revision:4,active:{...x.read().active,plants:true}});complete({bindingId:'current',deviceRevision:3,plants:false});await tick();assert.equal(x.read().active.plants,true);assert.equal(plantsInput(x).disabled,true);
+});
+
+test('worker uses a fixed crop message and closes it when binding disappears during display',async()=>{
+ const handlers={},shown=[],closed=[];let active={revision:2,account:'a',pending:[],active:{account:'a',bindingId:'current',plants:true}},remove=false;
+ const ctx={pushState:async()=>active,acceptsPush,URL,location:{origin:'https://game.invalid'},registration:{showNotification:async(title,options)=>{shown.push([title,options]);if(remove)active=changeBinding(active);},getNotifications:async options=>[{close(){closed.push(options.tag);}}]},clients:{matchAll:async()=>[],openWindow:async()=>{}},addEventListener:(type,handler)=>handlers[type]=handler};
+ let source=readFileSync(new URL('../src/push-worker.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'');runInNewContext(stripTypeScriptTypes(source),ctx);
+ async function push(payload){let work;handlers.push({data:{json:()=>payload},waitUntil:p=>work=p});await work;}
+ await push({type:'CROP_READY',bindingId:'current',body:'private',url:'https://evil.invalid'});assert.equal(shown.length,1);assert.equal(shown[0][1].body,'Há plantas prontas para colher na sua fazenda. Toque para voltar ao jogo.');assert.equal(shown[0][1].tag,'current');assert.doesNotMatch(JSON.stringify(shown),/private|evil/);
+ await push({type:'INVALID',bindingId:'current'});await push(null);await push({type:'CROP_READY'});assert.equal(shown.length,1);
+ remove=true;await push({type:'CROP_READY',bindingId:'current'});assert.deepEqual(closed,['current']);
+});
+
+test('malformed persisted bindings cannot accept a push with missing identity',()=>{
+ assert.equal(acceptsPush({revision:1,pending:[],active:{}},{type:'TEST'}),false);
+ assert.equal(acceptsPush({revision:1,pending:[],account:'a',active:{account:'a'}},{type:'CROP_READY'}),false);
+});
+
+test('reopened settings retries an uncertain plants write without inventing a new revision',async()=>{
+ const x=boundHarness();x.write({...x.read(),revision:4,active:{...x.read().active,plants:false,plantsPending:true}});const calls=[],api=preferencesApi(calls,true);
+ x.h.renderPushSettings(x.parent,'a',api);await tick();assert.equal(plantsInput(x).disabled,true);assert.equal(plantsInput(x).checked,false);assert.equal(calls.filter(([op])=>op==='preferences').length,0);
+ const retry=x.buttons().find(n=>n.textContent==='Repetir alteração de Plantas');assert.equal(retry.hidden,false);await retry.onclick();assert.equal(x.read().revision,4);assert.equal(x.read().active.plantsPending,undefined);assert.equal(x.read().active.plants,false);assert.equal(plantsInput(x).disabled,false);
+ assert.equal(calls.find(([op])=>op==='preferences')[1].deviceRevision,4);
+});
+
+for(const mode of ['rejected','wrong-binding','wrong-revision','wrong-value'])test('plants '+mode+' response cannot confirm the reserved intent',async()=>{
+ const x=boundHarness(),base=preferencesApi([],true),api={push:async(op,body)=>{if(op!=='preferences'||typeof body.plants!=='boolean')return base.push(op,body);if(mode==='rejected')throw new ApiError(403,'denied');return{bindingId:mode==='wrong-binding'?'other':body.bindingId,deviceRevision:body.deviceRevision+(mode==='wrong-revision'?1:0),plants:mode==='wrong-value'?!body.plants:body.plants};}};
+ x.h.renderPushSettings(x.parent,'a',api);await tick();const plants=plantsInput(x);plants.checked=false;await plants.onchange();assert.equal(x.read().revision,4);assert.equal(x.read().active.plantsPending,true);assert.equal(x.read().active.plants,false);assert.equal(plants.disabled,true);assert.match(panelText(x),/tente novamente/);
+ await x.buttons()[1].onclick();assert.equal(x.read().active,undefined);assert.equal(x.buttons()[0].disabled,false);
+});
+
+test('a second settings panel cannot overwrite an in-flight plants intention',async()=>{
+ const x=boundHarness(),base=preferencesApi([],true);let complete,writes=0;const api={push:async(op,body)=>op==='preferences'&&typeof body.plants==='boolean'?(writes++,new Promise(r=>complete=r)):base.push(op,body)};
+ x.h.renderPushSettings(x.parent,'a',api);await tick();const first=plantsInput(x);x.h.renderPushSettings(x.parent,'a',api);await tick();const second=plantsInput(x);
+ first.checked=false;const work=first.onchange();await tick();second.checked=true;await second.onchange();assert.equal(writes,1);assert.equal(x.read().revision,4);assert.equal(x.read().active.plants,false);
+ complete({bindingId:'current',deviceRevision:4,plants:false});await work;assert.equal(x.read().active.plants,false);
+});
+
+test('plants read failure offers a bounded explicit reload and does not reserve a revision',async()=>{
+ const x=boundHarness(),base=preferencesApi([],false);let offline=true,calls=0;const api={push:async(op,body)=>{if(op==='preferences'){calls++;if(offline)throw Error('offline');}return base.push(op,body);}};
+ x.h.renderPushSettings(x.parent,'a',api);await tick();assert.equal(calls,1);assert.equal(x.read().revision,3);assert.equal(plantsInput(x).disabled,true);assert.match(panelText(x),/tente novamente/);
+ offline=false;const reload=x.buttons().find(n=>n.textContent==='Recarregar preferência de Plantas');await reload.onclick();assert.equal(calls,2);assert.equal(x.read().revision,3);assert.equal(plantsInput(x).checked,false);assert.equal(plantsInput(x).disabled,false);
+});
+
+test('reloading plants after a read error ignores double clicks',async()=>{
+ const x=boundHarness(),base=preferencesApi([],false);let attempts=0,finish;const api={push:async(op,body)=>{if(op==='preferences'){attempts++;if(attempts===1)throw Error('offline');return new Promise(r=>finish=()=>r({bindingId:body.bindingId,deviceRevision:body.deviceRevision,plants:false}));}return base.push(op,body);}};
+ x.h.renderPushSettings(x.parent,'a',api);await tick();const reload=x.buttons().find(n=>n.textContent==='Recarregar preferência de Plantas');const first=reload.onclick(),second=reload.onclick();await tick();assert.equal(attempts,2);finish();await Promise.all([first,second]);assert.equal(plantsInput(x).disabled,false);
+});
+
+test('successful activation restores the disable control and offline revoke keeps its recovery message',async()=>{
+ const x=harness();let offline=false;const api={push:async op=>{if(op==='config')return{enabled:true,publicKey:'AA',plantEventsEnabled:true};if(offline)throw Error('offline');return{};}};
+ x.h.renderPushSettings(x.parent,'a',api);await tick();await x.buttons()[0].onclick();assert.equal(x.buttons()[1].disabled,false);offline=true;await x.buttons()[1].onclick();assert.equal(x.read().active,undefined);assert.equal(x.buttons()[0].disabled,false);assert.match(panelText(x),/vinculação será reconciliada/);
+});
+
+test('a PR80 binding permits tests but cannot display crops without an explicit boolean opt-in',async()=>{
+ const handlers={},shown=[];let state;
+ const ctx={pushState:async()=>state,acceptsPush,URL,location:{origin:'https://game.invalid'},registration:{showNotification:async(title,options)=>shown.push([title,options]),getNotifications:async()=>[]},clients:{matchAll:async()=>[],openWindow:async()=>{}},addEventListener:(type,handler)=>handlers[type]=handler};
+ const source=readFileSync(new URL('../src/push-worker.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'');runInNewContext(stripTypeScriptTypes(source),ctx);
+ async function push(type){let work;handlers.push({data:{json:()=>({type,bindingId:'current'})},waitUntil:p=>work=p});await work;}
+ for(const plants of [undefined,false,null,0,1,'true',{},[]]){
+  state={revision:3,account:'a',pending:[],active:{account:'a',bindingId:'current',...(plants===undefined?{}:{plants})}};
+  const before=shown.length;await push('CROP_READY');assert.equal(shown.length,before,'crop suppressed for '+JSON.stringify(plants));await push('TEST');assert.equal(shown.length,before+1);
+ }
+ state.active.plants=true;await push('CROP_READY');assert.equal(shown.at(-1)[1].body,'Há plantas prontas para colher na sua fazenda. Toque para voltar ao jogo.');
+});
+
+test('opening PR80 settings reads effective false without opting in or activating the device',async()=>{
+ const x=boundHarness(),calls=[];let complete;
+ x.h.renderPushSettings(x.parent,'a',{push:async(op,body)=>{calls.push([op,body]);if(op==='config')return{enabled:true,publicKey:'AA',plantEventsEnabled:true};return new Promise(r=>complete=()=>r({bindingId:'current',deviceRevision:3,plants:false}));}});
+ assert.equal(plantsInput(x).checked,false);await tick();assert.equal(plantsInput(x).checked,false);assert.equal(plantsInput(x).disabled,true);
+ complete();await tick();assert.equal(plantsInput(x).checked,false);assert.equal(plantsInput(x).disabled,false);assert.equal(x.read().active.plants,false);assert.equal(x.read().revision,3);
+ assert.deepEqual(calls.map(([op])=>op),['config','preferences']);assert.equal('plants'in calls[1][1],false);assert.equal(x.permissionCalls(),0);assert.equal(x.subscribeCalls(),0);
+});
+
+test('activation and a test leave plants off until the checkbox explicitly opts in',async()=>{
+ const x=harness(),calls=[],api=preferencesApi(calls,false);x.h.renderPushSettings(x.parent,'a',api);
+ assert.equal(plantsInput(x).checked,false);await tick();await x.buttons()[0].onclick();
+ const subscribe=calls.find(([op])=>op==='subscribe')[1];assert.deepEqual(JSON.parse(JSON.stringify(subscribe.preferences)),{plants:false,animals:false,thefts:false,pests:false});assert.equal(x.read().active.plants,false);assert.equal(plantsInput(x).checked,false);assert.equal(plantsInput(x).disabled,false);
+ await x.buttons().find(n=>n.textContent==='Enviar notificação de teste').onclick();assert.equal(x.read().active.plants,false);assert.equal(calls.filter(([op])=>op==='preferences').length,0);
+ const revision=x.read().revision,plants=plantsInput(x);plants.checked=true;await plants.onchange();assert.equal(x.read().revision,revision+1);assert.equal(x.read().active.plants,true);
+ const writes=calls.filter(([op])=>op==='preferences');assert.equal(writes.length,1);assert.equal(writes[0][1].plants,true);assert.equal(writes[0][1].deviceRevision,revision+1);
+ x.h.renderPushSettings(x.parent,'a',api);await tick();assert.equal(plantsInput(x).checked,true);assert.equal(plantsInput(x).disabled,false);
+ const buttons=x.parent.children.at(-1).children.filter(n=>typeof n==='object'&&n.tag==='button');await buttons[1].onclick();await buttons[0].onclick();assert.equal(x.read().active.plants,false);assert.equal(plantsInput(x).checked,false);assert.equal(calls.filter(([op])=>op==='subscribe').at(-1)[1].preferences.plants,false);
+});
+
+test('unavailable notification types remain unchecked and disabled',async()=>{
+ const x=harness();x.h.renderPushSettings(x.parent,'a',preferencesApi());await tick();
+ for(const row of x.parent.children[0].children.filter(n=>n.tag==='label')){assert.equal(row.children[0].checked,false);assert.equal(row.children[0].disabled,true);}
+});
+
+for(const plants of [undefined,false,null,0,1,'true',{},[]])test('settings fail closed for persisted plants '+JSON.stringify(plants),async()=>{
+ const x=boundHarness();if(plants!==undefined)x.write({...x.read(),active:{...x.read().active,plants}});
+ x.h.renderPushSettings(x.parent,'a',{push:async()=>{throw Error('offline');}});await tick();assert.equal(plantsInput(x).checked,false);assert.equal(plantsInput(x).disabled,true);assert.equal(acceptsPush(x.read(),{type:'CROP_READY',bindingId:'current'}),false);
+});
+
+test('a lost opt-in response repeats the explicit intent at exactly the same revision',async()=>{
+ const x=boundHarness(),calls=[],base=preferencesApi(calls,false);let lost=true;
+ const api={push:async(op,body)=>{const result=await base.push(op,body);if(op==='preferences'&&body.plants===true&&lost){lost=false;throw Error('response lost');}return result;}};
+ x.h.renderPushSettings(x.parent,'a',api);await tick();const plants=plantsInput(x);plants.checked=true;await plants.onchange();assert.equal(x.read().active.plantsPending,true);assert.equal(x.read().revision,4);
+ await x.buttons().find(n=>n.textContent==='Repetir alteração de Plantas').onclick();assert.equal(x.read().active.plants,true);assert.equal(x.read().active.plantsPending,undefined);assert.equal(x.read().revision,4);
+ assert.deepEqual(calls.filter(([op,b])=>op==='preferences'&&'plants'in b).map(([,b])=>[b.deviceRevision,b.plants]),[[4,true],[4,true]]);
+});

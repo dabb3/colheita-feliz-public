@@ -2,7 +2,7 @@
 
 ## Entrega
 
-O primeiro PR adiciona transporte, inscrição e teste manual em Ajustes. Não envia alertas automáticos de plantas, animais, furtos ou pragas. As opções desses eventos aparecem como “em breve”; os quatro campos de preferência já são privados e persistidos para as próximas entregas.
+O PR #80 adicionou transporte, inscrição e teste manual em Ajustes. A segunda entrega adiciona [avisos de plantas prontas](web-push-plantas.md), com preferência privada por dispositivo e fila persistente. Animais, furtos e pragas continuam em breve. O histórico de validações abaixo distingue as duas entregas.
 
 Sem chaves VAPID, a API inicia normalmente e a interface informa que o recurso não está configurado. Não é necessário habilitar nenhum serviço novo no Supabase, Render ou Cloudflare. A entrega não muda economia, snapshots, relógios de crescimento ou comandos pendentes.
 
@@ -26,8 +26,9 @@ O worker só exibe o texto fixo de teste se o binding corresponder ao ativo no d
 
 Todas as rotas usam autenticação e origem permitida, com validação adicional de jogador ativo:
 
-- GET `/v1/push/config`: disponibilidade, chave pública e `automaticEventsEnabled:false`.
+- GET `/v1/push/config`: disponibilidade, chave pública, `plantEventsEnabled` e `automaticEventsEnabled`. Na etapa 2, os dois sinalizadores são verdadeiros somente com transporte configurado; o primeiro identifica explicitamente Plantas.
 - POST `/v1/push/subscribe`: endpoint, chaves `p256dh`/`auth`, comprovante, binding, revisão e quatro preferências booleanas.
+- POST `/v1/push/preferences`: consulta ou alteração de Plantas para o vínculo próprio, com endpoint, comprovante, binding e revisão. Omitir `plants` consulta; enviar boolean altera com revisão seguinte e replay idempotente.
 - POST `/v1/push/revoke`: endpoint, comprovante e revisão. Pode revogar a vinculação anterior do mesmo dispositivo mesmo após troca de conta; não funciona apenas com ID.
 - POST `/v1/push/test`: associação própria atual, comprovante, binding, revisão e `testId` UUID. Uma tentativa é reservada antes da rede e a repetição não envia novamente. Se o processo interromper depois da reserva, uma nova consulta da mesma tentativa após sessenta segundos encerra o recibo como `unavailable`, sem reenvio. Esse resultado é persistido e não pode ser sobrescrito por uma resposta tardia do envio.
 

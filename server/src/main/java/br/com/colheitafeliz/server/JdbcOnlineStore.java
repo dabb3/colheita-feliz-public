@@ -34,18 +34,21 @@ final class JdbcOnlineStore implements AutoCloseable {
     private static final Gson JSON = new Gson();
     private final String schema;
     private final HikariDataSource pool;
+    private final CropPushStore crops;
 
     JdbcOnlineStore(String url, String user, String password, String schema) {
         if (!url.startsWith("jdbc:postgresql://") || !schema.matches("[a-z][a-z0-9_]{0,50}"))
             throw new IllegalArgumentException("Invalid PostgreSQL configuration");
         this.schema = schema;
         this.pool = pool(url, user, password);
+        this.crops = new CropPushStore(schema);
     }
 
     JdbcOnlineStore(HikariDataSource pool, String schema) {
         if (!schema.matches("[a-z][a-z0-9_]{0,50}")) throw new IllegalArgumentException("Invalid schema");
         this.pool = pool;
         this.schema = schema;
+        this.crops = new CropPushStore(schema);
     }
 
     static HikariDataSource pool(String url, String user, String password) {
@@ -67,6 +70,7 @@ final class JdbcOnlineStore implements AutoCloseable {
     }
 
     PushStore pushStore() { return new PushStore(schema); }
+    CropPushStore cropPushStore() { return crops; }
     @Override public void close() { pool.close(); }
 
     void initialize(UUID owner) {
@@ -99,8 +103,9 @@ final class JdbcOnlineStore implements AutoCloseable {
             tx.execute("CREATE TABLE IF NOT EXISTS "+schema+".update_note_views (actor uuid PRIMARY KEY REFERENCES "+schema
                     +".players(id), version varchar(80) NOT NULL, seen_day date NOT NULL)");
             pushStore().initialize(tx);
+            cropPushStore().initialize(tx);
             tx.execute("REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
-            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "daily_allowances", "update_note_views", "push_subscriptions", "push_tests")) {
+            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "daily_allowances", "update_note_views", "push_subscriptions", "push_tests", "crop_push_jobs", "crop_push_deliveries")) {
                 tx.execute("ALTER TABLE " + schema + "." + table + " ENABLE ROW LEVEL SECURITY");
                 tx.execute("REVOKE ALL ON " + schema + "." + table + " FROM PUBLIC");
             }
@@ -244,6 +249,7 @@ final class JdbcOnlineStore implements AutoCloseable {
             execute("INSERT INTO " + schema + ".farms VALUES (?,?,?,?,?::jsonb) ON CONFLICT(owner) DO UPDATE SET "
                     + "ruleset=EXCLUDED.ruleset,revision=EXCLUDED.revision,game_time=EXCLUDED.game_time,snapshot=EXCLUDED.snapshot",
                     owner, GameSave.RULESET, revision, java.sql.Timestamp.from(now), JSON.toJson(snapshot));
+            cropPushStore().reconcileIfEligible(this, owner, snapshot, now);
         }
         Receipt receipt(UUID actor, UUID request) {
             return first(query("SELECT hash,response FROM " + schema + ".receipts WHERE actor=? AND request_id=?",
@@ -282,6 +288,8 @@ final class JdbcOnlineStore implements AutoCloseable {
             sql.append("INSERT INTO ").append(schema).append(".receipts (actor,request_id,hash,response,expires_at) VALUES (?,?,?,?::jsonb,?)");
             values.add(actor); values.add(request); values.add(hash); values.add(JSON.toJson(response)); values.add(java.sql.Timestamp.from(expires));
             execute(sql.toString(), values.toArray());
+            if (pendingSaves != null) for (var farm : pendingSaves.values())
+                cropPushStore().reconcileIfEligible(this, farm.owner(), farm.snapshot(), farm.time());
             pendingSaves = null;
         }
         void invite(String hash, UUID owner, Instant expires) {

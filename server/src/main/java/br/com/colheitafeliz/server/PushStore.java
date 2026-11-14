@@ -7,7 +7,11 @@ import java.util.UUID;
 
 /** Private transport state; never touches farm snapshots or economic revisions. */
 final class PushStore {
-    record Subscription(UUID owner,String endpoint,String proof,String binding,long revision,String p256dh,String auth,String preferences,boolean active) {}
+    record Subscription(UUID owner,String endpoint,String proof,String binding,long revision,String p256dh,String auth,String preferences,boolean active) {
+        boolean plantsEnabled(){var prefs=com.google.gson.JsonParser.parseString(preferences).getAsJsonObject();return plantsConfirmed(prefs)&&isBooleanTrue(prefs,"plants");}
+    }
+    static boolean plantsConfirmed(com.google.gson.JsonObject preferences){return isBooleanTrue(preferences,"plantsConfirmed");}
+    private static boolean isBooleanTrue(com.google.gson.JsonObject preferences,String name){var value=preferences.get(name);return value!=null&&value.isJsonPrimitive()&&value.getAsJsonPrimitive().isBoolean()&&value.getAsBoolean();}
     record Attempt(UUID actor,String endpoint,String binding,long revision,String requestHash,String status,Instant reservedAt) {}
     private final String schema;
     PushStore(String schema){this.schema=schema;}
