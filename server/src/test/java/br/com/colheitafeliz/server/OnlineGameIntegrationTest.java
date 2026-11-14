@@ -141,6 +141,22 @@ class OnlineGameIntegrationTest {
         assertTrue(service.farm(alice).getAsJsonArray("tiles").get(0).getAsJsonObject().get("remainingSeconds").getAsInt() > 59000);
     }
 
+    @Test void httpHarvestKeepsOpenRevisionAfterBackgroundAdvance() throws Exception {
+        var farm=service.farm(alice);
+        farm=service.command(alice,new Command(requestId(),farm.get("revision").getAsString(),"BUY_SEED","nabo","GOLD",null,null,null)).getAsJsonObject("farm");
+        farm=service.command(alice,new Command(requestId(),farm.get("revision").getAsString(),"PLOW",null,null,0,0,null)).getAsJsonObject("farm");
+        farm=service.command(alice,new Command(requestId(),farm.get("revision").getAsString(),"PLANT","nabo",null,0,0,null)).getAsJsonObject("farm");
+        farm=service.command(alice,new Command(requestId(),farm.get("revision").getAsString(),"WATER",null,null,0,0,null)).getAsJsonObject("farm");
+        var openRevision=farm.get("revision").getAsString();clock.now=clock.now.plusSeconds(72000);
+        store.transaction(alice,tx->{service.advanceForCropPush(tx,alice);return null;});
+        Authenticator auth=header->{if(!"Bearer test".equals(header))throw new ApiFailure(401,"Login necessário.");return new Authenticator.Identity(alice,"Alice");};
+        try(var http=new GameHttpServer(new java.net.InetSocketAddress("127.0.0.1",0),service,auth,java.util.Set.of("http://localhost:5173"),true,clock);var client=java.net.http.HttpClient.newHttpClient()){
+            http.start();var command=new Command(requestId(),openRevision,"HARVEST",null,null,0,0,null);var body=OnlineViews.JSON.toJsonTree(command).getAsJsonObject();
+            var response=client.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:"+http.port()+"/v1/me/actions")).header("Authorization","Bearer test").header("Content-Type","application/json").POST(java.net.http.HttpRequest.BodyPublishers.ofString(body.toString())).build(),java.net.http.HttpResponse.BodyHandlers.ofString());
+            assertEquals(200,response.statusCode(),response.body());assertTrue(com.google.gson.JsonParser.parseString(response.body()).getAsJsonObject().getAsJsonObject("result").get("success").getAsBoolean(),response.body());
+        }
+    }
+
     @BeforeEach void setUp() {
         String url = System.getenv("TEST_DATABASE_URL");
         assertNotNull(url, "integrationTest requires TEST_DATABASE_URL pointing to disposable PostgreSQL");

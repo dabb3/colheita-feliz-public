@@ -34,6 +34,15 @@ test('worker rejects old bindings after offline logout and only opens its own or
  active={revision:3,pending:[]};await push({type:'TEST',bindingId:'current'});assert.equal(shown.length,1);
  let work;handlers.notificationclick({notification:{close(){}},waitUntil:p=>work=p});await work;assert.deepEqual(opened,['https://game.invalid/']);
 });
+test('legacy worker migrates to crop-ready only after explicit consent and logout suppresses it',async()=>{
+ const handlers={},shown=[];let state={revision:2,account:'a',pending:[],active:{account:'a',bindingId:'current'}};
+ const ctx={pushState:async()=>state,acceptsPush,URL,location:{origin:'https://game.invalid'},registration:{showNotification:async(...args)=>shown.push(args),getNotifications:async()=>[]},clients:{matchAll:async()=>[],openWindow:async()=>{}},addEventListener:(type,handler)=>handlers[type]=handler};
+ const source=readFileSync(new URL('../src/push-worker.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'');runInNewContext(stripTypeScriptTypes(source),ctx);
+ async function push(payload){let work;handlers.push({data:{json:()=>payload},waitUntil:p=>work=p});await work;}
+ await push({type:'CROP_READY',bindingId:'current'});assert.equal(shown.length,0);
+ state={...state,active:{...state.active,plants:true}};await push({type:'CROP_READY',bindingId:'current'});assert.equal(shown.length,1);
+ state=changeBinding(state);await push({type:'CROP_READY',bindingId:'current'});assert.equal(shown.length,1);
+});
 test('IndexedDB read-modify-write intents serialize revisions and preserve pending revocations',async()=>{
  let saved,tail=Promise.resolve();
  const indexedDB={open(){const request={};queueMicrotask(()=>{request.result={close(){},transaction(){const tx={},getRequest={};let done;const wait=tail;tail=new Promise(resolve=>done=resolve);const store={get(){wait.then(()=>{getRequest.result=structuredClone(saved);getRequest.onsuccess();queueMicrotask(()=>{tx.oncomplete();done();});});return getRequest;},put(value){saved=structuredClone(value);}};tx.objectStore=()=>store;return tx;}};request.onsuccess();});return request;}};
