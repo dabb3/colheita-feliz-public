@@ -1,9 +1,9 @@
 {
-  "version": "furto-pragas-6h-v1",
-  "prNumber": 83,
+  "version": "ui-mobile-v1",
+  "prNumber": 84,
   "items": [
-    "A espera para furtar de novo e para soltar pragas na fazenda de amigos caiu de 24 e 12 horas para 6 horas.",
-    "Ao visitar um amigo, o fertilizante do amor já mostra a quantidade certa, sem precisar clicar nele antes.",
-    "Depois de uma visita, o botão Adubar da sua fazenda volta a usar o seu fertilizante normal."
+    "No celular em pé, a fazenda ocupa a tela toda: use pinça ou os botões + e − para dar zoom e arraste para mover. Só o toque usa a ferramenta.",
+    "As ferramentas ficam num painel logo abaixo da fazenda, com o nome da selecionada em destaque e os itens sem estoque em cinza.",
+    "Avisos, Amigos e Ajustes agora ficam no botão Mais, com a engrenagem. No computador, nada muda."
   ]
 }

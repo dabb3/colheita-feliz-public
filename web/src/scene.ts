@@ -533,6 +533,9 @@ export class Scene {
       this.backgroundPeriod = periodKey;
       this.onPeriodChange(period);
     }
+    // Mobile camera may enlarge the backing store; drawing stays in 1600 × 900 world units.
+    const resolution = this.canvas.width / 1600;
+    if (resolution !== 1) ctx.setTransform(resolution, 0, 0, resolution, 0, 0);
     ctx.clearRect(0, 0, 1600, 900);
     ctx.fillStyle = period === "night" ? "#15464f" : "#84ba30";
     ctx.fillRect(0, 0, 1600, 900);

@@ -7,9 +7,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PublishedNotesTest {
     @Test void onlyMatchingPublicationMetadataEnablesTheRealPullRequestManifest(){
-        var active=PublishedNotes.fromEnvironment(Map.of("PUBLISHED_UPDATE_NOTES_VERSION","furto-pragas-6h-v1","PUBLISHED_UPDATE_NOTES_PR","83"));
-        assertNotNull(active);assertEquals(83,active.prNumber());assertEquals(3,active.items().size());
-        assertNull(PublishedNotes.fromEnvironment(Map.of("PUBLISHED_UPDATE_NOTES_VERSION","furto-pragas-6h-v1","PUBLISHED_UPDATE_NOTES_PR","82")));
+        var active=PublishedNotes.fromEnvironment(Map.of("PUBLISHED_UPDATE_NOTES_VERSION","ui-mobile-v1","PUBLISHED_UPDATE_NOTES_PR","84"));
+        assertNotNull(active);assertEquals(84,active.prNumber());assertEquals(3,active.items().size());
+        assertNull(PublishedNotes.fromEnvironment(Map.of("PUBLISHED_UPDATE_NOTES_VERSION","ui-mobile-v1","PUBLISHED_UPDATE_NOTES_PR","83")));
         assertNull(PublishedNotes.fromEnvironment(Map.of()));
     }
     @Test void unpublishedNotesAreDisabledByDefaultAndMisconfiguredActivationIsRejected(){

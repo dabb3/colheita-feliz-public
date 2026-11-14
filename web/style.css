@@ -598,3 +598,55 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 #modal .push-settings input[type=checkbox] { width:1rem; min-width:0; flex:0 0 auto; margin:0; }
 .push-settings button { min-height:44px; }
 .push-settings [hidden] { display:none; }
+
+/* Mobile portrait: "Mais" menu, farm camera and labelled tool panel. Desktop and landscape keep the original bar and scene. */
+#more,.camera-controls,.tools-head{display:none}
+.more-menu{position:absolute;top:100%;right:0;z-index:7;display:grid;gap:2px;min-width:210px;margin-top:6px;padding:6px;border:1px solid #a2b56c;border-radius:13px;background:rgba(16,51,44,.94);box-shadow:0 8px 22px #0006}
+.more-menu[hidden]{display:none}
+@media(max-width:700px) and (orientation:portrait){
+ #game #farm-menu{position:relative;flex-wrap:nowrap;justify-content:space-between;gap:4px}
+ #game #more{position:relative;display:flex}
+ #game #farm-menu>.farm-menu-button{position:relative;flex:1 1 0;width:auto;max-width:92px;min-width:48px;height:64px}
+ #game #farm-menu>.farm-menu-button:not(:first-child)::before{content:'';position:absolute;left:-2px;top:20%;width:1px;height:60%;background:#ffffff38}
+ #game #farm-menu>.farm-menu-button span:last-child{font-size:12px;font-weight:700}
+ #game .more-menu .farm-menu-button{position:relative;flex-direction:row;justify-content:flex-start;align-items:center;gap:12px;width:100%;max-width:none;height:52px;padding:0 12px 0 8px;border-radius:9px}
+ #game .more-menu .farm-menu-button:hover,#game .more-menu .farm-menu-button:focus-visible{background:#ffffff1f;filter:none}
+ #game .more-menu .farm-menu-button img,#game .more-menu .settings-icon{flex:none;width:36px;height:36px;font-size:32px;line-height:36px}
+ #game .more-menu .farm-menu-button span:last-child{order:1;font-size:15px;font-weight:700}
+ #game .more-menu .notification-badge{position:static;order:2;margin-left:auto}
+ #game footer{flex-direction:column;align-items:stretch;gap:8px;padding:14px 18px 12px}
+ /* Inner frame: the tools read as one refined card inside the bottom band. */
+ #game footer::before{content:'';position:absolute;inset:6px 6px max(4px,calc(env(safe-area-inset-bottom) - 4px));border:1px solid #ffffff38;border-radius:14px;box-shadow:inset 0 1px #ffffff1a,0 0 0 1px #0c282299;pointer-events:none}
+ #game .tools-head{display:flex;align-items:center;gap:10px;color:#fff;text-shadow:0 1px 3px #172b13}
+ #game .tools-title{font-size:16px;font-weight:800}
+ #game .tools-head::after{content:'';order:1;flex:1;height:1px;background:#ffffff40}
+ #game #tools{grid-template-columns:repeat(4,minmax(48px,1fr));gap:8px}
+ #game #tools button{width:auto;height:56px;border:1px solid #ffffff2e;border-radius:12px;background:linear-gradient(#ffffff1c,#ffffff0d);box-shadow:inset 0 1px #ffffff26,0 2px 3px #0003}
+ #game #tools button[aria-pressed=true]{background:radial-gradient(ellipse,#d4ff7859,transparent 75%),#fff8c826;border:2px solid #f2d46b;box-shadow:0 0 10px #f2d46b66}
+ #game .tool-key{display:none}
+ #game .tool-count{right:4px;bottom:4px;min-width:22px;padding:0 4px;font-size:12px;font-weight:700;line-height:18px;text-align:center}
+ #game .tool-button.empty>img:first-child{filter:grayscale(1);opacity:.5}
+ #game .tool-button.empty .tool-count{background:#8a2c22}
+ #game .tool-name{order:2;padding:3px 12px;border:1px solid #9cc47a99;border-radius:999px;background:#2f6a3fcc;font-size:13px;font-weight:700;line-height:18px;white-space:nowrap}
+}
+@media(max-width:700px) and (orientation:portrait){
+ /* Three continuous bands: profile, farm, tools. No loose background between them. */
+ #game{height:100dvh;min-height:0;overflow:hidden;gap:0;padding:0}
+ #game header{padding:max(8px,env(safe-area-inset-top)) 8px 8px;background:linear-gradient(#1c4a3e,#163d34);border-bottom:2px solid #0c2822;box-shadow:0 2px 0 #ffffff14;z-index:2}
+ #scene{overflow:hidden;border-radius:0;touch-action:none;overscroll-behavior:contain}
+ #game footer{justify-self:stretch;width:auto;max-width:none;margin:-16px 0 0;padding-bottom:max(14px,calc(env(safe-area-inset-bottom) + 6px));border:0;border-top:2px solid #0c2822;border-radius:16px 16px 0 0;background:linear-gradient(#1c4a3e,#143a31);box-shadow:0 -1px 0 #ffffff26,0 -6px 14px #0005}
+ #scene.camera>canvas{left:0;top:0;max-width:none;transform-origin:0 0;aspect-ratio:auto}
+ #game .camera-controls{position:absolute;right:8px;bottom:26px;z-index:2;display:grid;gap:6px}
+ #game .camera-controls[hidden]{display:none}
+ #game .camera-controls button{display:grid;place-items:center;width:32px;height:32px;padding:0;border:1.5px solid #ffffffb3;border-radius:50%;background:rgba(16,51,44,.78);color:#fff;font-size:20px;font-weight:700;line-height:1;box-shadow:0 2px 6px #0005}
+}
+
+/* VIP services: the duration + price line needs ~150px, wider than the third column on phones. */
+@media(min-width:561px) and (max-width:760px){
+ .vip-service-meta{grid-template-columns:1fr;justify-items:center;gap:.1rem}
+ .vip-service-duration{text-align:center}
+}
+@media(max-width:560px){
+ .vip-service{grid-template-columns:74px minmax(0,1fr)}
+ .vip-service-purchase{grid-column:1/-1}
+}
