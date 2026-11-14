@@ -249,7 +249,7 @@ function renderTools(){
  for(const [index,[id,label,icon]] of definitions.entries()){
   const b=button(label,()=>pickTool(id),toolbar);b.classList.add('tool-button');b.title=label;b.setAttribute('aria-label',label);b.setAttribute('aria-pressed',String(tool===id));b.textContent='';
   const pest=id==='SPREAD_INSECTS'||id==='SPREAD_WEEDS';
-  const selectedIcon=id==='FERTILIZE'?`adubo-${selectedFertilizer}`:icon,image=document.createElement('img');image.alt='';image.src=pest?`/assets/classic/effects/${icon}.png`:`/assets/classic/icons/${selectedIcon.startsWith('adubo-')?'':'hud/'}${selectedIcon}.png`;b.append(image);
+  const selectedIcon=id==='FERTILIZE'?`adubo-${selectedFertilizer}`:id==='LOVE'?`adubo-${selectedLoveFertilizer}`:icon,image=document.createElement('img');image.alt='';image.src=pest?`/assets/classic/effects/${icon}.png`:`/assets/classic/icons/${selectedIcon.startsWith('adubo-')?'':'hud/'}${selectedIcon}.png`;b.append(image);
   if(id===tool&&id!=='CURSOR'&&!pest)element('farm').style.cursor=`url("/assets/classic/icons/cursors/${selectedIcon}.png") 16 16, auto`;
   if(pest){const limit=document.createElement('span');limit.className='tool-count';limit.textContent='1/6h';b.append(limit);}
   if(id==='PLANT'){
