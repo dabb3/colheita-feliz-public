@@ -44,4 +44,4 @@ Files: web/src/push.ts,push-state.ts,push-worker.ts,web/test/push.test.ts e test
 - [x] Coordenador confirma diferenças, contratos e reexecuta suíte Java/PostgreSQL completa, capacidade, SpotBugs, installDist, web/TypeScript/build e diff --check.
 - [x] Revisão independente do diff completo; corrigir achados confirmados e repetir somente checks pertinentes.
 - [x] Documentar migração/worker/retomada/limites e evidência visual isolada sem VAPID real.
-- [ ] Commit/push e PR com notas ligadas ao número real, testes, limitações. Conferir CI; sem merge ou deploy.
+- [x] Commit/push e PR com notas ligadas ao número real, testes, limitações. Conferir CI; sem merge ou deploy.

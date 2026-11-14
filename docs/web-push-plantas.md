@@ -63,3 +63,5 @@ Rodada final em 13/11/2026: `gradlew.bat test build :server:integrationTest :ser
 As 27 regressões novas de PostgreSQL cobrem ativação, baseline, retomada, preferências, concorrência, rollback, crash, seis temporadas, automações/VIP, privacidade, jobs inválidos e colheita antes da reserva. A revisão independente encontrou um P2 na reativação com automação histórica expirada; quatro testes reproduziram a falha. A correção e a re-revisão foram aprovadas, sem novos P1/P2 confirmados. Não houve inscrição, envio ou teste no banco de produção.
 
 Limite operacional de rollback: se uma versão anterior gravar fazendas sem atualizar esta fila, uma futura retomada precisa revalidar também os jobs existentes, não somente fazer bootstrap dos ausentes. Planejar essa reconciliação administrativa antes de reabilitar envios; nenhum procedimento de escrita foi executado nesta entrega.
+
+PR de revisão: [#81](https://github.com/dabb3/colheita-feliz-public/pull/81). Notas web-push-plantas-v1 vinculadas ao número real; permanecem desativadas fora da publicação correspondente pelo pipeline. Nenhum merge ou deploy foi executado.
