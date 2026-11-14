@@ -98,7 +98,7 @@ html, body, #app { width: 100%; height: 100%; min-height: 100%; margin: 0; }
 #modal.missions-dialog[open] { display: flex; flex-direction: column; max-height: 88vh; max-height: 88dvh; }
 #modal.missions-dialog { width: min(760px, 94vw); }
 #modal.missions-dialog .dialog-header, #modal.missions-dialog #modal-footer { flex: none; }
-#modal.missions-dialog #modal-content { flex: 1; min-height: 0; overflow-y: auto; padding: 24px; }
+#modal.missions-dialog #modal-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 24px; }
 #modal.missions-dialog #modal-footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 24px; border-top: 1px solid #bec7ab; }
 #modal.missions-dialog #modal-footer[hidden] { display: none; }
 .mission-section { display: grid; gap: 8px; }
@@ -216,7 +216,7 @@ body,button,select,a,[role=button],.audio-setting input[type=checkbox]{cursor:ur
 
 #modal.deposit-dialog[open]{display:flex;flex-direction:column;width:min(780px,94vw);max-height:85vh;max-height:85dvh;padding:0;overflow:hidden;background:rgba(255,252,238,.65)}
 #modal.deposit-dialog .dialog-header{position:relative;flex:none;background:rgba(236,242,223,.4);backdrop-filter:blur(6px)}
-#modal.deposit-dialog #modal-content{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:24px}
+#modal.deposit-dialog #modal-content{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:24px}
 #modal.deposit-dialog::backdrop{backdrop-filter:blur(6px)}
 #modal.deposit-dialog :is(button,a):focus-visible{outline:3px solid #d5a92f;outline-offset:3px}
 .deposit-summary-line{display:flex;align-items:center;gap:16px;margin:0 0 24px;padding:16px;border:1px solid #e4d18c;border-radius:12px;background:rgba(255,249,227,.95)}

@@ -90,3 +90,13 @@ test('canvas clicks and hover share the uniform transform and ignore letterbox s
  handlers.get('pointermove')(point);assert.equal(timers.size,0);assert.deepEqual(sounds,[null,'abelha']);
  scene.close();
 });
+
+test('dialogs sized only by max-height never give the modal body a zero flex basis',()=>{
+ // iOS Safari resolves `flex:1` (basis 0%) to zero height inside a column dialog without a fixed height: only the header shows.
+ const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
+ for(const dialog of ['deposit-dialog','missions-dialog']){
+  const rules=[...css.matchAll(new RegExp(`#modal\\.${dialog} #modal-content\\s*\\{([^}]*)\\}`,'g'))].map(match=>match[1]);
+  assert.ok(rules.length>0,dialog);
+  for(const body of rules)assert.doesNotMatch(body,/(^|;)\s*flex\s*:\s*1\s*(;|$)/,`${dialog} body keeps flex-basis auto`);
+ }
+});
