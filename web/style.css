@@ -592,8 +592,8 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 #modal.bite-dialog button:focus-visible{outline:3px solid #705719;outline-offset:3px}
 @media(max-width:560px){#modal.bite-dialog .dialog-header h2{font-size:19px}.bite-dog{height:130px}#bite-message{font-size:16px}}
 .connection-report { box-sizing:border-box; width:100%; max-width:100%; min-height:16rem; font:inherit; font-size:.85rem; overflow-wrap:anywhere; resize:vertical; }
-.push-settings { display:flex; flex-wrap:wrap; gap:.65rem; }
-.push-settings h3,.push-settings p { flex-basis:100%; margin:.25rem 0; }
+.push-settings { display:flex; flex-direction:column; flex-wrap:nowrap; gap:.65rem; }
+.push-settings h3,.push-settings p { margin:.25rem 0; }
 .push-settings label { display:flex; align-items:center; gap:.35rem; flex:0 0 auto; min-width:0; color:var(--muted,#635a43); }
 #modal .push-settings input[type=checkbox] { width:1rem; min-width:0; flex:0 0 auto; margin:0; }
 .push-settings button { min-height:44px; }

@@ -65,3 +65,10 @@ As 27 regressões novas de PostgreSQL cobrem ativação, baseline, retomada, pre
 Limite operacional de rollback: se uma versão anterior gravar fazendas sem atualizar esta fila, uma futura retomada precisa revalidar também os jobs existentes, não somente fazer bootstrap dos ausentes. Planejar essa reconciliação administrativa antes de reabilitar envios; nenhum procedimento de escrita foi executado nesta entrega.
 
 PR de revisão: [#81](https://github.com/dabb3/colheita-feliz-public/pull/81). Notas web-push-plantas-v1 vinculadas ao número real; permanecem desativadas fora da publicação correspondente pelo pipeline. Nenhum merge ou deploy foi executado.
+### Correção visual após relato de sobreposição
+
+O cartão isolado da primeira revisão não reproduzia sua interação com a grade de Ajustes. Com cartões vizinhos, a direção flex em coluna combinada com wrap e flex-basis de 100% fazia os parágrafos ocuparem colunas laterais. Reprodução local: cartão de 327 px com scrollWidth de 1.051 px, sobrepondo Sobre.
+
+A correção remove a base percentual dos títulos/parágrafos e mantém uma única coluna sem wrap no cartão. Na mesma grade, o scrollWidth ficou em 325 px, dentro do cartão de 327 px. Conferidos 1280 × 800 e 390 × 844, com configuração simulada ativa e inativa, sem filhos transbordando horizontalmente. Evidências locais: `.tools/push2-visual/layout-before.png`, `layout-desktop-fixed.png`, `layout-mobile-fixed.png` e `layout-desktop-configured.png`.
+
+O texto “Notificações ainda não configuradas no servidor” é separado do defeito visual: indica indisponibilidade da configuração, sem autorizar instalar chaves ou habilitar envios. Nenhuma configuração de produção foi alterada nesta correção.
