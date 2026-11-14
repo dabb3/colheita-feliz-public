@@ -50,61 +50,65 @@ export function renderPushSettings(parent:HTMLElement,account:string,api:ApiClie
  const section=document.createElement('section');section.className='settings-section push-settings';parent.append(section);
  const title=document.createElement('h3');title.textContent='Notificações no dispositivo';section.append(title);
  const status=document.createElement('p');status.setAttribute('role','status');status.textContent='Consultando disponibilidade…';section.append(status);
- const note=document.createElement('p');note.textContent='Ativar notificações permite enviar um teste. Para receber avisos de Plantas, marque Plantas em Ajustes após ativar. Ativar ou testar não habilita esses avisos. Plantas prontas são agrupadas em até um aviso por minuto. Os horários são aproximados; a entrega depende do navegador e da conexão. Animais, furtos e pragas estarão disponíveis nas próximas entregas.';section.append(note);
+ const note=document.createElement('p');note.textContent='Ativar notificações permite enviar um teste. Escolha separadamente os avisos de plantas, animais, furtos e pragas. Os avisos são agrupados em até um lote por minuto; os horários são aproximados e a entrega depende do navegador e da conexão.';section.append(note);
  const preferences={plants:false,animals:false,thefts:false,pests:false};
- let plants!:HTMLInputElement;
- for(const [key,label]of [['plants','Plantas'],['animals','Animais'],['thefts','Furtos'],['pests','Pragas']]as const){const row=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=preferences[key];input.disabled=true;if(key==='plants')plants=input;row.append(input,document.createTextNode(label+(key==='plants'?'':' (em breve)')));section.append(row);}
+ const labels={plants:'Plantas',animals:'Animais',thefts:'Furtos',pests:'Pragas'} as const;
+ const inputs={} as Record<keyof typeof labels,HTMLInputElement>;
+ for(const key of Object.keys(labels) as (keyof typeof labels)[]){const row=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=preferences[key];input.disabled=true;inputs[key]=input;row.append(input,document.createTextNode(labels[key]));section.append(row);}
  const activate=document.createElement('button'),disable=document.createElement('button'),test=document.createElement('button');activate.textContent='Ativar notificações';disable.textContent='Desativar notificações';test.textContent='Enviar notificação de teste';activate.disabled=true;test.hidden=true;disable.hidden=true;section.append(activate,disable,test);
- const retry=document.createElement('button');retry.textContent='Repetir alteração de Plantas';retry.hidden=true;section.append(retry);
+ const retry=document.createElement('button');retry.textContent='Repetir alteração';retry.hidden=true;section.append(retry);
  const supported=typeof Notification!=='undefined'&&typeof PushManager!=='undefined'&&'serviceWorker'in navigator&&typeof indexedDB!=='undefined'&&globalThis.isSecureContext;
- let publicKey='',configurationMessage='Consultando disponibilidade…',busy=false,nextTest=0,plantEventsEnabled=false,loadedRevision:number|undefined,preferenceFailed=false,loadingPreferences=false;
+ let publicKey='',configurationMessage='Consultando disponibilidade…',busy=false,nextTest=0,eventsEnabled=false,categoryEnabled={plants:false,animals:false,thefts:false,pests:false},loadedRevision:number|undefined,preferenceFailed=false,loadingPreferences=false;
  const fail=()=>{status.textContent='Não foi possível concluir. Confira a conexão e tente novamente.';};
  function matches(current:PushState|undefined,expected:PushState){return current?.account===account&&current.revision===expected.revision&&current.active?.account===account&&current.active.bindingId===expected.active?.bindingId&&current.active.endpoint===expected.active?.endpoint&&current.active.deviceToken===expected.active?.deviceToken;}
  async function refresh(){
   const state=await pushState(),current=state?.account===account,bound=current&&state?.active?.account===account;
   test.hidden=!bound||!publicKey;disable.hidden=!bound;activate.hidden=bound;
   activate.disabled=busy||!current||!publicKey||Notification.permission==='denied';disable.disabled=busy;
-  plants.checked=bound?state.active!.plants===true:preferences.plants;
-  plants.disabled=busy||loadingPreferences||!bound||!publicKey||!plantEventsEnabled||loadedRevision!==state?.revision||!!state?.active?.plantsPending;
-  retry.hidden=!bound||!publicKey||!plantEventsEnabled||!state?.active?.plantsPending&&!preferenceFailed;retry.disabled=busy||loadingPreferences;
-  retry.textContent=state?.active?.plantsPending?'Repetir alteração de Plantas':'Recarregar preferência de Plantas';
+  for(const key of Object.keys(labels) as (keyof typeof labels)[]){inputs[key].checked=bound&&state.active![key]===true;inputs[key].disabled=busy||loadingPreferences||!bound||!publicKey||!categoryEnabled[key]||loadedRevision!==state?.revision||state?.active?.[`${key}Pending` as keyof typeof state.active]===true;}
+  const pending=bound&&(Object.keys(labels) as (keyof typeof labels)[]).some(key=>state?.active?.[`${key}Pending` as keyof typeof state.active]===true);
+  retry.hidden=!bound||!publicKey||!eventsEnabled||!pending&&!preferenceFailed;retry.disabled=busy||loadingPreferences;
+  const pendingKey=bound&&(Object.keys(labels) as (keyof typeof labels)[]).find(key=>state?.active?.[`${key}Pending` as keyof typeof state.active]===true);
+  retry.textContent=pendingKey?`Repetir alteração de ${labels[pendingKey]}`:'Recarregar preferências';
   status.textContent=!current?'A conta deste dispositivo mudou. Entre novamente para configurar notificações.':!publicKey?configurationMessage:bound?'Notificações ativadas neste dispositivo.':Notification.permission==='denied'?'Permissão negada. Altere nas configurações do navegador se desejar.':'Permissão: '+Notification.permission+'. Notificações desativadas.';
-  if(bound&&publicKey&&plantEventsEnabled&&(preferenceFailed||state?.active?.plantsPending))status.textContent='Não foi possível confirmar a preferência de Plantas. Confira a conexão e tente novamente.';
+  if(bound&&publicKey&&eventsEnabled&&(preferenceFailed||pending))status.textContent='Não foi possível confirmar uma preferência. Confira a conexão e tente novamente.';
  } if(!supported){status.textContent='Notificações indisponíveis neste navegador. No iPhone/iPad, adicione o jogo à Tela de Início e abra por lá.';return;}
  async function loadPreferences(){
-  if(loadingPreferences)return;loadingPreferences=true;retry.disabled=true;plants.disabled=true;
+  if(loadingPreferences)return;loadingPreferences=true;retry.disabled=true;for(const input of Object.values(inputs))input.disabled=true;
   try{
    const expected=await pushState();
-   if(!publicKey||!plantEventsEnabled||expected?.account!==account||expected.active?.account!==account||expected.active.plantsPending)return;
-   const active=expected.active,result=await api.push<{bindingId:string;deviceRevision:number;plants:boolean}>('preferences',{endpoint:active.endpoint,deviceToken:active.deviceToken,bindingId:active.bindingId,deviceRevision:expected.revision});
+   if(!publicKey||!eventsEnabled||expected?.account!==account||expected.active?.account!==account||Object.keys(labels).some(key=>expected.active?.[`${key}Pending` as keyof typeof expected.active]===true))return;
+   const active=expected.active,result=await api.push<{bindingId:string;deviceRevision:number;plants:boolean;animals:boolean;thefts:boolean;pests:boolean}>('preferences',{endpoint:active.endpoint,deviceToken:active.deviceToken,bindingId:active.bindingId,deviceRevision:expected.revision});
    if(result.bindingId!==active.bindingId||result.deviceRevision!==expected.revision||typeof result.plants!=='boolean')throw Error('Preferência inválida.');
-   await pushState(current=>{if(!matches(current,expected)||current!.active!.plantsPending)return current!;loadedRevision=current!.revision;preferenceFailed=false;return {...current!,active:{...current!.active!,plants:result.plants}};});
+   await pushState(current=>{if(!matches(current,expected))return current!;loadedRevision=current!.revision;preferenceFailed=false;return {...current!,active:{...current!.active!,plants:result.plants,animals:result.animals===true,thefts:result.thefts===true,pests:result.pests===true}};});
   }catch{preferenceFailed=true;}
   finally{loadingPreferences=false;await refresh();}
  }
- async function savePlants(repeat=false){
-  if(busy||!publicKey||!plantEventsEnabled||(!repeat&&plants.disabled))return;
-  const desired=plants.checked,started=lifecycle;busy=true;plants.disabled=true;retry.disabled=true;
+ async function savePreference(key:keyof typeof labels,repeat=false){
+  if(busy||!publicKey||!eventsEnabled||(!repeat&&inputs[key].disabled))return;
+  const desired=inputs[key].checked,started=lifecycle;busy=true;inputs[key].disabled=true;retry.disabled=true;
   try{
    let reserved=false;
    const expected=await pushState(current=>{
     if(started!==lifecycle||current?.account!==account||current.active?.account!==account)return current!;
-    if(repeat){if(!current.active.plantsPending)return current;reserved=true;return current;}
-    if(current.revision!==loadedRevision||current.active.plantsPending)return current;
+    const pendingKey=`${key}Pending` as keyof typeof current.active;
+    if(repeat){if(current.active[pendingKey]!==true)return current;reserved=true;return current;}
+    if(current.revision!==loadedRevision||current.active[pendingKey]===true)return current;
     if(!Number.isSafeInteger(current.revision+1))throw Error('Revisão indisponível.');
-    reserved=true;return {...current,revision:current.revision+1,active:{...current.active,plants:desired,plantsPending:true}};
+    reserved=true;return {...current,revision:current.revision+1,active:{...current.active,[key]:desired,[pendingKey]:true}};
    });
    if(!reserved||started!==lifecycle||!expected?.active)return;
-   const active=expected.active,result=await api.push<{bindingId:string;deviceRevision:number;plants:boolean}>('preferences',{endpoint:active.endpoint,deviceToken:active.deviceToken,bindingId:active.bindingId,deviceRevision:expected.revision,plants:active.plants});
-   if(result.bindingId!==active.bindingId||result.deviceRevision!==expected.revision||result.plants!==active.plants)throw Error('Preferência inválida.');
-   await pushState(current=>{if(started!==lifecycle||!matches(current,expected))return current!;loadedRevision=current!.revision;preferenceFailed=false;const {plantsPending,...binding}=current!.active!;return {...current!,active:binding};});
+   const active=expected.active,result=await api.push<{bindingId:string;deviceRevision:number;plants:boolean;animals:boolean;thefts:boolean;pests:boolean}>('preferences',{endpoint:active.endpoint,deviceToken:active.deviceToken,bindingId:active.bindingId,deviceRevision:expected.revision,[key]:active[key]});
+   if(result.bindingId!==active.bindingId||result.deviceRevision!==expected.revision||result[key]!==active[key])throw Error('Preferência inválida.');
+   await pushState(current=>{if(started!==lifecycle||!matches(current,expected))return current!;loadedRevision=current!.revision;preferenceFailed=false;const binding={...current!.active!};delete binding[`${key}Pending` as keyof typeof binding];return {...current!,active:binding};});
   }catch{preferenceFailed=true;}
   finally{busy=false;await refresh();}
  }
- plants.onchange=()=>savePlants();retry.onclick=async()=>{if(busy)return;if((await pushState())?.active?.plantsPending)await savePlants(true);else await loadPreferences();};
+ for(const key of Object.keys(labels) as (keyof typeof labels)[])inputs[key].onchange=()=>savePreference(key);
+ retry.onclick=async()=>{if(busy)return;const state=await pushState(),key=(Object.keys(labels) as (keyof typeof labels)[]).find(k=>state?.active?.[`${k}Pending` as keyof typeof state.active]===true);if(key)await savePreference(key,true);else await loadPreferences();};
  void refresh().catch(fail);
- void api.push<{enabled:boolean;publicKey:string;plantEventsEnabled?:boolean}>('config').then(async config=>{
-  if(config.enabled&&config.publicKey){publicKey=config.publicKey;plantEventsEnabled=config.plantEventsEnabled===true;}
+ void api.push<{enabled:boolean;publicKey:string;plantEventsEnabled?:boolean;animalEventsEnabled?:boolean;theftEventsEnabled?:boolean;pestEventsEnabled?:boolean}>('config').then(async config=>{
+  if(config.enabled&&config.publicKey){publicKey=config.publicKey;categoryEnabled={plants:config.plantEventsEnabled===true,animals:config.animalEventsEnabled===true,thefts:config.theftEventsEnabled===true,pests:config.pestEventsEnabled===true};eventsEnabled=Object.values(categoryEnabled).some(Boolean);}
   else configurationMessage='Notificações ainda não configuradas no servidor. Você pode desativar a vinculação local.';
   await refresh();
   await loadPreferences();
@@ -139,7 +143,7 @@ export function renderPushSettings(parent:HTMLElement,account:string,api:ApiClie
    let installed=false;
    const state=await pushState(current=>{
     if(started!==lifecycle||current?.account!==account||current?.revision!==revision)return current!;
-    installed=true;return {...current!,deviceToken,active:{account,endpoint,deviceToken,bindingId,plants:preferences.plants}};
+    installed=true;return {...current!,deviceToken,active:{account,endpoint,deviceToken,bindingId,...preferences}};
    });
    if(!installed)return;
    try{await api.push('subscribe',{endpoint,keys:subscription.toJSON().keys,deviceToken,bindingId,deviceRevision:state!.revision,preferences});}
@@ -160,7 +164,7 @@ export function renderPushSettings(parent:HTMLElement,account:string,api:ApiClie
     }
    }
    fail();
-  }finally{busy=false;const state=await pushState();disable.disabled=false;activate.disabled=state?.account!==account||!publicKey||Notification.permission==='denied';plants.disabled=state?.active?.account!==account||!publicKey||!plantEventsEnabled||loadedRevision!==state.revision||!!state.active.plantsPending;}
+  }finally{busy=false;const state=await pushState();disable.disabled=false;activate.disabled=state?.account!==account||!publicKey||Notification.permission==='denied';for(const key of Object.keys(labels) as (keyof typeof labels)[])inputs[key].disabled=state?.active?.account!==account||!publicKey||!categoryEnabled[key]||loadedRevision!==state.revision||state?.active?.[`${key}Pending` as keyof typeof state.active]===true;}
  };
  disable.onclick=async()=>{
   if(busy)return;busy=true;let failed=false;

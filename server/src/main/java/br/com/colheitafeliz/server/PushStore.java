@@ -9,8 +9,11 @@ import java.util.UUID;
 final class PushStore {
     record Subscription(UUID owner,String endpoint,String proof,String binding,long revision,String p256dh,String auth,String preferences,boolean active) {
         boolean plantsEnabled(){var prefs=com.google.gson.JsonParser.parseString(preferences).getAsJsonObject();return plantsConfirmed(prefs)&&isBooleanTrue(prefs,"plants");}
+        boolean preferenceEnabled(String key){var prefs=com.google.gson.JsonParser.parseString(preferences).getAsJsonObject();return isBooleanTrue(prefs,key)&&isBooleanTrue(prefs,key+"Confirmed");}
     }
-    static boolean plantsConfirmed(com.google.gson.JsonObject preferences){return isBooleanTrue(preferences,"plantsConfirmed");}
+    static boolean plantsConfirmed(com.google.gson.JsonObject preferences){return isConfirmed(preferences,"plants");}
+    static boolean isConfirmed(com.google.gson.JsonObject preferences,String key){return isBooleanTrue(preferences,key)&&hasConfirmation(preferences,key);}
+    static boolean hasConfirmation(com.google.gson.JsonObject preferences,String key){return isBooleanTrue(preferences,key+"Confirmed");}
     private static boolean isBooleanTrue(com.google.gson.JsonObject preferences,String name){var value=preferences.get(name);return value!=null&&value.isJsonPrimitive()&&value.getAsJsonPrimitive().isBoolean()&&value.getAsBoolean();}
     record Attempt(UUID actor,String endpoint,String binding,long revision,String requestHash,String status,Instant reservedAt) {}
     private final String schema;
@@ -22,6 +25,15 @@ final class PushStore {
         tx.execute("CREATE TABLE IF NOT EXISTS "+schema+".push_tests (id uuid PRIMARY KEY, actor uuid NOT NULL REFERENCES "+schema+".players(id), endpoint text NOT NULL, binding text NOT NULL, device_revision bigint NOT NULL, request_hash text NOT NULL, status text NOT NULL, reserved_at timestamptz NOT NULL)");
         tx.execute("CREATE INDEX IF NOT EXISTS push_tests_actor_time_idx ON "+schema+".push_tests(actor,reserved_at)");
         tx.execute("CREATE INDEX IF NOT EXISTS push_tests_endpoint_time_idx ON "+schema+".push_tests(endpoint,reserved_at)");
+        tx.execute("CREATE TABLE IF NOT EXISTS "+schema+".push_events (id uuid NOT NULL UNIQUE, owner uuid NOT NULL REFERENCES "+schema+".players(id), actor uuid NOT NULL REFERENCES "+schema+".players(id), request_id uuid NOT NULL, type text NOT NULL CHECK(type IN ('THEFT','PEST')), metadata jsonb NOT NULL, created_at timestamptz NOT NULL, PRIMARY KEY(actor,request_id))");
+        tx.execute("ALTER TABLE "+schema+".push_events ADD COLUMN IF NOT EXISTS request_id uuid");
+        tx.execute("UPDATE "+schema+".push_events SET request_id=id WHERE request_id IS NULL");
+        tx.execute("ALTER TABLE "+schema+".push_events ALTER COLUMN request_id SET NOT NULL");
+        tx.execute("CREATE UNIQUE INDEX IF NOT EXISTS push_events_id_idx ON "+schema+".push_events(id)");
+        tx.execute("DO $$ DECLARE pk text; definition text; BEGIN SELECT c.conname, pg_get_constraintdef(c.oid) INTO pk, definition FROM pg_constraint c WHERE c.conrelid='"+schema+".push_events'::regclass AND c.contype='p'; IF pk IS NOT NULL AND definition NOT LIKE '%(actor, request_id)%' THEN EXECUTE format('ALTER TABLE %I.push_events DROP CONSTRAINT %I', '"+schema+"', pk); pk := NULL; END IF; IF pk IS NULL THEN EXECUTE 'ALTER TABLE "+schema+".push_events ADD CONSTRAINT push_events_pkey PRIMARY KEY(actor,request_id)'; END IF; END $$");
+        tx.execute("CREATE INDEX IF NOT EXISTS push_events_owner_time_idx ON "+schema+".push_events(owner,created_at)");
+        tx.execute("ALTER TABLE "+schema+".push_events ADD COLUMN IF NOT EXISTS event_order bigserial");
+        tx.execute("CREATE UNIQUE INDEX IF NOT EXISTS push_events_owner_order_idx ON "+schema+".push_events(owner,event_order)");
     }
     Subscription find(JdbcOnlineStore.Tx tx,String endpoint){
         tx.lock("push-endpoint:"+endpoint);
@@ -42,5 +54,11 @@ final class PushStore {
     boolean coolingDown(JdbcOnlineStore.Tx tx,UUID actor,String endpoint,Instant now){return !tx.query("SELECT 1 FROM "+schema+".push_tests WHERE (actor=? OR endpoint=?) AND reserved_at>? LIMIT 1",r->r.getInt(1),actor,endpoint,Timestamp.from(now.minusSeconds(60))).isEmpty();}
     void reserve(JdbcOnlineStore.Tx tx,UUID id,Attempt a,Instant now){tx.execute("INSERT INTO "+schema+".push_tests(id,actor,endpoint,binding,device_revision,request_hash,status,reserved_at) VALUES(?,?,?,?,?,?,?,?)",id,a.actor(),a.endpoint(),a.binding(),a.revision(),a.requestHash(),"pending",Timestamp.from(now));}
     void finish(JdbcOnlineStore.Tx tx,UUID id,String status){tx.execute("UPDATE "+schema+".push_tests SET status=? WHERE id=? AND status='pending'",status,id);}
+    void recordEvent(JdbcOnlineStore.Tx tx,UUID requestId,UUID owner,UUID actor,String type,Instant now){
+        // Serialize allocation with consent and consumption; a sequence alone does not order commits.
+        tx.lockFarms(owner);
+        tx.execute("INSERT INTO "+schema+".push_events(id,owner,actor,request_id,type,metadata,created_at) VALUES(?,?,?,?,?,'{}'::jsonb,?) ON CONFLICT(actor,request_id) DO NOTHING",UUID.randomUUID(),owner,actor,requestId,type,Timestamp.from(now));
+        tx.execute("UPDATE "+schema+".crop_push_jobs SET next_at=CASE WHEN next_at IS NULL OR next_at>? THEN ? ELSE next_at END WHERE owner=? AND enabled",Timestamp.from(now),Timestamp.from(now),owner);
+    }
 }
 

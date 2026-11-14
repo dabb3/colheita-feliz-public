@@ -18,7 +18,7 @@ final class PushService {
     private final Sender sender;
     private final String publicKey;
     PushService(JdbcOnlineStore store,Clock clock,Sender sender,String publicKey){this.store=store;this.push=store.pushStore();this.clock=clock;this.sender=sender;this.publicKey=publicKey;}
-    JsonObject config(UUID actor){return store.transaction(actor,tx->{active(tx,actor);var result=new JsonObject();result.addProperty("enabled",publicKey!=null);if(publicKey==null)result.add("publicKey",com.google.gson.JsonNull.INSTANCE);else result.addProperty("publicKey",publicKey);result.addProperty("automaticEventsEnabled",false);result.addProperty("plantEventsEnabled",publicKey!=null);return result;});}
+    JsonObject config(UUID actor){return store.transaction(actor,tx->{active(tx,actor);var result=new JsonObject();result.addProperty("enabled",publicKey!=null);if(publicKey==null)result.add("publicKey",com.google.gson.JsonNull.INSTANCE);else result.addProperty("publicKey",publicKey);for(String key:new String[]{"automaticEventsEnabled","plantEventsEnabled","animalEventsEnabled","theftEventsEnabled","pestEventsEnabled"})result.addProperty(key,publicKey!=null);return result;});}
     JsonObject subscribe(UUID actor,JsonObject request){
         PushValidation.validateSubscription(request);
         String endpoint=text(request,"endpoint"),proof=hash(PushValidation.token(text(request,"deviceToken"))),binding=PushValidation.binding(text(request,"bindingId"));
@@ -36,7 +36,9 @@ final class PushService {
             }
             if((old==null||!old.owner().equals(actor))&&push.totalCount(tx,actor,clock.instant())>=50)throw new ApiFailure(409,"Limite de registros de dispositivos atingido.");
             if((old==null||!old.active()||!old.owner().equals(actor))&&push.activeCount(tx,actor)>=5)throw new ApiFailure(409,"Limite de dispositivos atingido.");
+            tx.lockFarms(actor,old==null?actor:old.owner());
             push.save(tx,candidate,clock.instant());store.cropPushStore().reconcileSubscription(tx,actor,clock.instant());
+            store.socialPushStore().reconcile(tx,actor);
             if(old!=null&&!old.owner().equals(actor))disableCropJob(tx,old.owner());
             return status("subscribed");
         });
@@ -52,32 +54,32 @@ final class PushService {
     }
     private void disableCropJob(JdbcOnlineStore.Tx tx,UUID owner){
         store.cropPushStore().suspendIfIneligible(tx,owner);
+        store.socialPushStore().reconcile(tx,owner);
     }
     JsonObject preferences(UUID actor,JsonObject request){
         String endpoint=text(request,"endpoint");PushValidation.validateEndpoint(endpoint);
         String proof=hash(PushValidation.token(text(request,"deviceToken"))),binding=PushValidation.binding(text(request,"bindingId"));
         long revision=PushValidation.revision(request);
-        boolean write=request.has("plants");
-        if(write&&(!request.get("plants").isJsonPrimitive()||!request.get("plants").getAsJsonPrimitive().isBoolean()))throw new ApiFailure(400,"Preferência inválida.");
+        String writeKey=null;for(String key:new String[]{"plants","animals","thefts","pests"})if(request.has(key)){if(writeKey!=null)throw new ApiFailure(400,"Escolha apenas uma preferência.");writeKey=key;if(!request.get(key).isJsonPrimitive()||!request.get(key).getAsJsonPrimitive().isBoolean())throw new ApiFailure(400,"Preferência inválida.");}
+        final String preferenceKey=writeKey;
         return store.transaction(actor,tx->{
             active(tx,actor);tx.lock("push-subscriptions");tx.lockFarms(actor);var old=push.find(tx,endpoint);
             if(old==null)throw new ApiFailure(403,"Dispositivo não autorizado.");possession(old,proof);
             if(!old.active()||!old.owner().equals(actor)||!old.binding().equals(binding))throw new ApiFailure(403,"Dispositivo não autorizado.");
-            var prefs=JsonParser.parseString(old.preferences()).getAsJsonObject();boolean plants=old.plantsEnabled();
-            if(!write){if(revision!=old.revision())throw conflict();}
+            var prefs=JsonParser.parseString(old.preferences()).getAsJsonObject();
+            if(preferenceKey==null){if(revision!=old.revision())throw conflict();}
             else{
-                boolean desired=request.get("plants").getAsBoolean();
-                if(revision<old.revision()||revision>old.revision()+1||(revision==old.revision()&&(!PushStore.plantsConfirmed(prefs)||plants!=desired)))throw conflict();
+                boolean desired=request.get(preferenceKey).getAsBoolean();boolean current=old.preferenceEnabled(preferenceKey);boolean confirmed=PushStore.hasConfirmation(prefs,preferenceKey);
+                if(revision<old.revision()||revision>old.revision()+1||(revision==old.revision()&&(!confirmed||current!=desired)))throw conflict();
                 if(revision>old.revision()){
                     store.cropPushStore().suspendIfIneligible(tx,actor);
-                    prefs.addProperty("plants",desired);
-                    prefs.addProperty("plantsConfirmed",true);
+                    prefs.addProperty(preferenceKey,desired);prefs.addProperty(preferenceKey+"Confirmed",true);
                     push.save(tx,new PushStore.Subscription(actor,endpoint,old.proof(),binding,revision,old.p256dh(),old.auth(),prefs.toString(),true),clock.instant());
+                    store.socialPushStore().reconcile(tx,actor);
                     store.cropPushStore().reconcileSubscription(tx,actor,clock.instant());
                 }
-                plants=desired;
             }
-            var result=new JsonObject();result.addProperty("plants",plants);result.addProperty("deviceRevision",revision);result.addProperty("bindingId",binding);return result;
+            var result=new JsonObject();for(String key:new String[]{"plants","animals","thefts","pests"})result.addProperty(key,PushStore.isConfirmed(prefs,key));result.addProperty("deviceRevision",revision);result.addProperty("bindingId",binding);return result;
         });
     }
     private record Reservation(PushStore.Subscription subscription,String result) {}
@@ -116,6 +118,9 @@ final class PushService {
         var preferences=JsonParser.parseString(a.preferences()).getAsJsonObject();
         // A registration replay cannot grant or erase the later, explicit preference consent.
         preferences.remove("plantsConfirmed");
+        preferences.remove("animalsConfirmed");
+        preferences.remove("theftsConfirmed");
+        preferences.remove("pestsConfirmed");
         return a.active()&&a.owner().equals(b.owner())&&a.binding().equals(b.binding())&&a.p256dh().equals(b.p256dh())&&a.auth().equals(b.auth())&&preferences.equals(JsonParser.parseString(b.preferences()));
     }
     private static void possession(PushStore.Subscription old,String proof){if(!MessageDigest.isEqual(old.proof().getBytes(StandardCharsets.US_ASCII),proof.getBytes(StandardCharsets.US_ASCII)))throw new ApiFailure(403,"Dispositivo não autorizado.");}

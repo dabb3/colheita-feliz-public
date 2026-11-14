@@ -89,6 +89,14 @@ test('crop ready requires the current account binding and respects the local pla
  assert.equal(acceptsPush(state,{type:'UNKNOWN',bindingId:'current'}),false);
  assert.equal(acceptsPush({...state,active:{...active,plants:false}},{type:'TEST',bindingId:'current'}),true);
 });
+test('social push types require their own confirmed category',()=>{
+ const state={revision:1,account:'a',pending:[],active:{account:'a',bindingId:'b',endpoint:'https://push',deviceToken:'d',plants:true,animals:false,thefts:true,pests:false}};
+ assert.equal(acceptsPush(state,{type:'ANIMAL_READY',bindingId:'b'}),false);
+ assert.equal(acceptsPush(state,{type:'THEFT',bindingId:'b'}),true);
+ assert.equal(acceptsPush(state,{type:'PEST',bindingId:'b'}),false);
+ assert.equal(acceptsPush({...state,active:{...state.active,animals:true,pests:true}},{type:'ANIMAL_READY',bindingId:'b'}),true);
+ assert.equal(acceptsPush({...state,active:{...state.active,animals:true,pests:true}},{type:'PEST',bindingId:'b'}),true);
+});
 
 function boundHarness(){const x=harness();x.write({revision:3,account:'a',deviceToken:'private',pending:[],active:{account:'a',bindingId:'current',endpoint:'https://push',deviceToken:'private'}});return x;}
 const plantsInput=x=>x.parent.children.at(-1).children.find(n=>n.tag==='label').children[0];
@@ -170,12 +178,12 @@ test('a second settings panel cannot overwrite an in-flight plants intention',as
 test('plants read failure offers a bounded explicit reload and does not reserve a revision',async()=>{
  const x=boundHarness(),base=preferencesApi([],false);let offline=true,calls=0;const api={push:async(op,body)=>{if(op==='preferences'){calls++;if(offline)throw Error('offline');}return base.push(op,body);}};
  x.h.renderPushSettings(x.parent,'a',api);await tick();assert.equal(calls,1);assert.equal(x.read().revision,3);assert.equal(plantsInput(x).disabled,true);assert.match(panelText(x),/tente novamente/);
- offline=false;const reload=x.buttons().find(n=>n.textContent==='Recarregar preferência de Plantas');await reload.onclick();assert.equal(calls,2);assert.equal(x.read().revision,3);assert.equal(plantsInput(x).checked,false);assert.equal(plantsInput(x).disabled,false);
+ offline=false;const reload=x.buttons().find(n=>n.textContent==='Recarregar preferências');await reload.onclick();assert.equal(calls,2);assert.equal(x.read().revision,3);assert.equal(plantsInput(x).checked,false);assert.equal(plantsInput(x).disabled,false);
 });
 
 test('reloading plants after a read error ignores double clicks',async()=>{
  const x=boundHarness(),base=preferencesApi([],false);let attempts=0,finish;const api={push:async(op,body)=>{if(op==='preferences'){attempts++;if(attempts===1)throw Error('offline');return new Promise(r=>finish=()=>r({bindingId:body.bindingId,deviceRevision:body.deviceRevision,plants:false}));}return base.push(op,body);}};
- x.h.renderPushSettings(x.parent,'a',api);await tick();const reload=x.buttons().find(n=>n.textContent==='Recarregar preferência de Plantas');const first=reload.onclick(),second=reload.onclick();await tick();assert.equal(attempts,2);finish();await Promise.all([first,second]);assert.equal(plantsInput(x).disabled,false);
+ x.h.renderPushSettings(x.parent,'a',api);await tick();const reload=x.buttons().find(n=>n.textContent==='Recarregar preferências');const first=reload.onclick(),second=reload.onclick();await tick();assert.equal(attempts,2);finish();await Promise.all([first,second]);assert.equal(plantsInput(x).disabled,false);
 });
 
 test('successful activation restores the disable control and offline revoke keeps its recovery message',async()=>{
@@ -230,4 +238,56 @@ test('a lost opt-in response repeats the explicit intent at exactly the same rev
  x.h.renderPushSettings(x.parent,'a',api);await tick();const plants=plantsInput(x);plants.checked=true;await plants.onchange();assert.equal(x.read().active.plantsPending,true);assert.equal(x.read().revision,4);
  await x.buttons().find(n=>n.textContent==='Repetir alteração de Plantas').onclick();assert.equal(x.read().active.plants,true);assert.equal(x.read().active.plantsPending,undefined);assert.equal(x.read().revision,4);
  assert.deepEqual(calls.filter(([op,b])=>op==='preferences'&&'plants'in b).map(([,b])=>[b.deviceRevision,b.plants]),[[4,true],[4,true]]);
+});
+
+test('mixed batches require unique known types and literal consent for every category',()=>{
+ const state={revision:1,account:'a',pending:[],active:{account:'a',bindingId:'b',plants:true,animals:true,thefts:true,pests:true}};
+ assert.equal(acceptsPush(state,{type:'BATCH',types:['CROP_READY','ANIMAL_READY','THEFT','PEST'],bindingId:'b'}),true);
+ assert.equal(acceptsPush(state,{type:'BATCH',types:['THEFT'],bindingId:'b'}),true);
+ for(const types of [undefined,null,{},'THEFT',[],['THEFT','THEFT'],['UNKNOWN'],['TEST'],['__proto__'],['THEFT',null],['CROP_READY','ANIMAL_READY','THEFT','PEST','THEFT']])assert.equal(acceptsPush(state,{type:'BATCH',types,bindingId:'b'}),false,JSON.stringify(types));
+ for(const value of [undefined,false,null,0,1,'true',{},[]])assert.equal(acceptsPush({...state,active:{...state.active,pests:value}},{type:'BATCH',types:['THEFT','PEST'],bindingId:'b'}),false);
+ for(const s of [changeBinding(state),{...state,account:'other'},{...state,active:{...state.active,bindingId:'old'}}])assert.equal(acceptsPush(s,{type:'BATCH',types:['THEFT'],bindingId:'b'}),false);
+});
+
+function batchWorker(){
+ const handlers={},shown=[],closed=[],opened=[],navigated=[];let state={revision:1,account:'a',pending:[],active:{account:'a',bindingId:'b',plants:true,animals:true,thefts:true,pests:true}},afterShow=()=>{},skipped=0,claimed=0;
+ const ctx={pushState:async()=>state,acceptsPush,URL,location:{origin:'https://game.invalid'},skipWaiting:async()=>{skipped++;},registration:{showNotification:async(title,options)=>{shown.push([title,options]);afterShow();},getNotifications:async()=>[{close:()=>closed.push('b')}]},clients:{claim:async()=>{claimed++;},matchAll:async()=>[{url:'https://evil.invalid/',navigate:async()=>{throw Error('foreign client');}},{url:'https://game.invalid/farm',navigate:async url=>navigated.push(url),focus:async()=>{}}],openWindow:async url=>opened.push(url)},addEventListener:(type,handler)=>handlers[type]=handler};
+ const source=readFileSync(new URL('../src/push-worker.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'');runInNewContext(stripTypeScriptTypes(source),ctx);
+ async function dispatch(type,event={}){let work;handlers[type]({...event,waitUntil:p=>work=p});await work;}
+ return {handlers,shown,closed,opened,navigated,ctx,dispatch,read:()=>state,write:s=>{state=s;},afterShow:f=>{afterShow=f;},skipped:()=>skipped,claimed:()=>claimed,push:payload=>dispatch('push',{data:{json:()=>payload}})};
+}
+
+test('worker replaces the legacy worker without waiting for tabs and keeps no fetch handler',async()=>{
+ const x=batchWorker();assert.equal(typeof x.handlers.install,'function');assert.equal(typeof x.handlers.activate,'function');await x.dispatch('install');await x.dispatch('activate');assert.equal(x.skipped(),1);assert.equal(x.claimed(),1);assert.equal(x.handlers.fetch,undefined);
+});
+
+test('worker uses one fixed mixed message and rechecks consent after displaying',async()=>{
+ const x=batchWorker(),payload={type:'BATCH',types:['CROP_READY','THEFT'],bindingId:'b',body:'private',title:'secret',url:'https://evil.invalid'};
+ await x.push(payload);assert.equal(x.shown.length,1);assert.equal(x.shown[0][0],'Colheita Feliz');assert.match(x.shown[0][1].body,/avisos/);assert.doesNotMatch(JSON.stringify(x.shown),/private|secret|evil|furto|planta/i);
+ x.afterShow(()=>x.write({...x.read(),active:{...x.read().active,thefts:false}}));await x.push(payload);assert.deepEqual(x.closed,['b']);await x.push(payload);assert.equal(x.shown.length,2);
+});
+
+test('mixed notifications suppress offline logout and account switches during display',async()=>{
+ for(const change of [s=>changeBinding(s),s=>({...s,account:'other'})]){const x=batchWorker();x.afterShow(()=>x.write(change(x.read())));await x.push({type:'BATCH',types:['PEST','ANIMAL_READY'],bindingId:'b'});assert.equal(x.shown.length,1);assert.deepEqual(x.closed,['b']);await x.push({type:'BATCH',types:['PEST','ANIMAL_READY'],bindingId:'b'});assert.equal(x.shown.length,1);}
+});
+
+test('notification click ignores external data and navigates only a same-origin client',async()=>{
+ const x=batchWorker();await x.dispatch('notificationclick',{notification:{data:{url:'https://evil.invalid/'},close(){}}});assert.deepEqual(x.navigated,['https://game.invalid/']);assert.deepEqual(x.opened,[]);
+});
+
+test('animal notification covers mature animals and products without external payload text',async()=>{
+ const x=batchWorker();await x.push({type:'ANIMAL_READY',bindingId:'b',body:'private animal'});assert.match(x.shown[0][1].body,/animais ou produtos prontos/);assert.doesNotMatch(x.shown[0][1].body,/private/);
+});
+
+test('activation persists every category as explicitly disabled',async()=>{
+ const x=harness();x.h.renderPushSettings(x.parent,'a',preferencesApi());await tick();await x.buttons()[0].onclick();for(const category of ['plants','animals','thefts','pests'])assert.equal(x.read().active[category],false,category);
+});
+
+test('a social preference read failure offers a general reload action',async()=>{
+ const x=boundHarness();let offline=true;x.h.renderPushSettings(x.parent,'a',{push:async(op,body)=>{if(op==='config')return{enabled:true,publicKey:'AA',animalEventsEnabled:true};if(offline)throw Error('offline');return{bindingId:body.bindingId,deviceRevision:body.deviceRevision,plants:false,animals:true,thefts:false,pests:false};}});await tick();const reload=x.buttons().find(n=>n.textContent==='Recarregar preferências');assert.ok(reload);offline=false;await reload.onclick();assert.equal(x.read().active.animals,true);assert.equal(x.read().revision,3);
+});
+
+for(const [key,label,flag] of [['animals','Animais','animalEventsEnabled'],['thefts','Furtos','theftEventsEnabled'],['pests','Pragas','pestEventsEnabled']])test(key+' preference retries the same revision after a lost opt-in response',async()=>{
+ const x=boundHarness(),calls=[];let lost=true;const values={plants:false,animals:false,thefts:false,pests:false};const api={push:async(op,body)=>{calls.push([op,body]);if(op==='config')return{enabled:true,publicKey:'AA',[flag]:true};if(op==='preferences'){if(key in body){values[key]=body[key];if(lost){lost=false;throw Error('response lost');}}return{bindingId:body.bindingId,deviceRevision:body.deviceRevision,...values};}return{};}};
+ x.h.renderPushSettings(x.parent,'a',api);await tick();const input=x.parent.children[0].children.find(n=>n.tag==='label'&&n.children[1]===label).children[0];assert.equal(input.disabled,false);assert.equal(input.checked,false);input.checked=true;await input.onchange();assert.equal(x.read().active[key+'Pending'],true);assert.equal(x.read().revision,4);await x.buttons().find(n=>n.textContent==='Repetir alteração de '+label).onclick();assert.equal(x.read().active[key],true);assert.equal(x.read().active[key+'Pending'],undefined);assert.equal(x.read().revision,4);assert.deepEqual(calls.filter(([op,b])=>op==='preferences'&&key in b).map(([,b])=>[b.deviceRevision,b[key]]),[[4,true],[4,true]]);
 });

@@ -71,8 +71,8 @@ class CropPushIntegrationTest {
     @Test void onlyTheExplicitlyConfirmedDeviceCanReserveAndSendAutomaticEvents(){
         plantAndWater();var first=PushStoreIntegrationTest.subscription(1,1);var second=PushStoreIntegrationTest.subscription(2,1);push.subscribe(owner,first);push.subscribe(owner,second);
         var explicit=PushStoreIntegrationTest.test(first);explicit.remove("testId");explicit.addProperty("deviceRevision",2);explicit.addProperty("plants",true);push.preferences(owner,explicit);
-        var reserved=store.transaction(owner,tx->store.cropPushStore().reserve(tx,owner,clock.now));assertEquals(1,reserved.size());assertEquals(first.get("endpoint").getAsString(),reserved.getFirst().subscription().endpoint());
-        var legacy=store.transaction(owner,tx->store.pushStore().find(tx,second.get("endpoint").getAsString()));assertFalse(store.transaction(owner,tx->store.cropPushStore().current(tx,new CropPushStore.Delivery(UUID.randomUUID(),owner,legacy))).booleanValue());
+        var reserved=store.transaction(owner,tx->store.cropPushStore().reserveBatch(tx,owner,clock.now,true,false,List.of()));assertEquals(1,reserved.size());assertEquals(first.get("endpoint").getAsString(),reserved.getFirst().subscription().endpoint());
+        var legacy=store.transaction(owner,tx->store.pushStore().find(tx,second.get("endpoint").getAsString()));assertFalse(store.transaction(owner,tx->store.cropPushStore().current(tx,new CropPushStore.Delivery(UUID.randomUUID(),owner,legacy,List.of("CROP_READY")))).booleanValue());
         clock.now=clock.now.plusSeconds(72000);var sends=new AtomicInteger();try(var worker=new CropPushService(store,game,clock,(endpoint,p,a,b)->{assertEquals(first.get("endpoint").getAsString(),endpoint);sends.incrementAndGet();return 201;})){worker.tick();}assertEquals(1,sends.get());
     }
     @Test void firstConsentResetsAnOldEnabledJobWithoutDiscardingItsCursors(){
@@ -159,7 +159,7 @@ class CropPushIntegrationTest {
     }
     @Test void crashReservationExpiresWithoutReplayAfterReopeningStore(){
         plantAndWater();subscribeConsent(PushStoreIntegrationTest.subscription(1,1));clock.now=clock.now.plusSeconds(72000);
-        store.transaction(owner,tx->{tx.lockFarms(owner);var snapshot=game.advanceForCropPush(tx,owner);var job=store.cropPushStore().job(tx,owner);store.cropPushStore().reserve(tx,owner,clock.now);store.cropPushStore().observeReady(snapshot,job.cursors(),clock.now);store.cropPushStore().save(tx,owner,new CropPushStore.Job(true,null,clock.now,job.cursors()));return null;});
+        store.transaction(owner,tx->{tx.lockFarms(owner);var snapshot=game.advanceForCropPush(tx,owner);var job=store.cropPushStore().job(tx,owner);store.cropPushStore().reserveBatch(tx,owner,clock.now,true,false,List.of());store.cropPushStore().observeReady(snapshot,job.cursors(),clock.now);store.cropPushStore().save(tx,owner,new CropPushStore.Job(true,null,clock.now,job.cursors()));return null;});
         store.close();store=new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"),"postgres","",schema);store.initialize(owner,clock.now);game=new OnlineGameService(store,clock,b->b-1,20);
         clock.now=clock.now.plusSeconds(60);var sends=new AtomicInteger();try(var worker=worker(sends)){worker.tick();}
         assertEquals(0,sends.get());assertEquals("unavailable",store.transaction(owner,tx->tx.query("SELECT status FROM "+schema+".crop_push_deliveries",r->r.getString(1)).getFirst()));

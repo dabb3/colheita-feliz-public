@@ -34,7 +34,7 @@ final class CropPushService implements AutoCloseable {
         try{
             Instant now=clock.instant();
             var missing=store.transaction(WORKER,crops::uninitialized);
-            for(UUID owner:missing)try{store.transaction(owner,tx->{crops.reconcileSubscription(tx,owner,now);return null;});}catch(RuntimeException failure){
+            for(UUID owner:missing)try{store.transaction(owner,tx->{tx.player(owner);tx.lock("push-subscriptions");store.socialPushStore().reconcile(tx,owner);crops.reconcileSubscription(tx,owner,now);return null;});}catch(RuntimeException failure){
                 logFailure();
                 try{store.transaction(owner,tx->{tx.lockFarms(owner);if(crops.job(tx,owner)==null){var baseline=new JsonObject();baseline.addProperty("baseline",now.toString());crops.save(tx,owner,new CropPushStore.Job(true,now.plusSeconds(60),null,baseline));}return null;});}catch(ApiFailure unavailable){logFailure();}
             }
@@ -43,17 +43,21 @@ final class CropPushService implements AutoCloseable {
             for(UUID owner:due){
                 if(closed||Thread.currentThread().isInterrupted())break;
                 try{reserved.addAll(store.transaction(owner,tx->{
+                    var player=tx.player(owner);tx.lock("push-subscriptions");
                     tx.lockFarms(owner);var job=crops.job(tx,owner);
                     if(job==null||!job.enabled()||job.due()==null||job.due().isAfter(now))return List.<CropPushStore.Delivery>of();
-                    var player=tx.player(owner);
-                    if(player==null||!player.active()||!crops.eligible(tx,owner)){crops.save(tx,owner,new CropPushStore.Job(false,null,job.lastBatch(),job.cursors()));return List.<CropPushStore.Delivery>of();}
+                    if(player==null||!player.active()||!crops.anyEligible(tx,owner)){crops.save(tx,owner,new CropPushStore.Job(false,null,job.lastBatch(),job.cursors()));return List.<CropPushStore.Delivery>of();}
+                    if(job.lastBatch()!=null&&now.isBefore(job.lastBatch().plusSeconds(60))){crops.save(tx,owner,new CropPushStore.Job(true,job.lastBatch().plusSeconds(60),job.lastBatch(),job.cursors()));return List.<CropPushStore.Delivery>of();}
                     var snapshot=game.advanceForCropPush(tx,owner);
                     job=crops.job(tx,owner);
-                    if(!crops.ready(snapshot,job.cursors(),now))return List.<CropPushStore.Delivery>of();
-                    if(job.lastBatch()!=null&&now.isBefore(job.lastBatch().plusSeconds(60)))return List.<CropPushStore.Delivery>of();
-                    var result=crops.reserve(tx,owner,now);
-                    crops.observeReady(snapshot,job.cursors(),now);
-                    crops.save(tx,owner,new CropPushStore.Job(true,crops.next(snapshot,job.cursors(),now,now),now,job.cursors()));
+                    boolean plants=job.cursors().get("plantsEnabled").getAsBoolean()&&crops.ready(snapshot,job.cursors(),now);
+                    boolean animals=crops.animalsReady(snapshot,job.cursors(),now);
+                    var events=store.socialPushStore().consume(tx,owner,now);
+                    var result=crops.reserveBatch(tx,owner,now,plants,animals,events);
+                    if(plants)crops.observeReady(snapshot,job.cursors(),now);
+                    if(animals)crops.observeAnimals(snapshot,job.cursors(),now);
+                    crops.save(tx,owner,new CropPushStore.Job(true,job.due(),result.isEmpty()?job.lastBatch():now,job.cursors()));
+                    crops.reconcile(tx,owner,snapshot,now);
                     return result;
                 }));}catch(RuntimeException failure){
                     logFailure();
@@ -78,7 +82,7 @@ final class CropPushService implements AutoCloseable {
         try{
             if(!store.transaction(delivery.owner(),tx->crops.current(tx,delivery)))return;
             String result;
-            try{var s=delivery.subscription();var payload=new JsonObject();payload.addProperty("type","CROP_READY");payload.addProperty("bindingId",s.binding());result=PushService.deliveryStatus(sender.send(s.endpoint(),s.p256dh(),s.auth(),payload.toString()));}
+            try{var s=delivery.subscription();var payload=new JsonObject();payload.addProperty("type",delivery.types().size()==1?delivery.types().getFirst():"BATCH");if(delivery.types().size()>1){var types=new com.google.gson.JsonArray();delivery.types().forEach(types::add);payload.add("types",types);}payload.addProperty("bindingId",s.binding());result=PushService.deliveryStatus(sender.send(s.endpoint(),s.p256dh(),s.auth(),payload.toString()));}
             catch(Exception failure){if(failure instanceof InterruptedException)Thread.currentThread().interrupt();result="unavailable";}
             String status=result;
             store.transaction(delivery.owner(),tx->{crops.finish(tx,delivery,status,clock.instant());return null;});

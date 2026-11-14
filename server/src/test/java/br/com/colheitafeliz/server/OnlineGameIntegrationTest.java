@@ -869,6 +869,12 @@ class OnlineGameIntegrationTest {
         return new Command(requestId(), service.farm(actor).get("revision").getAsString(), "CLAIM_DAILY_ALLOWANCE", null, null, null, null, null);
     }
 
+    @Test void socialPushEventOmitsUnusedActionMetadata(){
+        connectFriends();prepare(alice,"morango",true,false);clock.advanceSeconds(301);
+        var steal=theftCommand(bob,alice);var reply=service.visitAction(bob,alice,steal);
+        assertTrue(reply.getAsJsonObject("result").get("success").getAsBoolean());assertEquals(reply,service.visitAction(bob,alice,steal));
+        assertEquals(java.util.List.of("THEFT:{}"),store.transaction(alice,tx->tx.query("SELECT type||':'||metadata::text FROM "+testSchema+".push_events WHERE owner=?",r->r.getString(1),alice)));
+    }
     @Test void theftNotificationNamesActorIsPrivateAndReadCommandsSurviveReopen() {
         connectFriends();prepare(alice,"morango",true,false);clock.advanceSeconds(301);
         var steal=theftCommand(bob,alice);var reply=service.visitAction(bob,alice,steal);
