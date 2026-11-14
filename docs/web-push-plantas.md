@@ -8,6 +8,8 @@ Em Ajustes, o jogador precisa escolher explicitamente Plantas para o dispositivo
 
 Inscrições da primeira entrega que contenham `plants=true` sem `plantsConfirmed=true` são tratadas como desativadas. A leitura dessa preferência é somente leitura e nunca cria o marcador. O marcador só é gravado após uma alteração autenticada com revisão nova; a atualização suspende um agendamento antigo antes de reconciliar o estado. O Service Worker também exige o booleano literal `true`, de modo que ausência, `false`, strings e outros tipos falham fechados. Uma nova associação de dispositivo precisa repetir o opt-in.
 
+Nas gravações normais, a reconciliação do push usa primeiro uma consulta barata de elegibilidade e só bloqueia o job quando há inscrição confirmada. A ordem dos locks do transporte é: conta autenticada, lock global `push-subscriptions`, fazendas envolvidas e, por fim, o job do proprietário; novos caminhos devem manter essa ordem. O avanço temporal do worker persiste automações sem incrementar a revisão da fazenda, evitando invalidar uma ação que o jogador já deixou aberta.
+
 A mensagem é fixa: “Há plantas prontas para colher na sua fazenda. Toque para voltar ao jogo.” Não contém nome, saldo, cultura nem informações de amigos. O clique abre somente a origem do jogo.
 
 Maturações são agrupadas por jogador, em no máximo um lote por minuto. Cada dispositivo elegível recebe no máximo uma tentativa por lote. O servidor verifica se a temporada ainda está madura antes de reservar o envio. Se uma colheita ou furto acontecer depois dessa verificação, o aviso pode ficar desatualizado; a rede não mantém a fazenda bloqueada.
@@ -53,6 +55,8 @@ Os testes locais usam PostgreSQL descartável, relógio controlado e transporte 
 
 - `crop_push_jobs`: proprietário, habilitação, próxima verificação, horário do último lote e cursores JSON por terreno, incluindo o ponto inicial de ativação. Uma linha por fazenda; índice parcial em `next_at` para trabalhos habilitados.
 - `crop_push_deliveries`: identificador, proprietário, endpoint, binding/revisão, estado e horário da reserva. Índice parcial nas reservas pendentes. Recibos incertos expiram sem reenvio; o histórico permanece privado e exige acompanhamento de volume.
+
+As entregas mantêm o endpoint privado apenas pelo período necessário para validar binding e replay. A tabela ainda requer uma rotina de retenção em lote para estados terminais; essa limpeza não deve remover reservas pendentes nem recibos de deduplicação ativos. Até essa rotina ser publicada, acompanhar o volume e não executar limpeza manual em produção.
 
 Não há coluna nova no snapshot nem mudança de ruleset. A inicialização idempotente cria tabelas/índices e aplica RLS/revogações no schema privado. Apenas a API acessa esses registros.
 

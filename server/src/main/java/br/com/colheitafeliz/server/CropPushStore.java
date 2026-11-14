@@ -55,6 +55,10 @@ final class CropPushStore {
         var farm=tx.farm(owner);
         if(farm!=null)reconcile(tx,owner,farm.snapshot(),now.isBefore(farm.time())?farm.time():now);
     }
+    /** Fast path for ordinary saves: only eligible owners need a job upsert. */
+    void reconcileIfEligible(JdbcOnlineStore.Tx tx,UUID owner,GameSnapshot snapshot,Instant now){
+        if(eligible(tx,owner))reconcile(tx,owner,snapshot,now);
+    }
     List<UUID> uninitialized(JdbcOnlineStore.Tx tx){return tx.query("SELECT DISTINCT s.owner FROM "+schema+".push_subscriptions s JOIN "+schema+".players p ON p.id=s.owner JOIN "+schema+".farms f ON f.owner=s.owner LEFT JOIN "+schema+".crop_push_jobs j ON j.owner=s.owner WHERE p.active AND s.active AND s.preferences @> '{\"plants\":true,\"plantsConfirmed\":true}'::jsonb AND j.owner IS NULL ORDER BY s.owner LIMIT 10",r->r.getObject(1,UUID.class));}
     List<UUID> due(JdbcOnlineStore.Tx tx,Instant now,int limit){return tx.query("SELECT owner FROM "+schema+".crop_push_jobs WHERE enabled AND next_at<=? ORDER BY next_at,owner LIMIT ?",r->r.getObject(1,UUID.class),stamp(now),limit);}
     boolean ready(GameSnapshot snapshot,JsonObject cursors,Instant now){

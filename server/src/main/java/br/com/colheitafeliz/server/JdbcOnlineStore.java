@@ -249,7 +249,7 @@ final class JdbcOnlineStore implements AutoCloseable {
             execute("INSERT INTO " + schema + ".farms VALUES (?,?,?,?,?::jsonb) ON CONFLICT(owner) DO UPDATE SET "
                     + "ruleset=EXCLUDED.ruleset,revision=EXCLUDED.revision,game_time=EXCLUDED.game_time,snapshot=EXCLUDED.snapshot",
                     owner, GameSave.RULESET, revision, java.sql.Timestamp.from(now), JSON.toJson(snapshot));
-            cropPushStore().reconcile(this, owner, snapshot, now);
+            cropPushStore().reconcileIfEligible(this, owner, snapshot, now);
         }
         Receipt receipt(UUID actor, UUID request) {
             return first(query("SELECT hash,response FROM " + schema + ".receipts WHERE actor=? AND request_id=?",
@@ -289,7 +289,7 @@ final class JdbcOnlineStore implements AutoCloseable {
             values.add(actor); values.add(request); values.add(hash); values.add(JSON.toJson(response)); values.add(java.sql.Timestamp.from(expires));
             execute(sql.toString(), values.toArray());
             if (pendingSaves != null) for (var farm : pendingSaves.values())
-                cropPushStore().reconcile(this, farm.owner(), farm.snapshot(), farm.time());
+                cropPushStore().reconcileIfEligible(this, farm.owner(), farm.snapshot(), farm.time());
             pendingSaves = null;
         }
         void invite(String hash, UUID owner, Instant expires) {

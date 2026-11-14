@@ -38,6 +38,12 @@ class CropPushIntegrationTest {
         assertEquals(1,store.transaction(owner,tx->tx.query("SELECT count(*) FROM "+schema+".crop_push_jobs WHERE owner=?",r->r.getInt(1),owner).getFirst()).intValue());
         assertTrue(push.config(owner).get("plantEventsEnabled").getAsBoolean());
     }
+    @Test void backgroundAdvanceKeepsPlayerRevisionForAnOpenFarm(){
+        plantAndWater();subscribeConsent(PushStoreIntegrationTest.subscription(1,1));
+        var before=store.transaction(owner,tx->tx.farm(owner).revision());clock.now=clock.now.plusSeconds(72000);
+        store.transaction(owner,tx->{game.advanceForCropPush(tx,owner);return null;});
+        assertEquals(before,store.transaction(owner,tx->tx.farm(owner).revision()));
+    }
     @Test void legacySubscriptionsNeedExplicitConsentAndReadingNeverConfirms(){
         plantAndWater();var legacy=PushStoreIntegrationTest.subscription(1,1);push.subscribe(owner,legacy);
         var before=store.transaction(owner,tx->tx.query("SELECT preferences::text,updated_at,device_revision FROM "+schema+".push_subscriptions WHERE endpoint=?",r->List.of(r.getString(1),r.getTimestamp(2).toInstant().toString(),Long.toString(r.getLong(3))),legacy.get("endpoint").getAsString()).getFirst());

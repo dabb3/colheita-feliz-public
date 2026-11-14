@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /** Bounded offline work; durable reservations commit before any network call. */
 final class CropPushService implements AutoCloseable {
     private static final UUID WORKER=new UUID(0,0);
+    private static final int MAX_FARMS_PER_TICK=10;
     private final JdbcOnlineStore store;
     private final CropPushStore crops;
     private final OnlineGameService game;
@@ -37,7 +38,7 @@ final class CropPushService implements AutoCloseable {
                 logFailure();
                 try{store.transaction(owner,tx->{tx.lockFarms(owner);if(crops.job(tx,owner)==null){var baseline=new JsonObject();baseline.addProperty("baseline",now.toString());crops.save(tx,owner,new CropPushStore.Job(true,now.plusSeconds(60),null,baseline));}return null;});}catch(ApiFailure unavailable){logFailure();}
             }
-            var due=store.transaction(WORKER,tx->{crops.expire(tx,now);return crops.due(tx,now,10-missing.size());});
+            var due=store.transaction(WORKER,tx->{crops.expire(tx,now);return crops.due(tx,now,Math.max(0,MAX_FARMS_PER_TICK-missing.size()));});
             var reserved=new ArrayList<CropPushStore.Delivery>();
             for(UUID owner:due){
                 if(closed||Thread.currentThread().isInterrupted())break;
