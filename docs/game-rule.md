@@ -457,6 +457,10 @@ A planta precisa estar em crescimento, já ter recebido a primeira rega e ocupar
 
 As pragas pausam o crescimento sem apagar o progresso. O dono usa herbicida para remover ervas e pesticida para remover insetos; se os dois tipos estiverem presentes, só retoma após remover ambos. A limpeza não renova o limite do visitante. Lançar praga não custa moedas ou itens, não concede XP, moedas, tarefas ou produtos e não consome o limite de furto. A janela de cinco minutos da colheita permanece: planta pronta não recebe pragas.
 
+### 13.2. Presentes de sementes (online)
+
+O jogador pode presentear um amigo ativo com 1 a 5 sementes do próprio estoque, nunca a si mesmo. Cada par remetente → destinatário aceita um presente a cada 24 horas reais. O destinatário precisa ter o nível exigido pela semente e, se ela for VIP, cartão VIP ativo. As sementes chegam imediatamente com a mesma moeda e custo de origem, e o destinatário recebe uma notificação. Presentear não concede XP, moedas ou tarefas. Detalhes da API em [ONLINE.md](../ONLINE.md#presentes-de-sementes).
+
 ## 14. Assets e estado de entrega
 
 Reutilizar os assets existentes, com mapeamento explícito de nomes do catálogo para nomes de arquivos. A presença no disco deve ser conferida para os cinco estágios e a semente de cada cultura, fases e produtos animais e ícones de itens. A implementação deve conferir o carregamento e o resultado visual no jogo; inventário de caminhos não substitui revisão visual.

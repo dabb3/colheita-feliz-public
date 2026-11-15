@@ -30,6 +30,7 @@ final class JdbcOnlineStore implements AutoCloseable {
     record Farm(GameSnapshot snapshot, long revision, Instant time, LocalDate allowanceDay) {}
     record Receipt(String hash, JsonObject response) {}
     record Invitation(UUID owner, UUID usedBy, Instant expiresAt) {}
+    record Gift(UUID id, UUID sender, String senderName, UUID recipient, String recipientName, String cropId, int quantity, Instant createdAt, String state) {}
     private record FarmWrite(UUID owner, GameSnapshot snapshot, long revision, Instant time) {}
     private static final Gson JSON = new Gson();
     private final String schema;
@@ -103,11 +104,17 @@ final class JdbcOnlineStore implements AutoCloseable {
                     + schema + ".players(id), last_claimed_day date NOT NULL)");
             tx.execute("CREATE TABLE IF NOT EXISTS "+schema+".update_note_views (actor uuid PRIMARY KEY REFERENCES "+schema
                     +".players(id), version varchar(80) NOT NULL, seen_day date NOT NULL)");
+            tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".seed_gifts (id uuid PRIMARY KEY, sender uuid NOT NULL REFERENCES "
+                    + schema + ".players(id), recipient uuid NOT NULL REFERENCES " + schema + ".players(id), crop_id varchar(60) NOT NULL, "
+                    + "quantity int NOT NULL CHECK(quantity BETWEEN 1 AND 5), created_at timestamptz NOT NULL, "
+                    + "state text NOT NULL CHECK(state='DELIVERED'), CHECK(sender<>recipient))");
+            tx.execute("CREATE INDEX IF NOT EXISTS seed_gifts_pair_idx ON " + schema + ".seed_gifts(sender,recipient,created_at DESC)");
+            tx.execute("CREATE INDEX IF NOT EXISTS seed_gifts_recipient_idx ON " + schema + ".seed_gifts(recipient,created_at DESC)");
             pushStore().initialize(tx);
             cropPushStore().initialize(tx);
             socialPushStore().initialize(tx);
             tx.execute("REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
-            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "daily_allowances", "update_note_views", "push_subscriptions", "push_tests", "push_events", "crop_push_jobs", "crop_push_deliveries", "social_push_devices", "social_push_cursors", "social_push_deliveries")) {
+            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "daily_allowances", "update_note_views", "seed_gifts", "push_subscriptions", "push_tests", "push_events", "crop_push_jobs", "crop_push_deliveries", "social_push_devices", "social_push_cursors", "social_push_deliveries")) {
                 tx.execute("ALTER TABLE " + schema + "." + table + " ENABLE ROW LEVEL SECURITY");
                 tx.execute("REVOKE ALL ON " + schema + "." + table + " FROM PUBLIC");
             }
@@ -200,6 +207,21 @@ final class JdbcOnlineStore implements AutoCloseable {
             execute("INSERT INTO " + schema + ".theft_cooldowns (actor,last_stolen_at) VALUES (?,?) "
                     + "ON CONFLICT(actor) DO UPDATE SET last_stolen_at=EXCLUDED.last_stolen_at",
                     actor, java.sql.Timestamp.from(now));
+        }
+        Instant lastGift(UUID sender, UUID recipient) {
+            return first(query("SELECT created_at FROM " + schema + ".seed_gifts WHERE sender=? AND recipient=? ORDER BY created_at DESC LIMIT 1",
+                    row -> row.getTimestamp(1).toInstant(), sender, recipient));
+        }
+        void recordGift(UUID id, UUID sender, UUID recipient, String cropId, int quantity, Instant now) {
+            execute("INSERT INTO " + schema + ".seed_gifts (id,sender,recipient,crop_id,quantity,created_at,state) VALUES (?,?,?,?,?,?,'DELIVERED')",
+                    id, sender, recipient, cropId, quantity, java.sql.Timestamp.from(now));
+        }
+        List<Gift> gifts(UUID player) {
+            return query("SELECT g.id,g.sender,s.name,g.recipient,r.name,g.crop_id,g.quantity,g.created_at,g.state FROM " + schema
+                    + ".seed_gifts g JOIN " + schema + ".players s ON s.id=g.sender JOIN " + schema + ".players r ON r.id=g.recipient "
+                    + "WHERE g.sender=? OR g.recipient=? ORDER BY g.created_at DESC LIMIT 50",
+                    r -> new Gift(r.getObject(1, UUID.class), r.getObject(2, UUID.class), r.getString(3), r.getObject(4, UUID.class),
+                            r.getString(5), r.getString(6), r.getInt(7), r.getTimestamp(8).toInstant(), r.getString(9)), player, player);
         }
         Player player(UUID id) {
             // FOR SHARE keeps this row stable until the transaction ends; never cache across requests.
