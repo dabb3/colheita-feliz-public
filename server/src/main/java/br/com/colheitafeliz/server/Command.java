@@ -15,12 +15,14 @@ record Command(UUID requestId, String expectedRevision, String action, String it
     private static final Set<String> ACTIONS = Set.of("BUY_SEED", "BUY_ANIMAL", "BUY_FEED", "BUY_FERTILIZER",
             "BUY_VIP", "BUY_PLOT", "SELL_ALL", "SELL_ITEM", "SELL_ITEM_ALL", "SELL_ANIMAL", "TEND_ANIMAL",
             "PLOW", "PLANT", "WATER", "HARVEST", "WEED", "PESTICIDE", "FERTILIZE", "STEAL", "LOVE",
-            "SPREAD_INSECTS", "SPREAD_WEEDS", "CLEAN_WEEDS", "CLEAN_INSECTS", "FEED_ANIMAL", "CLAIM_DAILY_ALLOWANCE", "READ_NOTIFICATION", "READ_ALL_NOTIFICATIONS",
+            "SPREAD_INSECTS", "SPREAD_WEEDS", "CLEAN_WEEDS", "CLEAN_INSECTS", "FEED_ANIMAL", "CLAIM_DAILY_ALLOWANCE", "CLAIM_LOGIN_REWARD", "READ_NOTIFICATION", "READ_ALL_NOTIFICATIONS",
             "SET_AVATAR", "IMPORT_AVATAR", "DISMISS_NOTIFICATION", "DISMISS_READ_NOTIFICATIONS", "BUY_AUTOMATION");
     Command {
         Objects.requireNonNull(requestId);
         if (!ACTIONS.contains(action)) throw new ApiFailure(400, "Ação desconhecida.");
         if(photoUrl!=null&&!Set.of("SET_AVATAR","IMPORT_AVATAR").contains(action))throw new ApiFailure(400,"Foto não permitida nesta ação.");
+        if(action.equals("CLAIM_LOGIN_REWARD")&&(itemId!=null||currency!=null||column!=null||row!=null||harvestRevision!=null||feedId!=null))
+            throw new ApiFailure(400,"O calendário determina a recompensa no servidor.");
         if (feedId != null && (!action.equals("FEED_ANIMAL") || !Set.of("growth", "producer").contains(feedId)))
             throw new ApiFailure(400, "Ração inválida.");
         revision(expectedRevision);

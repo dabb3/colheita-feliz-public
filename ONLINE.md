@@ -313,6 +313,24 @@ precisam de ensaio; testes automatizados não comprovam esses resultados.
 
 A loja identifica o tempo nominal como duração com rega em dia e sem pragas. Solo seco cresce à metade da velocidade; ervas e minhocas pausam o crescimento. O popup separa o restante com rega em dia do restante sem nova rega. Cada cenário mostra sua própria previsão com data e hora locais, calculadas a partir do horário retornado pela API: uma mantendo a rega em dia e sem pragas; outra sem nova rega e sem novas pragas. O contador atualiza a previsão ideal conforme o crescimento real: ela permanece estável com solo úmido e acompanha o atraso enquanto a planta continuar seca. Pragas e plantas sem a primeira rega não exibem previsão de conclusão. Os textos usam os dados existentes da API; não alteram regras, preços, duração, relógio autoritativo ou saves.
 
+## Calendário de recompensas de login
+
+O backend aceita `CLAIM_LOGIN_REWARD` em `POST /v1/me/actions`. O cliente não escolhe dia, item, quantidade ou moeda: o servidor calcula uma data civil por `America/Sao_Paulo`, concede um prêmio por data e exige resgate manual. A sequência avança no próximo dia; uma falta reinicia no dia 1, inclusive quando o jogador abriu o jogo no dia perdido sem resgatar. O dia 30 seguido do próximo dia inicia novo ciclo. Retrocesso do relógio e segundo pedido na mesma data não concedem prêmio. As recompensas anteriores ficam no inventário/saldo.
+
+| Dias | Ouro por dia |
+|---|---|
+| 1–6, 8–13, 15–20, 22–27 | 250, 500, 750, 1.000, 1.500, 2.000; repetir a sequência para cada faixa |
+| 7, 14, 21, 30 | 1 Semente de Bronze, Prata, Ouro e Diamante, respectivamente |
+| 28–29 | 2.500 e 3.000 |
+
+O ciclo totaliza 29.500 ouro e quatro sementes. Bronze, Prata, Ouro e Diamante crescem em 24, 36, 48 e 72 horas; cada uma tem uma temporada e vende sua colheita por 5, 10, 15 e 20 moedas verdes, respectivamente, sem bônus VIP. A fórmula atual concede 36, 54, 72 e 108 XP; essas culturas ficam fora da rotação de eventos. Compra, presente e furto são bloqueados no domínio compartilhado online. Culturas e lotes têm origem explícita `LOGIN_REWARD`; snapshots que as contenham precisam continuar legíveis por qualquer binário de rollback.
+
+A projeção da própria fazenda inclui `loginRewards` (`completedDay`, `nextDay`, `available`, `streakReset`, `nextResetAt` ISO UTC e 30 `rewards` com dia, tipo, moeda, valor e `itemId` para sementes). `nextResetAt` corresponde à próxima meia-noite de São Paulo. Após o dia 30, o próximo resgate é dia 1; na projeção do dia seguinte, `completedDay` volta a zero. Visitas a outras fazendas não incluem calendário ou progresso privado. Consultar a fazenda nunca concede prêmio. O bônus `dailyAllowance` de 100 ouro segue independente, usa UTC e mantém seu contrato atual.
+
+A inicialização cria aditivamente e de forma idempotente `colheita.login_reward_progress` (`owner`, `last_claim_date`, `completed_day`, `cycle`, `total_claims`, `created_at`, `updated_at`), com chave estrangeira para participante, RLS e revogação de privilégios públicos, sem política de acesso direto. O lock da fazenda serializa o primeiro insert e as alterações seguintes. Progresso, ouro/semente, snapshot da fazenda e recibo confirmam ou revertem juntos; falha de capacidade da semente não avança o calendário. Replay do mesmo recibo devolve a mesma resposta, e reutilizar o UUID com outro conteúdo retorna 409.
+
+Incluir `login_reward_progress`, `farms` e demais tabelas existentes nos backups/restaurações. Publicar primeiro o backend com o catálogo das quatro culturas disponível e só então habilitar os claims no cliente. Jogadores existentes começam disponíveis para o dia 1, sem prêmios retroativos. Em rollback, desativar o calendário no código/cliente e preservar a tabela, os lotes e a leitura dos snapshots com sementes premiadas; não reverter para binário que não reconheça esses itens. O bônus UTC não faz parte do rollback do calendário.
+
 ## Ajuda diária de 100 ouro
 
 Missões oferece resgate manual de 100 ouro por dia UTC, sem acumular valores de dias ausentes e sem depender de saldo, nível ou VIP. O botão só aparece quando a API informa dailyAllowance; após o resgate fica bloqueado e mostra a próxima virada em data/hora local. Não há pagamento por GET, login ou tutorial, nem XP, verdes, itens ou progresso de tarefas. A regra fonte é a seção 12.1 de docs/game-rule.md.

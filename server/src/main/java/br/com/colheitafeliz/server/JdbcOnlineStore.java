@@ -28,6 +28,7 @@ final class JdbcOnlineStore implements AutoCloseable {
     record Player(UUID id, String name, boolean active, Instant registeredAt) {}
     record Friend(UUID id,String name,boolean active,br.com.colheitafeliz.game.PlayerAvatar avatar,boolean vipActive) {}
     record Farm(GameSnapshot snapshot, long revision, Instant time, LocalDate allowanceDay) {}
+    record LoginRewardProgress(LocalDate lastClaimDate, int completedDay, long cycle, long totalClaims) {}
     record Receipt(String hash, JsonObject response) {}
     record Invitation(UUID owner, UUID usedBy, Instant expiresAt) {}
     record Gift(UUID id, UUID sender, String senderName, UUID recipient, String recipientName, String cropId, int quantity, Instant createdAt, String state) {}
@@ -106,6 +107,10 @@ final class JdbcOnlineStore implements AutoCloseable {
                     + "harvest_revision bigint NOT NULL CHECK(harvest_revision >= 0), arrived_at text NOT NULL, PRIMARY KEY(owner,plot_id,kind))");
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".daily_allowances (actor uuid PRIMARY KEY REFERENCES "
                     + schema + ".players(id), last_claimed_day date NOT NULL)");
+            tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".login_reward_progress (owner uuid PRIMARY KEY REFERENCES "
+                    + schema + ".players(id), last_claim_date date, completed_day integer NOT NULL CHECK(completed_day BETWEEN 0 AND 30), "
+                    + "cycle bigint NOT NULL CHECK(cycle > 0), total_claims bigint NOT NULL CHECK(total_claims > 0), "
+                    + "created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at timestamptz NOT NULL)");
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".cooperative_xp (actor uuid PRIMARY KEY REFERENCES "
                     + schema + ".players(id), day date NOT NULL, xp integer NOT NULL CHECK(xp >= 0))");
             tx.execute("CREATE TABLE IF NOT EXISTS "+schema+".update_note_views (actor uuid PRIMARY KEY REFERENCES "+schema
@@ -120,7 +125,7 @@ final class JdbcOnlineStore implements AutoCloseable {
             cropPushStore().initialize(tx);
             socialPushStore().initialize(tx);
             tx.execute("REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
-            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "pest_origins", "daily_allowances", "cooperative_xp", "update_note_views", "seed_gifts", "push_subscriptions", "push_tests", "push_events", "crop_push_jobs", "crop_push_deliveries", "social_push_devices", "social_push_cursors", "social_push_deliveries")) {
+            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "pest_origins", "daily_allowances", "login_reward_progress", "cooperative_xp", "update_note_views", "seed_gifts", "push_subscriptions", "push_tests", "push_events", "crop_push_jobs", "crop_push_deliveries", "social_push_devices", "social_push_cursors", "social_push_deliveries")) {
                 tx.execute("ALTER TABLE " + schema + "." + table + " ENABLE ROW LEVEL SECURITY");
                 tx.execute("REVOKE ALL ON " + schema + "." + table + " FROM PUBLIC");
             }
@@ -293,6 +298,17 @@ final class JdbcOnlineStore implements AutoCloseable {
         void recordAllowance(UUID actor, LocalDate day) {
             execute("INSERT INTO " + schema + ".daily_allowances (actor,last_claimed_day) VALUES (?,?) "
                     + "ON CONFLICT(actor) DO UPDATE SET last_claimed_day=EXCLUDED.last_claimed_day", actor, day);
+        }
+        LoginRewardProgress loginRewardProgress(UUID owner) {
+            return first(query("SELECT last_claim_date,completed_day,cycle,total_claims FROM " + schema
+                            + ".login_reward_progress WHERE owner=?", row -> new LoginRewardProgress(
+                            row.getObject(1, LocalDate.class), row.getInt(2), row.getLong(3), row.getLong(4)), owner));
+        }
+        void recordLoginRewardProgress(UUID owner, LocalDate day, int completedDay, long cycle, long totalClaims, Instant now) {
+            execute("INSERT INTO " + schema + ".login_reward_progress(owner,last_claim_date,completed_day,cycle,total_claims,updated_at) "
+                            + "VALUES(?,?,?,?,?,?) ON CONFLICT(owner) DO UPDATE SET last_claim_date=EXCLUDED.last_claim_date, "
+                            + "completed_day=EXCLUDED.completed_day,cycle=EXCLUDED.cycle,total_claims=EXCLUDED.total_claims,updated_at=EXCLUDED.updated_at",
+                    owner, day, completedDay, cycle, totalClaims, java.sql.Timestamp.from(now));
         }
         void save(UUID owner, GameSnapshot snapshot, long revision, Instant now) {
             if (pendingSaves != null) {
