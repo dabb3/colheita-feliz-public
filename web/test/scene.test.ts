@@ -13,15 +13,17 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
   createRadialGradient(){return{addColorStop(){}};},getImageData(x,y,w,h){const data=new Uint8ClampedArray(w*h*4);for(let row=0;row<h;row++)for(let col=0;col<w;col++)if(row<h*.88||col<w*.25)data[(row*w+col)*4+3]=255;return{data};}};
  const canvas={width:1600,height:900,getContext:()=>context,getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(name,handler){events.set(name,handler);}};
  const environment={...presentation,periodAt:()=>period,performance:{now:()=>now},window:{requestAnimationFrame:fn=>{tick=fn;return ++timers;},cancelAnimationFrame:id=>cancelled.push(id)},AbortController,document:{hidden:false,createElement:()=>({getContext:()=>context})},
-  Image:class{width=100;height=200;onload;src;constructor(){pending.push(this);images.push(this);}}};
+  Image:class{width=100;height=200;onload;onerror;src;constructor(){pending.push(this);images.push(this);}}};
  const source=readFileSync(new URL('../src/scene.ts',import.meta.url),'utf8').replace(/^import\b[\s\S]*?;\s*/gm,'').replace('export class Scene','class Scene');
  runInNewContext(stripTypeScriptTypes(source)+'\nglobalThis.Scene=Scene;',environment);
- const scene=new environment.Scene(canvas,{crops:[{id:'nabo',spriteStem:'nabo'}],animals:[{id:'vaca',kind:'PRODUCER'},{id:'abelha',kind:'PROTECTOR'}]},()=>{},id=>selected.push(id),tile=>hovered.push(tile),value=>periods.push(value));
+ const scene=new environment.Scene(canvas,{crops:[{id:'nabo',spriteStem:'nabo'}],animals:[{id:'vaca',kind:'PRODUCER'},{id:'abelha',kind:'PROTECTOR'},{id:'cachorro-robo',kind:'PROTECTOR'}]},()=>{},id=>selected.push(id),tile=>hovered.push(tile),value=>periods.push(value));
  const tile={column:0,row:0,unlocked:true,state:'READY',cropId:'nabo',stage:3,weeds:true,insects:2};
- const farm={owner:'alice',own:true,nextPlot:{column:1,row:0},tiles:[tile,{column:0,row:1,unlocked:true,state:'GRASS'}],animals:[{id:'vaca',stage:'ADULT',status:'READY'},{id:'abelha',stage:'ADULT',status:'PRODUCING'}]};
+ const farm={owner:'alice',own:true,nextPlot:{column:1,row:0},tiles:[tile,{column:0,row:1,unlocked:true,state:'GRASS'}],animals:[{id:'vaca',stage:'ADULT',status:'READY'},{id:'abelha',stage:'ADULT',status:'PRODUCING'},{id:'cachorro-robo',stage:'ADULT',status:'PRODUCING'}]};
  scene.update(farm);
- while(pending.length){const image=pending.shift();if(image.src.includes('atlas')){image.width=400;image.height=100;}image.onload();}
+ while(pending.length){const image=pending.shift();if(image.src.includes('atlas')){image.width=400;image.height=100;}if(image.src.endsWith('cachorro-andando.png'))image.onerror();else image.onload();}
  drawn.length=0;scene.update(farm);
+ assert.ok(drawn.some(d=>d.path?.endsWith('cachorro.png')&&d.args.at(-2)===110),'idle dog remains visible at normal width when the walking reference fails');
+ assert.equal(images.filter(image=>image.src.endsWith('cachorro-andando.png')).length,1,'failed reference is not requested again');
  assert.ok(drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('nabo_3.png')&&d.args.at(-1)===80&&d.args.at(-2)===40));
  const lastTerrain=drawn.findLastIndex(d=>typeof d.path==='string'&&/terrain\/(grama-default|terra-molhada)\.png$/.test(d.path));
  const firstPlant=drawn.findIndex(d=>typeof d.path==='string'&&d.path.endsWith('nabo_3.png'));

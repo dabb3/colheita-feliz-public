@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {periodAt,tileCenter,pickTile,animalPath,animalWalkingFrame,animalSoundPath,tileArtRect,backgroundBounds,animalShadowRect,spriteDrawRect,measureSpriteFootprint,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand,friendFeedOptions} from '../src/presentation.ts';
+import {periodAt,tileCenter,pickTile,animalPath,animalWalkingFrame,animalSoundPath,tileArtRect,backgroundBounds,animalShadowRect,spriteDrawRect,measureSpriteFootprint,widthForMatchingHeight,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand,friendFeedOptions} from '../src/presentation.ts';
+
+test('the updated idle dog matches the walking sprite height after alpha trim',()=>{
+ // Trimmed boxes (>12 alpha) of cachorro.png and cachorro-andando.png at 1536×1024.
+ const idle={width:941,height:922},walking={width:1082,height:875};
+ const idleWidth=widthForMatchingHeight(110,idle.width,idle.height,walking.width,walking.height);
+ assert.ok(Math.abs(idleWidth*idle.height/idle.width-110*walking.height/walking.width)<1e-9);
+ assert.ok(Math.abs(idleWidth-90.79)<0.01);
+});
 
 test('existing robot identifier presents only the normal dog in every pose and faces its travel',()=>{
  assert.equal(animalPath('cachorro-robo','ADULT',false,false,false),'classic/animals/cachorro/cachorro.png');

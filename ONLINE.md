@@ -191,6 +191,8 @@ Ao receber respostas fora de ordem, o cliente mantém a revisão econômica mais
 
 Verifique com `npm.cmd test --prefix web`, `npm.cmd run typecheck --prefix web` e `npm.cmd run build:local --prefix web`. Os testes de viewport cobrem 390 × 844, 1024 × 600, 1280 × 1024, 1366 × 768 e 2560 × 1080. A revisão manual deve conferir tooltip, nome/saldos longos, bandejas, teclado, visita e modal nessas dimensões. Testes sintéticos não comprovam paridade funcional integral nem alterações já publicadas.
 
+O cachorro mantém a mesma altura visível ao alternar entre parado e andando, usando a caminhada como referência; a pose de sono preserva sua proporção. Miniaturas do Caviar recortam as margens transparentes da arte final antes de ajustar a imagem ao cartão, inclusive na loja e no depósito. Os PNGs originais permanecem inalterados.
+
 O piloto foi desenhado para Chrome/Edge em desktop, a partir de 1280×720. Não há promessa de suporte móvel ou reprodução visual idêntica ao desktop. Sons de ferramentas existentes são opcionais; novos sons de animais não foram gerados.
 
 ## Publicação gratuita proposta

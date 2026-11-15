@@ -287,6 +287,15 @@ export function spriteDrawRect(
     height,
   };
 }
+export function widthForMatchingHeight(
+  width: number,
+  spriteWidth: number,
+  spriteHeight: number,
+  referenceWidth: number,
+  referenceHeight: number,
+) {
+  return width * (referenceHeight / referenceWidth) / (spriteHeight / spriteWidth);
+}
 export function measureSpriteFootprint(
   imageWidth: number,
   imageHeight: number,
