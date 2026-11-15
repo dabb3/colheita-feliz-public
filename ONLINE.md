@@ -136,6 +136,17 @@ Os recibos recebem `expires_at` e são limpos em lotes de até 1.000, com locks 
 
 Tempo, saldos, XP, proteção e sorteios pertencem ao servidor. Visitantes recebem apenas a projeção pública, sem o campo `protected` dos terrenos nem outra indicação de quais terras estão protegidas; a web só desenha cadeados na própria fazenda. O relógio local controla a aparência dia/noite e a trilha ambiente, sem alterar a economia.
 
+### Presentes de sementes
+
+Em **Amigos > Presentes**, o jogador escolhe um amigo ativo, uma semente do próprio estoque e de 1 a 5 unidades, e confirma o envio. A entrega é imediata, sem etapa de aceite, e fica registrada como `DELIVERED`. Cada par remetente → destinatário aceita um presente a cada 24 horas corridas pelo relógio do servidor. O destinatário precisa cumprir os requisitos de plantio da semente: nível mínimo e, para sementes VIP, cartão VIP ativo. Enviar não concede XP nem verdes e não conta para tarefas.
+
+- `POST /v1/gifts` com `requestId`, `recipientId`, `cropId` e `quantity` retorna `result` e a fazenda atualizada do remetente. Quantidade fora de 1–5 ou semente desconhecida retorna 400; destinatário que não é amigo ou é o próprio jogador retorna 404; conta inativa retorna 403. Estoque insuficiente, requisito do destinatário, capacidade e limite de 24 horas retornam `result.success=false` sem alterar as fazendas.
+- `GET /v1/gifts` lista até 50 presentes recentes em `received` (`senderId`, `senderName`) e `sent` (`recipientId`, `recipientName`), com `cropId`, `quantity`, `createdAt` e `state`.
+
+A transferência retira lotes do remetente na mesma ordem do plantio e os adiciona ao destinatário preservando moeda, custo e marcação VIP. A ação usa o recibo por `requestId`, os locks ordenados das duas fazendas e uma única transação: a consulta do limite, a gravação do presente e as duas fazendas são confirmadas juntas. Replay devolve a resposta original sem nova transferência. O destinatário recebe uma notificação na caixa já existente; ela usa o tipo `CHRISTMAS_GIFT` e o cursor de furto para não alterar o formato de snapshot, e não gera Web Push.
+
+A inicialização cria, de forma aditiva e idempotente, `colheita.seed_gifts` (`id`, `sender`, `recipient`, `crop_id`, `quantity` entre 1 e 5, `created_at`, `state`) com índices por par e por destinatário, RLS e privilégios públicos revogados. Incluir a tabela no backup. Rollback de código desativa a rota e preserva a tabela; as notificações já gravadas continuam legíveis pela versão anterior.
+
 Antes de publicar: validar duas contas, configurar Google OAuth e redirects, testar restauração de backup PostgreSQL e conferir limites gratuitos vigentes. Proposta: Cloudflare Pages para arquivos, Render para API e Supabase para PostgreSQL/Auth. Nenhum deploy realizado. Serviços gratuitos podem suspender por inatividade ou atingir quotas.
 
 Backup usa `pg_dump` do schema `colheita`, guardado fora de artefatos públicos. Restaurar primeiro em banco isolado e conferir participantes, fazendas e recibos. Para rollback de código, guardar a imagem anterior e preservar compatibilidade do schema. Mudanças futuras de schema exigem migração explícita e backup.

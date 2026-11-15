@@ -52,8 +52,8 @@ class FriendFeedingIntegrationTest {
             var tile=game.farm().tile(0,0);var crop=new Crop(type,clock.instant(),origin).water(clock.instant());
             tile.restore(TileState.GROWING,crop,PestState.NONE,clock.instant().plusSeconds(3600),0,clock.instant().plusSeconds(3600),null,false,tile.harvestRevision()+1);
             var helper=GameState.newOnline(clock,game.catalog(),bound->bound-1);var visits=new VisitService();
-            assertTrue(visits.spreadWeeds(game,helper,0,0,tile.harvestRevision()).success());
-            assertTrue(visits.spreadInsects(game,helper,0,0,tile.harvestRevision()).success());
+            assertTrue(visits.spreadWeeds(game,helper,0,0,tile.harvestRevision()).result().success());
+            assertTrue(visits.spreadInsects(game,helper,0,0,tile.harvestRevision()).result().success());
             tile.observePestArrivals(clock.instant());
         });
     }

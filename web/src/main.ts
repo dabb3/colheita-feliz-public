@@ -1,11 +1,12 @@
 import {connectPush,suspendPush,reconcilePush,renderPushSettings} from './push.ts';
 import {createClient} from '@supabase/supabase-js';
-import type {Farm,Catalog,Tile,Animal,AnimalType,Reply,CommandFields,Friend} from './types.ts';
+import type {Farm,Catalog,Tile,Animal,AnimalType,Reply,CommandFields,Friend,Gifts} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
 import {syncMobileCamera} from './mobile.ts';
 import {takeInvite} from './invite-url.ts';
 import {renderWallet,control,text,image,renderDailyAllowance,friendAvatar,vipBadge} from './ui.ts';
+import {renderGifts} from './ui-panels.ts';
 import {fertilizerDuration,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText} from './ui-presentation.ts';
 import {PROTECTED_ICON,notificationCount,renderNotifications} from './notifications.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,avatarImport,type AvatarChoice} from './avatar.ts';
@@ -712,7 +713,15 @@ async function friends(){
  const heading=document.createElement('h3');heading.className='friends-title';heading.textContent='Seus amigos';content.append(heading);const listPanel=document.createElement('div');listPanel.className='friend-list';content.append(listPanel);
  let friendRefresh=0;
  refreshDialog=()=>{const request=++friendRefresh;void client.get<Friend[]>('/v1/friends').then(list=>{if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open||request!==friendRefresh)return;for(const row of Array.from(listPanel.children)){const name=row.children[1],friend=list.find(item=>item.id===(row as HTMLElement).dataset.friendId);if(name&&friend){name.replaceChildren(document.createTextNode(friend.name));if(friend.vipActive)name.append(vipBadge());}}}).catch(()=>{});};
- try{const list=await client.get<Friend[]>('/v1/friends');if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open)return;for(const friend of list){const row=document.createElement('article');row.className='friend-card';row.dataset.friendId=friend.id;const badge=friendAvatar(friend);const name=document.createElement('strong');name.textContent=friend.name;if(friend.vipActive)name.append(vipBadge());const visit=button('Visitar fazenda',async()=>{const navigation=++navigationGeneration;try{const farm=await client.get<Farm>(`/v1/farms/${friend.id}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||dialogGeneration!==panelGeneration||!modal.open)return;visited=farm;tool='CURSOR';render();modal.close();}catch(error){handleError(error);}},row);row.prepend(badge,name);listPanel.append(row);}if(!list.length)paragraph('Nenhum amigo adicionado ainda.',listPanel);}
+ try{const list=await client.get<Friend[]>('/v1/friends');if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open)return;for(const friend of list){const row=document.createElement('article');row.className='friend-card';row.dataset.friendId=friend.id;const badge=friendAvatar(friend);const name=document.createElement('strong');name.textContent=friend.name;if(friend.vipActive)name.append(vipBadge());const visit=button('Visitar fazenda',async()=>{const navigation=++navigationGeneration;try{const farm=await client.get<Farm>(`/v1/farms/${friend.id}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||dialogGeneration!==panelGeneration||!modal.open)return;visited=farm;tool='CURSOR';render();modal.close();}catch(error){handleError(error);}},row);row.prepend(badge,name);listPanel.append(row);}if(!list.length)paragraph('Nenhum amigo adicionado ainda.',listPanel);
+  const giftPanel=document.createElement('section');content.append(giftPanel);
+  const showGifts=async()=>{try{const data=await client.get<Gifts>('/v1/gifts');if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open)return;renderGifts(giftPanel,catalog,own?.seedCounts??{},list,data,Date.now(),sendGift);}catch(error){handleError(error);}};
+  const sendGift=async(fields:CommandFields)=>{
+   if(busy)return;if(!navigator.onLine){notify('Sem conexão. Reconecte antes de agir.');return;}busy=true;
+   try{const reply=await client.mutate('/v1/gifts',fields);if(generation!==sessionGeneration)return;receive(reply,false);if(reply.result)notify(reply.result.message);}
+   catch(error){if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();void client.prepareRequestId().catch(()=>{});void showGifts();}}
+  };
+  void showGifts();}
  catch(error){handleError(error);}
 }
 async function migrateAvatar(){const migration=own&&avatarImport(avatarStore,avatarUser,own.avatarSelected,googlePhoto);if(migration)await action(migration);}

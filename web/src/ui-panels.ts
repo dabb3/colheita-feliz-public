@@ -1,4 +1,4 @@
-import type { Farm, Catalog, Tile, CommandFields, Friend } from "./types.ts";
+import type { Farm, Catalog, Tile, CommandFields, Friend, Gifts } from "./types.ts";
 import { text, image, control, renderDailyAllowance,friendAvatar,vipBadge } from "./ui.ts";
 import { animalPath, productPath } from "./presentation.ts";
 import { durationLabel, animalCare, cropTimingText } from "./ui-presentation.ts";
@@ -412,6 +412,87 @@ export function renderFriends(
         "empty-state",
       ),
     );
+}
+
+export function giftLimit(stock: number) {
+  return Math.max(0, Math.min(5, Math.floor(stock)));
+}
+
+export function renderGifts(
+  root: HTMLElement,
+  catalog: Catalog,
+  seedCounts: Record<string, number>,
+  friends: Friend[],
+  gifts: Gifts,
+  now: number,
+  onSend: (fields: CommandFields) => void,
+) {
+  const state = { friend: "", crop: "", quantity: 1, confirming: false };
+  const crops = catalog.crops.filter((crop) => (seedCounts[crop.id] ?? 0) > 0);
+  const recent = (id: string) => gifts.sent.some((gift) => gift.recipientId === id && now - Date.parse(gift.createdAt) < 86_400_000);
+  const pick = (label: string, selected: boolean, action: () => void) => {
+    const node = control(label, action);
+    node.setAttribute("aria-pressed", String(selected));
+    return node;
+  };
+  const draw = () => {
+    root.replaceChildren();
+    root.className = "gift-panel";
+    const icon = text("span", "", "gift-icon");
+    icon.append(image("classic/icons/asset_presente.jpg"));
+    root.append(icon, text("h3", "Presentes"));
+    const friend = friends.find((item) => item.id === state.friend);
+    const crop = crops.find((item) => item.id === state.crop);
+    const limit = giftLimit(crop ? seedCounts[crop.id] : 0);
+    state.quantity = Math.min(Math.max(1, state.quantity), Math.max(1, limit));
+    if (!friends.length) root.append(text("p", "Adicione um amigo para enviar presentes.", "empty-state"));
+    else if (!crops.length) root.append(text("p", "Você não tem sementes para presentear.", "empty-state"));
+    else {
+      const people = text("div", "", "gift-options");
+      for (const item of friends) {
+        const button = pick(item.name, item.id === state.friend, () => { state.friend = item.id; state.confirming = false; draw(); });
+        button.disabled = recent(item.id);
+        people.append(button);
+      }
+      const seeds = text("div", "", "gift-options");
+      for (const item of crops)
+        seeds.append(pick(`${item.name} (${seedCounts[item.id]})`, item.id === state.crop, () => { state.crop = item.id; state.confirming = false; draw(); }));
+      const less = control("−", () => { state.quantity--; draw(); }), more = control("+", () => { state.quantity++; draw(); });
+      less.disabled = state.quantity <= 1;
+      more.disabled = state.quantity >= limit;
+      const quantity = text("div", "", "gift-quantity");
+      quantity.append(less, text("strong", `${state.quantity} semente(s)`), more);
+      root.append(text("p", "Amigo"), people, text("p", "Semente"), seeds, quantity);
+      const reason = friend && recent(friend.id) ? "Você já presenteou este amigo nas últimas 24 horas."
+        : friend && crop?.vipOnly && !friend.vipActive ? `${crop.name} exige VIP ativo do seu amigo.` : "";
+      if (reason) root.append(text("p", reason, "empty-state"));
+      if (state.confirming && friend && crop) {
+        const confirm = text("div", "", "gift-confirm");
+        confirm.append(
+          text("p", `Enviar ${state.quantity} semente(s) de ${crop.name} para ${friend.name}?`),
+          control("Confirmar", () => { state.confirming = false; draw(); onSend({ recipientId: friend.id, cropId: crop.id, quantity: state.quantity }); }),
+          control("Cancelar", () => { state.confirming = false; draw(); }),
+        );
+        root.append(confirm);
+      } else {
+        const send = control("Enviar presente", () => { state.confirming = true; draw(); });
+        send.disabled = !friend || !crop || !!reason;
+        root.append(send);
+      }
+    }
+    root.append(text("h4", "Recebidos"));
+    for (const gift of gifts.received) {
+      const card = text("article", "", "gift-card");
+      const art = text("span", "", "gift-icon");
+      art.append(image("classic/icons/asset_presente.jpg"));
+      const name = catalog.crops.find((item) => item.id === gift.cropId)?.name ?? gift.cropId;
+      card.append(art, text("strong", `${gift.senderName ?? "Amigo"} enviou ${gift.quantity} semente(s) de ${name}`),
+        text("span", new Date(gift.createdAt).toLocaleString("pt-BR")));
+      root.append(card);
+    }
+    if (!gifts.received.length) root.append(text("p", "Nenhum presente recebido ainda.", "empty-state"));
+  };
+  draw();
 }
 
 export function renderAudioSettings(

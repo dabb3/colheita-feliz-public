@@ -475,6 +475,10 @@ No online, durante a visita a um amigo ativo, o visitante pode alimentar (FEED_A
 
 O visitante recebe **2 XP** pelo mesmo teto cooperativo de 20 XP por dia UTC da limpeza e conclui a missão Amigo dos Animais; acima do teto, alimenta sem XP. O dono não recebe XP nem progresso. Ração incompatível, falta de ração, animal sem fome ou repetição do pedido não concedem XP, progresso nem gastam ração. As recusas não mencionam proteção de terrenos.
 
+### 13.4. Presentes de sementes (online)
+
+O jogador pode presentear um amigo ativo com 1 a 5 sementes do próprio estoque, nunca a si mesmo. Cada par remetente → destinatário aceita um presente a cada 24 horas reais. O destinatário precisa ter o nível exigido pela semente e, se ela for VIP, cartão VIP ativo. As sementes chegam imediatamente com a mesma moeda e custo de origem, e o destinatário recebe uma notificação. Presentear não concede XP, moedas ou tarefas. Detalhes da API em [ONLINE.md](../ONLINE.md#presentes-de-sementes).
+
 ## 14. Assets e estado de entrega
 
 Reutilizar os assets existentes, com mapeamento explícito de nomes do catálogo para nomes de arquivos. A presença no disco deve ser conferida para os cinco estágios e a semente de cada cultura, fases e produtos animais e ícones de itens. A implementação deve conferir o carregamento e o resultado visual no jogo; inventário de caminhos não substitui revisão visual.

@@ -19,6 +19,7 @@ const types = {
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".png": "image/png",
+  ".jpg": "image/jpeg",
   ".wav": "audio/wav",
   ".mp3": "audio/mpeg",
 };

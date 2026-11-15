@@ -32,7 +32,7 @@ final class OnlineGameService implements AutoCloseable {
     private static final BigDecimal DAILY_ALLOWANCE = BigDecimal.valueOf(100);
     private static final Set<String> PEST_ACTIONS = Set.of("SPREAD_INSECTS", "SPREAD_WEEDS");
     // Decisão de 2026-11-13: furto e cada tipo de praga liberam uma nova tentativa a cada 6 horas.
-    static final Duration THEFT_COOLDOWN = Duration.ofHours(6), PEST_COOLDOWN = Duration.ofHours(6);
+    static final Duration THEFT_COOLDOWN = Duration.ofHours(6), PEST_COOLDOWN = Duration.ofHours(6), GIFT_COOLDOWN = Duration.ofHours(24);
     private static final Set<String> VISIT_ACTIONS = Set.of("STEAL", "LOVE", "SPREAD_INSECTS", "SPREAD_WEEDS", "CLEAN_WEEDS", "CLEAN_INSECTS", "FEED_ANIMAL");
     private static final Set<String> CLEAN_ACTIONS = Set.of("CLEAN_WEEDS", "CLEAN_INSECTS");
     // Orçamento de XP cooperativo por visitante e dia UTC, compartilhado pelas ações de ajuda a amigos.
@@ -207,10 +207,8 @@ final class OnlineGameService implements AutoCloseable {
                     Instant lastTheft = tx.lastTheft(actor);
                     Instant availableAt = lastTheft == null ? now : lastTheft.plus(THEFT_COOLDOWN);
                     if (now.isBefore(availableAt)) {
-                        Duration remaining = Duration.between(now, availableAt);
-                        long seconds = remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);
                         theft = br.com.colheitafeliz.game.TheftAttempt.blocked("Você já usou sua tentativa de furto nas últimas 6 horas. Nova tentativa em "
-                                + seconds / 3600 + "h " + seconds % 3600 / 60 + "min " + seconds % 60 + "s.");
+                                + remaining(now, availableAt) + ".");
                     } else {
                         theft = stealAfterOwnerWindow(visits, destination, visitor, command, season, now);
                         if (theft.consumesCooldown()) tx.recordTheft(actor, now);
@@ -221,10 +219,8 @@ final class OnlineGameService implements AutoCloseable {
                     Instant last = tx.lastPest(actor, command.action());
                     Instant availableAt = last == null ? now : last.plus(PEST_COOLDOWN);
                     if (now.isBefore(availableAt)) {
-                        Duration remaining = Duration.between(now, availableAt);
-                        long seconds = remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);
                         result = ActionResult.fail("Você já lançou esse tipo de praga nas últimas 6 horas. Disponível em "
-                                + seconds / 3600 + "h " + seconds % 3600 / 60 + "min " + seconds % 60 + "s.");
+                                + remaining(now, availableAt) + ".");
                     } else {
                         var pest = command.action().equals("SPREAD_INSECTS")
                                 ? visits.spreadInsects(destination.game(), visitor.game(), command.column(), command.row(), season)
@@ -253,6 +249,47 @@ final class OnlineGameService implements AutoCloseable {
                 if(theft!=null)reply.add("theftOutcome",object("kind",theft.kind(),"goldDebited",theft.goldDebited().toPlainString()));
                 return reply;
             });
+    }
+
+    JsonObject sendGift(UUID actor, UUID recipient, String cropId, Integer quantity, UUID requestId) {
+        if (quantity == null || quantity < 1 || quantity > VisitService.MAX_GIFT_SEEDS) throw new ApiFailure(400, "Escolha de 1 a 5 sementes.");
+        try { catalog.get(cropId == null ? "" : cropId); } catch (IllegalArgumentException e) { throw new ApiFailure(400, "Semente inválida."); }
+        return store.transaction(actor, tx -> sendGift(tx, actor, recipient, cropId, quantity, requestId));
+    }
+
+    JsonObject sendGift(JdbcOnlineStore.Tx tx, UUID actor, UUID recipient, String cropId, int quantity, UUID requestId) {
+        authorizeVisit(tx, actor, recipient);
+        return receipt(tx, actor, requestId, hash("GIFT:" + recipient + ":" + cropId + ":" + quantity), () -> {
+            tx.lockFarms(actor, recipient);
+            var sender = load(tx, actor); var target = load(tx, recipient);
+            // The actor and farm locks serialize this check with the insert, so concurrent sends cannot both pass.
+            Instant now = clock.instant(), last = tx.lastGift(actor, recipient);
+            Instant availableAt = last == null ? now : last.plus(GIFT_COOLDOWN);
+            ActionResult result;
+            if (now.isBefore(availableAt))
+                result = ActionResult.fail("Você já enviou um presente a este amigo nas últimas 24 horas. Novo envio em " + remaining(now, availableAt) + ".");
+            else {
+                UUID gift = UUID.randomUUID();
+                result = new VisitService().giftSeeds(sender.game(), target.game(), cropId, quantity, sender.name(), gift.toString());
+                if (result.success()) tx.recordGift(gift, actor, recipient, cropId, quantity, now);
+            }
+            persist(tx, target, false, false);
+            return object("result", result, "farm", persist(tx, sender, false, true));
+        });
+    }
+
+    JsonObject gifts(UUID actor) {
+        return store.transaction(actor, tx -> {
+            active(tx, actor);
+            var received = new JsonArray(); var sent = new JsonArray();
+            for (var gift : tx.gifts(actor)) {
+                boolean incoming = gift.recipient().equals(actor);
+                (incoming ? received : sent).add(object("id", gift.id(), incoming ? "senderId" : "recipientId", incoming ? gift.sender() : gift.recipient(),
+                        incoming ? "senderName" : "recipientName", incoming ? gift.senderName() : gift.recipientName(),
+                        "cropId", gift.cropId(), "quantity", gift.quantity(), "createdAt", gift.createdAt().toString(), "state", gift.state()));
+            }
+            return object("received", received, "sent", sent);
+        });
     }
 
     private br.com.colheitafeliz.game.TheftAttempt stealAfterOwnerWindow(VisitService visits, Loaded destination, Loaded visitor,
@@ -328,6 +365,11 @@ final class OnlineGameService implements AutoCloseable {
     }
     private static void checkRevision(Loaded farm, Command command) {
         if (farm.revision() != Command.revision(command.expectedRevision())) throw new ApiFailure(409, "A fazenda mudou. Atualize antes de agir.");
+    }
+    private static String remaining(Instant now, Instant availableAt) {
+        Duration remaining = Duration.between(now, availableAt);
+        long seconds = remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);
+        return seconds / 3600 + "h " + seconds % 3600 / 60 + "min " + seconds % 60 + "s";
     }
     private JsonObject receipt(JdbcOnlineStore.Tx tx, UUID actor, UUID id, String hash, Supplier<JsonObject> operation) {
         Instant now = clock.instant();
