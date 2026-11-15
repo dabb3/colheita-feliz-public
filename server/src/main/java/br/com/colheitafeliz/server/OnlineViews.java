@@ -27,7 +27,7 @@ final class OnlineViews {
             var crop = tile.crop();
             var maturedAt = crop == null ? null : crop.maturedAt(now);
             var plot=game.land().at(col,row);
-            tiles.add(object("column", col, "row", row, "unlocked", game.land().isUnlocked(col, row),
+            var entry = object("column", col, "row", row, "unlocked", game.land().isUnlocked(col, row),
                     "requiredLevel",plot.requiredLevel(),"price",plot.price(),"currency",plot.currency(),
                     "purchasable",nextPlot!=null&&nextPlot.id()==plot.id(),
                     "state", tile.state(), "cropId", crop == null ? null : crop.type().id(),
@@ -35,12 +35,15 @@ final class OnlineViews {
                     "seasons", crop == null ? 0 : crop.type().seasons(), "watered", crop != null && crop.watered(),
                     "dry", crop != null && crop.dryAt(now),
                     "paused", crop != null && crop.paused(), "weeds", tile.pest().name().equals("WEEDS"),
-                    "insects", tile.insects(), "fertilized", tile.fertilized(), "protected", protectedPlots.contains(game.land().at(col, row).id()),
+                    "insects", tile.insects(), "fertilized", tile.fertilized(),
                     "harvestRevision", Long.toString(tile.harvestRevision()),
                     "remainingSeconds", crop == null ? 0 : crop.remainingAt(now).toSeconds(),
                     "nominalRemainingSeconds", crop == null ? 0 : Math.max(0, crop.currentDuration().toMillis() - crop.grownMillisAt(now)) / 1000,
                     "maturedAt", maturedAt == null ? null : maturedAt.toString(),
-                    "ownerExclusiveUntil", maturedAt == null ? null : maturedAt.plus(java.time.Duration.ofMinutes(5)).toString()));
+                    "ownerExclusiveUntil", maturedAt == null ? null : maturedAt.plus(java.time.Duration.ofMinutes(5)).toString());
+            // Visitors only learn protection by spending an attempt on the server.
+            if (own) entry.addProperty("protected", protectedPlots.contains(plot.id()));
+            tiles.add(entry);
         }
         JsonArray animals = new JsonArray();
         for (var animal : game.barn().animals()) {

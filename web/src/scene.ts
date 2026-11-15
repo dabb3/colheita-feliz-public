@@ -671,7 +671,7 @@ export class Scene {
           70,
           true,
         );
-      if (tile.protected) {
+      if (this.farm.own && tile.protected) {
         this.thing("classic/icons/icone-cadeado.png",p.x+58,p.y+6,18,true);
       }
     }

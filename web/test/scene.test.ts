@@ -47,6 +47,12 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  events.get('pointermove')({clientX:585,clientY:400});assert.equal(hovered.at(-1).state,'DEAD');
  now=10000;tick(33);assert.equal(timers,2);
  assert.deepEqual(periods,['day']);period='night';scene.update(farm);assert.deepEqual(periods,['day','night']);scene.update(farm);assert.deepEqual(periods,['day','night']);period='day';scene.update(farm);assert.deepEqual(periods,['day','night','day']);
+ scene.update({...farm,tiles:[{...tile,protected:true}]});while(pending.length)pending.shift().onload();
+ drawn.length=0;scene.update({...farm,tiles:[{...tile,protected:true}]});
+ assert.ok(drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('icone-cadeado.png')),'owner sees protected plots');
+ drawn.length=0;scene.update({...farm,own:false,tiles:[{...tile,protected:true}]});
+ assert.ok(drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('nabo_3.png')));
+ assert.ok(!drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('icone-cadeado.png')),'visitors never see protected plots');
  scene.close();
  assert.deepEqual(cancelled,[2]);
 });

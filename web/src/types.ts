@@ -17,7 +17,8 @@ export interface Tile {
   weeds: boolean;
   insects: number;
   fertilized: boolean;
-  protected: boolean;
+  /** Sent only to the owner; visits never reveal protected plots. */
+  protected?: boolean;
   harvestRevision: string;
   remainingSeconds: number;
   nominalRemainingSeconds: number;

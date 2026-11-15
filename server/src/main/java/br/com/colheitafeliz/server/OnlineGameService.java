@@ -227,10 +227,11 @@ final class OnlineGameService implements AutoCloseable {
                         result = ActionResult.fail("Você já lançou esse tipo de praga nas últimas 6 horas. Disponível em "
                                 + seconds / 3600 + "h " + seconds % 3600 / 60 + "min " + seconds % 60 + "s.");
                     } else {
-                        result = command.action().equals("SPREAD_INSECTS")
+                        var pest = command.action().equals("SPREAD_INSECTS")
                                 ? visits.spreadInsects(destination.game(), visitor.game(), command.column(), command.row(), season)
                                 : visits.spreadWeeds(destination.game(), visitor.game(), command.column(), command.row(), season);
-                        if (result.success()) tx.recordPest(actor, command.action(), now);
+                        result = pest.result();
+                        if (pest.consumesCooldown()) tx.recordPest(actor, command.action(), now);
                     }
                 } else {
                     result = visits.fertilizeVisit(destination.game(), visitor.game(), command.column(), command.row(), "amor", season);

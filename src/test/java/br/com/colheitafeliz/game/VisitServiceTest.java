@@ -35,12 +35,12 @@ class VisitServiceTest {
         var tile = plant("morango", false);
         tile.water(clock.instant());
         var before = visitor.snapshot();
-        assertTrue(visits.spreadInsects(owner, visitor, 0, 0, tile.harvestRevision()).success());
-        assertTrue(visits.spreadWeeds(owner, visitor, 0, 0, tile.harvestRevision()).success());
+        assertTrue(visits.spreadInsects(owner, visitor, 0, 0, tile.harvestRevision()).result().success());
+        assertTrue(visits.spreadWeeds(owner, visitor, 0, 0, tile.harvestRevision()).result().success());
         assertEquals(1, tile.insects());
         assertEquals(br.com.colheitafeliz.domain.farm.PestState.WEEDS, tile.pest());
-        assertFalse(visits.spreadInsects(owner, visitor, 0, 0, tile.harvestRevision()).success());
-        assertFalse(visits.spreadWeeds(owner, visitor, 0, 0, tile.harvestRevision()).success());
+        assertFalse(visits.spreadInsects(owner, visitor, 0, 0, tile.harvestRevision()).result().success());
+        assertFalse(visits.spreadWeeds(owner, visitor, 0, 0, tile.harvestRevision()).result().success());
         long grown = tile.crop().grownMillisAt(clock.instant());
         clock.advanceSeconds(60);
         assertEquals(grown, tile.crop().grownMillisAt(clock.instant()));
@@ -53,16 +53,16 @@ class VisitServiceTest {
     }
 
     @Test void visitorPestsRejectEmptyUnwateredMatureAndStaleTargets() {
-        assertFalse(visits.spreadInsects(owner, visitor, 0, 0, 0).success());
+        assertFalse(visits.spreadInsects(owner, visitor, 0, 0, 0).result().success());
         var tile = plant("nabo", false);
-        assertFalse(visits.spreadWeeds(owner, visitor, 0, 0, tile.harvestRevision()).success());
+        assertFalse(visits.spreadWeeds(owner, visitor, 0, 0, tile.harvestRevision()).result().success());
         tile.water(clock.instant());
-        assertFalse(visits.spreadInsects(owner, visitor, 0, 0, tile.harvestRevision() + 1).success());
-        assertFalse(visits.spreadWeeds(owner, owner, 0, 0, tile.harvestRevision()).success());
+        assertFalse(visits.spreadInsects(owner, visitor, 0, 0, tile.harvestRevision() + 1).result().success());
+        assertFalse(visits.spreadWeeds(owner, owner, 0, 0, tile.harvestRevision()).result().success());
         var ready = TestCrops.growUntilReady(tile, clock.instant());
         clock.advanceSeconds(Duration.between(clock.instant(), ready).toSeconds());
-        assertFalse(visits.spreadInsects(owner, visitor, 0, 0, tile.harvestRevision()).success());
-        assertFalse(visits.spreadWeeds(owner, visitor, 0, 0, tile.harvestRevision()).success());
+        assertFalse(visits.spreadInsects(owner, visitor, 0, 0, tile.harvestRevision()).result().success());
+        assertFalse(visits.spreadWeeds(owner, visitor, 0, 0, tile.harvestRevision()).result().success());
     }
     @Test void theftTransfersOriginWithoutRewardsAndLeavesOnlyTwoStrawberrySeasons() {
         var tile = plant("morango", true);
