@@ -21,7 +21,7 @@ test('friend list renders each persisted avatar and falls back safely without ch
 });
 function app(preferences=new Map(),pushLogoutOptions){
  const intervals=new Map(),elements=new Map(),listeners=new Map(),audioClips=[],observers=[],timeouts=new Map();let nextTimeout=0;
- const make=(tag='div')=>({tag,value:'',selectedIndex:0,hidden:false,children:[],attributes:{},dataset:{},style:{setProperty(key,value){this[key]=value;}},scrollTop:0,scrollLeft:0,classList:{add(){},remove(){},toggle(){}},
+ const make=(tag='div')=>({tag,value:'',selectedIndex:0,hidden:false,children:[],get childElementCount(){return this.children.length;},attributes:{},dataset:{},style:{setProperty(key,value){this[key]=value;}},scrollTop:0,scrollLeft:0,classList:{add(){},remove(){},toggle(){}},
   replaceChildren(...nodes){if(this.contains(ctx.document.activeElement))ctx.document.activeElement=null;this.children=nodes;},
   append(...nodes){this.children.push(...nodes);},prepend(...nodes){this.children.unshift(...nodes);},insertBefore(node,before){this.children.splice(this.children.indexOf(before),0,node);},replaceChild(node,before){this.children.splice(this.children.indexOf(before),1,node);return before;},replaceWith(node){const parent=descendants(elements.get('modal-content')).find(candidate=>candidate.children.includes(this));parent?.replaceChild(node,this);},
   removeAttribute(key){delete this.attributes[key];},setAttribute(key,value){this.attributes[key]=String(value);},getAttribute(key){return this.attributes[key]??null;},
@@ -151,6 +151,19 @@ test('pinned pest hint follows tool selection without restarting the growth coun
  h.pickTool('SPREAD_INSECTS');h.health(tile,{x:585,y:400},'tap');assert.match(text(panel),/Lançar inseto nesta planta/);
  clientNow+=60000;h.pickTool('SPREAD_WEEDS');assert.match(text(panel),/Lançar erva nesta planta/);assert.ok(!text(panel).includes('Lançar inseto nesta planta'));
  assert.equal(panel.querySelector('.crop-growth-value').textContent,'59min');
+});
+
+test('visits ignore protection data while the owner still sees the lock chip',()=>{
+ const {h,ctx}=app(),catalog={crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:36000}],animals:[],fertilizers:[],vip:{greenPrice:20}};
+ const tile={column:0,row:0,cropId:'nabo',state:'GROWING',watered:true,season:1,seasons:1,remainingSeconds:3600,nominalRemainingSeconds:3600,protected:true};
+ const bounds={left:0,top:0,width:1280,height:720};ctx.document.getElementById('game').getBoundingClientRect=()=>bounds;ctx.document.getElementById('farm').getBoundingClientRect=()=>bounds;
+ const panel=ctx.document.getElementById('plant-health');panel.getBoundingClientRect=()=>({width:360,height:280});
+ h.set({own:{...farm('alice'),own:true,serverTime:'2026-11-03T12:00:00Z'},catalog});h.receive({});
+ const lock=()=>descendants(panel).some(n=>n.src==='/assets/classic/icons/icone-cadeado.png');
+ h.health(tile,{x:585,y:400},'tap');assert.ok(lock());
+ h.set({own:{...farm('alice'),own:true},visited:{...farm('bob'),own:false,serverTime:'2026-11-03T12:00:00Z'},catalog});h.receive({});
+ h.pickTool('SPREAD_INSECTS');h.health({...tile,remainingSeconds:3599},{x:585,y:400},'tap');
+ assert.ok(!lock());assert.match(text(panel),/Lançar inseto nesta planta/);
 });
 
 test('live shop explains nominal duration and the live popup qualifies its forecast',()=>{

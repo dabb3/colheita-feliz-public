@@ -114,7 +114,7 @@ Ao abrir a própria fazenda, o servidor atualiza o nome público pelo perfil aut
 
 ## Consistência e operação
 
-Na visita a amigos, a toolbar oferece **Lançar inseto** e **Lançar erva**, cada qual limitado a um sucesso global por jogador a cada 6 horas reais. Selecione a ferramenta e depois uma planta em crescimento já regada. A [regra de pragas entre visitantes](docs/game-rule.md#131-pragas-lançadas-por-visitantes) define elegibilidade, coexistência e limpeza. As ferramentas normais do dono continuam removendo as pragas. A recusa informa o tempo restante quando o limite estiver ativo. Não há custo, estoque consumível ou recompensa por lançar pragas, nem compartilhamento de limite com o furto.
+Na visita a amigos, a toolbar oferece **Lançar inseto** e **Lançar erva**, cada qual limitado a um sucesso global por jogador a cada 6 horas reais; a tentativa bloqueada por terra protegida também consome esse prazo. Selecione a ferramenta e depois uma planta em crescimento já regada. A [regra de pragas entre visitantes](docs/game-rule.md#131-pragas-lançadas-por-visitantes) define elegibilidade, coexistência e limpeza. As ferramentas normais do dono continuam removendo as pragas. A recusa informa o tempo restante quando o limite estiver ativo. Não há custo, estoque consumível ou recompensa por lançar pragas, nem compartilhamento de limite com o furto.
 
 As ações `SPREAD_INSECTS` e `SPREAD_WEEDS` são exclusivas de `POST /v1/farms/{owner}/visit-actions`. Exigem amizade ativa, revisão da fazenda e da temporada; não são aceitas na rota própria. A inicialização cria de forma aditiva e idempotente a tabela privada `colheita.pest_cooldowns`, com chave `(actor, kind)` e `last_applied_at`, RLS e revogação de privilégios como nas demais tabelas. A aplicação e o prazo são gravados na mesma transação do recibo e das fazendas, sob os locks existentes. Rollback desfaz ambos; replay não renova a janela. O horário não vem do cliente e a expiração de recibos não remove os limites.
 
@@ -134,7 +134,7 @@ Comandos carregam UUID único e revisão decimal em string. A API registra recib
 
 Os recibos recebem `expires_at` e são limpos em lotes de até 1.000, com locks ignorados por outros limpadores. Cada participante pode manter até 1.000 recibos válidos na janela de 24 horas; o limite recusa novas ações antes de alterar o jogo, mas permite repetir recibos existentes. A inicialização mantém a atualização idempotente da tabela de recibos e cria a tabela de limite de furto descrita acima; não muda snapshots nem saves locais. IDs UUIDv4 usados no protótipo anterior deixam de ser aceitos; consulte a fazenda para confirmar seus efeitos e não os converta em IDs novos.
 
-Tempo, saldos, XP, proteção e sorteios pertencem ao servidor. Visitantes recebem apenas a projeção pública. O relógio local controla a aparência dia/noite e a trilha ambiente, sem alterar a economia.
+Tempo, saldos, XP, proteção e sorteios pertencem ao servidor. Visitantes recebem apenas a projeção pública, sem o campo `protected` dos terrenos nem outra indicação de quais terras estão protegidas; a web só desenha cadeados na própria fazenda. O relógio local controla a aparência dia/noite e a trilha ambiente, sem alterar a economia.
 
 Antes de publicar: validar duas contas, configurar Google OAuth e redirects, testar restauração de backup PostgreSQL e conferir limites gratuitos vigentes. Proposta: Cloudflare Pages para arquivos, Render para API e Supabase para PostgreSQL/Auth. Nenhum deploy realizado. Serviços gratuitos podem suspender por inatividade ou atingir quotas.
 

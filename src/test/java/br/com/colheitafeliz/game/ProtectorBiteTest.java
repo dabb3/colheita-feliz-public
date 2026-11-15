@@ -71,4 +71,30 @@ class ProtectorBiteTest {
         int openRow=(protectedRow+1)%5;
         assertEquals("STOLEN",visits.attemptSteal(owner,visitor,0,openRow,1,"Visitor",bound->{throw new AssertionError("Uncovered plot rolled");}).kind().name());
     }
+    @Test void fullDestinationIsRefusedBeforeProtectionWithoutRolling(){
+        ready(0);var origin=owner.farm().tile(0,0).crop().origin();
+        visitor.inventory().addProduceLot(new ItemLot(origin.itemId(),origin.currency(),origin.unitCost(),Integer.MAX_VALUE,false));
+        var open=visits.attemptSteal(owner,visitor,0,0,1,"Visitor",bound->{throw new AssertionError("Full destination rolled");});
+        protect(5);
+        var guarded=visits.attemptSteal(owner,visitor,0,0,1,"Visitor",bound->{throw new AssertionError("Full destination rolled");});
+        assertEquals(open,guarded);assertEquals("BLOCKED",guarded.kind().name());
+    }
+    @Test void protectedPestSpendsAttemptOnlyAfterProtectionIndependentChecks(){
+        var tile=owner.farm().tile(0,0);tile.plow();tile.plant(owner.catalog().get("cenoura"),clock.instant());
+        var dryOpen=visits.spreadInsects(owner,visitor,0,0,tile.harvestRevision());
+        protect(5);
+        assertEquals(dryOpen,visits.spreadInsects(owner,visitor,0,0,tile.harvestRevision()));assertFalse(dryOpen.consumesCooldown());
+        tile.water(clock.instant());tile.checkInsects(clock.instant(),true);
+        var repeated=visits.spreadInsects(owner,visitor,0,0,tile.harvestRevision());
+        assertEquals("Esta planta já tem esse tipo de praga.",repeated.result().message());assertFalse(repeated.consumesCooldown());
+        var blocked=visits.spreadWeeds(owner,visitor,0,0,tile.harvestRevision());
+        assertFalse(blocked.result().success());assertTrue(blocked.consumesCooldown());
+        assertTrue(blocked.result().message().contains("protegido"));assertEquals(PestState.NONE,tile.pest());
+    }
+    @Test void loveHelpsProtectedPlots(){
+        var tile=owner.farm().tile(0,0);tile.plow();tile.plant(owner.catalog().get("cenoura"),clock.instant());tile.water(clock.instant());protect(5);
+        while(visitor.progress().level()<15)visitor.progress().award(visitor.progress().xpToNext());
+        visitor.inventory().addFertilizer("amor",1);
+        assertTrue(visits.fertilizeVisit(owner,visitor,0,0,"amor",tile.harvestRevision()).success());assertTrue(tile.fertilized());
+    }
 }

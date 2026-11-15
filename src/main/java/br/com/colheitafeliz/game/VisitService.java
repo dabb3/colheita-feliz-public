@@ -9,6 +9,9 @@ import br.com.colheitafeliz.domain.farm.TileState;
  * Identidade, amizade, autoridade de tempo e transação entre processos pertencem ao serviço online chamador.
  */
 public final class VisitService {
+    /** A pest blocked by protection spends the online cooldown like a successful spread. */
+    public record PestAttempt(ActionResult result, boolean consumesCooldown) {}
+
     /** Online caller validates friendship, owner window and cooldown before this attempt. */
     public TheftAttempt attemptSteal(GameState owner,GameState visitor,int col,int row,long revision,
                                     String visitorName,br.com.colheitafeliz.domain.farm.RandomSource random) {
@@ -16,6 +19,8 @@ public final class VisitService {
             var tile=eligibleTile(owner,visitor,col,row,revision,true);
             if(tile==null||tile.crop()==null||!tile.crop().matureAt(owner.now())||tile.harvestRevision()==Long.MAX_VALUE)
                 return TheftAttempt.blocked("Temporada indisponível para furto.");
+            if(!visitor.inventory().canAddProduceLot(tile.crop().origin()))
+                return TheftAttempt.blocked("Destino ou revisão sem capacidade.");
             if(!owner.protectedPlots().contains(owner.land().at(col,row).id()))
                 return TheftAttempt.from(steal(owner,visitor,col,row,revision,visitorName));
             int roll=random.nextInt(100);
@@ -56,7 +61,8 @@ public final class VisitService {
     public ActionResult fertilizeVisit(GameState owner, GameState visitor, int col, int row,
                                        String fertilizerId, long expectedRevision) {
         synchronized (GameState.class) {
-            FarmTile tile = eligibleTile(owner, visitor, col, row, expectedRevision);
+            // Love only helps, so protection never blocks it nor changes its answer.
+            FarmTile tile = eligibleTile(owner, visitor, col, row, expectedRevision, true);
             if (tile == null || !"amor".equals(fertilizerId)) return ActionResult.fail("Ajuda indisponível.");
             var type = visitor.fertilizer(fertilizerId);
             var now = owner.now();
@@ -70,25 +76,28 @@ public final class VisitService {
         }
     }
 
-    public ActionResult spreadInsects(GameState owner, GameState visitor, int col, int row, long expectedRevision) {
+    public PestAttempt spreadInsects(GameState owner, GameState visitor, int col, int row, long expectedRevision) {
         return spreadPest(owner, visitor, col, row, expectedRevision, true);
     }
 
-    public ActionResult spreadWeeds(GameState owner, GameState visitor, int col, int row, long expectedRevision) {
+    public PestAttempt spreadWeeds(GameState owner, GameState visitor, int col, int row, long expectedRevision) {
         return spreadPest(owner, visitor, col, row, expectedRevision, false);
     }
 
-    private static ActionResult spreadPest(GameState owner, GameState visitor, int col, int row, long revision, boolean insects) {
+    private static PestAttempt spreadPest(GameState owner, GameState visitor, int col, int row, long revision, boolean insects) {
         synchronized (GameState.class) {
-            FarmTile tile = eligibleTile(owner, visitor, col, row, revision);
+            // Protection is checked last so earlier refusals never reveal it without spending the attempt.
+            FarmTile tile = eligibleTile(owner, visitor, col, row, revision, true);
             if (tile == null || tile.state() != TileState.GROWING || tile.crop() == null
                     || !tile.crop().watered() || tile.crop().matureAt(owner.now()))
-                return ActionResult.fail("Praga indisponível: escolha uma planta em crescimento, já regada e sem proteção.");
+                return new PestAttempt(ActionResult.fail("Praga indisponível: escolha uma planta em crescimento e já regada."), false);
             if (insects ? tile.insects() > 0 : tile.pest() != br.com.colheitafeliz.domain.farm.PestState.NONE)
-                return ActionResult.fail("Esta planta já tem esse tipo de praga.");
+                return new PestAttempt(ActionResult.fail("Esta planta já tem esse tipo de praga."), false);
+            if (owner.protectedPlots().contains(owner.land().at(col, row).id()))
+                return new PestAttempt(ActionResult.fail("Este terreno está protegido pelos animais. Sua praga foi bloqueada; aguarde 6 horas para lançar esse tipo novamente."), true);
             if (insects) tile.checkInsects(owner.now(), true);
             else tile.checkPest(owner.now(), true);
-            return ActionResult.ok(insects ? "Uma minhoca lançada. O crescimento foi pausado." : "Uma erva daninha lançada. O crescimento foi pausado.");
+            return new PestAttempt(ActionResult.ok(insects ? "Uma minhoca lançada. O crescimento foi pausado." : "Uma erva daninha lançada. O crescimento foi pausado."), true);
         }
     }
 
