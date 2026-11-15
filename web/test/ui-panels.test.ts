@@ -8,11 +8,11 @@ import {animalPath,productPath,seedArtPath} from '../src/presentation.ts';
 import {avatarSource} from '../src/avatar.ts';
 
 function panels(){
- const make=tag=>({tag,children:[],attributes:{},textContent:'',style:{setProperty(){}},append(...nodes){this.children.push(...nodes);},prepend(...nodes){this.children.unshift(...nodes);},replaceChildren(){this.children=[];},setAttribute(k,v){this.attributes[k]=v;},getAttribute(k){return this.attributes[k]??null;}});
- const ctx={...values,animalPath,productPath,seedArtPath,avatarSource,document:{createElement:make}};
+ const make=tag=>({tag,children:[],attributes:{},textContent:'',style:{setProperty(){}},append(...nodes){this.children.push(...nodes);},prepend(...nodes){this.children.unshift(...nodes);},replaceChildren(){this.children=[];},setAttribute(k,v){this.attributes[k]=v;},getAttribute(k){return this.attributes[k]??null;},contains(node){return nodes(this).includes(node);},focus(){document.activeElement=this;},querySelectorAll(selector){return nodes(this).slice(1).filter(node=>selector==='[data-focus-key]'?node.getAttribute('data-focus-key')!==null:false);}});
+ const document={activeElement:null,createElement:make};const ctx={...values,animalPath,productPath,seedArtPath,avatarSource,document};
  const load=name=>readFileSync(new URL('../src/'+name,import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(load('ui.ts')+'\n'+load('ui-panels.ts'))+'\nglobalThis.panels={renderDeposit,renderPlantHealth,renderAnimal,renderMissions,renderFriends,renderGiftComposer,giftLimit,renderAudioSettings:typeof renderAudioSettings==="undefined"?undefined:renderAudioSettings};',ctx);
- return{...ctx.panels,root:make('div')};
+ return{...ctx.panels,root:make('div'),document};
 }
 function nodes(root){return[root,...root.children.flatMap(child=>typeof child==='object'?nodes(child):[])];}
 const catalog={crops:[{id:'milho',name:'Milho',spriteStem:'milho',vipOnly:false},{id:'vip',name:'Especial',spriteStem:'nabo',vipOnly:true}],animals:[{id:'vaca',name:'Vaca',kind:'PRODUCER',productId:'leite',productName:'Leite'}],fertilizers:[],feedPrices:{producer:10,growth:20}};
@@ -70,6 +70,18 @@ test('gift composer keeps a fixed friend, accessible seed selection and persiste
  assert.deepEqual([giftLimit(0),giftLimit(3),giftLimit(9)],[0,3,5]);assert.equal(footer.children[0].textContent,'Cancelar');assert.equal(footer.children[1].textContent,'Enviar');
  renderGiftComposer(root,footer,catalog,{id:'friend-2',name:'Sam'}, {...state,phase:'sending',canSend:false},actions);
  assert.equal(footer.children[0].disabled,true);assert.equal(footer.children[1].disabled,true);assert.equal(nodes(root).some(n=>n.textContent==='Presentes'),false);
+});
+
+test('gift composer restores focused seed and quantity controls after rerender',()=>{
+ const {root,renderGiftComposer,document}=panels();root.contains=node=>node===root||nodes(root).includes(node);root.scrollTop=84;
+ const focus=(key)=>{document.activeElement=nodes(root).find(node=>node.getAttribute?.('data-focus-key')===key);};
+ const state={phase:'ready',cropId:'nabo',quantity:1,seedCounts:{nabo:5,milho:2},gifts:{received:[],sent:[]},canSend:true};
+ const actions={selectSeed(id){state.cropId=id;state.quantity=1;render();},setQuantity(value){state.quantity=value;render();},send(){},cancel(){},retry(){}};
+ const render=()=>renderGiftComposer(root,{...root,children:[],replaceChildren(...items){this.children=items;}},{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'},{id:'milho',name:'Milho',spriteStem:'milho'}]},{id:'friend',name:'Sam'},state,actions);
+ render();focus('gift-seed:nabo');nodes(root).find(node=>node.getAttribute?.('data-focus-key')==='gift-seed:nabo').onclick();assert.equal(document.activeElement?.getAttribute('data-focus-key'),'gift-seed:nabo');assert.equal(root.scrollTop,84);
+ focus('gift-quantity-more');nodes(root).find(node=>node.getAttribute?.('data-focus-key')==='gift-quantity-more').onclick();assert.equal(state.quantity,2);assert.equal(document.activeElement?.getAttribute('data-focus-key'),'gift-quantity-more');
+ focus('gift-quantity-more');nodes(root).find(node=>node.getAttribute?.('data-focus-key')==='gift-quantity-more').onclick();nodes(root).find(node=>node.getAttribute?.('data-focus-key')==='gift-quantity-more').onclick();nodes(root).find(node=>node.getAttribute?.('data-focus-key')==='gift-quantity-more').onclick();assert.equal(state.quantity,5);assert.equal(document.activeElement?.getAttribute('data-focus-key'),'gift-quantity-less');
+ const outside=document.createElement('button');outside.focus();render();assert.equal(document.activeElement,outside);
 });
 
 test('audio controls keep separate channel toggles and volume',()=>{

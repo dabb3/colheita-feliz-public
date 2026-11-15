@@ -438,6 +438,7 @@ export interface GiftComposerActions {
   retryLoad?(): void;
 }
 export function renderGiftComposer(root: HTMLElement, footer: HTMLElement, catalog: Catalog, friend: Friend, state: GiftComposerState, actions: GiftComposerActions) {
+  const active=document.activeElement,focusKey=root.contains(active)?active?.getAttribute("data-focus-key"):null,scrollTop=root.scrollTop,scrollLeft=root.scrollLeft;
   root.replaceChildren(); root.className = "gift-composer-scroll";
   const identity = text("div", "", "gift-recipient"); identity.append(friendAvatar(friend), text("strong", friend.name)); root.append(text("h3", "Presentear"), identity);
   if (state.phase === "loading") root.append(text("p", "Carregando disponibilidade…", "muted"));
@@ -446,6 +447,7 @@ export function renderGiftComposer(root: HTMLElement, footer: HTMLElement, catal
     const crops = catalog.crops.filter(crop => (state.seedCounts[crop.id] ?? 0) > 0), seeds = text("div", "", "gift-options");
     for (const crop of crops) {
       const choice = control(`${crop.name} · ${state.seedCounts[crop.id]} no estoque`, () => actions.selectSeed(crop.id));
+      choice.setAttribute("data-focus-key",`gift-seed:${crop.id}`);
       choice.setAttribute("aria-pressed", String(crop.id === state.cropId));
       choice.disabled = state.phase === "sending" || state.phase === "unknown";
       choice.prepend(image(seedArtPath(crop.spriteStem), "gift-seed-icon")); seeds.append(choice);
@@ -454,6 +456,7 @@ export function renderGiftComposer(root: HTMLElement, footer: HTMLElement, catal
     const crop = catalog.crops.find(item => item.id === state.cropId), limit = giftLimit(crop ? state.seedCounts[crop.id] ?? 0 : 0), quantity = text("div", "", "gift-quantity");
     if(state.phase === "unknown") root.append(text("p", `Tentativa pendente: ${crop?.name ?? state.cropId} · ${state.quantity} semente(s).`, "gift-message"));
     const less = control("−", () => actions.setQuantity(state.quantity - 1)), more = control("+", () => actions.setQuantity(state.quantity + 1));
+    less.setAttribute("data-focus-key","gift-quantity-less");more.setAttribute("data-focus-key","gift-quantity-more");
     less.disabled = state.quantity <= 1 || state.phase === "sending" || state.phase === "unknown"; more.disabled = state.quantity >= limit || state.phase === "sending" || state.phase === "unknown";
     quantity.append(less, text("strong", `${state.quantity} semente(s)`), more); root.append(quantity);
     if (!crops.length) root.append(text("p", "Você não tem sementes disponíveis para presentear.", "empty-state"));
@@ -465,6 +468,14 @@ export function renderGiftComposer(root: HTMLElement, footer: HTMLElement, catal
   const cancel = control("Cancelar", actions.cancel), send = control(state.phase === "sending" ? "Enviando…" : "Enviar", actions.send);
   cancel.disabled = state.phase === "sending"; send.disabled = state.phase !== "ready" || !state.canSend;
   footer.append(cancel, send); footer.hidden = false;
+  if(focusKey){
+    const controls=Array.from(root.querySelectorAll<HTMLButtonElement>("[data-focus-key]"));
+    let target=controls.find(node=>node.getAttribute("data-focus-key")===focusKey&&!node.disabled);
+    if(!target&&focusKey==="gift-quantity-more")target=controls.find(node=>node.getAttribute("data-focus-key")==="gift-quantity-less"&&!node.disabled);
+    if(!target&&focusKey==="gift-quantity-less")target=controls.find(node=>node.getAttribute("data-focus-key")==="gift-quantity-more"&&!node.disabled);
+    target??=controls.find(node=>node.getAttribute("data-focus-key")===`gift-seed:${state.cropId}`&&!node.disabled)??controls.find(node=>node.getAttribute("data-focus-key")?.startsWith("gift-seed:")&&!node.disabled)??(cancel.disabled?undefined:cancel);
+    target?.focus({preventScroll:true});root.scrollTop=scrollTop;root.scrollLeft=scrollLeft;
+  }
 }
 
 export function renderAudioSettings(

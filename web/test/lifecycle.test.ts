@@ -10,7 +10,7 @@ import * as avatar from '../src/avatar.ts';
 import * as inviteUrl from '../src/invite-url.ts';
 
 const farm=owner=>({owner,name:owner,revision:'1',tiles:[],animals:[],seedCounts:{}});
-function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve};}
+function deferred(){let resolve,reject;const promise=new Promise((accept,fail)=>{resolve=accept;reject=fail;});return{promise,resolve,reject};}
 test('friend list orders Presentear before visit, removes old gift block and keeps IDs despite homonyms',async()=>{
  const {h,elements}=app();let target='';
  h.set({own:farm('alice'),api:{get:path=>{if(path==='/v1/friends')return Promise.resolve([{id:'bob',name:'Sam',avatar:{id:'female-2'}},{id:'carol',name:'Sam',avatar:{id:'google',photoUrl:'https://lh3.googleusercontent.com/a/carol'}},{id:'dan',name:'Dan'}]);target=path;return Promise.resolve(farm('bob'));}}});
@@ -81,6 +81,32 @@ test('pending gift reload offers shared receipt retry for its original recipient
  assert.equal(elements.get('modal-title').textContent,'Presentear');assert.ok(text(elements.get('modal-content')).includes('envio anterior'));assert.ok(text(elements.get('modal-content')).includes('Tentativa pendente: Nabo · 2 semente(s)'));
  descendants(elements.get('modal-content')).find(n=>n.textContent==='Recuperar resultado').onclick();await new Promise(r=>setTimeout(r,0));await new Promise(r=>setTimeout(r,0));
  assert.equal(retries,1);assert.equal(mutations,0);assert.equal(elements.get('modal-title').textContent,'Amigos');
+});
+test('late pending gift retry stays out of a different dialog but updates the current farm',async()=>{
+ for(const outcome of ['success','reject']){
+  const {h,elements,ctx}=app(),reply=deferred(),own={...farm('alice'),revision:'1',seedCounts:{nabo:1}},pending={path:'/v1/gifts',body:'{"requestId":"same-id","recipientId":"bob","cropId":"nabo","quantity":1}'};
+  const api={pending,get:async path=>path==='/v1/friends'?[{id:'bob',name:'Bob'}]:path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm('bob'),retry:()=>reply.promise};
+  h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api});await h.friends();descendants(elements.get('modal-content')).find(n=>n.dataset.friendGift==='bob').onclick();await new Promise(r=>setTimeout(r,0));
+  descendants(elements.get('modal-content')).find(n=>n.textContent==='Recuperar resultado').onclick();h.dialog('Outro painel');const content=elements.get('modal-content').children,notice=text(elements.get('notice')??{textContent:''}),focusTarget=ctx.document.createElement('button');focusTarget.focus();elements.get('modal').setAttribute('closedby','none');elements.get('close-modal').disabled=true;
+  if(outcome==='success')reply.resolve({farm:{...own,revision:'2',seedCounts:{}},result:{success:true,message:'Presente confirmado'}});else reply.reject(new TypeError('offline'));
+  await new Promise(r=>setTimeout(r,0));await new Promise(r=>setTimeout(r,0));
+  assert.equal(h.get().own.revision,outcome==='success'?'2':'1');assert.equal(elements.get('modal-title').textContent,'Outro painel');assert.equal(elements.get('modal-content').children,content);assert.equal(text(elements.get('notice')??{textContent:''}),notice);assert.equal(elements.get('modal').getAttribute('closedby'),'none');assert.equal(elements.get('close-modal').disabled,true);assert.equal(ctx.document.activeElement,focusTarget);
+ }
+});
+test('late generic retry cannot replace the current panel with a returned invitation code',async()=>{
+ const {h,elements,ctx}=app(),reply=deferred(),api={pending:{body:'{"action":"ACCEPT_INVITATION"}'},retry:()=>reply.promise};h.set({own:{...farm('alice'),revision:'1'},api});elements.get('retry').onclick();h.dialog('Outro painel');const children=elements.get('modal-content').children,focusTarget=ctx.document.createElement('button');focusTarget.focus();elements.get('modal').setAttribute('closedby','none');elements.get('close-modal').disabled=true;reply.resolve({farm:{...farm('alice'),revision:'2'},code:'late-code',result:{success:true,message:'Convite confirmado'}});await new Promise(r=>setTimeout(r,0));
+ assert.equal(h.get().own.revision,'2');assert.equal(elements.get('modal-title').textContent,'Outro painel');assert.equal(elements.get('modal-content').children,children);assert.equal(text(elements.get('notice')??{textContent:''}),'');assert.equal(elements.get('modal').getAttribute('closedby'),'none');assert.equal(elements.get('close-modal').disabled,true);assert.equal(ctx.document.activeElement,focusTarget);
+});
+test('pending gift retry cannot restore farm after logout',async()=>{
+ const {h,elements}=app(),reply=deferred(),own=farm('alice'),api={pending:{path:'/v1/gifts',body:'{"requestId":"same-id","recipientId":"bob","cropId":"nabo","quantity":1}'},get:async path=>path==='/v1/friends'?[{id:'bob',name:'Bob'}]:path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm('bob'),retry:()=>reply.promise};
+ h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api});await h.friends();descendants(elements.get('modal-content')).find(n=>n.dataset.friendGift==='bob').onclick();await new Promise(r=>setTimeout(r,0));descendants(elements.get('modal-content')).find(n=>n.textContent==='Recuperar resultado').onclick();await h.logout();reply.resolve({farm:{...own,revision:'2'},result:{success:true,message:'late'}});await new Promise(r=>setTimeout(r,0));
+ assert.equal(h.get().own,undefined);assert.equal(elements.get('modal').open,false);
+});
+test('pending gift retry does not notify a newer Amigos dialog after its list loads',async()=>{
+ const {h,elements}=app(),reply=deferred(),friendsReply=deferred(),own=farm('alice');let friendReads=0;
+ const api={pending:{path:'/v1/gifts',body:'{"requestId":"same-id","recipientId":"bob","cropId":"nabo","quantity":1}'},get:async path=>path==='/v1/friends'?(++friendReads===1?[{id:'bob',name:'Bob'}]:friendsReply.promise):path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm('bob'),retry:()=>reply.promise};
+ h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api});await h.friends();descendants(elements.get('modal-content')).find(n=>n.dataset.friendGift==='bob').onclick();await new Promise(r=>setTimeout(r,0));descendants(elements.get('modal-content')).find(n=>n.textContent==='Recuperar resultado').onclick();reply.resolve({result:{success:true,message:'Presente confirmado'},farm:own});await new Promise(r=>setTimeout(r,0));
+ assert.equal(elements.get('modal-title').textContent,'Amigos');h.dialog('Amigos');friendsReply.resolve([{id:'bob',name:'Bob'}]);await new Promise(r=>setTimeout(r,0));await new Promise(r=>setTimeout(r,0));assert.equal(text(elements.get('notice')??{textContent:''}),'');
 });
 test('secondary GET failure keeps receipt recovery separate from data retry',async()=>{
  const {h,elements}=app(),own={...farm('alice'),seedCounts:{nabo:1}},pending={path:'/v1/gifts',body:'{"requestId":"same-id","recipientId":"bob","cropId":"nabo","quantity":1}'};let reads=0,retries=0,mutations=0;
