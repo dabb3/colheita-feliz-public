@@ -131,28 +131,39 @@ export class ApiClient {
   async retry(): Promise<Reply> {
     if (!this.pending || this.busy)
       throw new Error("Não há ação pendente disponível.");
+    const pending = this.pending;
     this.busy = true;
     try {
       const response = await this.request<Reply>(
-        this.pending.path,
-        this.pending.body,
+        pending.path,
+        pending.body,
       );
-      this.clear();
+      if (pending.path === "/v1/gifts" && typeof response?.result?.success !== "boolean")
+        throw new Error("A resposta não confirmou o resultado do presente.");
+      this.clear(pending);
       return response;
     } catch (error) {
       if (
         error instanceof ApiError &&
         [400, 403, 404, 409, 410, 413, 415, 429].includes(error.status)
       )
-        this.clear();
+        this.clear(pending);
       throw error;
     } finally {
       this.busy = false;
     }
   }
-  private clear() {
-    this.storage.removeItem(this.key);
-    this.pending = null;
+  private clear(expected: Pending) {
+    const matches = (value: string | null) => {
+      if (!value) return false;
+      try {
+        const current = JSON.parse(value) as Pending;
+        return current.path === expected.path && current.body === expected.body;
+      } catch { return false; }
+    };
+    if (matches(this.storage.getItem(this.key))) this.storage.removeItem(this.key);
+    if (this.pending?.path === expected.path && this.pending.body === expected.body)
+      this.pending = null;
   }
 
   private async request<T>(path: string, body?: string): Promise<T> {

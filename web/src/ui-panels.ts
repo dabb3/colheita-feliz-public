@@ -1,6 +1,6 @@
 import type { Farm, Catalog, Tile, CommandFields, Friend, Gifts } from "./types.ts";
 import { text, image, control, renderDailyAllowance,friendAvatar,vipBadge } from "./ui.ts";
-import { animalPath, productPath } from "./presentation.ts";
+import { animalPath, productPath, seedArtPath } from "./presentation.ts";
 import { durationLabel, animalCare, cropTimingText } from "./ui-presentation.ts";
 
 function inventoryCard(name: string, path: string, count: number) {
@@ -418,81 +418,64 @@ export function giftLimit(stock: number) {
   return Math.max(0, Math.min(5, Math.floor(stock)));
 }
 
-export function renderGifts(
-  root: HTMLElement,
-  catalog: Catalog,
-  seedCounts: Record<string, number>,
-  friends: Friend[],
-  gifts: Gifts,
-  now: number,
-  onSend: (fields: CommandFields) => void,
-) {
-  const state = { friend: "", crop: "", quantity: 1, confirming: false };
-  const crops = catalog.crops.filter((crop) => (seedCounts[crop.id] ?? 0) > 0);
-  const recent = (id: string) => gifts.sent.some((gift) => gift.recipientId === id && now - Date.parse(gift.createdAt) < 86_400_000);
-  const pick = (label: string, selected: boolean, action: () => void) => {
-    const node = control(label, action);
-    node.setAttribute("aria-pressed", String(selected));
-    return node;
-  };
-  const draw = () => {
-    root.replaceChildren();
-    root.className = "gift-panel";
-    const icon = text("span", "", "gift-icon");
-    icon.append(image("classic/icons/asset_presente.jpg"));
-    root.append(icon, text("h3", "Presentes"));
-    const friend = friends.find((item) => item.id === state.friend);
-    const crop = crops.find((item) => item.id === state.crop);
-    const limit = giftLimit(crop ? seedCounts[crop.id] : 0);
-    state.quantity = Math.min(Math.max(1, state.quantity), Math.max(1, limit));
-    if (!friends.length) root.append(text("p", "Adicione um amigo para enviar presentes.", "empty-state"));
-    else if (!crops.length) root.append(text("p", "Você não tem sementes para presentear.", "empty-state"));
-    else {
-      const people = text("div", "", "gift-options");
-      for (const item of friends) {
-        const button = pick(item.name, item.id === state.friend, () => { state.friend = item.id; state.confirming = false; draw(); });
-        button.disabled = recent(item.id);
-        people.append(button);
-      }
-      const seeds = text("div", "", "gift-options");
-      for (const item of crops)
-        seeds.append(pick(`${item.name} (${seedCounts[item.id]})`, item.id === state.crop, () => { state.crop = item.id; state.confirming = false; draw(); }));
-      const less = control("−", () => { state.quantity--; draw(); }), more = control("+", () => { state.quantity++; draw(); });
-      less.disabled = state.quantity <= 1;
-      more.disabled = state.quantity >= limit;
-      const quantity = text("div", "", "gift-quantity");
-      quantity.append(less, text("strong", `${state.quantity} semente(s)`), more);
-      root.append(text("p", "Amigo"), people, text("p", "Semente"), seeds, quantity);
-      const reason = friend && recent(friend.id) ? "Você já presenteou este amigo nas últimas 24 horas."
-        : friend && crop?.vipOnly && !friend.vipActive ? `${crop.name} exige VIP ativo do seu amigo.` : "";
-      if (reason) root.append(text("p", reason, "empty-state"));
-      if (state.confirming && friend && crop) {
-        const confirm = text("div", "", "gift-confirm");
-        confirm.append(
-          text("p", `Enviar ${state.quantity} semente(s) de ${crop.name} para ${friend.name}?`),
-          control("Confirmar", () => { state.confirming = false; draw(); onSend({ recipientId: friend.id, cropId: crop.id, quantity: state.quantity }); }),
-          control("Cancelar", () => { state.confirming = false; draw(); }),
-        );
-        root.append(confirm);
-      } else {
-        const send = control("Enviar presente", () => { state.confirming = true; draw(); });
-        send.disabled = !friend || !crop || !!reason;
-        root.append(send);
-      }
+export interface GiftComposerState {
+  phase: "loading" | "ready" | "sending" | "unknown" | "load-error";
+  cropId: string;
+  quantity: number;
+  seedCounts: Record<string, number>;
+  gifts: Gifts | null;
+  canSend: boolean;
+  pending?: boolean;
+  blockedReason?: string;
+  message?: string;
+}
+export interface GiftComposerActions {
+  selectSeed(cropId: string): void;
+  setQuantity(quantity: number): void;
+  send(): void;
+  cancel(): void;
+  retry(): void;
+  retryLoad?(): void;
+}
+export function renderGiftComposer(root: HTMLElement, footer: HTMLElement, catalog: Catalog, friend: Friend, state: GiftComposerState, actions: GiftComposerActions) {
+  const active=document.activeElement,focusKey=root.contains(active)?active?.getAttribute("data-focus-key"):null,scrollTop=root.scrollTop,scrollLeft=root.scrollLeft;
+  root.replaceChildren(); root.className = "gift-composer-scroll";
+  const identity = text("div", "", "gift-recipient"); identity.append(friendAvatar(friend), text("strong", friend.name)); root.append(text("h3", "Presentear"), identity);
+  if (state.phase === "loading") root.append(text("p", "Carregando disponibilidade…", "muted"));
+  else if (state.phase === "load-error") { root.append(text("p", state.message ?? "Não foi possível carregar os presentes.", "empty-state")); if(state.pending){const crop=catalog.crops.find(item=>item.id===state.cropId);root.append(text("p",`Tentativa pendente: ${crop?.name??state.cropId} · ${state.quantity} semente(s).`,"gift-message"));}root.append(control("Tentar novamente", actions.retryLoad??actions.retry)); if(state.pending){root.append(text("p","Há um envio pendente. A consulta falhou; recuperar ainda usa o mesmo pedido.","muted"));root.append(control("Recuperar resultado",actions.retry));} }
+  else {
+    const crops = catalog.crops.filter(crop => (state.seedCounts[crop.id] ?? 0) > 0), seeds = text("div", "", "gift-options");
+    for (const crop of crops) {
+      const choice = control(`${crop.name} · ${state.seedCounts[crop.id]} no estoque`, () => actions.selectSeed(crop.id));
+      choice.setAttribute("data-focus-key",`gift-seed:${crop.id}`);
+      choice.setAttribute("aria-pressed", String(crop.id === state.cropId));
+      choice.disabled = state.phase === "sending" || state.phase === "unknown";
+      choice.prepend(image(seedArtPath(crop.spriteStem), "gift-seed-icon")); seeds.append(choice);
     }
-    root.append(text("h4", "Recebidos"));
-    for (const gift of gifts.received) {
-      const card = text("article", "", "gift-card");
-      const art = text("span", "", "gift-icon");
-      art.append(image("classic/icons/asset_presente.jpg"));
-      const name = catalog.crops.find((item) => item.id === gift.cropId)?.name ?? gift.cropId;
-      card.append(art, text("strong", `${gift.senderName ?? "Amigo"} enviou ${gift.quantity} semente(s) de ${name}`),
-        text("span", new Date(gift.createdAt).toLocaleString("pt-BR")));
-      root.append(card);
-    }
-    if (!gifts.received.length) root.append(text("p", "Nenhum presente recebido ainda.", "empty-state"));
-  };
-  draw();
+    root.append(text("p", "Escolha as sementes"), seeds);
+    const crop = catalog.crops.find(item => item.id === state.cropId), limit = giftLimit(crop ? state.seedCounts[crop.id] ?? 0 : 0), quantity = text("div", "", "gift-quantity");
+    if(state.phase === "unknown") root.append(text("p", `Tentativa pendente: ${crop?.name ?? state.cropId} · ${state.quantity} semente(s).`, "gift-message"));
+    const less = control("−", () => actions.setQuantity(state.quantity - 1)), more = control("+", () => actions.setQuantity(state.quantity + 1));
+    less.setAttribute("data-focus-key","gift-quantity-less");more.setAttribute("data-focus-key","gift-quantity-more");
+    less.disabled = state.quantity <= 1 || state.phase === "sending" || state.phase === "unknown"; more.disabled = state.quantity >= limit || state.phase === "sending" || state.phase === "unknown";
+    quantity.append(less, text("strong", `${state.quantity} semente(s)`), more); root.append(quantity);
+    if (!crops.length) root.append(text("p", "Você não tem sementes disponíveis para presentear.", "empty-state"));
+    if (state.blockedReason) root.append(text("p", state.blockedReason, "empty-state"));
+    if (state.message) root.append(text("p", state.message, "gift-message"));
+    if (state.phase === "unknown") { root.append(text("p", "O envio já foi iniciado e ainda não foi confirmado. Sair não desfaz a tentativa; recuperar consulta o mesmo pedido.", "muted")); root.append(control("Recuperar resultado", actions.retry)); }
+  }
+  footer.replaceChildren(); footer.className = "gift-composer-footer";
+  const cancel = control("Cancelar", actions.cancel), send = control(state.phase === "sending" ? "Enviando…" : "Enviar", actions.send);
+  cancel.disabled = state.phase === "sending"; send.disabled = state.phase !== "ready" || !state.canSend;
+  footer.append(cancel, send); footer.hidden = false;
+  if(focusKey){
+    const controls=Array.from(root.querySelectorAll<HTMLButtonElement>("[data-focus-key]"));
+    let target=controls.find(node=>node.getAttribute("data-focus-key")===focusKey&&!node.disabled);
+    if(!target&&focusKey==="gift-quantity-more")target=controls.find(node=>node.getAttribute("data-focus-key")==="gift-quantity-less"&&!node.disabled);
+    if(!target&&focusKey==="gift-quantity-less")target=controls.find(node=>node.getAttribute("data-focus-key")==="gift-quantity-more"&&!node.disabled);
+    target??=controls.find(node=>node.getAttribute("data-focus-key")===`gift-seed:${state.cropId}`&&!node.disabled)??controls.find(node=>node.getAttribute("data-focus-key")?.startsWith("gift-seed:")&&!node.disabled)??(cancel.disabled?undefined:cancel);
+    target?.focus({preventScroll:true});root.scrollTop=scrollTop;root.scrollLeft=scrollLeft;
+  }
 }
 
 export function renderAudioSettings(
