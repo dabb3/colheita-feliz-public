@@ -45,7 +45,7 @@ public record CropType(String id, String name, long growthSeconds, long regrowth
                 .anyMatch(price -> price == null || price.signum() <= 0))
             throw new IllegalArgumentException("Invalid seed prices: " + id);
         EnumMap<Currency, BigDecimal> prices = new EnumMap<>(Currency.class);
-        if (seedPrices != null) prices.putAll(seedPrices);
+        prices.putAll(seedPrices);
         seedPrices = Map.copyOf(prices);
         try { firstHarvestXp(growthSeconds); }
         catch (ArithmeticException e) { throw new IllegalArgumentException("Growth time without exact XP: " + id, e); }
