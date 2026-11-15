@@ -287,6 +287,15 @@ export function spriteDrawRect(
     height,
   };
 }
+export function widthForMatchingHeight(
+  width: number,
+  spriteWidth: number,
+  spriteHeight: number,
+  referenceWidth: number,
+  referenceHeight: number,
+) {
+  return width * (referenceHeight / referenceWidth) / (spriteHeight / spriteWidth);
+}
 export function measureSpriteFootprint(
   imageWidth: number,
   imageHeight: number,
@@ -586,6 +595,13 @@ export function tileCommand(
   return fields;
 }
 
+/** Ferramentas de limpeza na visita só valem em plantas que mostram a praga correspondente. */
+export function visitCleanAvailable(tool: string, tile: Tile) {
+  if (tool === "CLEAN_WEEDS") return tile.weeds;
+  if (tool === "CLEAN_INSECTS") return tile.insects > 0;
+  return false;
+}
+
 export function animalStatusText(
   status: string,
   kind: string,
@@ -625,6 +641,19 @@ export function animalActionLabel(
   if (status === "READY" && kind === "GROWING" && stage === "ADULT")
     return "Vender adulto";
   return null;
+}
+/** Rações do visitante que servem para o animal faminto do amigo; protetores aceitam as duas. */
+export function friendFeedOptions(
+  kind: string,
+  status: string,
+  stock: Record<string, number> | undefined,
+): ("growth" | "producer")[] {
+  if (status !== "HUNGRY") return [];
+  const compatible: ("growth" | "producer")[] =
+    kind === "PROTECTOR"
+      ? ["growth", "producer"]
+      : [kind === "PRODUCER" ? "producer" : "growth"];
+  return compatible.filter((id) => (stock?.[id] ?? 0) > 0);
 }
 export function animalClickCommand(
   id: string,

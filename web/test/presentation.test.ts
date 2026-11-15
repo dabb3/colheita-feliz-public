@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {periodAt,tileCenter,pickTile,animalPath,animalWalkingFrame,animalSoundPath,tileArtRect,backgroundBounds,animalShadowRect,spriteDrawRect,measureSpriteFootprint,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand} from '../src/presentation.ts';
+import {periodAt,tileCenter,pickTile,animalPath,animalWalkingFrame,animalSoundPath,tileArtRect,backgroundBounds,animalShadowRect,spriteDrawRect,measureSpriteFootprint,widthForMatchingHeight,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand,friendFeedOptions} from '../src/presentation.ts';
+
+test('the updated idle dog matches the walking sprite height after alpha trim',()=>{
+ // Trimmed boxes (>12 alpha) of cachorro.png and cachorro-andando.png at 1536×1024.
+ const idle={width:941,height:922},walking={width:1082,height:875};
+ const idleWidth=widthForMatchingHeight(110,idle.width,idle.height,walking.width,walking.height);
+ assert.ok(Math.abs(idleWidth*idle.height/idle.width-110*walking.height/walking.width)<1e-9);
+ assert.ok(Math.abs(idleWidth-90.79)<0.01);
+});
 
 test('existing robot identifier presents only the normal dog in every pose and faces its travel',()=>{
  assert.equal(animalPath('cachorro-robo','ADULT',false,false,false),'classic/animals/cachorro/cachorro.png');
@@ -158,6 +166,25 @@ test('each toolbar tool sends the selected seed, fertilizer, and visit revision'
  assert.deepEqual(tileCommand('LOVE',tile,'nabo','amor',true),{action:'LOVE',column:2,row:1,harvestRevision:'17',itemId:'amor'});
  for(const action of ['SPREAD_INSECTS','SPREAD_WEEDS'])
   assert.deepEqual(tileCommand(action,tile,'nabo','amor',true),{action,column:2,row:1,harvestRevision:'17'});
+});
+test('visit cleaning tools only target plants showing the matching pest, protected or not',()=>{
+ const tile=(weeds:boolean,insects:number,isProtected=false)=>({column:0,row:0,harvestRevision:'3',weeds,insects,protected:isProtected}) as import('../src/types.ts').Tile;
+ assert.equal(visitCleanAvailable('CLEAN_WEEDS',tile(true,0,true)),true);
+ assert.equal(visitCleanAvailable('CLEAN_WEEDS',tile(false,2)),false);
+ assert.equal(visitCleanAvailable('CLEAN_INSECTS',tile(false,1,true)),true);
+ assert.equal(visitCleanAvailable('CLEAN_INSECTS',tile(true,0)),false);
+ assert.equal(visitCleanAvailable('SPREAD_WEEDS',tile(true,1)),false);
+ assert.deepEqual(tileCommand('CLEAN_INSECTS',tile(false,1),'nabo','amor',true),{action:'CLEAN_INSECTS',column:0,row:0,harvestRevision:'3'});
+});
+test('visitors feed only hungry friend animals with compatible feed they own',()=>{
+ const stock={growth:1,producer:2};
+ assert.deepEqual(friendFeedOptions('PRODUCER','HUNGRY',stock),['producer']);
+ assert.deepEqual(friendFeedOptions('GROWING','HUNGRY',stock),['growth']);
+ assert.deepEqual(friendFeedOptions('PROTECTOR','HUNGRY',stock),['growth','producer']);
+ assert.deepEqual(friendFeedOptions('PROTECTOR','HUNGRY',{producer:1}),['producer']);
+ assert.deepEqual(friendFeedOptions('GROWING','HUNGRY',{producer:3}),[]);
+ assert.deepEqual(friendFeedOptions('PRODUCER','HUNGRY',undefined),[]);
+ for(const status of ['PRODUCING','READY'])assert.deepEqual(friendFeedOptions('PRODUCER',status,stock),[]);
 });
 test('crop tooltip uses total nominal duration for growth and rounds remaining time down to elapsed hours',()=>{
  const tile={state:'GROWING',season:2,seasons:4,nominalRemainingSeconds:3600,remainingSeconds:900,dry:true,paused:true,weeds:true,insects:2,protected:true} as import('../src/types.ts').Tile;

@@ -1,6 +1,6 @@
 import type { Farm, Catalog, CommandFields, Friend } from "./types.ts";
 import {avatarSource,type AvatarChoice} from './avatar.ts';
-import { animalPath } from "./presentation.ts";
+import { animalPath, measureSpriteFootprint } from "./presentation.ts";
 import { fertilizerDuration, xpPercent, purchaseLock, seedGrowthLabel, CROP_TIME_NOTICE, dailyAllowanceText } from "./ui-presentation.ts";
 
 export function text(tag: string, value: string, className = "") {
@@ -9,11 +9,32 @@ export function text(tag: string, value: string, className = "") {
   node.className = className;
   return node;
 }
-export function image(path: string, className = "") {
+export function image(path: string, className = "", loading?: "eager" | "lazy") {
   const node = document.createElement("img");
-  node.src = "/assets/" + path;
+  if (path === "classic/crops/plants_phase_one_to_five/caviar_5.png")
+    node.onload = () => {
+      node.onload = null;
+      try {
+        const canvas = document.createElement("canvas"),
+          context = canvas.getContext("2d");
+        if (!context) return;
+        canvas.width = node.naturalWidth;
+        canvas.height = node.naturalHeight;
+        context.drawImage(node, 0, 0);
+        const { data } = context.getImageData(0, 0, canvas.width, canvas.height),
+          bounds = measureSpriteFootprint(canvas.width, canvas.height, (x, y) => data[(y * canvas.width + x) * 4 + 3]);
+        canvas.width = bounds.width;
+        canvas.height = bounds.height;
+        context.drawImage(node, bounds.left, bounds.top, bounds.width, bounds.height, 0, 0, bounds.width, bounds.height);
+        node.src = canvas.toDataURL();
+      } catch {
+        // Canvas pixel access may be unavailable; keep the original thumbnail.
+      }
+    };
   node.alt = "";
   node.className = className;
+  if (loading) node.loading = loading;
+  node.src = "/assets/" + path;
   return node;
 }
 export function control(label: string, action: () => void) {

@@ -11,6 +11,7 @@ import {
   pickTile,
   animalPath,
   animalWalkingFrame,
+  widthForMatchingHeight,
   animalLayout,
   animalShadowRect,
   spriteDrawRect,
@@ -42,6 +43,7 @@ export class Scene {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private sprites = new Map<string, Sprite | null>();
+  private failedSprites = new Set<string>();
   private farm?: Farm;
   private tileEffects: {
     column: number;
@@ -291,7 +293,9 @@ export class Scene {
       this.draw();
     };
     image.onerror = () => {
+      this.failedSprites.add(key);
       console.warn("Asset indisponível:", path);
+      this.draw();
     };
     return;
   }
@@ -411,18 +415,39 @@ export class Scene {
         motion.open,
       ),
       sprite = this.sprite(path, true);
+    const needsWalkingReference =
+        animal.id === "cachorro-robo" && !sleep && !walkingFrame,
+      walkingPath = needsWalkingReference
+        ? animalPath(animal.id, animal.stage, false, true, false)
+        : undefined,
+      walkingSprite = walkingPath ? this.sprite(walkingPath, true) : undefined;
+    if (
+      needsWalkingReference &&
+      !walkingSprite &&
+      !this.failedSprites.has(`${walkingPath}:true:`)
+    ) return;
+    const drawWidth =
+      sprite && walkingSprite
+        ? widthForMatchingHeight(
+            width,
+            sprite.w,
+            sprite.h,
+            walkingSprite.w,
+            walkingSprite.h,
+          )
+        : width;
     this.animal(
       path,
       xAt,
       bottom,
-      width,
+      drawWidth,
       animalFlip(animal.id, motion.facingRight),
     );
     const type = this.catalog.animals.find((item) => item.id === animal.id);
     if (showAnimalProduct(animal.status, type?.kind ?? "", animal.id))
       this.product(animalProductPath(animal.id)!, x + 38, bottom + 12, 28);
     if (hungry && sprite)
-      this.feedMarker(xAt, bottom - (width * sprite.h) / sprite.w - 2);
+      this.feedMarker(xAt, bottom - (drawWidth * sprite.h) / sprite.w - 2);
   }
   private product(path: string, x: number, bottom: number, width: number) {
     const sprite = this.sprite(path, true);
@@ -671,7 +696,7 @@ export class Scene {
           70,
           true,
         );
-      if (tile.protected) {
+      if (this.farm.own && tile.protected) {
         this.thing("classic/icons/icone-cadeado.png",p.x+58,p.y+6,18,true);
       }
     }

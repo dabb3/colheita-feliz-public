@@ -23,7 +23,7 @@ import static br.com.colheitafeliz.server.OnlineViews.object;
 
 final class GameHttpServer implements AutoCloseable {
     static final int WORKERS = 4, QUEUE = 32, IO_THREADS = 64;
-    private static final Set<String> COMMAND_FIELDS = Set.of("requestId", "expectedRevision", "action", "itemId", "currency", "column", "row", "harvestRevision", "photoUrl");
+    private static final Set<String> COMMAND_FIELDS = Set.of("requestId", "expectedRevision", "action", "itemId", "currency", "column", "row", "harvestRevision", "photoUrl", "feedId");
     private final HttpServer http;
     private final OnlineGameService service;
     private final Authenticator auth;
@@ -113,6 +113,12 @@ final class GameHttpServer implements AutoCloseable {
             if (method.equals("GET") && path.equals("/v1/request-id")) response = service.requestId();
             else if (method.equals("GET") && path.equals("/v1/me/farm")) response = service.farm(actor, identity.name());
             else if (method.equals("GET") && path.equals("/v1/friends")) response = service.friends(actor);
+            else if (method.equals("GET") && path.equals("/v1/gifts")) response = service.gifts(actor);
+            else if (method.equals("POST") && path.equals("/v1/gifts")) {
+                var body = read(exchange, raw, Set.of("requestId", "recipientId", "cropId", "quantity"));
+                response = service.sendGift(actor, UUID.fromString(string(body, "recipientId", true)), string(body, "cropId", true),
+                        integer(body, "quantity"), UUID.fromString(string(body, "requestId", true)));
+            }
             else if (method.equals("POST") && path.equals("/v1/me/actions")) response = service.command(actor, command(read(exchange, raw, COMMAND_FIELDS)));
             else if (method.equals("POST") && path.equals("/v1/friend-invitations")) response = service.createInvitation(actor,
                     UUID.fromString(string(read(exchange, raw, Set.of("requestId")), "requestId", true)));
@@ -184,7 +190,7 @@ final class GameHttpServer implements AutoCloseable {
     private static Command command(JsonObject json) {
         return new Command(UUID.fromString(string(json, "requestId", true)), string(json, "expectedRevision", true),
                 string(json, "action", true), string(json, "itemId", false), string(json, "currency", false),
-                integer(json, "column"), integer(json, "row"), string(json, "harvestRevision", false),string(json,"photoUrl",false));
+                integer(json, "column"), integer(json, "row"), string(json, "harvestRevision", false),string(json,"photoUrl",false),string(json,"feedId",false));
     }
     private static String string(JsonObject object, String field, boolean required) {
         var value = object.get(field);

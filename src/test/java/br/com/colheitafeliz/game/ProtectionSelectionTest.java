@@ -63,7 +63,7 @@ class ProtectionSelectionTest {
         real.advanceSeconds(30 * 86400);
         buy("cachorro-robo"); owner.protectedPlots(); assertEquals(2, draws);
     }
-    @Test void onlyCatalogProtectorsContributeAndFiveBlockTheftAndLoveOnEveryPlot() {
+    @Test void onlyCatalogProtectorsContributeAndFiveBlockTheftButNotLoveOnEveryPlot() {
         affordAnimals(); buy("galinha");
         assertEquals(0, owner.activeProtectors());
         var tile = owner.farm().tile(0, 0);
@@ -80,8 +80,8 @@ class ProtectionSelectionTest {
         }
         while (visitor.progress().level() < 15) visitor.progress().award(visitor.progress().xpToNext());
         visitor.inventory().addFertilizer("amor", 5);
-        for (int row = 0; row < 5; row++) assertFalse(visits.fertilizeVisit(owner, visitor, 0, row, "amor", owner.farm().tile(0, row).harvestRevision()).success());
-        assertEquals(5, visitor.inventory().fertilizer("amor"));
+        for (int row = 1; row < 5; row++) assertTrue(visits.fertilizeVisit(owner, visitor, 0, row, "amor", owner.farm().tile(0, row).harvestRevision()).success());
+        assertEquals(1, visitor.inventory().fertilizer("amor"));
         simulation.advanceSeconds(6 * 3600);
         assertTrue(owner.protectedPlots().isEmpty());
         assertTrue(visits.steal(owner, visitor, 0, 0, tile.harvestRevision()).success());

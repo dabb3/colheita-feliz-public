@@ -185,7 +185,7 @@ class CropEconomyFaithfulSimulationTest {
                 }
                 if (message.contains("reservada ao dono")) windowDenied++;
                 else if (message.contains("últimas 6 horas")) { cooldownDenied++; break; }
-                else if (target.get("protected").getAsBoolean()) protectionDenied++;
+                else if (java.util.Set.of("PROTECTED", "BITTEN").contains(reply.getAsJsonObject("theftOutcome").get("kind").getAsString())) protectionDenied++;
                 else fail("Unexpected theft refusal: " + message);
             }
         }

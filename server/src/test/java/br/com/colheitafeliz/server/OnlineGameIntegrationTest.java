@@ -405,14 +405,37 @@ class OnlineGameIntegrationTest {
     @Test void protectionIsCheckedInsideTheVisitTransaction() {
         connectFriends();
         prepare(alice, "morango", true, true);
+        assertTrue(service.farm(alice).getAsJsonArray("tiles").get(0).getAsJsonObject().get("protected").getAsBoolean());
         var visit = service.visit(bob, alice);
         var tile = visit.getAsJsonArray("tiles").get(0).getAsJsonObject();
-        assertTrue(tile.get("protected").getAsBoolean());
+        assertHidesProtection(visit);
         var command = new Command(requestId(), visit.get("revision").getAsString(), "STEAL", null, null,
                 0, 0, tile.get("harvestRevision").getAsString());
-        assertFalse(service.visitAction(bob, alice, command).getAsJsonObject("result").get("success").getAsBoolean());
+        var reply = service.visitAction(bob, alice, command);
+        assertFalse(reply.getAsJsonObject("result").get("success").getAsBoolean());
+        assertHidesProtection(reply.getAsJsonObject("visitedFarm"));
+        assertTrue(reply.getAsJsonObject("farm").getAsJsonArray("tiles").get(0).getAsJsonObject().has("protected"));
         assertEquals(0, quantity(service.farm(bob)));
         assertEquals("READY", service.farm(alice).getAsJsonArray("tiles").get(0).getAsJsonObject().get("state").getAsString());
+    }
+
+    private static void assertHidesProtection(JsonObject farm) {
+        assertFalse(farm.toString().toLowerCase(java.util.Locale.ROOT).contains("protect"), farm.toString());
+    }
+
+    @Test void loveHelpsProtectedPlotsWithoutRevealingProtection() {
+        connectFriends();
+        prepare(alice, "morango", false, true);
+        prepare(bob, null, false, false);
+        var reply = service.visitAction(bob, alice, loveCommand(bob, alice));
+        assertTrue(reply.getAsJsonObject("result").get("success").getAsBoolean());
+        assertTrue(reply.getAsJsonObject("visitedFarm").getAsJsonArray("tiles").get(0).getAsJsonObject().get("fertilized").getAsBoolean());
+        assertHidesProtection(reply.getAsJsonObject("visitedFarm"));
+    }
+
+    private Command loveCommand(UUID actor, UUID owner) {
+        var base = theftCommand(actor, owner);
+        return new Command(base.requestId(), base.expectedRevision(), "LOVE", "amor", null, base.column(), base.row(), base.harvestRevision());
     }
 
     @org.junit.jupiter.params.ParameterizedTest
@@ -683,14 +706,44 @@ class OnlineGameIntegrationTest {
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings = {"SPREAD_INSECTS", "SPREAD_WEEDS"})
-    void protectedPestRefusalPreservesStateAndDoesNotSpendTheVisitorsTurn(String kind) {
+    void protectedPestIsBlockedOnlyAfterSpendingTheVisitorsTurn(String kind) {
         UUID carol = preparePestFriends(true);
         var ownerBefore = service.farm(alice);
         var visitorBefore = service.farm(bob);
-        assertFalse(service.visitAction(bob, alice, pestCommand(bob, alice, kind)).getAsJsonObject("result").get("success").getAsBoolean());
+        var blocked = service.visitAction(bob, alice, pestCommand(bob, alice, kind));
+        assertFalse(blocked.getAsJsonObject("result").get("success").getAsBoolean());
+        assertTrue(blocked.getAsJsonObject("result").get("message").getAsString().contains("protegido"));
+        assertHidesProtection(blocked.getAsJsonObject("visitedFarm"));
+        assertEquals(clock.instant(), store.transaction(bob, tx -> tx.lastPest(bob, kind)));
         assertEquals(ownerBefore.get("revision"), service.farm(alice).get("revision"));
+        assertEquals(ownerBefore.get("tiles"), service.farm(alice).get("tiles"));
         assertEquals(visitorBefore.get("revision"), service.farm(bob).get("revision"));
-        assertTrue(service.visitAction(bob, carol, pestCommand(bob, carol, kind)).getAsJsonObject("result").get("success").getAsBoolean());
+        var refused = service.visitAction(bob, carol, pestCommand(bob, carol, kind));
+        assertTrue(refused.getAsJsonObject("result").get("message").getAsString().contains("6h 0min 0s"));
+        assertNull(store.transaction(bob, tx -> tx.lastTheft(bob)));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"SPREAD_INSECTS", "SPREAD_WEEDS", "LOVE"})
+    void ineligiblePlotsAnswerTheSameWithOrWithoutProtection(String kind) {
+        connectFriends();
+        UUID carol = UUID.randomUUID();
+        service.acceptInvitation(carol, "Carol", service.createInvitation(bob, requestId()).get("code").getAsString(), requestId());
+        service.farm(carol);
+        prepare(carol, "morango", true, false);
+        prepare(alice, "morango", true, true);
+        prepare(bob, null, false, false);
+        assertTrue(service.farm(alice).getAsJsonArray("tiles").get(0).getAsJsonObject().get("protected").getAsBoolean());
+        assertFalse(service.farm(carol).getAsJsonArray("tiles").get(0).getAsJsonObject().get("protected").getAsBoolean());
+        var messages = new java.util.ArrayList<String>();
+        for (UUID owner : java.util.List.of(alice, carol)) {
+            var command = kind.equals("LOVE") ? loveCommand(bob, owner) : pestCommand(bob, owner, kind);
+            var reply = service.visitAction(bob, owner, command);
+            assertFalse(reply.getAsJsonObject("result").get("success").getAsBoolean());
+            messages.add(reply.getAsJsonObject("result").get("message").getAsString());
+        }
+        assertEquals(messages.get(0), messages.get(1));
+        if (!kind.equals("LOVE")) assertNull(store.transaction(bob, tx -> tx.lastPest(bob, kind)));
     }
 
     @org.junit.jupiter.params.ParameterizedTest
