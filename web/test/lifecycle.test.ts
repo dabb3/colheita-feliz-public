@@ -19,6 +19,28 @@ test('friend list renders each persisted avatar and falls back safely without ch
  assert.equal(images[2].src,avatar.CLASSIC_AVATAR);images[1].onerror();assert.equal(images[1].src,avatar.CLASSIC_AVATAR);assert.equal(images[1].onerror,null);
  await descendants(elements.get('modal-content')).find(node=>node.textContent==='Visitar fazenda').onclick();assert.equal(target,'/v1/farms/bob/visit');
 });
+test('gift loading failure stays inside the gift panel and can be retried',async()=>{
+ const {h,elements}=app();let giftReads=0;
+ h.set({own:{...farm('alice'),seedCounts:{nabo:2}},catalog:{crops:[{id:'nabo',name:'Nabo'}],animals:[],fertilizers:[],vip:{greenPrice:20}},api:{get:async path=>{if(path==='/v1/friends')return[{id:'bob',name:'Bob'}];if(path==='/v1/gifts'&&giftReads++===0)throw new ApiError(500,'server failure');return{received:[],sent:[]};}}});
+ await h.friends();await new Promise(r=>setTimeout(r,0));
+ const content=elements.get('modal-content'),gift=descendants(content).find(node=>node.className==='gift-panel');
+ assert.ok(descendants(content).some(node=>node.textContent==='Bob'));assert.ok(gift);assert.match(text(gift),/Não foi possível carregar os presentes/);assert.equal(elements.get('modal-title').textContent,'Amigos');
+ descendants(gift).find(node=>node.textContent==='Tentar novamente').onclick();await new Promise(r=>setTimeout(r,0));
+ assert.equal(giftReads,2);assert.ok(descendants(content).some(node=>node.textContent==='Bob'));assert.ok(descendants(gift).some(node=>node.textContent==='Enviar presente'),JSON.stringify(gift.children.map(node=>node.textContent)));assert.ok(!descendants(gift).some(node=>node.textContent==='Tentar novamente'));
+});
+test('gift network failure stays in the friends panel without showing the global connection error',async()=>{
+ const {h,elements}=app();h.set({own:farm('alice'),api:{get:async path=>{if(path==='/v1/friends')return[{id:'bob',name:'Bob'}];throw new TypeError('network unavailable');}}});
+ await h.friends();await new Promise(r=>setTimeout(r,0));
+ assert.equal(elements.get('modal-title').textContent,'Amigos');assert.ok(descendants(elements.get('modal-content')).some(node=>node.textContent==='Bob'));
+ assert.match(text(elements.get('modal-content')),/Não foi possível carregar os presentes/);assert.ok(!elements.has('connection'));
+});
+test('late gift failure after navigating away does not affect the next panel',async()=>{
+ const {h,elements}=app(),reply=deferred();h.set({own:farm('alice'),api:{get:path=>path==='/v1/friends'?Promise.resolve([{id:'bob',name:'Bob'}]):reply.promise}});
+ await h.friends();h.dialog('Outro painel');reply.resolve(Promise.reject(new TypeError('network unavailable')));await new Promise(r=>setTimeout(r,0));
+ assert.equal(elements.get('modal-title').textContent,'Outro painel');assert.ok(!text(elements.get('modal-content')).includes('Não foi possível carregar os presentes'));
+ const next=app(),late=deferred();next.h.set({own:farm('alice'),api:{get:path=>path==='/v1/friends'?Promise.resolve([{id:'bob',name:'Bob'}]):late.promise}});await next.h.friends();await next.h.logout();late.resolve(Promise.reject(new TypeError('network unavailable')));await new Promise(r=>setTimeout(r,0));
+ assert.equal(next.elements.get('modal').open,false);assert.ok(!text(next.elements.get('modal-content')).includes('Não foi possível carregar os presentes'));
+});
 function app(preferences=new Map(),pushLogoutOptions){
  const intervals=new Map(),elements=new Map(),listeners=new Map(),audioClips=[],observers=[],timeouts=new Map();let nextTimeout=0;
  const make=(tag='div')=>({tag,value:'',selectedIndex:0,hidden:false,children:[],get childElementCount(){return this.children.length;},attributes:{},dataset:{},style:{setProperty(key,value){this[key]=value;}},scrollTop:0,scrollLeft:0,classList:{add(){},remove(){},toggle(){}},
@@ -34,6 +56,8 @@ function app(preferences=new Map(),pushLogoutOptions){
  const ctx={syncMobileCamera(){ctx.cameraSyncs=(ctx.cameraSyncs??0)+1;},reconcilePush:async()=>{},connectPush:async()=>{},suspendPush:pushLogoutOptions?.suspendPush??(async()=>{}),createClient:()=>({auth:{signOut:pushLogoutOptions?.signOut}}),renderPushSettings:()=>{},...presentation,...uiPresentation,...avatar,...inviteUrl,history:{state:null,replaceState(){}},window:{localStorage:{getItem:key=>preferences.get(key)??null,setItem:(key,value)=>preferences.set(key,value)},COLHEITA_CONFIG:{development:!pushLogoutOptions},setInterval(callback,delay){intervals.set(delay,callback);return delay;},clearInterval(id){intervals.delete(id);},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make());return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}addEventListener(){}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
  const uiSource=readFileSync(new URL('../src/ui.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(uiSource),ctx);
+ const panelsSource=readFileSync(new URL('../src/ui-panels.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
+ runInNewContext(stripTypeScriptTypes(panelsSource),ctx);
  const notificationSource=readFileSync(new URL('../src/notifications.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(notificationSource),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
@@ -139,18 +163,28 @@ test('pest tools exist only in visits and send the selected plot with its revisi
   assert.equal(text(elements.get('notice')),'Disponível em 1h 0min 0s.');
   const last=sent.at(-1);assert.equal(last.path,'/v1/farms/bob/visit-actions');assert.equal(JSON.stringify(last.command),JSON.stringify({action,column:2,row:1,harvestRevision:'9',expectedRevision:'42'}));
  }
+ h.pickTool('CLEAN_WEEDS');assert.match(text(elements.get('notice')),/limpeza elegível dá 2 XP.*até 20 XP de ajuda por dia/i);assert.match(text(elements.get('notice')),/limpar a própria praga não dá recompensa/i);
  h.set({own,api});h.receive({});assert.ok(!descendants(elements.get('tools')).some(n=>n.getAttribute?.('aria-label')?.startsWith('Lançar')));
 });
 
-test('pinned pest hint follows tool selection without restarting the growth counter',()=>{
- const {h,ctx}=app();let clientNow=Date.parse('2026-11-03T12:00:00Z');ctx.Date=class extends Date{static now(){return clientNow;}};
+test('pest tool guidance explains growth, watering and blocked cooldown without exposing protection',()=>{
+ const {h,ctx,elements}=app();let clientNow=Date.parse('2026-11-03T12:00:00Z');ctx.Date=class extends Date{static now(){return clientNow;}};
  h.set({own:farm('alice'),visited:{...farm('bob'),serverTime:'2026-11-03T12:00:00Z'},catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:36000}],animals:[],fertilizers:[],vip:{greenPrice:20}}});h.receive({});
  const bounds={left:0,top:0,width:1280,height:720};ctx.document.getElementById('game').getBoundingClientRect=()=>bounds;ctx.document.getElementById('farm').getBoundingClientRect=()=>bounds;
  const panel=ctx.document.getElementById('plant-health');panel.getBoundingClientRect=()=>({width:360,height:280});
  const tile={column:0,row:0,cropId:'nabo',state:'GROWING',watered:true,season:1,seasons:1,remainingSeconds:3600,nominalRemainingSeconds:3600};
- h.pickTool('SPREAD_INSECTS');h.health(tile,{x:585,y:400},'tap');assert.match(text(panel),/Lançar inseto nesta planta/);
+ h.pickTool('SPREAD_INSECTS');assert.match(text(elements.get('notice')),/em crescimento e já regada/);assert.match(text(elements.get('notice')),/bloqueada.*consome.*6h/i);assert.doesNotMatch(text(elements.get('notice')),/prote[cç][aã]o/i);h.health(tile,{x:585,y:400},'tap');assert.match(text(panel),/Lançar inseto nesta planta/);
  clientNow+=60000;h.pickTool('SPREAD_WEEDS');assert.match(text(panel),/Lançar erva nesta planta/);assert.ok(!text(panel).includes('Lançar inseto nesta planta'));
  assert.equal(panel.querySelector('.crop-growth-value').textContent,'59min');
+});
+test('friend cleanup health actions do not promise XP',()=>{
+ const {h,ctx}=app();h.set({own:farm('alice'),visited:farm('bob'),catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:3600}],animals:[],fertilizers:[],vip:{greenPrice:20}}});h.receive({});
+ const bounds={left:0,top:0,width:1280,height:720};ctx.document.getElementById('game').getBoundingClientRect=()=>bounds;ctx.document.getElementById('farm').getBoundingClientRect=()=>bounds;
+ const panel=ctx.document.getElementById('plant-health');panel.getBoundingClientRect=()=>({width:360,height:280});
+ for(const [tool,tile,label]of [['CLEAN_WEEDS',{state:'GROWING',weeds:true},'Tirar ervas do amigo'],['CLEAN_INSECTS',{state:'GROWING',insects:1},'Matar insetos do amigo']]){
+  h.pickTool(tool);h.health({...tile,cropId:'nabo',watered:true,season:1,seasons:1,remainingSeconds:60,nominalRemainingSeconds:60},{x:585,y:400},'tap');
+  const hint=descendants(panel).find(node=>node.className==='crop-action-hint');assert.ok(hint);assert.equal(text(hint),label);assert.doesNotMatch(text(hint),/XP/);
+ }
 });
 
 test('visits ignore protection data while the owner still sees the lock chip',()=>{

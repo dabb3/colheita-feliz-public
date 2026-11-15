@@ -39,7 +39,8 @@ class FriendFeedingIntegrationTest {
     private void feed(String feedId,int amount){edit(visitor,game->game.inventory().addFeed(feedId,amount));}
     private int stock(UUID player,String feedId){var feed=farm(player).getAsJsonObject("feed");return feed.has(feedId)?feed.get(feedId).getAsInt():0;}
     private Command feedCommand(String type,String feedId){var farm=service.visit(visitor,owner);return new Command(id(),farm.get("revision").getAsString(),"FEED_ANIMAL",type,null,null,null,null,null,feedId);}
-    private JsonObject act(Command command){return service.visitAction(visitor,owner,command);}
+    private JsonObject act(Command command){return act(visitor,command);}
+    private JsonObject act(UUID actor,Command command){return service.visitAction(actor,owner,command);}
     private boolean success(JsonObject reply){return reply.getAsJsonObject("result").get("success").getAsBoolean();}
     private String message(JsonObject reply){return reply.getAsJsonObject("result").get("message").getAsString();}
     private BigDecimal xp(){return new BigDecimal(farm(visitor).get("currentXp").getAsString());}
@@ -56,6 +57,30 @@ class FriendFeedingIntegrationTest {
             assertTrue(visits.spreadInsects(game,helper,0,0,tile.harvestRevision()).result().success());
             tile.observePestArrivals(clock.instant());
         });
+    }
+    private void prepareSpreadablePlot(){
+        edit(owner,game->{
+            var type=game.catalog().get("cenoura");var origin=type.plantingOrigin(new ItemLot(type.id(),Currency.GOLD,type.seedPrices().get(Currency.GOLD),1,false));
+            var tile=game.farm().tile(0,0);var crop=new Crop(type,clock.instant(),origin).water(clock.instant());
+            tile.restore(TileState.GROWING,crop,PestState.NONE,clock.instant().plusSeconds(3600),0,clock.instant().plusSeconds(3600),null,false,tile.harvestRevision()+1);
+        });
+    }
+    private void reinfest(String kind,boolean newSeason){
+        if(!newSeason)clock.advance(1);
+        edit(owner,game->{
+            var tile=game.farm().tile(0,0);long revision=tile.harvestRevision();
+            if(newSeason){
+                var type=game.catalog().get("cenoura");var origin=type.plantingOrigin(new ItemLot(type.id(),Currency.GOLD,type.seedPrices().get(Currency.GOLD),1,false));
+                var crop=new Crop(type,clock.instant(),origin).water(clock.instant());
+                tile.restore(TileState.GROWING,crop,PestState.NONE,clock.instant().plusSeconds(3600),0,clock.instant().plusSeconds(3600),null,false,revision+1);
+            }else if(kind.equals("SPREAD_INSECTS"))tile.removeInsects(clock.instant());else tile.removePest(clock.instant());
+            if(kind.equals("SPREAD_INSECTS"))tile.checkInsects(clock.instant(),true);else tile.checkPest(clock.instant(),true);
+        });
+    }
+    private Command tileAction(UUID actor,String action){
+        var view=service.visit(actor,owner);String harvest=null;
+        for(var t:view.getAsJsonArray("tiles")){var o=t.getAsJsonObject();if(o.get("column").getAsInt()==0&&o.get("row").getAsInt()==0)harvest=o.get("harvestRevision").getAsString();}
+        return new Command(id(),view.get("revision").getAsString(),action,null,null,0,0,harvest);
     }
     private Command clean(String action){var farm=service.visit(visitor,owner);String harvest=null;
         for(var t:farm.getAsJsonArray("tiles")){var o=t.getAsJsonObject();if(o.get("column").getAsInt()==0&&o.get("row").getAsInt()==0)harvest=o.get("harvestRevision").getAsString();}
@@ -115,5 +140,59 @@ class FriendFeedingIntegrationTest {
         assertTrue(after.getAsJsonObject("cooperativeBonus").get("done").getAsBoolean());assertEquals(0,green.add(BigDecimal.ONE).compareTo(green()));
         var other=hungry(AnimalType.Kind.PRODUCER);
         assertTrue(success(act(feedCommand(other,"producer"))));assertEquals(0,green.add(BigDecimal.ONE).compareTo(green()));
+    }
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(strings={"SPREAD_WEEDS","SPREAD_INSECTS"})
+    void visitorCanCleanItsOwnPestWithoutXpMissionOrCooperativeBonus(String spread){
+        prepareSpreadablePlot();String clean=spread.equals("SPREAD_WEEDS")?"CLEAN_WEEDS":"CLEAN_INSECTS";
+        var xp=xp();var before=farm(visitor);var result=act(tileAction(visitor,spread));
+        assertTrue(success(result),message(result));
+        result=act(tileAction(visitor,clean));
+        assertTrue(success(result),message(result));
+        var after=farm(visitor);
+        assertEquals(0,xp.compareTo(new BigDecimal(after.get("currentXp").getAsString())));
+        assertEquals(0,mission(before,"nature").get("progress").getAsInt());
+        assertEquals(0,mission(after,"nature").get("progress").getAsInt());
+        assertFalse(after.getAsJsonObject("cooperativeBonus").get("done").getAsBoolean());
+        assertEquals(0,(int)store.transaction(visitor,tx->tx.cooperativeXp(visitor,LocalDate.ofInstant(clock.instant(),ZoneOffset.UTC))));
+    }
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(strings={"SPREAD_WEEDS","SPREAD_INSECTS"})
+    void selfOriginDoesNotSuppressRewardsForAnotherVisitorOrForANewInfestation(String kind){
+        prepareSpreadablePlot();var spread=act(tileAction(visitor,kind));assertTrue(success(spread),message(spread));
+        UUID helper=UUID.randomUUID();var invitation=service.createInvitation(owner,id());
+        service.acceptInvitation(helper,"Outro visitante",invitation.get("code").getAsString(),id());farm(helper);
+        var helperXp=new BigDecimal(farm(helper).get("currentXp").getAsString());
+        String clean=kind.equals("SPREAD_INSECTS")?"CLEAN_INSECTS":"CLEAN_WEEDS";
+        var cleaned=act(helper,tileAction(helper,clean));assertTrue(success(cleaned),message(cleaned));
+        assertEquals(0,helperXp.add(BigDecimal.TWO).compareTo(new BigDecimal(farm(helper).get("currentXp").getAsString())));
+        assertEquals(1,mission(farm(helper),"nature").get("progress").getAsInt());
+
+        clock.advance(6*60*60);
+        prepareSpreadablePlot();
+        assertTrue(success(act(tileAction(visitor,kind))));
+        reinfest(kind,false);
+        var visitorXp=xp();cleaned=act(tileAction(visitor,clean));assertTrue(success(cleaned),message(cleaned));
+        assertEquals(0,visitorXp.add(BigDecimal.TWO).compareTo(xp()));
+        assertEquals(1,mission(farm(visitor),"nature").get("progress").getAsInt());
+    }
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(strings={"SPREAD_WEEDS","SPREAD_INSECTS"})
+    void staleOriginFromPriorSeasonDoesNotSuppressRewards(String kind){
+        prepareSpreadablePlot();assertTrue(success(act(tileAction(visitor,kind))));
+        reinfest(kind,true);
+        var before=xp();String clean=kind.equals("SPREAD_INSECTS")?"CLEAN_INSECTS":"CLEAN_WEEDS";
+        var reply=act(tileAction(visitor,clean));assertTrue(success(reply),message(reply));
+        assertEquals(0,before.add(BigDecimal.TWO).compareTo(xp()));
+        assertEquals(1,mission(farm(visitor),"nature").get("progress").getAsInt());
+    }
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(strings={"SPREAD_WEEDS","SPREAD_INSECTS"})
+    void pestOriginCooldownAndReceiptRollbackTogetherAndReplayKeepsTheOutcome(String kind){
+        prepareSpreadablePlot();var command=tileAction(visitor,kind);int plotId=0;
+        assertThrows(IllegalStateException.class,()->store.transaction(visitor,tx->{
+            service.visitAction(tx,visitor,owner,command);throw new IllegalStateException("rollback pest origin");
+        }));
+        assertNull(store.transaction(visitor,tx->tx.lastPest(visitor,kind)));
+        assertNull(store.transaction(visitor,tx->tx.pestOrigin(owner,plotId,kind)));
+        var applied=act(command);assertTrue(success(applied));assertEquals(applied,act(command));
+        String clean=kind.equals("SPREAD_INSECTS")?"CLEAN_INSECTS":"CLEAN_WEEDS";
+        var before=xp();assertTrue(success(act(tileAction(visitor,clean))));assertEquals(0,before.compareTo(xp()));
     }
 }

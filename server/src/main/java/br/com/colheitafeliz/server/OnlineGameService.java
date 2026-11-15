@@ -226,17 +226,38 @@ final class OnlineGameService implements AutoCloseable {
                                 ? visits.spreadInsects(destination.game(), visitor.game(), command.column(), command.row(), season)
                                 : visits.spreadWeeds(destination.game(), visitor.game(), command.column(), command.row(), season);
                         result = pest.result();
-                        if (pest.consumesCooldown()) tx.recordPest(actor, command.action(), now);
+                        if (pest.consumesCooldown()) {
+                            tx.recordPest(actor, command.action(), now);
+                            if (result.success()) {
+                                int plotId = destination.game().land().at(command.column(), command.row()).id();
+                                String arrivedAt = pestArrival(destination.game(), command.column(), command.row(), command.action());
+                                if (arrivedAt == null) throw new IllegalStateException("Successful pest spread has no arrival timestamp");
+                                tx.recordPestOrigin(owner, plotId, command.action(), actor, season, arrivedAt);
+                            }
+                        }
                     }
                 } else if (CLEAN_ACTIONS.contains(command.action()) || command.action().equals("FEED_ANIMAL")) {
                     // The actor lock serializes this read-modify-write of the daily cooperative budget.
                     LocalDate today = LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC);
-                    int xp = Math.max(0, Math.min(HELP_XP, COOPERATIVE_XP_DAILY_CAP - tx.cooperativeXp(actor, today)));
-                    result = command.action().equals("FEED_ANIMAL")
-                            ? visits.feedAnimal(destination.game(), visitor.game(), command.itemId(), command.feedId(), xp)
-                            : visits.cleanPest(destination.game(), visitor.game(), command.column(), command.row(), season,
-                                    command.action().equals("CLEAN_INSECTS"), xp);
-                    if (result.success() && xp > 0) tx.addCooperativeXp(actor, today, xp);
+                    if (command.action().equals("FEED_ANIMAL")) {
+                        int xp = cooperativeHelpXp(tx, actor, today);
+                        result = visits.feedAnimal(destination.game(), visitor.game(), command.itemId(), command.feedId(), xp);
+                        if (result.success() && xp > 0) tx.addCooperativeXp(actor, today, xp);
+                    } else {
+                        String kind = command.action().equals("CLEAN_INSECTS") ? "SPREAD_INSECTS" : "SPREAD_WEEDS";
+                        int plotId = destination.game().land().at(command.column(), command.row()).id();
+                        var origin = tx.pestOrigin(owner, plotId, kind);
+                        String arrivedAt = pestArrival(destination.game(), command.column(), command.row(), kind);
+                        boolean reward = origin == null || !origin.actor().equals(actor) || origin.harvestRevision() != season
+                                || !origin.arrivedAt().equals(arrivedAt);
+                        int xp = reward ? cooperativeHelpXp(tx, actor, today) : 0;
+                        result = visits.cleanPest(destination.game(), visitor.game(), command.column(), command.row(), season,
+                                command.action().equals("CLEAN_INSECTS"), xp, reward);
+                        if (result.success()) {
+                            tx.deletePestOrigin(owner, plotId, kind);
+                            if (reward && xp > 0) tx.addCooperativeXp(actor, today, xp);
+                        }
+                    }
                 } else {
                     result = visits.fertilizeVisit(destination.game(), visitor.game(), command.column(), command.row(), "amor", season);
                 }
@@ -249,6 +270,16 @@ final class OnlineGameService implements AutoCloseable {
                 if(theft!=null)reply.add("theftOutcome",object("kind",theft.kind(),"goldDebited",theft.goldDebited().toPlainString()));
                 return reply;
             });
+    }
+
+    private static int cooperativeHelpXp(JdbcOnlineStore.Tx tx, UUID actor, LocalDate today) {
+        return Math.max(0, Math.min(HELP_XP, COOPERATIVE_XP_DAILY_CAP - tx.cooperativeXp(actor, today)));
+    }
+
+    private static String pestArrival(GameState game, int column, int row, String kind) {
+        var tile = game.farm().tile(column, row);
+        var arrivedAt = kind.equals("SPREAD_INSECTS") ? tile.insectsSince() : tile.weedsSince();
+        return arrivedAt == null ? null : arrivedAt.toString();
     }
 
     JsonObject sendGift(UUID actor, UUID recipient, String cropId, Integer quantity, UUID requestId) {

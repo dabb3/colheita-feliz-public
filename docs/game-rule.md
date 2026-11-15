@@ -465,7 +465,9 @@ As pragas pausam o crescimento sem apagar o progresso. O dono usa herbicida para
 
 ### 13.2. Limpeza feita por visitantes
 
-No online, durante a visita a um amigo ativo, o visitante pode remover ervas (`CLEAN_WEEDS`) ou insetos (`CLEAN_INSECTS`) de uma planta do dono. A remoção usa a mesma lógica de domínio do herbicida e do pesticida do dono, inclusive a limpeza dos horários de chegada usados pelo removedor automático VIP. Ninguém gasta itens. O dono não recebe XP nem progresso de missão; o visitante recebe **2 XP** por limpeza bem-sucedida e 1 ponto na missão Amigo da Natureza.
+No online, durante a visita a um amigo ativo, o visitante pode remover ervas (`CLEAN_WEEDS`) ou insetos (`CLEAN_INSECTS`) de uma planta do dono. A remoção usa a mesma lógica de domínio do herbicida e do pesticida do dono, inclusive a limpeza dos horários de chegada usados pelo removedor automático VIP. Ninguém gasta itens. O dono não recebe XP nem progresso de missão; o visitante recebe **2 XP** por limpeza bem-sucedida e 1 ponto na missão Amigo da Natureza, exceto quando ele próprio lançou a infestação removida.
+
+Limpar a própria praga continua permitido, mas não dá XP, progresso de missão ou bônus cooperativo e não consome o orçamento diário de XP. A autoria pertence à infestação atual: outra chegada natural, outro autor ou uma nova temporada não herdam a penalidade de uma praga anterior.
 
 O XP cooperativo tem teto de **20 XP por visitante por dia UTC**, compartilhado com a alimentação de animais de amigos (seção 13.3). Atingido o teto, a limpeza continua funcionando e contando para a missão, mas concede 0 XP e avisa o jogador. Terrenos protegidos também aceitam limpeza, porque a proteção só impede furto e pragas; as recusas usam a mesma mensagem com ou sem proteção. Planta sem a praga escolhida, temporada desatualizada ou repetição do mesmo pedido não concedem XP nem progresso.
 

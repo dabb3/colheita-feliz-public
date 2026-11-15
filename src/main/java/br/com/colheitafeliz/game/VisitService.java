@@ -138,6 +138,11 @@ public final class VisitService {
      * Terreno protegido também aceita a limpeza, e as recusas não revelam proteção.
      */
     public ActionResult cleanPest(GameState owner, GameState visitor, int col, int row, long revision, boolean insects, int xp) {
+        return cleanPest(owner, visitor, col, row, revision, insects, xp, true);
+    }
+
+    public ActionResult cleanPest(GameState owner, GameState visitor, int col, int row, long revision,
+                                 boolean insects, int xp, boolean reward) {
         synchronized (GameState.class) {
             FarmTile tile = eligibleTile(owner, visitor, col, row, revision, true);
             var now = owner.now();
@@ -146,10 +151,11 @@ public final class VisitService {
                 return ActionResult.fail(insects ? "Não há insetos para remover nesta planta." : "Não há ervas daninhas para remover nesta planta.");
             if (insects) tile.removeInsects(now);
             else tile.removePest(now);
-            String reward = visitor.rewardFriendHelp("friend-pest", xp);
+            if (!reward) return ActionResult.ok((insects ? "Insetos removidos" : "Ervas removidas") + " da fazenda do amigo. A limpeza da praga lançada por você não concede recompensa.");
+            String missionReward = visitor.rewardFriendHelp("friend-pest", xp);
             return ActionResult.ok((insects ? "Insetos removidos" : "Ervas removidas") + " da fazenda do amigo. "
                     + (xp > 0 ? "+" + xp + " XP." : "Limite diário de XP cooperativo atingido: limpeza sem XP.")
-                    + (reward.isEmpty() ? "" : " " + reward));
+                    + (missionReward.isEmpty() ? "" : " " + missionReward));
         }
     }
 

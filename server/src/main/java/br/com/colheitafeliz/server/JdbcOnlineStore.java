@@ -31,6 +31,7 @@ final class JdbcOnlineStore implements AutoCloseable {
     record Receipt(String hash, JsonObject response) {}
     record Invitation(UUID owner, UUID usedBy, Instant expiresAt) {}
     record Gift(UUID id, UUID sender, String senderName, UUID recipient, String recipientName, String cropId, int quantity, Instant createdAt, String state) {}
+    record PestOrigin(UUID actor, long harvestRevision, String arrivedAt) {}
     private record FarmWrite(UUID owner, GameSnapshot snapshot, long revision, Instant time) {}
     private static final Gson JSON = new Gson();
     private final String schema;
@@ -100,6 +101,9 @@ final class JdbcOnlineStore implements AutoCloseable {
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".pest_cooldowns (actor uuid NOT NULL REFERENCES "
                     + schema + ".players(id), kind text NOT NULL CHECK(kind IN ('SPREAD_INSECTS','SPREAD_WEEDS')), "
                     + "last_applied_at timestamptz NOT NULL, PRIMARY KEY(actor,kind))");
+            tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".pest_origins (owner uuid NOT NULL REFERENCES " + schema + ".players(id), plot_id integer NOT NULL CHECK(plot_id BETWEEN 0 AND 29), "
+                    + "kind text NOT NULL CHECK(kind IN ('SPREAD_INSECTS','SPREAD_WEEDS')), actor uuid NOT NULL REFERENCES " + schema + ".players(id), "
+                    + "harvest_revision bigint NOT NULL CHECK(harvest_revision >= 0), arrived_at text NOT NULL, PRIMARY KEY(owner,plot_id,kind))");
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".daily_allowances (actor uuid PRIMARY KEY REFERENCES "
                     + schema + ".players(id), last_claimed_day date NOT NULL)");
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".cooperative_xp (actor uuid PRIMARY KEY REFERENCES "
@@ -116,7 +120,7 @@ final class JdbcOnlineStore implements AutoCloseable {
             cropPushStore().initialize(tx);
             socialPushStore().initialize(tx);
             tx.execute("REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
-            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "daily_allowances", "cooperative_xp", "update_note_views", "seed_gifts", "push_subscriptions", "push_tests", "push_events", "crop_push_jobs", "crop_push_deliveries", "social_push_devices", "social_push_cursors", "social_push_deliveries")) {
+            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "pest_origins", "daily_allowances", "cooperative_xp", "update_note_views", "seed_gifts", "push_subscriptions", "push_tests", "push_events", "crop_push_jobs", "crop_push_deliveries", "social_push_devices", "social_push_cursors", "social_push_deliveries")) {
                 tx.execute("ALTER TABLE " + schema + "." + table + " ENABLE ROW LEVEL SECURITY");
                 tx.execute("REVOKE ALL ON " + schema + "." + table + " FROM PUBLIC");
             }
@@ -204,6 +208,18 @@ final class JdbcOnlineStore implements AutoCloseable {
             execute("INSERT INTO " + schema + ".pest_cooldowns (actor,kind,last_applied_at) VALUES (?,?,?) "
                     + "ON CONFLICT(actor,kind) DO UPDATE SET last_applied_at=EXCLUDED.last_applied_at",
                     actor, kind, java.sql.Timestamp.from(now));
+        }
+        PestOrigin pestOrigin(UUID owner, int plotId, String kind) {
+            return first(query("SELECT actor,harvest_revision,arrived_at FROM " + schema + ".pest_origins WHERE owner=? AND plot_id=? AND kind=?",
+                    row -> new PestOrigin(row.getObject(1, UUID.class), row.getLong(2), row.getString(3)), owner, plotId, kind));
+        }
+        void recordPestOrigin(UUID owner, int plotId, String kind, UUID actor, long harvestRevision, String arrivedAt) {
+            execute("INSERT INTO " + schema + ".pest_origins(owner,plot_id,kind,actor,harvest_revision,arrived_at) VALUES(?,?,?,?,?,?) "
+                            + "ON CONFLICT(owner,plot_id,kind) DO UPDATE SET actor=EXCLUDED.actor,harvest_revision=EXCLUDED.harvest_revision,arrived_at=EXCLUDED.arrived_at",
+                    owner, plotId, kind, actor, harvestRevision, arrivedAt);
+        }
+        void deletePestOrigin(UUID owner, int plotId, String kind) {
+            execute("DELETE FROM " + schema + ".pest_origins WHERE owner=? AND plot_id=? AND kind=?", owner, plotId, kind);
         }
         void recordTheft(UUID actor, Instant now) {
             execute("INSERT INTO " + schema + ".theft_cooldowns (actor,last_stolen_at) VALUES (?,?) "
