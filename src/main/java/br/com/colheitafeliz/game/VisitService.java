@@ -17,6 +17,9 @@ public final class VisitService {
                                     String visitorName,br.com.colheitafeliz.domain.farm.RandomSource random) {
         synchronized (GameState.class) {
             var tile=eligibleTile(owner,visitor,col,row,revision,true);
+            if (tile != null && tile.crop() != null && tile.crop().type().acquisitionSource()
+                    == br.com.colheitafeliz.domain.inventory.AcquisitionSource.LOGIN_REWARD)
+                return TheftAttempt.blocked("Culturas do calendário não podem ser furtadas.");
             if(tile==null||tile.crop()==null||!tile.crop().matureAt(owner.now())||tile.harvestRevision()==Long.MAX_VALUE)
                 return TheftAttempt.blocked("Temporada indisponível para furto.");
             if(!visitor.inventory().canAddProduceLot(tile.crop().origin()))
@@ -41,6 +44,9 @@ public final class VisitService {
     public ActionResult steal(GameState owner, GameState visitor, int col, int row, long expectedRevision, String visitorName) {
         synchronized (GameState.class) {
             FarmTile tile = eligibleTile(owner, visitor, col, row, expectedRevision);
+            if (tile != null && tile.crop() != null && tile.crop().type().acquisitionSource()
+                    == br.com.colheitafeliz.domain.inventory.AcquisitionSource.LOGIN_REWARD)
+                return ActionResult.fail("Culturas do calendário não podem ser furtadas.");
             if (tile == null || tile.crop() == null || !tile.crop().matureAt(owner.now()))
                 return ActionResult.fail("Temporada indisponível para furto.");
             var origin = tile.crop().origin();
@@ -65,6 +71,8 @@ public final class VisitService {
             if (sender == null || recipient == null || sender == recipient || quantity < 1 || quantity > MAX_GIFT_SEEDS)
                 throw new IllegalArgumentException("Invalid gift");
             var type = sender.catalog().get(cropId);
+            if (type.acquisitionSource() == br.com.colheitafeliz.domain.inventory.AcquisitionSource.LOGIN_REWARD)
+                return ActionResult.fail("Sementes do calendário não podem ser enviadas como presente.");
             if (sender.inventory().seeds(type) < quantity)
                 return ActionResult.fail("Você não tem " + quantity + " semente(s) de " + type.name() + ".");
             if (!recipient.unlocked(type))

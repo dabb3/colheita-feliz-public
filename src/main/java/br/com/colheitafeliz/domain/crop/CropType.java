@@ -3,6 +3,7 @@ package br.com.colheitafeliz.domain.crop;
 import br.com.colheitafeliz.domain.economy.Currency;
 import br.com.colheitafeliz.domain.economy.CropSale;
 import br.com.colheitafeliz.domain.inventory.ItemLot;
+import br.com.colheitafeliz.domain.inventory.AcquisitionSource;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.EnumMap;
@@ -15,12 +16,19 @@ import java.util.Map;
  */
 public record CropType(String id, String name, long growthSeconds, long regrowthSeconds, int seasons,
                        int stages, String spriteStem, int requiredLevel, boolean vipOnly,
-                       Map<Currency, BigDecimal> seedPrices, long cycleRevenueTenths) {
+                       Map<Currency, BigDecimal> seedPrices, long cycleRevenueTenths,
+                       AcquisitionSource acquisitionSource) {
     public CropType(String id, String name, long growthSeconds, long regrowthSeconds, int seasons,
                     int stages, String spriteStem, int requiredLevel, boolean vipOnly,
                     Map<Currency, BigDecimal> seedPrices) {
         this(id, name, growthSeconds, regrowthSeconds, seasons, stages, spriteStem, requiredLevel,
-                vipOnly, seedPrices, 0);
+                vipOnly, seedPrices, 0, AcquisitionSource.SHOP);
+    }
+    public CropType(String id, String name, long growthSeconds, long regrowthSeconds, int seasons,
+                    int stages, String spriteStem, int requiredLevel, boolean vipOnly,
+                    Map<Currency, BigDecimal> seedPrices, long cycleRevenueTenths) {
+        this(id, name, growthSeconds, regrowthSeconds, seasons, stages, spriteStem, requiredLevel,
+                vipOnly, seedPrices, cycleRevenueTenths, AcquisitionSource.SHOP);
     }
     private static final BigDecimal SECONDS_PER_HOUR = BigDecimal.valueOf(3600);
     private static final BigDecimal XP_PER_HOUR = new BigDecimal("1.5");
@@ -32,10 +40,13 @@ public record CropType(String id, String name, long growthSeconds, long regrowth
                 || seasons < 1 || (seasons == 1) != (regrowthSeconds == 0) || regrowthSeconds < 0
                 || cycleRevenueTenths < 0 || (cycleRevenueTenths > 0 && cycleRevenueTenths < seasons))
             throw new IllegalArgumentException("Invalid crop definition: " + id);
-        if (seedPrices == null || seedPrices.isEmpty() || seedPrices.values().stream()
+        if (acquisitionSource == null) acquisitionSource = AcquisitionSource.SHOP;
+        if (seedPrices == null || (seedPrices.isEmpty() != (acquisitionSource == AcquisitionSource.LOGIN_REWARD)) || seedPrices.values().stream()
                 .anyMatch(price -> price == null || price.signum() <= 0))
             throw new IllegalArgumentException("Invalid seed prices: " + id);
-        seedPrices = Map.copyOf(new EnumMap<>(seedPrices));
+        EnumMap<Currency, BigDecimal> prices = new EnumMap<>(Currency.class);
+        if (seedPrices != null) prices.putAll(seedPrices);
+        seedPrices = Map.copyOf(prices);
         try { firstHarvestXp(growthSeconds); }
         catch (ArithmeticException e) { throw new IllegalArgumentException("Growth time without exact XP: " + id, e); }
     }
@@ -51,6 +62,12 @@ public record CropType(String id, String name, long growthSeconds, long regrowth
 
     /** New plantings, including already-owned seeds, enter v1. Existing plants keep their origin. */
     public ItemLot plantingOrigin(ItemLot seed) {
+        if (acquisitionSource == AcquisitionSource.LOGIN_REWARD) {
+            validateSaleTerms(seed);
+            return seed.withCropSale(new CropSale(1, 0, seasons, cycleRevenueTenths, 0));
+        }
+        if (seed.acquisitionSource() != AcquisitionSource.SHOP)
+            throw new IllegalArgumentException("Invalid shop crop acquisition: " + id);
         if (cycleRevenueTenths == 0) return seed;
         BigDecimal catalogCost = seedPrices.get(seed.currency());
         // Historical seeds outside this catalog retain their original economy instead of being re-priced.
@@ -62,6 +79,16 @@ public record CropType(String id, String name, long growthSeconds, long regrowth
 
     /** Version 1 has an immutable authority table. Legacy acquisitions are deliberately not re-priced. */
     public void validateSaleTerms(ItemLot lot) {
+        if (!id.equals(lot.itemId()) || acquisitionSource != lot.acquisitionSource())
+            throw new IllegalArgumentException("Inconsistent crop acquisition for " + id);
+        if (acquisitionSource == AcquisitionSource.LOGIN_REWARD) {
+            var rewardTerms = lot.cropSale();
+            if (lot.currency() != Currency.GREEN || lot.unitCost().signum() != 0 || lot.vipOnly()
+                    || (rewardTerms != null && (rewardTerms.economyVersion() != 1 || rewardTerms.seasons() != 1
+                    || rewardTerms.cycleRevenueTenths() != cycleRevenueTenths || rewardTerms.cycleVipBonusTenths() != 0)))
+                throw new IllegalArgumentException("Inconsistent login reward sale terms for " + id);
+            return;
+        }
         var terms = lot.cropSale();
         if (terms == null) return;
         var price = seedPrices.get(lot.currency());

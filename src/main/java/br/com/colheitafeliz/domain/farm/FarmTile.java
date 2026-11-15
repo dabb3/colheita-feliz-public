@@ -59,6 +59,7 @@ public final class FarmTile {
     }
 
     public void plant(CropType type, Instant now) {
+        if (type.seedPrices().isEmpty()) throw new IllegalArgumentException("Reward seed origin is required");
         var price = type.seedPrices().entrySet().iterator().next();
         plant(type, now, new ItemLot(type.id(), price.getKey(), price.getValue(), 1, type.vipOnly()));
     }

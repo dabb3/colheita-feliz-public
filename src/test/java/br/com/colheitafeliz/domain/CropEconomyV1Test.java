@@ -25,7 +25,9 @@ class CropEconomyV1Test {
             167,175,183,191,199,207,215,223,231,239,276,504,18,48,90,144,210};
 
     @Test void allThirtyThreeCyclesMatchTableProfitAndNominalSlope() {
-        var crops = CropCatalogLoader.load().all().stream().filter(crop->!crop.id().equals("mini-bis")).toList();
+        var crops = CropCatalogLoader.load().all().stream().filter(crop -> crop.acquisitionSource()
+                == br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP)
+                .filter(crop->!crop.id().equals("mini-bis")).toList();
         assertEquals(33, crops.size());
         for (int i = 0; i < crops.size(); i++) {
             var crop = crops.get(i);
@@ -56,7 +58,8 @@ class CropEconomyV1Test {
     }
 
     @Test void everyCropHasIdenticalIndividualBatchAndReverseOrderRevenueWithFractionalBalances() {
-        for (var crop : CropCatalogLoader.load().all()) for (boolean vip : new boolean[]{false,true}) {
+        for (var crop : CropCatalogLoader.load().all().stream().filter(crop -> crop.acquisitionSource()
+                == br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP).toList()) for (boolean vip : new boolean[]{false,true}) {
             if (crop.vipOnly() && !vip) continue;
             var lots = harvests(crop.id());
             var individual = new Wallet(new BigDecimal("0.1"), new BigDecimal("0.1"));
@@ -89,7 +92,8 @@ class CropEconomyV1Test {
     }
 
     @Test void allVipCombinationsFollowTheSoldSeasonEvenInReverseOrder() {
-        for (var crop : CropCatalogLoader.load().all()) {
+        for (var crop : CropCatalogLoader.load().all().stream().filter(crop -> crop.acquisitionSource()
+                == br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP).toList()) {
             if (crop.vipOnly()) continue;
             for (int mask = 0; mask < (1 << crop.seasons()); mask++) {
                 var lots = harvests(crop.id());

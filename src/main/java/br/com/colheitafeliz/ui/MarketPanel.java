@@ -33,6 +33,7 @@ public final class MarketPanel {
     private static final int CROP_COLUMNS = 5, CROP_VISIBLE_ROWS = 2, ROWS_VISIBLE = 4;
     private final List<CropType> commonCrops;
     private final List<CropType> vipCrops;
+    private final List<CropType> allCrops;
     private final int animalCount = br.com.colheitafeliz.game.AnimalCatalogLoader.load().size();
     private boolean open;
     private boolean selling;
@@ -46,8 +47,11 @@ public final class MarketPanel {
 
     public MarketPanel(CropCatalog catalog) {
         List<CropType> crops = catalog.all();
-        commonCrops = crops.stream().filter(crop -> !crop.vipOnly()).toList();
-        vipCrops = crops.stream().filter(CropType::vipOnly).toList();
+        allCrops = List.copyOf(crops);
+        commonCrops = crops.stream().filter(crop -> !crop.vipOnly()
+                && crop.acquisitionSource() == br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP).toList();
+        vipCrops = crops.stream().filter(CropType::vipOnly)
+                .filter(crop -> crop.acquisitionSource() == br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP).toList();
     }
     public void showShop() { open = true; selling = false; animals = false; vip = false; fertilizers = false; scrollRows = 0; }
     public void showSell() { open = true; selling = true; animals = false; vip = false; fertilizers = false; scrollRows = 0; }
@@ -56,7 +60,10 @@ public final class MarketPanel {
     public void showFertilizers() { showShop(); fertilizers = true; }
     public boolean fertilizers() { return fertilizers; }
     int scrollRows() { return scrollRows; }
-    private List<CropType> displayedCrops() { return vipSeeds ? vipCrops : commonCrops; }
+    private List<CropType> displayedCrops() {
+        if (selling) return allCrops.stream().filter(crop -> crop.vipOnly() == vipSeeds).toList();
+        return vipSeeds ? vipCrops : commonCrops;
+    }
     private CropType displayedCrop(int index) { return displayedCrops().get(scrollRows * CROP_COLUMNS + index); }
     private int visibleCrops() { return Math.min(CROP_VISIBLE_ROWS * CROP_COLUMNS, displayedCrops().size() - scrollRows * CROP_COLUMNS); }
     public boolean animals() { return animals; }
@@ -336,9 +343,9 @@ public final class MarketPanel {
             skin.text(batch, skin.label, vipBlocked ? "VIP necessário" : "Nível " + crop.requiredLevel(), cx, c.y + c.height - 93, Palette.INK, Align.center);
         }
         String info = selling ? "cada" : formatTime(crop.growthSeconds());
-        var seedPrice = crop.seedPrice();
-        String price = selling ? "—" : GameText.money(seedPrice.getValue());
-        boolean green = seedPrice.getKey() == br.com.colheitafeliz.domain.economy.Currency.GREEN;
+        var seedPrice = crop.seedPrices().isEmpty() ? null : crop.seedPrice();
+        String price = selling || seedPrice == null ? "—" : GameText.money(seedPrice.getValue());
+        boolean green = seedPrice != null && seedPrice.getKey() == br.com.colheitafeliz.domain.economy.Currency.GREEN;
         if (vipBlocked) {
             var origin = state.inventory().produceLots().stream().filter(lot -> lot.itemId().equals(crop.id())).findFirst().orElseThrow();
             price = GameText.money(br.com.colheitafeliz.domain.economy.Market.unitRevenue(origin, true)

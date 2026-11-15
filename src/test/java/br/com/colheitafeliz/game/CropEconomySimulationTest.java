@@ -21,7 +21,8 @@ class CropEconomySimulationTest {
 
     @Test void compareCulturesWithTheSameCapitalAndSeparateCashFromInvestment() throws Exception {
         StringBuilder csv = new StringBuilder(CASHFLOW_HEADER);
-        for (var crop : CropCatalogLoader.load().all()) {
+            for (var crop : CropCatalogLoader.load().all().stream().filter(crop -> crop.acquisitionSource()
+                    == br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP).toList()) {
             if (crop.vipOnly()) continue;
             for (int logins : new int[]{1,3,6}) run(csv, crop, logins, 5, false, 0, new BigDecimal("125000"));
         }
@@ -65,7 +66,9 @@ class CropEconomySimulationTest {
                             game.selectTool(Tool.HOE); assertTrue(game.act(col, row).success());
                         }
                         if (tile.state() == TileState.PLOWED) {
-                            var seed = game.catalog().all().stream().filter(type -> !type.vipOnly() && game.unlocked(type)
+                            var seed = game.catalog().all().stream().filter(type -> type.acquisitionSource()
+                                            == br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP)
+                                    .filter(type -> !type.vipOnly() && game.unlocked(type)
                                             && game.wallet().coins().compareTo(type.seedPrice().getValue()) >= 0)
                                     .reduce((previous, current) -> current);
                             if (seed.isPresent()) {
@@ -96,7 +99,8 @@ class CropEconomySimulationTest {
     @Test void thirtyDaysAcrossLoginLandVipAndLossProfiles() throws Exception {
         StringBuilder csv = new StringBuilder(CASHFLOW_HEADER);
         int scenarios = 0;
-        for (var crop : CropCatalogLoader.load().all()) for (int logins : new int[]{1,3,6})
+        for (var crop : CropCatalogLoader.load().all().stream().filter(crop -> crop.acquisitionSource()
+                == br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP).toList()) for (int logins : new int[]{1,3,6})
             for (int plots : new int[]{5,15,30}) for (boolean vip : new boolean[]{false,true})
                 for (int loss : new int[]{0,10,25}) {
                     if (crop.vipOnly() && !vip) continue;

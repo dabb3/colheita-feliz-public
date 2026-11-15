@@ -473,11 +473,16 @@ public final class GameState {
 
     /** Compra na única moeda que a cultura aceita. */
     public ActionResult buySeed(CropType type) {
-        return buySeed(type, catalog.get(type.id()).seedPrice().getKey());
+        CropType known = catalog.get(type.id());
+        if (known.acquisitionSource() != br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP)
+            return report(ActionResult.fail(known.name() + " só pode ser obtida como recompensa do calendário."));
+        return buySeed(known, known.seedPrice().getKey());
     }
 
     public ActionResult buySeed(CropType type, Currency currency) {
         CropType known = catalog.get(type.id());
+        if (known.acquisitionSource() != br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP)
+            return report(ActionResult.fail(known.name() + " só pode ser obtida como recompensa do calendário."));
         if (!unlocked(known))
             return report(ActionResult.fail(known.name() + " libera no nível " + known.requiredLevel() + "."));
         if (known.vipOnly() && !vipActive())
@@ -494,6 +499,22 @@ public final class GameState {
             return report(result);
         } catch (IllegalStateException e) {
             return report(ActionResult.fail("Moedas insuficientes."));
+        }
+    }
+
+    /** Concede uma única semente exclusiva do calendário, sem carteira ou termos de venda de produto. */
+    public ActionResult grantLoginRewardSeed(String cropId) {
+        synchronized (GameState.class) {
+            CropType known;
+            try { known = catalog.get(cropId); }
+            catch (RuntimeException e) { return report(ActionResult.fail("Recompensa de semente inválida.")); }
+            if (known.acquisitionSource() != br.com.colheitafeliz.domain.inventory.AcquisitionSource.LOGIN_REWARD)
+                return report(ActionResult.fail("Essa cultura não é uma recompensa do calendário."));
+            if (inventory.seeds(known) == Integer.MAX_VALUE)
+                return report(ActionResult.fail("O estoque não comporta esta recompensa."));
+            inventory.addSeedLot(new ItemLot(known.id(), Currency.GREEN, BigDecimal.ZERO, 1, false,
+                    br.com.colheitafeliz.domain.inventory.AcquisitionSource.LOGIN_REWARD));
+            return report(ActionResult.ok("Você recebeu 1 " + known.name() + " do calendário."));
         }
     }
 
@@ -890,12 +911,20 @@ public final class GameState {
         game.dailyMissions.restore(snapshot.dailyMissionDay(), snapshot.dailyMissionProgress(),
                 snapshot.completedDailyMissions(), LocalDate.ofInstant(realClock.instant(), java.time.ZoneOffset.UTC));
         for (var lot : snapshot.seeds()) {
-            catalog.get(lot.itemId());
+            catalog.get(lot.itemId()).validateSaleTerms(lot);
             if (lot.cropSale() != null) throw new IllegalArgumentException("Seeds cannot contain harvested sale terms");
         }
         for (var lot : snapshot.produce()) {
             boolean animalProduct = game.animalTypes.stream().anyMatch(type -> type.kind() == AnimalType.Kind.PRODUCER && type.productId().equals(lot.itemId()));
-            if (!animalProduct) catalog.get(lot.itemId()).validateSaleTerms(lot);
+            if (animalProduct && lot.acquisitionSource() != br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP)
+                throw new IllegalArgumentException("Animal product cannot contain login reward origin");
+            if (!animalProduct) {
+                var crop = catalog.get(lot.itemId());
+                crop.validateSaleTerms(lot);
+                if (crop.acquisitionSource() == br.com.colheitafeliz.domain.inventory.AcquisitionSource.LOGIN_REWARD
+                        && (lot.cropSale() == null || lot.cropSale().seasonIndex() < 1))
+                    throw new IllegalArgumentException("Reward crop product is missing sale metadata");
+            }
             if (lot.cropSale() != null && (animalProduct || lot.cropSale().seasonIndex() == 0))
                 throw new IllegalArgumentException("Invalid product sale metadata");
         }
@@ -909,6 +938,8 @@ public final class GameState {
         if (snapshot.animals() != null) {
             List<Animal> animals = new ArrayList<>();
             for (GameSnapshot.AnimalSnapshot saved : snapshot.animals()) {
+                if (saved.origin().acquisitionSource() != br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP)
+                    throw new IllegalArgumentException("Animal cannot contain login reward origin");
                 if (saved.origin().cropSale() != null) throw new IllegalArgumentException("Animal cannot contain crop sale terms");
                 animals.add(new Animal(game.animalType(saved.typeId()),
                         saved.origin(), Instant.parse(saved.acquiredAt()), Instant.parse(saved.growthAnchorAt()),
@@ -919,6 +950,14 @@ public final class GameState {
         for (int i = 0; i < snapshot.tiles().size(); i++) {
             GameSnapshot.TileSnapshot tile = snapshot.tiles().get(i);
             boolean dead = tile.state() == TileState.DEAD;
+            if (!dead && tile.cropId() != null) {
+                var cropType = catalog.get(tile.cropId());
+                if (tile.origin() != null) cropType.validateSaleTerms(tile.origin());
+                if (cropType.acquisitionSource() == br.com.colheitafeliz.domain.inventory.AcquisitionSource.LOGIN_REWARD
+                        && (tile.origin() == null || tile.origin().cropSale() == null
+                        || tile.origin().cropSale().seasonIndex() != 0 || tile.season() != 1))
+                    throw new IllegalArgumentException("Reward crop plant is missing sale metadata");
+            }
             Crop crop = tile.cropId() == null || dead ? null : new Crop(catalog.get(tile.cropId()),
                     Instant.parse(tile.plantedAt()), tile.wateredAt() == null ? null : Instant.parse(tile.wateredAt()),
                     tile.pausedAt() == null ? null : Instant.parse(tile.pausedAt()),
