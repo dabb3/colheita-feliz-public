@@ -56,8 +56,8 @@ class VisitServiceTest {
         var helper = GameState.newOnline(clock, CropCatalogLoader.load(), bound -> bound - 1);
         var tile = plant("morango", false);
         tile.water(clock.instant());
-        assertTrue(visits.spreadInsects(owner, visitor, 0, 0, tile.harvestRevision()).success());
-        assertTrue(visits.spreadWeeds(owner, visitor, 0, 0, tile.harvestRevision()).success());
+        assertTrue(visits.spreadInsects(owner, visitor, 0, 0, tile.harvestRevision()).result().success());
+        assertTrue(visits.spreadWeeds(owner, visitor, 0, 0, tile.harvestRevision()).result().success());
         tile.observePestArrivals(clock.instant());
         var ownerXp = owner.progress().currentXp();
         var ownerInventory = owner.inventory().fertilizerSnapshot();
