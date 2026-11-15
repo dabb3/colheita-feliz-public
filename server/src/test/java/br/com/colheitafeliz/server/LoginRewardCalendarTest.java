@@ -1,10 +1,14 @@
 package br.com.colheitafeliz.server;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import br.com.colheitafeliz.domain.crop.CropCatalog;
+import br.com.colheitafeliz.game.CropCatalogLoader;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LoginRewardCalendarTest {
     @Test void definesThirtyRewardsFor29500GoldAndFourExactSeeds() {
@@ -32,5 +36,16 @@ class LoginRewardCalendarTest {
         assertEquals(2, duplicate.day());
         assertFalse(duplicate.available());
         assertFalse(LoginRewardCalendar.nextDay(today, 1, today.minusDays(1)).available());
+    }
+
+    @Test void onlineCalendarRequiresEverySeedDefinitionButPartialDomainCatalogsRemainValid() {
+        var full = CropCatalogLoader.load();
+        assertDoesNotThrow(() -> LoginRewardCalendar.requireCrops(full));
+        for (var reward : LoginRewardCalendar.rewards()) {
+            if (!reward.kind().equals("SEED")) continue;
+            String missingId = reward.itemId();
+            var partial = new CropCatalog(full.all().stream().filter(crop -> !crop.id().equals(missingId)).toList());
+            assertThrows(IllegalArgumentException.class, () -> LoginRewardCalendar.requireCrops(partial), missingId);
+        }
     }
 }

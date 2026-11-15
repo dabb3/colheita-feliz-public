@@ -192,6 +192,27 @@ test('calendar data refresh failure leaves the same pending receipt recoverable'
  assert.equal(replays,1);assert.equal(api.pending,null);assert.equal(h.get().own.revision,'2');assert.ok(text(elements.get('modal-content')).includes('Recompensa confirmada.'));
 });
 
+test('calendar rollover GET failure recovers manually and only then allows an explicit claim',async()=>{
+ const {h,elements,intervals}=app(),before=loginFarm('alice',false,'1','2026-11-16T02:59:50Z','2026-11-16T03:00:00Z'),after=loginFarm('alice',true,'2','2026-11-16T03:00:05Z','2026-11-17T03:00:00Z'),claimed={...after,revision:'3',loginRewards:{...after.loginRewards,completedDay:1,nextDay:2,available:false}};let reads=0,mutations=0;
+ h.set({own:before,api:{pending:null,busy:false,get:async()=>{if(++reads===1)throw new TypeError('offline');return after;},mutate:async(path,fields)=>{mutations++;assert.equal(path,'/v1/me/actions');assert.equal(JSON.stringify(fields),JSON.stringify({action:'CLAIM_LOGIN_REWARD',expectedRevision:'2'}));return{farm:claimed,result:{success:true,message:'Dia 1 resgatado.'}};}}});h.receive({farm:before});h.loginCalendar();
+ h.setNow(11_000);intervals.get(1000)();await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(reads,1);assert.equal(mutations,0);assert.equal(h.calendarInfo().phase,'error');assert.ok(text(elements.get('modal-content')).includes('offline'));assert.equal(descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa').disabled,true);
+ descendants(elements.get('modal-content')).find(node=>text(node)==='Atualizar calendário').onclick();await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(reads,2);assert.equal(mutations,0);assert.equal(h.get().own.revision,'2');assert.equal(h.calendarInfo().phase,'ready');assert.equal(descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa').disabled,false);
+ descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa').onclick();await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(mutations,1);assert.equal(h.get().own.revision,'3');assert.equal(h.get().own.loginRewards.available,false);assert.equal(descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa').disabled,true);
+});
+
+test('returning from a hidden tab rechecks server time when the monotonic clock did not advance',async()=>{
+ const {h,elements,listeners,ctx,intervals}=app(),before=loginFarm('alice',false,'1','2026-11-16T02:59:50Z','2026-11-16T03:00:00Z'),after=loginFarm('alice',true,'2','2026-11-16T03:00:05Z','2026-11-17T03:00:00Z');let reads=0;
+ h.set({own:before,api:{pending:null,busy:false,get:async path=>{assert.equal(path,'/v1/me/farm');reads++;return after;}}});h.receive({farm:before});h.loginCalendar();
+ const panel=elements.get('modal-content').children,scrollTarget=elements.get('modal-content'),refresh=descendants(scrollTarget).find(node=>text(node)==='Atualizar calendário');scrollTarget.scrollTop=125;refresh.focus();ctx.document.hidden=true;listeners.get('visibilitychange')();
+ ctx.document.hidden=false;listeners.get('visibilitychange')();await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(reads,1);assert.equal(h.get().own.revision,'2');assert.equal(h.calendarInfo().anchorServer,Date.parse(after.serverTime));assert.equal(h.calendarInfo().anchorClient,0);
+ assert.equal(descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa').disabled,false);assert.ok(text(elements.get('modal-content')).includes('Próximo resgate em'));assert.equal(scrollTarget.scrollTop,125);assert.notEqual(elements.get('modal-content').children,panel);assert.equal(ctx.document.activeElement.getAttribute('data-focus-key'),'login-rewards-refresh');
+ intervals.get(1000)();assert.match(text(elements.get('modal-content')),/Próximo resgate em 23 h 59 min 55 s\./);assert.equal(reads,1);
+});
+
 test('gift default selection and send remain blocked when stock contains only calendar seeds',async()=>{
  const {h,elements}=app(),own={...farm('alice'),seedCounts:{'semente-bronze':1}},crop={id:'semente-bronze',name:'Semente de Bronze',spriteStem:'semente-bronze',acquisitionSource:'LOGIN_REWARD'};let mutations=0;
  h.set({own,catalog:{crops:[crop],animals:[],fertilizers:[],vip:{greenPrice:20}},api:{pending:null,get:async path=>path==='/v1/friends'?[{id:'bob',name:'Bob'}]:path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm('bob'),mutate(){mutations++;}}});

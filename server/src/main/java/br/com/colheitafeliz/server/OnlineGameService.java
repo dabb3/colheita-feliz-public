@@ -54,6 +54,7 @@ final class OnlineGameService implements AutoCloseable {
     OnlineGameService(JdbcOnlineStore store, Clock clock, RandomSource random, int limit,PublishedNotes publishedNotes) {
         this.store = store; this.clock = clock; this.random = random; this.limit = limit;
         this.publishedNotes=publishedNotes;
+        LoginRewardCalendar.requireCrops(catalog);
     }
 
     record AutomationOffer(String id,String name,String description,BigDecimal greenPrice,int durationDays) {}

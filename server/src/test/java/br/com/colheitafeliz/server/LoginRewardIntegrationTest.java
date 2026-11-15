@@ -201,6 +201,47 @@ class LoginRewardIntegrationTest {
         assertEquals(Integer.MAX_VALUE, failed.getAsJsonObject("farm").getAsJsonObject("seedCounts").get("semente-bronze").getAsInt());
     }
 
+    @Test void replayAfterLostDaySevenSeedResponseDoesNotDuplicateAnyCommittedState() {
+        for (int day = 1; day <= 6; day++) {
+            if (day > 1) clock.set(Instant.parse("2026-01-01T12:00:00Z").plusSeconds((long) (day - 1) * 86_400));
+            assertTrue(service.command(owner, claim()).getAsJsonObject("result").get("success").getAsBoolean());
+        }
+        clock.set(Instant.parse("2026-01-07T12:00:00Z"));
+        var before = service.farm(owner);
+        assertEquals("6500", before.get("coins").getAsString());
+        var greenBefore = before.get("greenCoins").deepCopy();
+        assertEquals(6, before.getAsJsonObject("loginRewards").get("completedDay").getAsInt());
+        assertEquals(0, before.getAsJsonObject("seedCounts").get("semente-bronze").getAsInt());
+        var command = new Command(requestId(), before.get("revision").getAsString(),
+                "CLAIM_LOGIN_REWARD", null, null, null, null, null);
+
+        service.command(owner, command); // A resposta se perde depois do commit.
+        var afterFirstCommit = service.farm(owner);
+        int receiptsAfterFirstCommit = store.transaction(owner, tx -> tx.query("SELECT count(*) FROM " + schema
+                + ".receipts WHERE actor=?", row -> row.getInt(1), owner).getFirst());
+        var progressAfterFirstCommit = store.transaction(owner, tx -> tx.loginRewardProgress(owner));
+        assertEquals("6500", afterFirstCommit.get("coins").getAsString());
+        assertEquals(1, afterFirstCommit.getAsJsonObject("seedCounts").get("semente-bronze").getAsInt());
+        assertEquals(7, progressAfterFirstCommit.completedDay());
+        assertEquals(7, progressAfterFirstCommit.totalClaims());
+        assertEquals(Long.parseLong(before.get("revision").getAsString()) + 1,
+                Long.parseLong(afterFirstCommit.get("revision").getAsString()));
+
+        var replay = service.command(owner, command); // Mesmo UUID, revisão antiga e corpo idêntico.
+        var afterReplay = service.farm(owner);
+        var progressAfterReplay = store.transaction(owner, tx -> tx.loginRewardProgress(owner));
+        int receiptsAfterReplay = store.transaction(owner, tx -> tx.query("SELECT count(*) FROM " + schema
+                + ".receipts WHERE actor=?", row -> row.getInt(1), owner).getFirst());
+        assertEquals(afterFirstCommit.get("revision"), replay.getAsJsonObject("farm").get("revision"));
+        assertEquals(afterFirstCommit.get("revision"), afterReplay.get("revision"));
+        assertEquals(afterFirstCommit.get("coins"), afterReplay.get("coins"));
+        assertEquals(greenBefore, afterReplay.get("greenCoins"));
+        assertEquals(afterFirstCommit.getAsJsonObject("seedCounts"), afterReplay.getAsJsonObject("seedCounts"));
+        assertEquals(1, afterReplay.getAsJsonObject("seedCounts").get("semente-bronze").getAsInt());
+        assertEquals(progressAfterFirstCommit, progressAfterReplay);
+        assertEquals(receiptsAfterFirstCommit, receiptsAfterReplay);
+    }
+
     @Test void progressTableIsIdempotentAndPrivateToTheFarmOwner() {
         store.initialize(owner, clock.instant());
         assertTrue(Boolean.TRUE.equals(store.transaction(owner, tx -> tx.query("SELECT relrowsecurity FROM pg_class WHERE oid=?::regclass",

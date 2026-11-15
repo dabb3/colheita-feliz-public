@@ -1,5 +1,6 @@
 package br.com.colheitafeliz.server;
 
+import br.com.colheitafeliz.domain.crop.CropCatalog;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +15,10 @@ final class LoginRewardCalendar {
     static List<Reward> rewards() { return REWARDS; }
 
     static Reward reward(int day) { return REWARDS.get(day - 1); }
+
+    static void requireCrops(CropCatalog catalog) {
+        for (var reward : REWARDS) if (reward.kind().equals("SEED")) catalog.get(reward.itemId());
+    }
 
     static NextDay nextDay(LocalDate lastClaimDate, int completedDay, LocalDate today) {
         if (lastClaimDate == null) return new NextDay(1, true, false);
