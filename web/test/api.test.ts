@@ -72,6 +72,42 @@ test('known rejection clears pending but unavailable response preserves it',asyn
  await assert.rejects(api.mutate('/v1/me/actions',{})); assert.equal(api.pending,null);
  status=503; await assert.rejects(api.mutate('/v1/me/actions',{})); assert.ok(api.pending);
 });
+test('gift retry keeps pending when HTTP 200 has no explicit success confirmation',async()=>{
+ for(const reply of ['{}','{"result":{}}']){
+  const storage=memory();let calls=0;
+  const api=new ApiClient('http://localhost','alice',async ()=>'token',storage,async url=>{
+   if(url.endsWith('/v1/request-id'))return new Response('{"requestId":"019a0000-0000-7000-8000-000000000001"}');
+   calls++;return new Response(reply);
+  });
+  await assert.rejects(api.mutate('/v1/gifts',{recipientId:'friend',cropId:'turnip',quantity:1}),/confirmou/);
+  assert.equal(calls,1);assert.ok(api.pending);assert.equal(JSON.parse(api.pending.body).requestId,'019a0000-0000-7000-8000-000000000001');
+ }
+});
+test('an old client retry cannot clear a newer stored pending operation',async()=>{
+ const storage=memory();let release,online=false;
+ const old=new ApiClient('http://localhost','alice',async ()=>'token',storage,async url=>{
+  if(url.endsWith('/v1/request-id'))return new Response('{"requestId":"old"}');
+  if(!online)throw new TypeError('offline');await new Promise(resolve=>release=resolve);return new Response('{"result":{"success":true}}');
+ });
+ await assert.rejects(old.mutate('/v1/gifts',{recipientId:'friend',cropId:'turnip',quantity:1}),/offline/);online=true;
+ const newer={path:'/v1/gifts',body:'{"requestId":"new","recipientId":"other","cropId":"turnip","quantity":1}'};
+ storage.setItem('colheita:pending:http://localhost:alice',JSON.stringify(newer));
+ const replay=old.retry();await new Promise(resolve=>setImmediate(resolve));release();await replay;
+ assert.deepEqual(JSON.parse(storage.getItem('colheita:pending:http://localhost:alice')),newer);
+});
+test('an unconfirmed gift reload retries the exact body and requestId',async()=>{
+ const storage=memory(),bodies=[];let attempts=0;
+ const send=async(url,init)=>{if(url.endsWith('/v1/request-id'))return new Response('{"requestId":"019a0000-0000-7000-8000-000000000001"}');bodies.push(init.body);return new Response(attempts++===0?'{}':'{"result":{"success":true,"message":"Enviado"}}');};
+ const first=new ApiClient('http://localhost','alice',async ()=>'token',storage,send);
+ await assert.rejects(first.mutate('/v1/gifts',{recipientId:'friend',cropId:'turnip',quantity:2}),/não confirmou/);
+ const restored=new ApiClient('http://localhost','alice',async ()=>'token',storage,send);await restored.retry();
+ assert.equal(bodies.length,2);assert.equal(bodies[0],bodies[1]);assert.equal(JSON.parse(bodies[1]).requestId,'019a0000-0000-7000-8000-000000000001');assert.equal(restored.pending,null);
+});
+test('storage removal failure does not drop the in-memory gift receipt',async()=>{
+ const storage=memory();let removalFails=false;const original=storage.removeItem;storage.removeItem=key=>{if(removalFails)throw new Error('storage unavailable');original(key);};
+ const api=new ApiClient('http://localhost','alice',async ()=>'token',storage,async url=>url.endsWith('/v1/request-id')?new Response('{"requestId":"id"}'):new Response('{"result":{"success":true}}'));
+ removalFails=true;await assert.rejects(api.mutate('/v1/gifts',{recipientId:'friend',cropId:'turnip',quantity:1}),/storage unavailable/);assert.ok(api.pending);
+});
 test('late replay cannot replace a newer farm even beyond safe JS integer',()=>{
  const current={owner:'alice',revision:'9007199254740993'};
  assert.equal(acceptFarm(current,{owner:'alice',revision:'9007199254740992'}),current);

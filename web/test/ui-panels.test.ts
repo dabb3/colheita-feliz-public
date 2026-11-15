@@ -4,14 +4,14 @@ import {readFileSync} from 'node:fs';
 import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
 import * as values from '../src/ui-presentation.ts';
-import {animalPath,productPath} from '../src/presentation.ts';
+import {animalPath,productPath,seedArtPath} from '../src/presentation.ts';
 import {avatarSource} from '../src/avatar.ts';
 
 function panels(){
- const make=tag=>({tag,children:[],attributes:{},textContent:'',style:{setProperty(){}},append(...nodes){this.children.push(...nodes);},replaceChildren(){this.children=[];},setAttribute(k,v){this.attributes[k]=v;}});
- const ctx={...values,animalPath,productPath,avatarSource,document:{createElement:make}};
+ const make=tag=>({tag,children:[],attributes:{},textContent:'',style:{setProperty(){}},append(...nodes){this.children.push(...nodes);},prepend(...nodes){this.children.unshift(...nodes);},replaceChildren(){this.children=[];},setAttribute(k,v){this.attributes[k]=v;},getAttribute(k){return this.attributes[k]??null;}});
+ const ctx={...values,animalPath,productPath,seedArtPath,avatarSource,document:{createElement:make}};
  const load=name=>readFileSync(new URL('../src/'+name,import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
- runInNewContext(stripTypeScriptTypes(load('ui.ts')+'\n'+load('ui-panels.ts'))+'\nglobalThis.panels={renderDeposit,renderPlantHealth,renderAnimal,renderMissions,renderFriends,renderGifts,giftLimit,renderAudioSettings:typeof renderAudioSettings==="undefined"?undefined:renderAudioSettings};',ctx);
+ runInNewContext(stripTypeScriptTypes(load('ui.ts')+'\n'+load('ui-panels.ts'))+'\nglobalThis.panels={renderDeposit,renderPlantHealth,renderAnimal,renderMissions,renderFriends,renderGiftComposer,giftLimit,renderAudioSettings:typeof renderAudioSettings==="undefined"?undefined:renderAudioSettings};',ctx);
  return{...ctx.panels,root:make('div')};
 }
 function nodes(root){return[root,...root.children.flatMap(child=>typeof child==='object'?nodes(child):[])];}
@@ -58,29 +58,19 @@ test('missions show partial progress against the target',()=>{
  assert.ok(nodes(root).some(n=>n.textContent==='1/2'));assert.ok(nodes(root).some(n=>n.textContent==='0/1'));assert.ok(nodes(root).some(n=>n.textContent==='Em andamento'));
 });
 
- test('seed gifts bound quantity, confirm before sending and list received gifts',()=>{
-  const {root,renderGifts,giftLimit}=panels(),sent=[],now=Date.parse('2026-11-10T12:00:00Z');
-  assert.deepEqual([giftLimit(0),giftLimit(3),giftLimit(9)],[0,3,5]);
-  const catalog={crops:[{id:'nabo',name:'Nabo',vipOnly:false},{id:'batata-doce',name:'Batata-doce',vipOnly:true}]};
-  const gifts={received:[{id:'g',senderName:'<Ana>',cropId:'nabo',quantity:2,createdAt:'2026-11-09T12:00:00Z',state:'DELIVERED'}],
-   sent:[{id:'s',recipientId:'eva',cropId:'nabo',quantity:1,createdAt:'2026-11-10T00:00:00Z',state:'DELIVERED'}]};
-  renderGifts(root,catalog,{nabo:3,'batata-doce':1},[{id:'bob',name:'Bob'},{id:'eva',name:'Eva'}],gifts,now,fields=>sent.push(fields));
-  const find=label=>nodes(root).find(n=>n.textContent===label);
-  assert.ok(find('<Ana> enviou 2 semente(s) de Nabo'));
-  assert.equal(find('Eva').disabled,true);
-  assert.equal(find('Enviar presente').disabled,true);
-  find('Bob').onclick();find('Batata-doce (1)').onclick();
-  assert.ok(find('Batata-doce exige VIP ativo do seu amigo.'));assert.equal(find('Enviar presente').disabled,true);
-  find('Nabo (3)').onclick();
-  for(let i=0;i<5;i++)if(!find('+').disabled)find('+').onclick();
-  assert.ok(find('3 semente(s)'));assert.equal(find('+').disabled,true);
-  find('Enviar presente').onclick();assert.deepEqual(sent,[]);
-  find('Cancelar').onclick();assert.ok(!find('Confirmar'));
-  find('Enviar presente').onclick();assert.ok(find('Enviar 3 semente(s) de Nabo para Bob?'));
-  find('Confirmar').onclick();assert.deepEqual(JSON.parse(JSON.stringify(sent)),[{recipientId:'bob',cropId:'nabo',quantity:3}]);
-  renderGifts(root,catalog,{},[],{received:[],sent:[]},now,()=>{});
-  assert.ok(find('Nenhum presente recebido ainda.'));
- });
+test('gift composer keeps a fixed friend, accessible seed selection and persistent footer',()=>{
+ const {root,renderGiftComposer,giftLimit}=panels(),footer={...root,children:[],replaceChildren(...items){this.children=items;}};
+ const catalog={crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'},{id:'milho',name:'Milho',spriteStem:'milho'}]};
+ const state={phase:'ready',cropId:'nabo',quantity:1,seedCounts:{nabo:8,milho:2},gifts:{received:[],sent:[]},canSend:true};
+ const actions={selectSeed(){},setQuantity(){},send(){},cancel(){},retry(){}};
+ renderGiftComposer(root,footer,catalog,{id:'friend-1',name:'Sam'},state,actions);
+ const all=nodes(root),choices=all.filter(n=>n.getAttribute?.('aria-pressed')!==null);
+ assert.equal(all.find(n=>n.textContent==='Sam')?.tag,'strong');assert.equal(choices.length,2);assert.equal(choices.filter(n=>n.getAttribute('aria-pressed')==='true').length,1);
+ assert.ok(choices.some(n=>n.textContent.includes('Nabo · 8 no estoque')));assert.equal(footer.children[1].disabled,false);
+ assert.deepEqual([giftLimit(0),giftLimit(3),giftLimit(9)],[0,3,5]);assert.equal(footer.children[0].textContent,'Cancelar');assert.equal(footer.children[1].textContent,'Enviar');
+ renderGiftComposer(root,footer,catalog,{id:'friend-2',name:'Sam'}, {...state,phase:'sending',canSend:false},actions);
+ assert.equal(footer.children[0].disabled,true);assert.equal(footer.children[1].disabled,true);assert.equal(nodes(root).some(n=>n.textContent==='Presentes'),false);
+});
 
 test('audio controls keep separate channel toggles and volume',()=>{
  const {root,renderAudioSettings}=panels(),changes=[];
