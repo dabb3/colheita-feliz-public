@@ -43,14 +43,21 @@ class DailyMissionBoardTest {
         partial.restore(day.toString(), board.progressSnapshot(), board.completedSnapshot(), day);
         assertEquals(1, partial.progress(nature));
         assertFalse(partial.cooperativeBonusPaid());
-        var rewards = partial.record("friend-pest", 1, day);
-        assertEquals(java.util.List.of(nature, DailyMissionBoard.COOPERATIVE_BONUS), rewards);
+        assertEquals(java.util.List.of(nature), partial.record("friend-pest", 1, day));
+        assertFalse(partial.cooperativeBonusPaid());
+        var animals = partial.missions().getLast();
+        assertEquals(java.util.List.of(animals, DailyMissionBoard.COOPERATIVE_BONUS), partial.record("friend-feed", 1, day));
         assertTrue(partial.record("friend-pest", 1, day).isEmpty());
+        assertTrue(partial.record("friend-feed", 1, day).isEmpty());
         var paid = new DailyMissionBoard(day, true);
         paid.restore(day.toString(), partial.progressSnapshot(), partial.completedSnapshot(), day);
         assertTrue(paid.cooperativeBonusPaid());
         assertTrue(paid.record("friend-pest", 1, day).isEmpty());
-        assertEquals(java.util.List.of(nature, DailyMissionBoard.COOPERATIVE_BONUS), paid.record("friend-pest", 2, day.plusDays(1)));
+        assertEquals(java.util.List.of(nature), paid.record("friend-pest", 2, day.plusDays(1)));
+        var legacy = new DailyMissionBoard(day, true);
+        legacy.restore(day.toString(), java.util.Map.of("nature", 2), java.util.List.of("nature", DailyMissionBoard.COOPERATIVE_BONUS.id()), day);
+        assertTrue(legacy.cooperativeBonusPaid());
+        assertEquals(java.util.List.of(animals), legacy.record("friend-feed", 1, day));
     }
     @Test void oldSavesLoadWithoutCooperativeKeysAndInvalidValuesAreRejected() {
         var day = LocalDate.of(2026, 11, 14);
@@ -63,7 +70,7 @@ class DailyMissionBoardTest {
                 () -> new DailyMissionBoard(day, true).restore(day.toString(), java.util.Map.of("nature", 3), java.util.List.of("nature"), day),
                 () -> new DailyMissionBoard(day, true).restore(day.toString(), java.util.Map.of("nature", 1), java.util.List.of("nature"), day),
                 () -> new DailyMissionBoard(day, true).restore(day.toString(), java.util.Map.of("nature", 2), java.util.List.of(), day),
-                () -> new DailyMissionBoard(day, true).restore(day.toString(), java.util.Map.of("nature", 2), java.util.List.of("nature"), day),
+                () -> new DailyMissionBoard(day, true).restore(day.toString(), java.util.Map.of("nature", 2, "animals", 1), java.util.List.of("nature", "animals"), day),
                 () -> new DailyMissionBoard(day, true).restore(day.toString(), java.util.Map.of(), java.util.List.of(bonus), day),
                 () -> new DailyMissionBoard(day, true).restore(day.toString(), java.util.Map.of("other", 0), java.util.List.of(), day),
                 () -> new DailyMissionBoard(day).restore(day.toString(), java.util.Map.of("nature", 1), java.util.List.of(), day),

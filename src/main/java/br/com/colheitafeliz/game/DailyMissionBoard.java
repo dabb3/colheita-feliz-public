@@ -19,13 +19,15 @@ public final class DailyMissionBoard {
             new Mission("care", "care", "Cuidar da fazenda", 1, 1),
             new Mission("trade", "trade", "Movimentar a fazenda", 1, 1));
     private static final List<Mission> COOPERATIVE = List.of(
-            new Mission("nature", "friend-pest", "Amigo da Natureza", 2, 0));
+            new Mission("nature", "friend-pest", "Amigo da Natureza", 2, 0),
+            new Mission("animals", "friend-feed", "Amigo dos Animais", 1, 0));
     /** Pseudo-missão gravada em completedDailyMissions quando o bônus cooperativo do dia é pago. */
     public static final Mission COOPERATIVE_BONUS = new Mission("cooperative-bonus", "cooperative", "Bônus cooperativo", 1, 1);
     private static final Map<String, Set<String>> ACTIONS = Map.of(
             "care", Set.of("plant", "water", "weed", "pesticide", "harvest", "clear", "feed", "collect"),
             "trade", Set.of("buy", "purchase", "sell", "animal-sale"),
-            "nature", Set.of("friend-pest"));
+            "nature", Set.of("friend-pest"),
+            "animals", Set.of("friend-feed"));
     private final List<Mission> missions;
     private final boolean cooperative;
     private LocalDate day;

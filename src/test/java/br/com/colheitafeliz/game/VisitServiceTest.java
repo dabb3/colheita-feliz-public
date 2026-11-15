@@ -62,7 +62,7 @@ class VisitServiceTest {
         var ownerXp = owner.progress().currentXp();
         var ownerInventory = owner.inventory().fertilizerSnapshot();
         var xp = helper.progress().currentXp();
-        var nature = helper.dailyMissions().missions().getLast();
+        var nature = helper.dailyMissions().missions().stream().filter(m -> m.id().equals("nature")).findFirst().orElseThrow();
         var weeds = visits.cleanPest(owner, helper, 0, 0, tile.harvestRevision(), false, 2);
         assertTrue(weeds.success(), weeds.message());
         assertEquals(br.com.colheitafeliz.domain.farm.PestState.NONE, tile.pest());
@@ -82,10 +82,68 @@ class VisitServiceTest {
         assertNull(tile.insectsSince());
         assertFalse(tile.crop().paused());
         assertTrue(helper.dailyMissions().completed(nature));
-        assertEquals(0, green.add(BigDecimal.ONE).compareTo(helper.greenCoins()));
+        assertEquals(0, green.compareTo(helper.greenCoins()));
         assertEquals(ownerXp, owner.progress().currentXp());
         assertEquals(ownerInventory, owner.inventory().fertilizerSnapshot());
         assertTrue(owner.dailyMissions().completedSnapshot().isEmpty());
+    }
+
+    private br.com.colheitafeliz.domain.animal.Animal hungry(br.com.colheitafeliz.domain.animal.AnimalType.Kind kind, long grownMillis) {
+        var type = owner.animalTypes().stream().filter(t -> t.kind() == kind).findFirst().orElseThrow();
+        var price = type.prices().entrySet().iterator().next();
+        var lot = new ItemLot(type.id(), price.getKey(), price.getValue(), 1, false);
+        var animal = new br.com.colheitafeliz.domain.animal.Animal(type, lot, clock.instant(), clock.instant(),
+                grownMillis < 0 ? type.requiredMillis() : grownMillis, clock.instant());
+        owner.barn().add(animal);
+        return animal;
+    }
+
+    @Test void visitorFeedsHungryFriendAnimalWithOwnFeedOnceAndOnlyVisitorIsRewarded() {
+        var helper = GameState.newOnline(clock, CropCatalogLoader.load(), bound -> bound - 1);
+        var animal = hungry(br.com.colheitafeliz.domain.animal.AnimalType.Kind.PRODUCER, 0);
+        var animals = helper.dailyMissions().missions().getLast();
+        assertEquals("animals", animals.id());
+        var ownerXp = owner.progress().currentXp();
+        var ownerFeed = owner.inventory().feedSnapshot();
+        var xp = helper.progress().currentXp();
+        assertEquals("Sem ração. Compre na Loja, aba Animais.", visits.feedAnimal(owner, helper, animal.type().id(), "producer", 2).message());
+        helper.inventory().addFeed("growth", 1);
+        assertFalse(visits.feedAnimal(owner, helper, animal.type().id(), "growth", 2).success());
+        assertEquals(1, helper.inventory().feed("growth"));
+        helper.inventory().addFeed("producer", 2);
+        var fed = visits.feedAnimal(owner, helper, animal.type().id(), "producer", 2);
+        assertTrue(fed.success(), fed.message());
+        assertFalse(owner.barn().get(0).hungryAt(clock.instant()));
+        assertEquals(clock.instant().plus(animal.type().foodDuration()), owner.barn().get(0).fedUntil());
+        assertEquals(1, helper.inventory().feed("producer"));
+        assertEquals(0, xp.add(BigDecimal.TWO).compareTo(helper.progress().currentXp()));
+        assertTrue(helper.dailyMissions().completed(animals));
+        var again = visits.feedAnimal(owner, helper, animal.type().id(), "producer", 2);
+        assertFalse(again.success());
+        assertEquals(1, helper.inventory().feed("producer"));
+        assertEquals(0, xp.add(BigDecimal.TWO).compareTo(helper.progress().currentXp()));
+        assertEquals(ownerXp, owner.progress().currentXp());
+        assertEquals(ownerFeed, owner.inventory().feedSnapshot());
+        assertTrue(owner.dailyMissions().completedSnapshot().isEmpty());
+    }
+
+    @Test void visitorFeedingFollowsOwnerAnimalRules() {
+        var helper = GameState.newOnline(clock, CropCatalogLoader.load(), bound -> bound - 1);
+        helper.inventory().addFeed("growth", 5);
+        helper.inventory().addFeed("producer", 5);
+        var adult = hungry(br.com.colheitafeliz.domain.animal.AnimalType.Kind.GROWING, -1);
+        assertFalse(visits.feedAnimal(owner, helper, adult.type().id(), "growth", 2).success());
+        var ready = hungry(br.com.colheitafeliz.domain.animal.AnimalType.Kind.PRODUCER, -1);
+        assertFalse(visits.feedAnimal(owner, helper, ready.type().id(), "producer", 2).success());
+        assertFalse(visits.feedAnimal(owner, helper, "inexistente", "producer", 2).success());
+        assertEquals(5, helper.inventory().feed("growth"));
+        assertEquals(5, helper.inventory().feed("producer"));
+        var guard = hungry(br.com.colheitafeliz.domain.animal.AnimalType.Kind.PROTECTOR, 0);
+        var result = visits.feedAnimal(owner, helper, guard.type().id(), "producer", 0);
+        assertTrue(result.success(), result.message());
+        assertTrue(result.message().contains("sem XP"), result.message());
+        assertEquals(4, helper.inventory().feed("producer"));
+        assertEquals(1, owner.activeProtectors());
     }
 
     @Test void visitorPestsRejectEmptyUnwateredMatureAndStaleTargets() {

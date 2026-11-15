@@ -634,14 +634,41 @@ public final class GameState {
             String mission = recordDailyMission("collect", 1);
             return report(ActionResult.ok("Coletou 1× " + type.productName() + ". Animal removido. " + reward + " " + mission));
         }
-        if (!animal.hungryAt(now)) return report(ActionResult.fail(type.name() + " ainda está alimentado."));
-        String feedId = type.feedId();
-        if (type.kind() == AnimalType.Kind.PROTECTOR && inventory.feed("growth") == 0) feedId = "producer";
-        if (inventory.feed(feedId) == 0) return report(ActionResult.fail("Sem ração. Compre na Loja, aba Animais."));
-        Animal fed = animal.feed(now);
-        inventory.useFeed(feedId);
+        String refusal = feedWith(index, inventory, null);
+        if (refusal != null) return report(ActionResult.fail(refusal));
+        return report(ActionResult.ok(type.name() + " alimentado por " + formatDuration(type.foodDuration()) + ". " + recordDailyMission("feed", 1)));
+    }
+
+    /**
+     * Regra única de alimentação de um animal faminto deste celeiro. A ração sai de {@code payer}: o estoque do
+     * dono ou, na visita, o do visitante. Sem {@code feedId}, protetores preferem crescimento e depois produtor.
+     * Devolve a recusa ou null quando alimentou.
+     */
+    String feedWith(int index, Inventory payer, String feedId) {
+        Animal animal = barn.get(index);
+        AnimalType type = animal.type();
+        Instant now = now();
+        if (!animal.hungryAt(now)) return type.name() + " ainda está alimentado.";
+        if (feedId == null) feedId = type.kind() == AnimalType.Kind.PROTECTOR && payer.feed("growth") == 0 ? "producer" : type.feedId();
+        else if (!feedId.equals(type.feedId()) && !(type.kind() == AnimalType.Kind.PROTECTOR && feedId.equals("producer")))
+            return "Essa ração não serve para " + type.name() + ".";
+        if (payer.feed(feedId) == 0) return "Sem ração. Compre na Loja, aba Animais.";
         barn.feed(index, now);
-        return report(ActionResult.ok(type.name() + " alimentado por " + formatDuration(fed.type().foodDuration()) + ". " + recordDailyMission("feed", 1)));
+        payer.useFeed(feedId);
+        return null;
+    }
+
+    /** Índice do animal que a visita pode alimentar: o primeiro do tipo que o dono também alimentaria agora. */
+    int friendFeedableAnimal(String typeId) {
+        Instant now = now();
+        for (int i = 0; i < barn.size(); i++) {
+            Animal animal = barn.get(i);
+            if (!animal.type().id().equals(typeId) || animal.expiredAt(realNow()) || !animal.hungryAt(now)) continue;
+            if (animal.type().kind() == AnimalType.Kind.GROWING && animal.stageAt(now) == Animal.Stage.ADULT) continue;
+            if (animal.type().kind() == AnimalType.Kind.PRODUCER && animal.statusAt(now) == Animal.Status.READY) continue;
+            return i;
+        }
+        return -1;
     }
 
     public ActionResult sellAnimal(int index) {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {periodAt,tileCenter,pickTile,animalPath,animalWalkingFrame,animalSoundPath,tileArtRect,backgroundBounds,animalShadowRect,spriteDrawRect,measureSpriteFootprint,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand} from '../src/presentation.ts';
+import {periodAt,tileCenter,pickTile,animalPath,animalWalkingFrame,animalSoundPath,tileArtRect,backgroundBounds,animalShadowRect,spriteDrawRect,measureSpriteFootprint,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand,friendFeedOptions} from '../src/presentation.ts';
 
 test('existing robot identifier presents only the normal dog in every pose and faces its travel',()=>{
  assert.equal(animalPath('cachorro-robo','ADULT',false,false,false),'classic/animals/cachorro/cachorro.png');
@@ -167,6 +167,16 @@ test('visit cleaning tools only target plants showing the matching pest, protect
  assert.equal(visitCleanAvailable('CLEAN_INSECTS',tile(true,0)),false);
  assert.equal(visitCleanAvailable('SPREAD_WEEDS',tile(true,1)),false);
  assert.deepEqual(tileCommand('CLEAN_INSECTS',tile(false,1),'nabo','amor',true),{action:'CLEAN_INSECTS',column:0,row:0,harvestRevision:'3'});
+});
+test('visitors feed only hungry friend animals with compatible feed they own',()=>{
+ const stock={growth:1,producer:2};
+ assert.deepEqual(friendFeedOptions('PRODUCER','HUNGRY',stock),['producer']);
+ assert.deepEqual(friendFeedOptions('GROWING','HUNGRY',stock),['growth']);
+ assert.deepEqual(friendFeedOptions('PROTECTOR','HUNGRY',stock),['growth','producer']);
+ assert.deepEqual(friendFeedOptions('PROTECTOR','HUNGRY',{producer:1}),['producer']);
+ assert.deepEqual(friendFeedOptions('GROWING','HUNGRY',{producer:3}),[]);
+ assert.deepEqual(friendFeedOptions('PRODUCER','HUNGRY',undefined),[]);
+ for(const status of ['PRODUCING','READY'])assert.deepEqual(friendFeedOptions('PRODUCER',status,stock),[]);
 });
 test('crop tooltip uses total nominal duration for growth and rounds remaining time down to elapsed hours',()=>{
  const tile={state:'GROWING',season:2,seasons:4,nominalRemainingSeconds:3600,remainingSeconds:900,dry:true,paused:true,weeds:true,insects:2,protected:true} as import('../src/types.ts').Tile;

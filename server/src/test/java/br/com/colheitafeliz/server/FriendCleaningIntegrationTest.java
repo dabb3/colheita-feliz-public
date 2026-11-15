@@ -60,11 +60,11 @@ class FriendCleaningIntegrationTest {
         var again=act(clean("CLEAN_WEEDS",0,0));assertFalse(success(again));assertEquals(0,xp.add(BigDecimal.TWO).compareTo(xp()));assertEquals(1,nature(farm(visitor)).get("progress").getAsInt());
         var insects=act(clean("CLEAN_INSECTS",0,0));assertTrue(success(insects),message(insects));
         var after=farm(visitor);assertEquals(0,xp.add(BigDecimal.valueOf(4)).compareTo(xp()));assertTrue(nature(after).get("done").getAsBoolean());assertEquals(2,nature(after).get("target").getAsInt());
-        assertTrue(after.getAsJsonObject("cooperativeBonus").get("done").getAsBoolean());assertEquals(0,green.add(BigDecimal.ONE).compareTo(new BigDecimal(after.get("greenCoins").getAsString())));
+        assertFalse(after.getAsJsonObject("cooperativeBonus").get("done").getAsBoolean());assertEquals(0,green.compareTo(new BigDecimal(after.get("greenCoins").getAsString())));
         var ownerAfter=farm(owner);assertEquals(0,tile(ownerAfter,0,0).get("insects").getAsInt());assertTrue(arrivals().insectsSince().isEmpty());
         for(String key:List.of("currentXp","greenCoins","missions","coins","fertilizers"))assertEquals(ownerBefore.get(key),ownerAfter.get(key),key);
         infest(0,0);assertTrue(success(act(clean("CLEAN_WEEDS",0,0))));
-        assertEquals(0,green.add(BigDecimal.ONE).compareTo(new BigDecimal(farm(visitor).get("greenCoins").getAsString())));assertEquals(2,nature(farm(visitor)).get("progress").getAsInt());
+        assertEquals(0,green.compareTo(new BigDecimal(farm(visitor).get("greenCoins").getAsString())));assertEquals(2,nature(farm(visitor)).get("progress").getAsInt());
     }
     @Test void dailyCooperativeXpCapStillCleansAndCountsMission(){
         infest(0,0);store.transaction(visitor,tx->{tx.addCooperativeXp(visitor,LocalDate.of(2026,11,9),19);return null;});var xp=xp();

@@ -33,10 +33,10 @@ final class OnlineGameService implements AutoCloseable {
     private static final Set<String> PEST_ACTIONS = Set.of("SPREAD_INSECTS", "SPREAD_WEEDS");
     // Decisão de 2026-11-13: furto e cada tipo de praga liberam uma nova tentativa a cada 6 horas.
     static final Duration THEFT_COOLDOWN = Duration.ofHours(6), PEST_COOLDOWN = Duration.ofHours(6);
-    private static final Set<String> VISIT_ACTIONS = Set.of("STEAL", "LOVE", "SPREAD_INSECTS", "SPREAD_WEEDS", "CLEAN_WEEDS", "CLEAN_INSECTS");
+    private static final Set<String> VISIT_ACTIONS = Set.of("STEAL", "LOVE", "SPREAD_INSECTS", "SPREAD_WEEDS", "CLEAN_WEEDS", "CLEAN_INSECTS", "FEED_ANIMAL");
     private static final Set<String> CLEAN_ACTIONS = Set.of("CLEAN_WEEDS", "CLEAN_INSECTS");
     // Orçamento de XP cooperativo por visitante e dia UTC, compartilhado pelas ações de ajuda a amigos.
-    static final int CLEAN_XP = 2, COOPERATIVE_XP_DAILY_CAP = 20;
+    static final int HELP_XP = 2, COOPERATIVE_XP_DAILY_CAP = 20;
     private record Loaded(UUID owner, String name, GameState game, long revision, GameSnapshot before, LocalDate allowanceDay) {}
     private final JdbcOnlineStore store;
     private final PublishedNotes publishedNotes;
@@ -186,22 +186,18 @@ final class OnlineGameService implements AutoCloseable {
     }
 
     JsonObject visitAction(UUID actor, UUID owner, Command command) {
-        command.requireTile();
-        if (command.harvestRevision() == null) throw new ApiFailure(400, "Falta a revisão da temporada.");
-        if (!VISIT_ACTIONS.contains(command.action())) throw new ApiFailure(400, "Ação de visita inválida.");
+        validateVisit(command);
         return store.transaction(actor, tx -> visitAction(tx, actor, owner, command));
     }
 
     JsonObject visitAction(JdbcOnlineStore.Tx tx, UUID actor, UUID owner, Command command) {
-        command.requireTile();
-        if (command.harvestRevision() == null) throw new ApiFailure(400, "Falta a revisão da temporada.");
-        if (!VISIT_ACTIONS.contains(command.action())) throw new ApiFailure(400, "Ação de visita inválida.");
+        validateVisit(command);
             authorizeVisit(tx, actor, owner);
             return receipt(tx, actor, command.requestId(), hash("VISIT:" + owner + ":" + JSON.toJson(command)), () -> {
                 tx.lockFarms(actor, owner);
                 var destination = load(tx, owner); var visitor = load(tx, actor);
                 checkRevision(destination, command);
-                long season = Command.revision(command.harvestRevision());
+                long season = command.harvestRevision() == null ? -1 : Command.revision(command.harvestRevision());
                 var visits = new VisitService();
                 ActionResult result;
                 br.com.colheitafeliz.game.TheftAttempt theft=null;
@@ -235,12 +231,14 @@ final class OnlineGameService implements AutoCloseable {
                                 : visits.spreadWeeds(destination.game(), visitor.game(), command.column(), command.row(), season);
                         if (result.success()) tx.recordPest(actor, command.action(), now);
                     }
-                } else if (CLEAN_ACTIONS.contains(command.action())) {
+                } else if (CLEAN_ACTIONS.contains(command.action()) || command.action().equals("FEED_ANIMAL")) {
                     // The actor lock serializes this read-modify-write of the daily cooperative budget.
                     LocalDate today = LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC);
-                    int xp = Math.max(0, Math.min(CLEAN_XP, COOPERATIVE_XP_DAILY_CAP - tx.cooperativeXp(actor, today)));
-                    result = visits.cleanPest(destination.game(), visitor.game(), command.column(), command.row(), season,
-                            command.action().equals("CLEAN_INSECTS"), xp);
+                    int xp = Math.max(0, Math.min(HELP_XP, COOPERATIVE_XP_DAILY_CAP - tx.cooperativeXp(actor, today)));
+                    result = command.action().equals("FEED_ANIMAL")
+                            ? visits.feedAnimal(destination.game(), visitor.game(), command.itemId(), command.feedId(), xp)
+                            : visits.cleanPest(destination.game(), visitor.game(), command.column(), command.row(), season,
+                                    command.action().equals("CLEAN_INSECTS"), xp);
                     if (result.success() && xp > 0) tx.addCooperativeXp(actor, today, xp);
                 } else {
                     result = visits.fertilizeVisit(destination.game(), visitor.game(), command.column(), command.row(), "amor", season);
@@ -320,6 +318,12 @@ final class OnlineGameService implements AutoCloseable {
         active(tx, actor);
         if (actor.equals(owner) || !tx.friends(actor, owner)) throw new ApiFailure(404, "Fazenda indisponível.");
         active(tx, owner);
+    }
+    private static void validateVisit(Command command) {
+        if (!VISIT_ACTIONS.contains(command.action())) throw new ApiFailure(400, "Ação de visita inválida.");
+        if (command.action().equals("FEED_ANIMAL")) { command.requireItem(); return; }
+        command.requireTile();
+        if (command.harvestRevision() == null) throw new ApiFailure(400, "Falta a revisão da temporada.");
     }
     private static void checkRevision(Loaded farm, Command command) {
         if (farm.revision() != Command.revision(command.expectedRevision())) throw new ApiFailure(409, "A fazenda mudou. Atualize antes de agir.");

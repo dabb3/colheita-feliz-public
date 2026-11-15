@@ -9,7 +9,7 @@ import {renderWallet,control,text,image,renderDailyAllowance,friendAvatar,vipBad
 import {fertilizerDuration,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText} from './ui-presentation.ts';
 import {PROTECTED_ICON,notificationCount,renderNotifications} from './notifications.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,avatarImport,type AvatarChoice} from './avatar.ts';
-import {musicArtPath,seedArtPath,periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalSoundPath,animalStatusText,animalActionLabel,animalClickCommand,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
+import {musicArtPath,seedArtPath,periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalSoundPath,animalStatusText,animalActionLabel,animalClickCommand,friendFeedOptions,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
 
 const config=window.COLHEITA_CONFIG;
 const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
@@ -562,6 +562,10 @@ function animalPopup(id:string){
   const feedId=type.kind==='PRODUCER'?'producer':'growth';
   button(`Comprar ração · ${catalog.feedPrices[feedId]} ouro`,()=>{modal.close();void action({action:'BUY_FEED',itemId:feedId});},detail);
   if(type.kind==='GROWING')button('Vender adulto',()=>{modal.close();void action({action:'SELL_ANIMAL',itemId:id});},detail);
+ }else if(visited&&animal.status==='HUNGRY'){
+  const owner=visited.owner,options=friendFeedOptions(type.kind,animal.status,own?.feed);
+  if(!options.length)paragraph('Você não tem ração compatível. Compre na Loja, aba Animais.',detail);
+  for(const feedId of options)button(`Alimentar com ${feedDetails.find(item=>item.id===feedId)!.name} · ${own?.feed?.[feedId]??0}`,()=>{modal.close();void action({action:'FEED_ANIMAL',itemId:id,feedId},`/v1/farms/${owner}/visit-actions`);},detail);
  }else paragraph('Somente visualização durante a visita.',detail);
 }
 function animalDuration(type:AnimalType){return type.kind==='PRODUCER'?type.productionSeconds??0:type.kind==='GROWING'?(type.babySeconds??0)+(type.youngSeconds??0):type.kind==='PROTECTOR'?6*60*60:0;}
@@ -663,7 +667,7 @@ function missions(){
  modalFooter.append(timerWrap,vip);modalFooter.hidden=false;updateMissionCountdown();if(missionsTimer===undefined)missionsTimer=window.setInterval(updateMissionCountdown,60_000);
 }
 function sectionHeading(label:string){const heading=document.createElement('h3');heading.className='mission-section-title';heading.textContent=label;return heading;}
-function missionDescription(id:string){return id==='care'?'Plante, regue, colha ou cuide dos animais.':id==='trade'?'Compre ou venda itens na fazenda.':id==='nature'?'Remova ervas ou insetos nas fazendas de amigos.':'Avance esta tarefa para receber a recompensa.';}
+function missionDescription(id:string){return id==='care'?'Plante, regue, colha ou cuide dos animais.':id==='trade'?'Compre ou venda itens na fazenda.':id==='nature'?'Remova ervas ou insetos nas fazendas de amigos.':id==='animals'?'Alimente com sua ração um animal com fome na fazenda de um amigo.':'Avance esta tarefa para receber a recompensa.';}
 function countdownText(showLocalTime=true){const now=new Date(),midnight=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+1)),minutes=Math.max(0,Math.ceil((midnight.getTime()-now.getTime())/60_000)),hours=Math.floor(minutes/60),parts=new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',hourCycle:'h23'}).formatToParts(midnight),hour=parts.find(part=>part.type==='hour')?.value??'00';return `Novas missões em ${hours?`${hours}h `:''}${minutes%60}min${showLocalTime?` (às ${hour}h)`:''}`;}
 function countdownNode(compact=false){const timer=text('span','','missions-countdown'),clock=document.createElement('span');clock.className='missions-clock-icon';clock.setAttribute('aria-hidden','true');clock.textContent='◷';timer.dataset.compact=String(compact);timer.append(clock,text('span',countdownText(!compact)));timer.setAttribute('aria-live','off');return timer;}
 function updateMissionCountdown(){for(const timer of modal.querySelectorAll<HTMLElement>('.missions-countdown')){const value=timer.lastElementChild;if(value)value.textContent=countdownText(timer.dataset.compact!=='true');}}

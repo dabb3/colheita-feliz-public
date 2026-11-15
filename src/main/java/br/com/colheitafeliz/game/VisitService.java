@@ -112,6 +112,24 @@ public final class VisitService {
         }
     }
 
+    /**
+     * Visitante online alimenta um animal faminto do dono pela regra do dono, pagando a ração do próprio estoque.
+     * O dono não recebe XP nem missão; recusas não mencionam terrenos ou proteção.
+     */
+    public ActionResult feedAnimal(GameState owner, GameState visitor, String typeId, String feedId, int xp) {
+        synchronized (GameState.class) {
+            if (owner == null || visitor == null || owner == visitor) return ActionResult.fail("Nenhum animal deste tipo precisa de ração agora.");
+            int index = owner.friendFeedableAnimal(typeId);
+            if (index < 0) return ActionResult.fail("Nenhum animal deste tipo precisa de ração agora.");
+            String refusal = owner.feedWith(index, visitor.inventory(), feedId);
+            if (refusal != null) return ActionResult.fail(refusal);
+            String reward = visitor.rewardFriendHelp("friend-feed", xp);
+            return ActionResult.ok(owner.barn().get(index).type().name() + " do amigo alimentado. "
+                    + (xp > 0 ? "+" + xp + " XP." : "Limite diário de XP cooperativo atingido: alimentação sem XP.")
+                    + (reward.isEmpty() ? "" : " " + reward));
+        }
+    }
+
     private static FarmTile eligibleTile(GameState owner, GameState visitor, int col, int row, long revision) {
         return eligibleTile(owner,visitor,col,row,revision,false);
     }

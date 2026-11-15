@@ -633,6 +633,19 @@ export function animalActionLabel(
     return "Vender adulto";
   return null;
 }
+/** Rações do visitante que servem para o animal faminto do amigo; protetores aceitam as duas. */
+export function friendFeedOptions(
+  kind: string,
+  status: string,
+  stock: Record<string, number> | undefined,
+): ("growth" | "producer")[] {
+  if (status !== "HUNGRY") return [];
+  const compatible: ("growth" | "producer")[] =
+    kind === "PROTECTOR"
+      ? ["growth", "producer"]
+      : [kind === "PRODUCER" ? "producer" : "growth"];
+  return compatible.filter((id) => (stock?.[id] ?? 0) > 0);
+}
 export function animalClickCommand(
   id: string,
   visiting: boolean,
