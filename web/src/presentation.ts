@@ -89,9 +89,10 @@ export function untilUtcMidnight(serverTime: string) {
     : `${minutes} min`;
 }
 export function cropGroups(crops: Crop[]) {
+  const purchasable = crops.filter((crop) => crop.acquisitionSource !== "LOGIN_REWARD");
   return {
-    common: crops.filter((crop) => !crop.vipOnly),
-    vip: crops.filter((crop) => crop.vipOnly),
+    common: purchasable.filter((crop) => !crop.vipOnly),
+    vip: purchasable.filter((crop) => crop.vipOnly),
   };
 }
 export function soundForAction(action: string, animalReady = false) {

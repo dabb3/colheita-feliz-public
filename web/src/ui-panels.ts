@@ -1,7 +1,7 @@
 import type { Farm, Catalog, Tile, CommandFields, Friend, Gifts } from "./types.ts";
 import { text, image, control, renderDailyAllowance,friendAvatar,vipBadge } from "./ui.ts";
 import { animalPath, productPath, seedArtPath } from "./presentation.ts";
-import { durationLabel, animalCare, cropTimingText } from "./ui-presentation.ts";
+import { durationLabel, animalCare, cropTimingText, seedGrowthLabel } from "./ui-presentation.ts";
 
 function inventoryCard(name: string, path: string, count: number) {
   const card = document.createElement("article");
@@ -418,6 +418,81 @@ export function giftLimit(stock: number) {
   return Math.max(0, Math.min(5, Math.floor(stock)));
 }
 
+export function renderLoginRewards(
+  root: HTMLElement,
+  status: NonNullable<Farm["loginRewards"]> | undefined,
+  catalog: Catalog,
+  state: { phase: "ready" | "sending" | "unknown" | "error"; pending: boolean; recoverable: boolean; busy: boolean; refreshing: boolean; online: boolean; countdown: string; message?: string },
+  actions: { claim(): void; retry(): void; refresh(): void },
+) {
+  const active = document.activeElement,
+    focusKey = root.contains(active) ? active?.getAttribute("data-focus-key") : null,
+    scrollTop = root.scrollTop;
+  root.replaceChildren();
+  root.className = "login-calendar-content login-rewards-panel";
+  if (!status) {
+    root.append(text("p", "O calendário de recompensas está indisponível.", "empty-state"));
+    return;
+  }
+  const heading = text("h3", "Recompensas do ciclo", "login-rewards-heading");
+  heading.tabIndex = -1;
+  heading.setAttribute("data-focus-key", "login-rewards-heading");
+  root.append(heading);
+  root.append(text("p", "Se perder um dia, sua sequência volta ao início.", "login-rewards-rule"));
+  if (status.streakReset) root.append(text("p", "Sua sequência foi reiniciada. O próximo resgate começa no dia 1.", "login-rewards-reset"));
+  const countdown = text("p", `Próximo resgate em ${state.countdown}.`, "login-rewards-countdown");
+  countdown.setAttribute("role", "timer");
+  countdown.setAttribute("aria-live", "off");
+  root.append(countdown);
+  const grid = text("div", "", "login-rewards-grid");
+  grid.setAttribute("role", "list");
+  grid.setAttribute("aria-label", "Recompensas dos 30 dias");
+  for (const reward of [...status.rewards].sort((a, b) => a.day - b.day)) {
+    const completed = reward.day <= status.completedDay,
+      available = status.available && reward.day === status.nextDay,
+      stateLabel = completed ? "Concluído" : available ? "Disponível" : "Futuro",
+      card = text("article", "", `login-reward-card${completed ? " is-completed" : available ? " is-available" : " is-future"}`);
+    card.setAttribute("role", "listitem");
+    const crop = reward.kind === "SEED" ? catalog.crops.find(item => item.id === reward.itemId) : undefined;
+    const amount = reward.kind === "SEED"
+      ? `${reward.amount} ${crop?.name ?? reward.itemId ?? "semente"}${reward.amount === "1" ? "" : "s"}`
+      : `${new Intl.NumberFormat("pt-BR").format(Number(reward.amount))} ${reward.currency === "GOLD" ? "ouro" : "verdes"}`;
+    card.setAttribute("aria-label", `Dia ${reward.day}, ${stateLabel}: ${amount}`);
+    const icon = reward.kind === "SEED" && crop
+      ? image(seedArtPath(crop.spriteStem), "login-reward-icon")
+      : image(`classic/icons/moeda-${reward.currency === "GOLD" ? "comum" : "verde"}.png`, "login-reward-icon");
+    icon.setAttribute("aria-hidden", "true");
+    card.append(text("strong", `Dia ${reward.day}`), icon, text("span", amount, "login-reward-amount"), text("span", stateLabel, "login-reward-state"));
+    if (crop?.acquisitionSource === "LOGIN_REWARD") {
+      const payout = (crop.cycleRevenueTenths ?? 0) / 10;
+      card.append(text("small", `${seedGrowthLabel(crop)} · ${new Intl.NumberFormat("pt-BR").format(payout)} verdes por colheita`, "login-reward-details"));
+    }
+    grid.append(card);
+  }
+  root.append(grid);
+  if (state.message) { const message=text("p",state.message,"login-rewards-message");message.setAttribute("role","status");message.setAttribute("aria-live","polite");root.append(message); }
+  const claim = control("Resgatar recompensa", actions.claim);
+  claim.setAttribute("data-focus-key", "login-rewards-claim");
+  claim.disabled = !status.available || state.busy || state.refreshing || state.pending || !state.online || state.phase !== "ready";
+  root.append(claim);
+  if (state.pending && state.recoverable) {
+    const retry = control("Recuperar resultado", actions.retry);
+    retry.setAttribute("data-focus-key", "login-rewards-retry");
+    retry.disabled = state.busy || state.refreshing || !state.online;
+    root.append(retry);
+  } else if (state.pending) root.append(text("p", "Resolva a ação pendente antes de resgatar outra recompensa.", "login-rewards-message"));
+  const refresh = control(state.refreshing ? "Atualizando calendário…" : "Atualizar calendário", actions.refresh);
+  refresh.setAttribute("data-focus-key", "login-rewards-refresh");
+  refresh.disabled = state.refreshing || !state.online;
+  root.append(refresh);
+  if (!state.online) root.append(text("p", "Sem conexão. Reconecte para resgatar ou recuperar o resultado.", "login-rewards-message"));
+  if (focusKey) {
+    const target = Array.from(root.querySelectorAll<HTMLElement>("[data-focus-key]")).find(node => node.getAttribute("data-focus-key") === focusKey && !("disabled" in node && (node as HTMLButtonElement).disabled));
+    (target??heading).focus({ preventScroll: true });
+  }
+  root.scrollTop = scrollTop;
+}
+
 export interface GiftComposerState {
   phase: "loading" | "ready" | "sending" | "unknown" | "load-error";
   cropId: string;
@@ -444,7 +519,7 @@ export function renderGiftComposer(root: HTMLElement, footer: HTMLElement, catal
   if (state.phase === "loading") root.append(text("p", "Carregando disponibilidade…", "muted"));
   else if (state.phase === "load-error") { root.append(text("p", state.message ?? "Não foi possível carregar os presentes.", "empty-state")); if(state.pending){const crop=catalog.crops.find(item=>item.id===state.cropId);root.append(text("p",`Tentativa pendente: ${crop?.name??state.cropId} · ${state.quantity} semente(s).`,"gift-message"));}root.append(control("Tentar novamente", actions.retryLoad??actions.retry)); if(state.pending){root.append(text("p","Há um envio pendente. A consulta falhou; recuperar ainda usa o mesmo pedido.","muted"));root.append(control("Recuperar resultado",actions.retry));} }
   else {
-    const crops = catalog.crops.filter(crop => (state.seedCounts[crop.id] ?? 0) > 0), seeds = text("div", "", "gift-options");
+    const crops = catalog.crops.filter(crop => crop.acquisitionSource !== "LOGIN_REWARD" && (state.seedCounts[crop.id] ?? 0) > 0), seeds = text("div", "", "gift-options");
     for (const crop of crops) {
       const choice = control(`${crop.name} · ${state.seedCounts[crop.id]} no estoque`, () => actions.selectSeed(crop.id));
       choice.setAttribute("data-focus-key",`gift-seed:${crop.id}`);

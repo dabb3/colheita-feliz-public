@@ -128,7 +128,7 @@ test('late gift failure after navigating away does not affect the next panel',as
  assert.equal(next.elements.get('modal').open,false);assert.ok(!text(next.elements.get('modal-content')).includes('Não foi possível'));
 });
 function app(preferences=new Map(),pushLogoutOptions){
- const intervals=new Map(),elements=new Map(),listeners=new Map(),audioClips=[],observers=[],timeouts=new Map();let nextTimeout=0;
+ const intervals=new Map(),elements=new Map(),listeners=new Map(),audioClips=[],observers=[],timeouts=new Map();let nextTimeout=0,monotonic=0;
  const make=(tag='div')=>({tag,value:'',selectedIndex:0,hidden:false,children:[],get childElementCount(){return this.children.length;},attributes:{},dataset:{},style:{setProperty(key,value){this[key]=value;}},scrollTop:0,scrollLeft:0,classList:{add(){},remove(){},toggle(){}},
   replaceChildren(...nodes){if(this.contains(ctx.document.activeElement))ctx.document.activeElement=null;this.children=nodes;},
   append(...nodes){this.children.push(...nodes);},prepend(...nodes){this.children.unshift(...nodes);},insertBefore(node,before){this.children.splice(this.children.indexOf(before),0,node);},replaceChild(node,before){this.children.splice(this.children.indexOf(before),1,node);return before;},replaceWith(node){const parent=descendants(elements.get('modal-content')).find(candidate=>candidate.children.includes(this));parent?.replaceChild(node,this);},
@@ -139,7 +139,7 @@ function app(preferences=new Map(),pushLogoutOptions){
   querySelector(selector){return this.querySelectorAll(selector)[0]??null;},focus(){if(this.tag==='div'&&this.tabIndex===undefined)return;ctx.document.activeElement=this;},
   getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(name,handler){(this.listenerCounts??={})[name]=(this.listenerCounts[name]??0)+1;(this.listeners??={})[name]=handler;},close(){this.open=false;},showModal(){this.open=true;}});
  const storage={getItem:()=>null,setItem(){},removeItem(){}};
- const ctx={syncMobileCamera(){ctx.cameraSyncs=(ctx.cameraSyncs??0)+1;},reconcilePush:async()=>{},connectPush:async()=>{},suspendPush:pushLogoutOptions?.suspendPush??(async()=>{}),createClient:()=>({auth:{signOut:pushLogoutOptions?.signOut}}),renderPushSettings:()=>{},...presentation,...uiPresentation,...avatar,...inviteUrl,history:{state:null,replaceState(){}},window:{localStorage:{getItem:key=>preferences.get(key)??null,setItem:(key,value)=>preferences.set(key,value)},COLHEITA_CONFIG:{development:!pushLogoutOptions},setInterval(callback,delay){intervals.set(delay,callback);return delay;},clearInterval(id){intervals.delete(id);},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make(id==='close-modal'||id==='retry'?'button':'div'));return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}addEventListener(){}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
+ const ctx={syncMobileCamera(){ctx.cameraSyncs=(ctx.cameraSyncs??0)+1;},reconcilePush:async()=>{},connectPush:async()=>{},suspendPush:pushLogoutOptions?.suspendPush??(async()=>{}),createClient:()=>({auth:{signOut:pushLogoutOptions?.signOut}}),renderPushSettings:()=>{},setMonotonic(value){monotonic=value;},performance:{now:()=>monotonic},...presentation,...uiPresentation,...avatar,...inviteUrl,history:{state:null,replaceState(){}},window:{localStorage:{getItem:key=>preferences.get(key)??null,setItem:(key,value)=>preferences.set(key,value)},COLHEITA_CONFIG:{development:!pushLogoutOptions},setInterval(callback,delay){intervals.set(delay,callback);return delay;},clearInterval(id){intervals.delete(id);},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make(id==='close-modal'||id==='retry'?'button':'div'));return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}addEventListener(){}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
  const uiSource=readFileSync(new URL('../src/ui.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(uiSource),ctx);
  const panelsSource=readFileSync(new URL('../src/ui-panels.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
@@ -147,11 +147,71 @@ function app(preferences=new Map(),pushLogoutOptions){
  const notificationSource=readFileSync(new URL('../src/notifications.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(notificationSource),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,friends,presentGift,closeGiftComposer,receive,dialog,health,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
+ source+='\nglobalThis.h={refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,friends,presentGift,closeGiftComposer,receive,dialog,health,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:{...ctx.h,runTimeouts(){for(const [id,callback]of [...timeouts]){timeouts.delete(id);callback();}}},elements,listeners,audioClips,observers,ctx,intervals};
 }
 function text(node){return(node.textContent??'')+(node.children??[]).map(child=>typeof child==='object'?text(child):child).join('');}
 function descendants(node){return[node,...(node.children??[]).flatMap(child=>typeof child==='object'?descendants(child):[])];}
+function loginFarm(owner='alice',available=true,revision='1',serverTime='2026-11-15T12:00:00Z',nextResetAt='2026-11-16T03:00:00Z'){
+ return{...farm(owner),revision,serverTime,loginRewards:{completedDay:0,nextDay:1,available,streakReset:false,nextResetAt,rewards:[{day:1,kind:'GOLD',currency:'GOLD',amount:'250'}]}};
+}
+
+test('login reward claim locks double clicks and sends only action plus current revision',async()=>{
+ const {h,elements}=app(),post=deferred();let mutations=0,request;
+ const own=loginFarm(),api={pending:null,busy:false,async get(path){assert.equal(path,'/v1/me/farm');return own;},mutate(path,fields){mutations++;assert.equal(path,'/v1/me/actions');request=fields;return post.promise;}};
+ h.set({own,visited:farm('bob'),catalog:{crops:[],animals:[],fertilizers:[],vip:{greenPrice:20}},api});h.receive({farm:own});h.loginCalendar();
+ assert.equal(elements.get('modal-title').textContent,'Calendário de Recompensas');const claim=descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa');claim.onclick();const locked=descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa');claim.onclick();
+ assert.equal(mutations,1);assert.equal(locked.disabled,true);assert.equal(JSON.stringify(request),JSON.stringify({action:'CLAIM_LOGIN_REWARD',expectedRevision:'1'}));
+ const after={...own,revision:'2',serverTime:'2026-11-15T12:01:00Z',loginRewards:{...own.loginRewards,completedDay:1,nextDay:2,available:false}};
+ post.resolve({farm:after,result:{success:true,message:'Dia 1 resgatado.'}});await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(h.get().own.revision,'2');assert.equal(elements.get('modal-title').textContent,'Calendário de Recompensas');assert.ok(text(elements.get('modal-content')).includes('Dia 1 resgatado.'));
+});
+
+test('calendar rollover rechecks the server once and clears its interval when the panel changes',async()=>{
+ const {h,elements,intervals,ctx}=app(),before=loginFarm(),after=loginFarm('alice',true,'2','2026-11-16T03:00:01Z','2026-11-17T03:00:00Z');let reads=0;
+ h.set({own:before,api:{pending:null,busy:false,get:async path=>{assert.equal(path,'/v1/me/farm');reads++;return after;}}});h.receive({farm:before});h.loginCalendar();
+ assert.equal(intervals.has(1000),true);h.setNow(55_000_000);intervals.get(1000)();await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(reads,1);assert.equal(h.get().own.loginRewards.available,true);intervals.get(1000)();await new Promise(resolve=>setTimeout(resolve,0));assert.equal(reads,1);
+ h.dialog('Outro painel');assert.equal(intervals.has(1000),false);assert.equal(elements.get('modal-title').textContent,'Outro painel');
+});
+
+test('definitive reward revision rejection reloads the server status before another claim',async()=>{
+ const {h,elements}=app(),before=loginFarm(),after=loginFarm('alice',false,'2');let reads=0,mutations=0;
+ const api={pending:null,busy:false,get:async()=>{reads++;return after;},mutate:async()=>{mutations++;throw new ApiError(409,'A revisão mudou.');}};
+ h.set({own:before,api});h.receive({farm:before});h.loginCalendar();descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa').onclick();await new Promise(resolve=>setTimeout(resolve,0));
+ const claim=descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa');assert.equal(mutations,1);assert.equal(reads,1);assert.equal(claim.disabled,true);assert.equal(h.get().own.revision,'2');assert.ok(text(elements.get('modal-content')).includes('A revisão mudou.'));
+});
+
+test('calendar data refresh failure leaves the same pending receipt recoverable',async()=>{
+ const {h,elements}=app(),own=loginFarm(),body=JSON.stringify({action:'CLAIM_LOGIN_REWARD',expectedRevision:'1',requestId:'same-request'});let reads=0,replays=0;
+ const api={pending:{path:'/v1/me/actions',body},busy:false,get:async()=>{reads++;throw new TypeError('offline');},retry:async()=>{replays++;api.pending=null;return{farm:{...own,revision:'2',loginRewards:{...own.loginRewards,completedDay:1,nextDay:2,available:false}},result:{success:true,message:'Recompensa confirmada.'}};}};
+ h.set({own,api});h.receive({farm:own});h.loginCalendar();
+ descendants(elements.get('modal-content')).find(node=>text(node)==='Atualizar calendário').onclick();await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(reads,1);assert.ok(api.pending);assert.ok(text(elements.get('modal-content')).includes('offline'));assert.ok(descendants(elements.get('modal-content')).some(node=>text(node)==='Recuperar resultado'));
+ descendants(elements.get('modal-content')).find(node=>text(node)==='Recuperar resultado').onclick();await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(replays,1);assert.equal(api.pending,null);assert.equal(h.get().own.revision,'2');assert.ok(text(elements.get('modal-content')).includes('Recompensa confirmada.'));
+});
+
+test('gift default selection and send remain blocked when stock contains only calendar seeds',async()=>{
+ const {h,elements}=app(),own={...farm('alice'),seedCounts:{'semente-bronze':1}},crop={id:'semente-bronze',name:'Semente de Bronze',spriteStem:'semente-bronze',acquisitionSource:'LOGIN_REWARD'};let mutations=0;
+ h.set({own,catalog:{crops:[crop],animals:[],fertilizers:[],vip:{greenPrice:20}},api:{pending:null,get:async path=>path==='/v1/friends'?[{id:'bob',name:'Bob'}]:path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm('bob'),mutate(){mutations++;}}});
+ await h.friends();descendants(elements.get('modal-content')).find(node=>text(node)==='Presentear').onclick();await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(elements.get('modal-title').textContent,'Presentear');assert.ok(!text(elements.get('modal-content')).includes('Semente de Bronze'));assert.equal(mutations,0);assert.equal(elements.get('modal-footer').children.find(node=>text(node)==='Enviar').disabled,true);
+});
+
+test('plant picker keeps reward seeds from the full catalog',()=>{
+ const {h,elements}=app(),crop={id:'semente-bronze',name:'Semente de Bronze',spriteStem:'semente-bronze',acquisitionSource:'LOGIN_REWARD',requiredLevel:1};
+ h.set({own:{...farm('alice'),level:2,seedCounts:{'semente-bronze':1}},catalog:{crops:[crop],animals:[],fertilizers:[],vip:{greenPrice:20}},api:{pending:null}});h.pickTool('PLANT');
+ assert.ok(descendants(elements.get('tool-tray')).some(node=>node.getAttribute('aria-label')==='Semente de Bronze, 1 sementes'));
+});
+
+test('stale calendar claim updates own farm silently after navigation and ignores logout response',async()=>{
+ const {h,elements}=app(),first=deferred(),initial=loginFarm(),updated={...initial,revision:'2'};let api={pending:null,busy:false,mutate:()=>first.promise};
+ h.set({own:initial,api});h.receive({farm:initial});h.loginCalendar();descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa').onclick();h.dialog('Outro painel');first.resolve({farm:updated,result:{success:true,message:'late reward'}});await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(h.get().own.revision,'2');assert.equal(elements.get('modal-title').textContent,'Outro painel');assert.doesNotMatch(text(elements.get('modal-content')),/late reward/);
+ const stale=deferred(),current=loginFarm('alice',true,'3');api={pending:null,busy:false,mutate:()=>stale.promise};h.set({own:current,api});h.receive({farm:current});h.loginCalendar();descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa').onclick();const logout=h.logout();stale.resolve({farm:{...current,revision:'4'},result:{success:true,message:'after logout'}});await logout;await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(h.get().own,undefined);assert.equal(elements.get('modal').open,false);
+});
 
 test('connection diagnostics is available with a pending action and cannot replay it',async()=>{
  const {h,elements}=app(),result=deferred();let runs=0;

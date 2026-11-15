@@ -6,7 +6,7 @@ import {Scene} from './scene.ts';
 import {syncMobileCamera} from './mobile.ts';
 import {takeInvite} from './invite-url.ts';
 import {renderWallet,control,text,image,renderDailyAllowance,friendAvatar,vipBadge} from './ui.ts';
-import {renderGiftComposer,giftLimit,type GiftComposerState} from './ui-panels.ts';
+import {renderGiftComposer,renderLoginRewards,giftLimit,type GiftComposerState} from './ui-panels.ts';
 import {fertilizerDuration,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText} from './ui-presentation.ts';
 import {PROTECTED_ICON,notificationCount,renderNotifications} from './notifications.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,avatarImport,type AvatarChoice} from './avatar.ts';
@@ -25,6 +25,7 @@ let toastTimer:number,loginTransitionTimer:number,sessionGeneration=0,navigation
 let goldAnimationFrame=0;
 let giftContext:{client:ApiClient;session:number;dialog:number;recipientId:string;friend:Friend;state:GiftComposerState;returnScroll:number;reload?:()=>void;paint?:()=>void}|undefined;
 let giftReturn:{friendId:string;scroll:number}|undefined;
+let calendarContext:{client:ApiClient;session:number;dialog:number;phase:'ready'|'sending'|'unknown'|'error';message?:string;anchorServer:number;anchorClient:number;resetAt:string;checkedResetAt?:string;refreshing?:boolean}|undefined,calendarTimer:number|undefined,ownServerClock:{owner:string;server:number;client:number}|undefined;
 const depositNumber=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1});
 const depositPriceNumber=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2});
 const login=element('login');
@@ -123,7 +124,8 @@ async function fadeSoldDepositRows(fields:CommandFields,farm:Farm){
  await new Promise(resolve=>window.setTimeout(resolve,matchMedia('(prefers-reduced-motion: reduce)').matches?0:180));
 }
 let missionsTimer:number|undefined;
-function dialog(title:string){giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;modal.classList.remove('bite-dialog');modal.removeAttribute('aria-describedby');dialogGeneration++;refreshDialog=undefined;closeHealth();element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');modal.classList.toggle('missions-dialog',title==='Missões');modal.classList.toggle('gift-dialog',title==='Presentear');if(title!=='Missões'){window.clearInterval(missionsTimer);missionsTimer=undefined;}content.className='';content.replaceChildren();content.scrollTop=0;modalFooter.className='';modalFooter.replaceChildren();modalFooter.hidden=true;if(!modal.open)modal.showModal();}
+function stopCalendar(){window.clearInterval(calendarTimer);calendarTimer=undefined;calendarContext=undefined;}
+function dialog(title:string){stopCalendar();giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;modal.classList.remove('bite-dialog');modal.removeAttribute('aria-describedby');dialogGeneration++;refreshDialog=undefined;closeHealth();element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');modal.classList.toggle('missions-dialog',title==='Missões');modal.classList.toggle('gift-dialog',title==='Presentear');modal.classList.toggle('login-calendar-dialog',title==='Calendário de Recompensas');if(title!=='Missões'){window.clearInterval(missionsTimer);missionsTimer=undefined;}content.className='';content.replaceChildren();content.scrollTop=0;modalFooter.className='';modalFooter.replaceChildren();modalFooter.hidden=true;if(!modal.open)modal.showModal();}
 const shownBites=new Set<string>();
 function showBite(reply:Reply,actionName?:string){
  if(actionName!=='STEAL'||reply.theftOutcome?.kind!=='BITTEN'||!reply.farm||reply.farm.owner!==own?.owner)return false;
@@ -218,7 +220,7 @@ function avatarSettings(){
  }
  if(!googlePhoto)paragraph('A foto do Google não está disponível nesta sessão.');
 }
-async function logout(){const suppression=suspendPush(api).catch(()=>{});giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner="";sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;setLoginStep('login');syncPending();await suppression;if(supabase)await supabase.auth.signOut();}
+async function logout(){const suppression=suspendPush(api).catch(()=>{});stopCalendar();ownServerClock=undefined;giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner="";sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;setLoginStep('login');syncPending();await suppression;if(supabase)await supabase.auth.signOut();}
 function showConnection(message?:string){element('connection').hidden=!message;element('connection').textContent=message??'';}
 function syncPending(){element('pending').hidden=!api?.pending;element<HTMLButtonElement>('retry').disabled=!!api?.busy;}
 async function retryPending(context?:NonNullable<typeof giftContext>){
@@ -254,7 +256,7 @@ function render(){
  const moreBadge=element('more-badge');moreBadge.textContent=String(unread);moreBadge.hidden=unread===0;element('more').setAttribute('aria-label',unread?`Mais opções, ${unread} avisos não lidos`:'Mais opções');
  syncMusic();
  element('welcome').hidden=true;element('game').hidden=false;
- const profile=display()!;renderWallet(element('wallet'),profile,visited?.name,avatarSource(profile.avatar?.id as AvatarChoice,profile.avatar?.photoUrl??undefined),visited?undefined:avatarSettings);
+ const profile=display()!;element('calendar').hidden=!own.loginRewards;renderWallet(element('wallet'),profile,visited?.name,avatarSource(profile.avatar?.id as AvatarChoice,profile.avatar?.photoUrl??undefined),visited?undefined:avatarSettings);
  element('home').hidden=!visited;
  const tutorial=element('tutorial');tutorial.hidden=!!visited||!own.tutorial;tutorial.replaceChildren();
  if(own.tutorial){const strong=document.createElement('strong');strong.textContent=own.tutorial.title??'';tutorial.append(strong);paragraph(own.tutorial.hint??'',tutorial);}
@@ -320,6 +322,66 @@ async function refresh(){
   showConnection();render();void client.prepareRequestId().catch(()=>{});
  }catch(error){if(generation===sessionGeneration)handleError(error);}
 }
+function loginRewardPending(client:ApiClient){try{return client.pending?.path==='/v1/me/actions'&&JSON.parse(client.pending.body).action==='CLAIM_LOGIN_REWARD';}catch{return false;}}
+function calendarCurrent(context:NonNullable<typeof calendarContext>){return calendarContext===context&&api===context.client&&sessionGeneration===context.session&&dialogGeneration===context.dialog&&modal.open&&element('modal-title').textContent==='Calendário de Recompensas';}
+function calendarClock(context:NonNullable<typeof calendarContext>){const clock=ownServerClock?.owner===own?.owner?ownServerClock:undefined;context.anchorServer=clock?.server??Number.NaN;context.anchorClient=clock?.client??performance.now();context.resetAt=own?.loginRewards?.nextResetAt??'';context.checkedResetAt=undefined;}
+function loginCountdown(context:NonNullable<typeof calendarContext>){
+ const target=Date.parse(context.resetAt),now=context.anchorServer+(performance.now()-context.anchorClient);
+ if(!Number.isFinite(target)||!Number.isFinite(now))return 'indisponível';
+ const seconds=Math.ceil(Math.max(0,target-now)/1000),hours=Math.floor(seconds/3600),minutes=Math.floor(seconds%3600/60),rest=seconds%60;
+ return `${hours} h ${String(minutes).padStart(2,'0')} min ${String(rest).padStart(2,'0')} s`;
+}
+function calendarPaint(context:NonNullable<typeof calendarContext>){
+ if(!calendarCurrent(context)||!own)return;
+ const latestClock=ownServerClock?.owner===own.owner?ownServerClock:undefined,resetAt=own.loginRewards?.nextResetAt??'';
+ if(latestClock&&latestClock.client>=context.anchorClient){context.anchorServer=latestClock.server;context.anchorClient=latestClock.client;}
+ if(context.resetAt!==resetAt){context.resetAt=resetAt;context.checkedResetAt=undefined;}
+ const rewardPending=loginRewardPending(context.client);
+ renderLoginRewards(content,own.loginRewards,catalog,{phase:context.phase,pending:!!context.client.pending,recoverable:rewardPending,busy:busy||context.client.busy,refreshing:!!context.refreshing,online:navigator.onLine,countdown:loginCountdown(context),message:context.message},{claim:()=>void submitLoginReward(context,false),retry:()=>void submitLoginReward(context,true),refresh:()=>void refreshCalendarAtBoundary(context)});
+}
+async function refreshCalendarAtBoundary(context:NonNullable<typeof calendarContext>,preserveMessage?:string){
+ if(!calendarCurrent(context)||context.refreshing||!navigator.onLine)return;
+ context.refreshing=true;context.message=preserveMessage;context.phase=loginRewardPending(context.client)?'unknown':'ready';calendarPaint(context);
+ const client=context.client,generation=context.session,resetAt=context.resetAt;
+ try{
+  const farm=await client.get<Farm>('/v1/me/farm');if(generation!==sessionGeneration||api!==client||farm.owner!==own?.owner)return;
+  if(!calendarCurrent(context)){own=acceptFarm(own,farm);return;}
+  updateOwnFarm(farm);calendarClock(context);context.message=preserveMessage;calendarPaint(context);
+ }catch(error){if(calendarCurrent(context)){const message=(error as {message?:unknown})?.message;context.message=preserveMessage?`${preserveMessage} Não foi possível atualizar o calendário: ${typeof message==='string'?message:'erro de conexão'}`:typeof message==='string'?`Não foi possível atualizar o calendário: ${message}`:'Não foi possível atualizar o calendário.';context.phase='error';calendarPaint(context);}}
+ finally{if(calendarCurrent(context)){context.refreshing=false;if(context.resetAt===resetAt)context.checkedResetAt=resetAt;calendarPaint(context);}}
+}
+function tickLoginCalendar(context:NonNullable<typeof calendarContext>){
+ if(!calendarCurrent(context))return;
+ const countdown=content.querySelector<HTMLElement>('.login-rewards-countdown'),target=Date.parse(context.resetAt),now=context.anchorServer+(performance.now()-context.anchorClient);
+ if(countdown)countdown.textContent=Number.isFinite(target)&&Number.isFinite(now)&&now>=target?'Aguardando confirmação do servidor…':`Próximo resgate em ${loginCountdown(context)}.`;
+ if(Number.isFinite(target)&&Number.isFinite(now)&&now>=target&&context.checkedResetAt!==context.resetAt){context.checkedResetAt=context.resetAt;void refreshCalendarAtBoundary(context);}
+}
+async function submitLoginReward(context:NonNullable<typeof calendarContext>,retry:boolean){
+ if(!calendarCurrent(context)||!api||!own||busy||context.client.busy||context.refreshing||!navigator.onLine)return;
+ const pending=!!context.client.pending;
+ if(retry?!loginRewardPending(context.client):pending||context.phase!=='ready'||!own.loginRewards?.available)return;
+ const client=context.client,generation=context.session,fields:CommandFields={action:'CLAIM_LOGIN_REWARD',expectedRevision:own.revision};
+ busy=true;context.phase='sending';context.message=undefined;calendarPaint(context);
+ try{
+  const reply=retry?await client.retry():await client.mutate('/v1/me/actions',fields);
+  if(generation!==sessionGeneration||api!==client)return;
+  if(reply.farm){if(calendarCurrent(context))updateOwnFarm(reply.farm);else own=acceptFarm(own,reply.farm);}
+  if(!calendarCurrent(context))return;
+  if(reply.result?.success){context.phase='ready';context.message=reply.result.message||'Recompensa resgatada.';if(own)calendarClock(context);render();}
+  else{context.phase='error';context.message=reply.result?.message??'O servidor não confirmou a recompensa.';calendarPaint(context);}
+ }catch(error){
+  if(generation!==sessionGeneration||api!==client)return;
+  if(calendarCurrent(context)){const message=(error as {message?:unknown})?.message;context.phase=loginRewardPending(client)?'unknown':'error';context.message=typeof message==='string'?message:'Não foi possível confirmar o resgate.';calendarPaint(context);if(error instanceof ApiError&&[409,410].includes(error.status)&&!client.pending)await refreshCalendarAtBoundary(context,context.message);}
+ }finally{
+  if(generation===sessionGeneration&&api===client){busy=false;if(calendarCurrent(context))calendarPaint(context);syncPending();}
+ }
+}
+function loginCalendar(){
+ if(!own||!own.loginRewards)return;
+ dialog('Calendário de Recompensas');const client=api;if(!client)return;
+ const context:NonNullable<typeof calendarContext>={client,session:sessionGeneration,dialog:dialogGeneration,phase:loginRewardPending(client)?'unknown':'ready',anchorServer:Number.NaN,anchorClient:performance.now(),resetAt:own.loginRewards.nextResetAt};calendarContext=context;calendarClock(context);
+ refreshDialog=()=>calendarPaint(context);calendarPaint(context);calendarTimer=window.setInterval(()=>tickLoginCalendar(context),1000);if(!Number.isFinite(context.anchorServer))void refreshCalendarAtBoundary(context);
+}
 function handleError(error:unknown){
  const message=error instanceof Error?error.message:'Falha de conexão.';
  if(error instanceof ApiError){notify(message);if(error.status===409||error.status===410)void refresh();}
@@ -329,6 +391,7 @@ function handleError(error:unknown){
 function updateOwnFarm(farm:Farm){
  const previous=own;
  own=acceptFarm(own,farm);
+ if(own===farm){const server=Date.parse(farm.serverTime??'');if(Number.isFinite(server))ownServerClock={owner:farm.owner,server,client:performance.now()};}
  if(own===farm)collectUpdateNotes(farm);
  if(previous&&own!==previous&&own.tiles.some(tile=>tile.state==='READY'&&previous.tiles.some(old=>
   old.column===tile.column&&old.row===tile.row&&old.cropId===tile.cropId&&old.season===tile.season&&old.state==='GROWING'
@@ -737,17 +800,17 @@ async function friends(restore?:{friendId:string;scroll:number}){
 function presentGift(friend:Friend,returnScroll:number){
  if(!api||!own||busy)return;let savedGift:CommandFields|undefined;if(api.pending){try{const pending=api.pending;if(pending.path!=='/v1/gifts')return;const body=JSON.parse(pending.body);if(body.recipientId!==friend.id)return;savedGift=body;}catch{return;}}
  dialog('Presentear');const client=api,session=sessionGeneration,panel=dialogGeneration,recipientId=friend.id;
- const state:GiftComposerState={phase:'loading',cropId:savedGift?.cropId as string??catalog.crops.find(c=>giftLimit(own?.seedCounts?.[c.id]??0)>0)?.id??'',quantity:savedGift?.quantity as number??1,seedCounts:{...(own.seedCounts??{})},gifts:null,canSend:false,message:savedGift?'Um envio anterior ainda aguarda confirmação.':''};
+ const state:GiftComposerState={phase:'loading',cropId:savedGift?.cropId as string??catalog.crops.find(c=>c.acquisitionSource!=='LOGIN_REWARD'&&giftLimit(own?.seedCounts?.[c.id]??0)>0)?.id??'',quantity:savedGift?.quantity as number??1,seedCounts:{...(own.seedCounts??{})},gifts:null,canSend:false,message:savedGift?'Um envio anterior ainda aguarda confirmação.':''};
  const ctx:{client:ApiClient;session:number;dialog:number;recipientId:string;friend:Friend;state:GiftComposerState;returnScroll:number;reload?:()=>void;paint?:()=>void;recipientLevel?:number}={client,session,dialog:panel,recipientId,friend,state,returnScroll};giftContext=ctx;
  const current=()=>giftContext===ctx&&api===client&&sessionGeneration===session&&dialogGeneration===panel&&modal.open&&element('modal-title').textContent==='Presentear';let initialized=false;
- const paint=()=>{if(current())renderGiftComposer(content,modalFooter,catalog,ctx.friend,state,{selectSeed(id){const crop=catalog.crops.find(c=>c.id===id);if(state.phase!=='ready'||!crop||(state.seedCounts[id]??0)<=0)return;state.cropId=id;state.quantity=1;evaluate();paint();},setQuantity(value){if(state.phase!=='ready')return;const limit=giftLimit(state.seedCounts[state.cropId]??0);state.quantity=Math.max(1,Math.min(limit,value));evaluate();paint();},send(){void send();},cancel(){if(state.phase!=='sending')void returnFriends();},retry(){if(client.pending?.path==='/v1/gifts'&&JSON.parse(client.pending.body).recipientId===recipientId)void retryPending(ctx);else void loadData(true);},retryLoad(){void loadData(true);}});};ctx.paint=paint;
+ const paint=()=>{if(current())renderGiftComposer(content,modalFooter,catalog,ctx.friend,state,{selectSeed(id){const crop=catalog.crops.find(c=>c.id===id);if(state.phase!=='ready'||!crop||crop.acquisitionSource==='LOGIN_REWARD'||(state.seedCounts[id]??0)<=0)return;state.cropId=id;state.quantity=1;evaluate();paint();},setQuantity(value){if(state.phase!=='ready')return;const limit=giftLimit(state.seedCounts[state.cropId]??0);state.quantity=Math.max(1,Math.min(limit,value));evaluate();paint();},send(){void send();},cancel(){if(state.phase!=='sending')void returnFriends();},retry(){if(client.pending?.path==='/v1/gifts'&&JSON.parse(client.pending.body).recipientId===recipientId)void retryPending(ctx);else void loadData(true);},retryLoad(){void loadData(true);}});};ctx.paint=paint;
  const cooldown=()=>state.gifts?.sent.some(g=>g.recipientId===recipientId&&Date.now()-Date.parse(g.createdAt)<86_400_000)??false;
- const evaluate=()=>{const crop=catalog.crops.find(c=>c.id===state.cropId),stock=state.seedCounts[state.cropId]??0;state.blockedReason=!state.gifts?'Carregando disponibilidade.':client.pending?'Resolva o envio pendente antes de iniciar outro presente.':cooldown()?'Você já presenteou este amigo nas últimas 24 horas.':crop?.vipOnly&&!ctx.friend.vipActive?`${crop.name} exige VIP ativo do seu amigo.`:crop&&typeof ctx.recipientLevel==='number'&&crop.requiredLevel>ctx.recipientLevel?`Seu amigo precisa alcançar o nível ${crop.requiredLevel} para receber ${crop.name}.`:stock<=0?'Esta semente não está mais disponível.':undefined;state.canSend=state.phase==='ready'&&!state.blockedReason&&!!crop&&Number.isInteger(state.quantity)&&state.quantity>=1&&state.quantity<=giftLimit(stock)&&!client.pending&&!client.busy&&!busy;};
+ const evaluate=()=>{const crop=catalog.crops.find(c=>c.id===state.cropId),stock=state.seedCounts[state.cropId]??0;state.blockedReason=!state.gifts?'Carregando disponibilidade.':client.pending?'Resolva o envio pendente antes de iniciar outro presente.':crop?.acquisitionSource==='LOGIN_REWARD'?'Sementes do calendário não podem ser presenteadas.':cooldown()?'Você já presenteou este amigo nas últimas 24 horas.':crop?.vipOnly&&!ctx.friend.vipActive?`${crop.name} exige VIP ativo do seu amigo.`:crop&&typeof ctx.recipientLevel==='number'&&crop.requiredLevel>ctx.recipientLevel?`Seu amigo precisa alcançar o nível ${crop.requiredLevel} para receber ${crop.name}.`:stock<=0?'Esta semente não está mais disponível.':undefined;state.canSend=state.phase==='ready'&&!state.blockedReason&&!!crop&&crop.acquisitionSource!=='LOGIN_REWARD'&&Number.isInteger(state.quantity)&&state.quantity>=1&&state.quantity<=giftLimit(stock)&&!client.pending&&!client.busy&&!busy;};
  refreshDialog=()=>{if(!current()||!own)return;state.seedCounts={...(own.seedCounts??{})};if(!state.pending&&state.phase!=='sending'&&state.phase!=='unknown'){if(state.cropId&&(state.seedCounts[state.cropId]??0)<=0){state.cropId='';state.quantity=1;}else if(state.cropId)state.quantity=Math.min(state.quantity,giftLimit(state.seedCounts[state.cropId]??0)||1);}evaluate();paint();};
  const loadData=async(retry:boolean)=>{if(!current())return;if(retry){state.phase='loading';state.message='Revalidando estoque e disponibilidade…';paint();}try{
    const [gifts,me,target]=await Promise.all([client.get<Gifts>('/v1/gifts'),client.get<Farm>('/v1/me/farm'),client.get<Farm>(`/v1/farms/${recipientId}/visit`)]);
    if(!current())return;if(target.owner!==recipientId)throw new Error('Não foi possível confirmar a fazenda deste amigo.');
-   if(me.owner!==own?.owner)throw new Error('Não foi possível confirmar seu estoque.');updateOwnFarm(me);ctx.friend={...ctx.friend,vipActive:target.vipActive};ctx.recipientLevel=target.level;state.seedCounts={...(own?.seedCounts??me.seedCounts??{})};state.gifts=gifts;const pending=client.pending;state.pending=pending?.path==='/v1/gifts'&&JSON.parse(pending.body).recipientId===recipientId;if(state.pending){state.phase='unknown';state.message='Um envio anterior ainda aguarda confirmação. Recuperar consulta o mesmo pedido; sair não desfaz o envio.';}else{state.phase='ready';state.message=undefined;}const selected=catalog.crops.find(c=>c.id===state.cropId);if(!pending&&(!selected||(state.seedCounts[state.cropId]??0)<=0)){if(!initialized){state.cropId=catalog.crops.find(c=>(state.seedCounts[c.id]??0)>0)?.id??'';state.quantity=1;}else{state.cropId='';state.quantity=1;}}if(!pending)state.quantity=Math.min(state.quantity,giftLimit(state.seedCounts[state.cropId]??0)||1);initialized=true;evaluate();paint();
+   if(me.owner!==own?.owner)throw new Error('Não foi possível confirmar seu estoque.');updateOwnFarm(me);ctx.friend={...ctx.friend,vipActive:target.vipActive};ctx.recipientLevel=target.level;state.seedCounts={...(own?.seedCounts??me.seedCounts??{})};state.gifts=gifts;const pending=client.pending;state.pending=pending?.path==='/v1/gifts'&&JSON.parse(pending.body).recipientId===recipientId;if(state.pending){state.phase='unknown';state.message='Um envio anterior ainda aguarda confirmação. Recuperar consulta o mesmo pedido; sair não desfaz o envio.';}else{state.phase='ready';state.message=undefined;}const selected=catalog.crops.find(c=>c.id===state.cropId);if(!pending&&(!selected||(state.seedCounts[state.cropId]??0)<=0)){if(!initialized){state.cropId=catalog.crops.find(c=>c.acquisitionSource!=='LOGIN_REWARD'&&(state.seedCounts[c.id]??0)>0)?.id??'';state.quantity=1;}else{state.cropId='';state.quantity=1;}}if(!pending)state.quantity=Math.min(state.quantity,giftLimit(state.seedCounts[state.cropId]??0)||1);initialized=true;evaluate();paint();
   }catch(error){if(!current())return;state.phase='load-error';state.pending=client.pending?.path==='/v1/gifts'&&JSON.parse(client.pending.body).recipientId===recipientId;state.canSend=false;state.message=error instanceof Error?`Não foi possível revalidar estoque e requisitos: ${error.message}`:'Não foi possível carregar os presentes.';paint();}};
  ctx.reload=()=>void loadData(true);
  const returnFriends=async()=>{if(!current())return;giftContext=undefined;const focus={friendId:recipientId,scroll:returnScroll};await friends(focus);};
@@ -761,7 +824,7 @@ function presentGift(friend:Friend,returnScroll:number){
 }
 async function migrateAvatar(){const migration=own&&avatarImport(avatarStore,avatarUser,own.avatarSelected,googlePhoto);if(migration)await action(migration);}
 async function connect(user:string,token:()=>Promise<string>,photo?:unknown,displayName=''){
- shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner='';sessionGeneration++;navigationGeneration++;busy=false;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;closeScene();const generation=sessionGeneration;
+ shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner='';sessionGeneration++;navigationGeneration++;busy=false;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;ownServerClock=undefined;stopCalendar();closeScene();const generation=sessionGeneration;
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
  avatarUser=`${config.api}:${user}`;void connectPush(avatarUser,api).catch(()=>{});googlePhoto=googleAvatar(photo);avatarChoice='classic';loadAudioSettings();
  scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>{if(healthPinned&&!(tool==='CURSOR'&&tile.cropId))closeHealth();void tileAction(tile);},(id,pointerType)=>{if(pointerType==='touch'&&tool==='CURSOR'){playAnimalSound(id);animalPopup(id);return;}const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health,syncMusic,()=>{if(healthPinned)closeHealth();},(id,point)=>{if(id&&point){playAnimalSound(id);animalTooltip(id,point);}else animalTooltip(null);});
@@ -798,7 +861,7 @@ async function start(){
   }
  }catch(error){showConnection();notify(error instanceof Error?error.message:'Servidor indisponível.');button('Tentar conectar novamente',start,login);}
 }
-element('notifications').onclick=notifications;
+element('notifications').onclick=notifications;element('calendar').onclick=loginCalendar;
 element('shop').onclick=()=>shop();element('deposit').onclick=deposit;element('missions').onclick=missions;element('friends').onclick=()=>void friends();
 element('home').onclick=()=>{navigationGeneration++;visited=undefined;tool='PLOW';render();};element('settings').onclick=()=>shortcutPanel('Ajustes',settings);element('close-modal').onclick=()=>{if(element('modal-title').textContent==='Presentear'){closeGiftComposer();return;}modal.close();showUpdateNotes();};
 modal.addEventListener('cancel',event=>{if(element('modal-title').textContent!=='Presentear')return;event.preventDefault();closeGiftComposer();});
@@ -808,7 +871,7 @@ element('retry').onclick=()=>retryPending();
 window.addEventListener('offline',()=>showConnection('Sem conexão. Reconecte antes de agir.'));
 window.addEventListener('online',()=>{void refresh();if(api)void reconcilePush(avatarUser,api).catch(()=>{});});
 document.addEventListener('pointerdown',event=>{if(healthPinned&&!element('farm').contains(event.target as Node)&&!element('plant-health').contains(event.target as Node))closeHealth();});
-modal.addEventListener('close',()=>{health(healthTile,healthPoint);window.clearInterval(missionsTimer);missionsTimer=undefined;});
+modal.addEventListener('close',()=>{if(element('modal-title').textContent==='Calendário de Recompensas')stopCalendar();health(healthTile,healthPoint);window.clearInterval(missionsTimer);missionsTimer=undefined;});
 document.addEventListener('keydown',event=>{if(!own||event.repeat||event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement||(event.target as HTMLElement)?.tagName==='TEXTAREA')return;const shortcut=gameShortcut(event.key,!!visited);if(!shortcut)return;if(shortcut.action==='tool'){if(!modal.open)pickTool(shortcut.tool);return;}if(shortcut.action==='shop')shortcutPanel('Loja',()=>shop());else if(shortcut.action==='deposit')shortcutPanel('Depósito',deposit);else if(shortcut.action==='missions')shortcutPanel('Missões',missions);else if(shortcut.action==='plots')shortcutPanel('Terras da fazenda',tileList);else if(shortcut.action==='music')toggleMusic();else if(shortcut.action==='effects')toggleEffects();});
 document.addEventListener('visibilitychange',()=>{syncMusic();if(!document.hidden)void refresh();});
 window.setInterval(()=>{if(!document.hidden)void refresh();},30_000);
