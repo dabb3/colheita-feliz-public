@@ -11,7 +11,7 @@ function panels(){
  const make=tag=>({tag,children:[],attributes:{},textContent:'',style:{setProperty(){}},append(...nodes){this.children.push(...nodes);},prepend(...nodes){this.children.unshift(...nodes);},replaceChildren(){this.children=[];},setAttribute(k,v){this.attributes[k]=v;},getAttribute(k){return this.attributes[k]??null;},contains(node){return nodes(this).includes(node);},focus(){document.activeElement=this;},querySelectorAll(selector){return nodes(this).slice(1).filter(node=>selector==='[data-focus-key]'?node.getAttribute('data-focus-key')!==null:false);}});
  const document={activeElement:null,createElement:make};const ctx={...values,animalPath,productPath,seedArtPath,avatarSource,document};
  const load=name=>readFileSync(new URL('../src/'+name,import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
- runInNewContext(stripTypeScriptTypes(load('ui.ts')+'\n'+load('ui-panels.ts'))+'\nglobalThis.panels={renderDeposit,renderPlantHealth,renderAnimal,renderMissions,renderFriends,renderGiftComposer,giftLimit,renderAudioSettings:typeof renderAudioSettings==="undefined"?undefined:renderAudioSettings};',ctx);
+ runInNewContext(stripTypeScriptTypes(load('ui.ts')+'\n'+load('ui-panels.ts'))+'\nglobalThis.panels={renderDeposit,renderMarket,renderPlantHealth,renderAnimal,renderMissions,renderFriends,renderGiftComposer,renderLoginRewards:typeof renderLoginRewards==="undefined"?undefined:renderLoginRewards,giftLimit,renderAudioSettings:typeof renderAudioSettings==="undefined"?undefined:renderAudioSettings};',ctx);
  return{...ctx.panels,root:make('div'),document};
 }
 function nodes(root){return[root,...root.children.flatMap(child=>typeof child==='object'?nodes(child):[])];}
@@ -82,6 +82,53 @@ test('gift composer restores focused seed and quantity controls after rerender',
  focus('gift-quantity-more');nodes(root).find(node=>node.getAttribute?.('data-focus-key')==='gift-quantity-more').onclick();assert.equal(state.quantity,2);assert.equal(document.activeElement?.getAttribute('data-focus-key'),'gift-quantity-more');
  focus('gift-quantity-more');nodes(root).find(node=>node.getAttribute?.('data-focus-key')==='gift-quantity-more').onclick();nodes(root).find(node=>node.getAttribute?.('data-focus-key')==='gift-quantity-more').onclick();nodes(root).find(node=>node.getAttribute?.('data-focus-key')==='gift-quantity-more').onclick();assert.equal(state.quantity,5);assert.equal(document.activeElement?.getAttribute('data-focus-key'),'gift-quantity-less');
  const outside=document.createElement('button');outside.focus();render();assert.equal(document.activeElement,outside);
+});
+
+test('login calendar renders all server rewards in order with special seed details and accessible states',()=>{
+ const {root,renderLoginRewards}=panels(),gold=[250,500,750,1000,1500,2000,250,500,750,1000,1500,2000,250,500,750,1000,1500,2000,250,500,750,1000,1500,2000,2500,3000];let goldIndex=0;
+ const rewards=Array.from({length:30},(_,index)=>{const day=index+1,isSeed=[7,14,21,30].includes(day);return{day,kind:isSeed?'SEED':'GOLD',currency:isSeed?'GREEN':'GOLD',amount:isSeed?'1':String(gold[goldIndex++]),...({7:{itemId:'semente-bronze'},14:{itemId:'semente-prata'},21:{itemId:'semente-ouro'},30:{itemId:'semente-diamante'}}[day]??{})};});
+ const catalog={crops:[{id:'semente-bronze',name:'Semente de Bronze',spriteStem:'semente-bronze',growthSeconds:86400,seasons:1,cycleRevenueTenths:50,acquisitionSource:'LOGIN_REWARD'},{id:'semente-prata',name:'Semente de Prata',spriteStem:'semente-prata',growthSeconds:129600,seasons:1,cycleRevenueTenths:100,acquisitionSource:'LOGIN_REWARD'},{id:'semente-ouro',name:'Semente de Ouro',spriteStem:'semente-ouro',growthSeconds:172800,seasons:1,cycleRevenueTenths:150,acquisitionSource:'LOGIN_REWARD'},{id:'semente-diamante',name:'Semente de Diamante',spriteStem:'semente-diamante',growthSeconds:259200,seasons:1,cycleRevenueTenths:200,acquisitionSource:'LOGIN_REWARD'}]};
+ renderLoginRewards(root,{completedDay:6,nextDay:7,available:true,streakReset:false,nextResetAt:'2026-11-16T03:00:00Z',rewards},catalog,{phase:'ready',pending:false,recoverable:false,busy:false,refreshing:false,online:true,countdown:'15 h 00 min 00 s'}, {claim(){},retry(){},refresh(){}});
+ const all=nodes(root),cards=all.filter(n=>n.className?.includes('login-reward-card'));assert.equal(cards.length,30);assert.deepEqual(cards.map(n=>n.getAttribute('aria-label')?.match(/Dia (\d+)/)?.[1]),Array.from({length:30},(_,i)=>String(i+1)));
+ assert.ok(nodes(cards[6]).some(n=>n.textContent.includes('Semente de Bronze')));assert.ok(nodes(cards[6]).some(n=>n.textContent.includes('1 d')));assert.ok(nodes(cards[6]).some(n=>n.textContent.includes('5 verdes')));assert.ok(nodes(cards[6]).some(n=>n.textContent==='Disponível'));
+ assert.ok(nodes(cards[5]).some(n=>n.textContent==='Concluído'));assert.ok(nodes(cards[7]).some(n=>n.textContent==='Futuro'));assert.equal(all.find(n=>n.textContent==='Resgatar recompensa').disabled,false);
+ for(const [day,name,payout,growth]of [[14,'Semente de Prata','10 verdes','1 d 12 h'],[21,'Semente de Ouro','15 verdes','2 d'],[30,'Semente de Diamante','20 verdes','3 d']]){const card=cards[day-1];assert.ok(nodes(card).some(n=>n.textContent.includes(name)));assert.ok(nodes(card).some(n=>n.textContent.includes(payout)));assert.ok(nodes(card).some(n=>n.textContent.includes(growth)));}
+ assert.ok(all.some(n=>n.textContent==='Se perder um dia, sua sequência volta ao início.'));
+});
+
+test('login calendar preserves panel scroll, retains controls focus, and moves disabled claim focus to summary',()=>{
+ const {root,renderLoginRewards,document}=panels();root.contains=node=>node===root||nodes(root).includes(node);root.scrollTop=88;
+ const status={completedDay:0,nextDay:1,available:true,streakReset:false,nextResetAt:'2026-11-16T03:00:00Z',rewards:[{day:1,kind:'GOLD',currency:'GOLD',amount:'250'}]},catalog={crops:[]},state={phase:'ready',pending:false,recoverable:false,busy:false,refreshing:false,online:true,countdown:'1 h 00 min 00 s'},actions={claim(){},retry(){},refresh(){}};
+ const render=()=>renderLoginRewards(root,status,catalog,state,actions);render();
+ const claim=nodes(root).find(n=>n.getAttribute?.('data-focus-key')==='login-rewards-claim');document.activeElement=claim;
+ render();assert.equal(document.activeElement.getAttribute('data-focus-key'),'login-rewards-claim');assert.equal(root.scrollTop,88);
+ status.available=false;render();assert.equal(document.activeElement.getAttribute('data-focus-key'),'login-rewards-heading');assert.equal(root.scrollTop,88);
+ const outside=document.createElement('button');outside.focus();render();assert.equal(document.activeElement,outside);
+ const countdown=nodes(root).find(n=>n.className==='login-rewards-countdown');assert.equal(countdown.getAttribute('aria-live'),'off');assert.equal(countdown.getAttribute('role'),'timer');
+});
+
+test('calendar entry uses the existing mobile more menu and modal scrolls on short screens',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8'),mobile=readFileSync(new URL('../src/mobile.ts',import.meta.url),'utf8'),css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
+ assert.match(html,/id="calendar"/);assert.match(mobile,/\['notifications', 'friends', 'settings', 'calendar'\]/);assert.match(css,/\.login-calendar-dialog #modal-content\{[^}]*overflow:auto/);assert.match(css,/@media\(max-width:380px\)\{\.login-rewards-grid\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+});
+
+test('shop excludes login reward crops while catalog crops remain available for planting and deposit',()=>{
+ const {root,renderMarket}=panels();let seen=[];
+ renderMarket(root,{crops:[{id:'normal',name:'Normal',spriteStem:'normal',seedPrices:{GOLD:5},acquisitionSource:'SHOP',vipOnly:false,requiredLevel:1},{id:'semente-bronze',name:'Semente de Bronze',spriteStem:'semente-bronze',seedPrices:{},acquisitionSource:'LOGIN_REWARD',vipOnly:false,requiredLevel:1}],animals:[],fertilizers:[],feedPrices:{},vip:{greenPrice:1}},undefined,'crops','common',()=>{},fields=>seen.push(fields));
+ assert.equal(nodes(root).filter(n=>n.className?.split(/\s+/).includes('market-card')).length,1);assert.ok(nodes(root).some(n=>n.textContent==='Normal'));assert.ok(!nodes(root).some(n=>n.textContent==='Semente de Bronze'));
+});
+
+test('gift composer excludes login reward crops but does not mutate catalog selection',()=>{
+ const {root,renderGiftComposer}=panels(),footer={...root,children:[],replaceChildren(...items){this.children=items;}};
+ const catalog={crops:[{id:'normal',name:'Normal',spriteStem:'normal',acquisitionSource:'SHOP'},{id:'semente-bronze',name:'Semente de Bronze',spriteStem:'semente-bronze',acquisitionSource:'LOGIN_REWARD'}]};
+ renderGiftComposer(root,footer,catalog,{id:'friend',name:'Sam'},{phase:'ready',cropId:'normal',quantity:1,seedCounts:{normal:2,'semente-bronze':1},gifts:{received:[],sent:[]},canSend:true},{selectSeed(){},setQuantity(){},send(){},cancel(){},retry(){}});
+ assert.ok(nodes(root).some(n=>n.textContent.includes('Normal · 2 no estoque')));assert.ok(!nodes(root).some(n=>n.textContent.includes('Semente de Bronze')));
+});
+
+test('deposit seed inventory keeps login reward crops visible',()=>{
+ const {root,renderDeposit}=panels(),crop={id:'semente-bronze',name:'Semente de Bronze',spriteStem:'semente-bronze',acquisitionSource:'LOGIN_REWARD'};
+ renderDeposit(root,{crops:[crop],animals:[],fertilizers:[],feedPrices:{},vip:{greenPrice:1}},{seedCounts:{'semente-bronze':1}},'seeds',()=>{},()=>{});
+ assert.ok(nodes(root).some(node=>node.textContent==='Semente de Bronze'));assert.ok(!nodes(root).some(node=>node.textContent==='Nenhuma semente armazenada.'));
 });
 
 test('audio controls keep separate channel toggles and volume',()=>{

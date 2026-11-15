@@ -140,6 +140,8 @@ export class ApiClient {
       );
       if (pending.path === "/v1/gifts" && typeof response?.result?.success !== "boolean")
         throw new Error("A resposta não confirmou o resultado do presente.");
+      if (pending.path === "/v1/me/actions" && JSON.parse(pending.body).action === "CLAIM_LOGIN_REWARD" && typeof response?.result?.success !== "boolean")
+        throw new Error("A resposta não confirmou o resgate da recompensa.");
       this.clear(pending);
       return response;
     } catch (error) {

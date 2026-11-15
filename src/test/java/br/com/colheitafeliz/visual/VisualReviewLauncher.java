@@ -86,7 +86,10 @@ public final class VisualReviewLauncher {
             rich.progress().award(60);
             rich.progress().award(80);
             rich.refresh();
-            for (CropType crop : catalog.all()) if (crop.requiredLevel() <= 3) rich.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot(crop.id(), br.com.colheitafeliz.domain.economy.Currency.GOLD, crop.seedPrice().getValue(), 2, false));
+            for (CropType crop : catalog.all()) if (crop.acquisitionSource()
+                    == br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP && crop.requiredLevel() <= 3)
+                rich.inventory().addProduceLot(new br.com.colheitafeliz.domain.inventory.ItemLot(crop.id(),
+                        br.com.colheitafeliz.domain.economy.Currency.GOLD, crop.seedPrice().getValue(), 2, false));
             for (int i = 0; i < 4; i++) rich.buySeed(catalog.get("nabo"));
             rich.dailyMissions().record("buy", 3, rich.dailyMissions().day());
             rich.dailyMissions().record("plant", 1, rich.dailyMissions().day());

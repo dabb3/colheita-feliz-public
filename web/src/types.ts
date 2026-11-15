@@ -70,6 +70,14 @@ export interface Farm {
   feed?: Record<string, number>;
   fertilizers?: Record<string, number>;
   dailyAllowance?: { amount: string; available: boolean; nextResetAt: string };
+  loginRewards?: {
+    completedDay: number;
+    nextDay: number;
+    available: boolean;
+    streakReset: boolean;
+    nextResetAt: string;
+    rewards: { day: number; kind: "GOLD" | "SEED"; currency: "GOLD" | "GREEN"; amount: string; itemId?: string }[];
+  };
   tutorial?: { title?: string; hint?: string };
   tutorialStep?: number;
   tutorialTotal?: number;
@@ -106,6 +114,8 @@ export interface Crop {
   requiredLevel: number;
   vipOnly: boolean;
   seedPrices: Record<string, number>;
+  acquisitionSource?: "SHOP" | "LOGIN_REWARD";
+  cycleRevenueTenths?: number;
 }
 export interface AnimalType {
   id: string;

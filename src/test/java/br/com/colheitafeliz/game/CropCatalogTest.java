@@ -25,15 +25,19 @@ class CropCatalogTest {
 
     @Test void catalogHasTheThirtyThreeOriginalCropsAndPermanentMiniBis() throws IOException {
         List<Row> rows = normativeRows();
+        var shopCrops = catalog.all().stream().filter(crop -> crop.acquisitionSource()
+                == br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP).toList();
         assertEquals(34, rows.size(), "33 culturas originais e Mini-Bis permanente");
-        assertEquals(rows.stream().map(Row::name).toList(), catalog.all().stream().map(CropType::name).toList());
+        assertEquals(rows.stream().map(Row::name).toList(), shopCrops.stream().map(CropType::name).toList());
         for (String legacy : new String[]{"arroz", "repolho", "girassol"})
             assertThrows(IllegalArgumentException.class, () -> catalog.get(legacy), legacy);
     }
 
     @Test void everyCropMatchesItsRowOfTheRule() throws IOException {
         for (Row row : normativeRows()) {
-            CropType type = catalog.all().stream().filter(crop -> crop.name().equals(row.name())).findFirst().orElseThrow();
+            CropType type = catalog.all().stream().filter(crop -> crop.acquisitionSource()
+                    == br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP)
+                    .filter(crop -> crop.name().equals(row.name())).findFirst().orElseThrow();
             String id = type.id();
             assertEquals(row.vip(), type.vipOnly(), id);
             assertEquals(row.level(), type.requiredLevel(), id);

@@ -73,6 +73,8 @@ public final class Market {
 
     /** Compra uma semente na moeda pedida; o lote guarda moeda, preço e exclusividade VIP para a venda. */
     public void buySeed(CropType type, Currency currency) {
+        if (type.acquisitionSource() != br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP)
+            throw new IllegalArgumentException(type.id() + " is not sold");
         BigDecimal price = type.seedPrices().get(currency);
         if (price == null) throw new IllegalArgumentException(type.id() + " is not sold for " + currency);
         Math.addExact(inventory.seeds(type), 1);

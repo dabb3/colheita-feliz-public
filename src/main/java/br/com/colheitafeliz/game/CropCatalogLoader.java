@@ -7,6 +7,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import com.google.gson.JsonParser;
+import br.com.colheitafeliz.domain.inventory.AcquisitionSource;
 
 public final class CropCatalogLoader {
     private CropCatalogLoader() {}
@@ -24,7 +26,19 @@ public final class CropCatalogLoader {
     /** Lê um catálogo em JSON; qualquer linha inválida recusa o catálogo inteiro, sem cultura padrão. */
     static CropCatalog load(java.io.Reader reader) {
         try {
-            CropType[] crops = new Gson().fromJson(reader, CropType[].class);
+            var json = JsonParser.parseReader(reader);
+            if (!json.isJsonArray()) throw new IllegalArgumentException("Crop catalog must be an array");
+            for (var item : json.getAsJsonArray()) {
+                if (!item.isJsonObject()) throw new IllegalArgumentException("Invalid crop entry");
+                var object = item.getAsJsonObject();
+                if (object.has("acquisitionSource")) {
+                    var source = object.get("acquisitionSource");
+                    if (!source.isJsonPrimitive() || !source.getAsJsonPrimitive().isString())
+                        throw new IllegalArgumentException("Invalid acquisition source");
+                    AcquisitionSource.valueOf(source.getAsString());
+                }
+            }
+            CropType[] crops = new Gson().fromJson(json, CropType[].class);
             if (crops == null) throw new IllegalArgumentException("Empty crop catalog");
             return new CropCatalog(Arrays.asList(crops));
         } catch (RuntimeException e) {

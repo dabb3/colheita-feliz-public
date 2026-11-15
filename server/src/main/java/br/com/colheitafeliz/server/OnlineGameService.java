@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.math.BigDecimal;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.HexFormat;
@@ -30,6 +31,7 @@ import static br.com.colheitafeliz.server.OnlineViews.object;
 
 final class OnlineGameService implements AutoCloseable {
     private static final BigDecimal DAILY_ALLOWANCE = BigDecimal.valueOf(100);
+    private static final ZoneId LOGIN_REWARD_ZONE = ZoneId.of("America/Sao_Paulo");
     private static final Set<String> PEST_ACTIONS = Set.of("SPREAD_INSECTS", "SPREAD_WEEDS");
     // Decisão de 2026-11-13: furto e cada tipo de praga liberam uma nova tentativa a cada 6 horas.
     static final Duration THEFT_COOLDOWN = Duration.ofHours(6), PEST_COOLDOWN = Duration.ofHours(6), GIFT_COOLDOWN = Duration.ofHours(24);
@@ -52,6 +54,7 @@ final class OnlineGameService implements AutoCloseable {
     OnlineGameService(JdbcOnlineStore store, Clock clock, RandomSource random, int limit,PublishedNotes publishedNotes) {
         this.store = store; this.clock = clock; this.random = random; this.limit = limit;
         this.publishedNotes=publishedNotes;
+        LoginRewardCalendar.requireCrops(catalog);
     }
 
     record AutomationOffer(String id,String name,String description,BigDecimal greenPrice,int durationDays) {}
@@ -119,6 +122,26 @@ final class OnlineGameService implements AutoCloseable {
                         tx.recordAllowance(actor, today);
                         farm = new Loaded(farm.owner(), farm.name(), farm.game(), farm.revision(), farm.before(), today);
                         result = ActionResult.ok("Ajuda diária resgatada: +100 ouro.");
+                    }
+                } else if (command.action().equals("CLAIM_LOGIN_REWARD")) {
+                    var previous = tx.loginRewardProgress(actor);
+                    LocalDate today = LocalDate.ofInstant(clock.instant(), LOGIN_REWARD_ZONE);
+                    var next = LoginRewardCalendar.nextDay(previous == null ? null : previous.lastClaimDate(),
+                            previous == null ? 0 : previous.completedDay(), today);
+                    if (!next.available()) {
+                        result = ActionResult.fail("A recompensa do calendário já foi resgatada nesta data de São Paulo.");
+                    } else {
+                        var reward = LoginRewardCalendar.reward(next.day());
+                        if (reward.kind().equals("SEED")) result = farm.game().grantLoginRewardSeed(reward.itemId());
+                        else {
+                            farm.game().wallet().credit(Currency.GOLD, new BigDecimal(reward.amount()));
+                            result = ActionResult.ok("Recompensa do calendário resgatada: +" + reward.amount() + " ouro.");
+                        }
+                        if (result.success()) {
+                            long cycle = previous == null ? 1 : previous.cycle() + (next.day() == 1 ? 1 : 0);
+                            long total = previous == null ? 1 : previous.totalClaims() + 1;
+                            tx.recordLoginRewardProgress(actor, today, next.day(), cycle, total, clock.instant());
+                        }
                     }
                 } else result = act(farm.game(), command);
                 return object("result", result, "farm", persist(tx, farm, true, true));
@@ -374,8 +397,27 @@ final class OnlineGameService implements AutoCloseable {
             LocalDate resetDay = (available ? today : loaded.allowanceDay()).plusDays(1);
             view.add("dailyAllowance", object("amount", DAILY_ALLOWANCE.toPlainString(), "available", available,
                     "nextResetAt", resetDay.atStartOfDay(ZoneOffset.UTC).toInstant().toString()));
+            view.add("loginRewards", loginRewardView(tx, loaded.owner()));
         }
         return view;
+    }
+
+    private JsonObject loginRewardView(JdbcOnlineStore.Tx tx, UUID owner) {
+        Instant now = clock.instant();
+        LocalDate today = LocalDate.ofInstant(now, LOGIN_REWARD_ZONE);
+        var progress = tx.loginRewardProgress(owner);
+        var next = LoginRewardCalendar.nextDay(progress == null ? null : progress.lastClaimDate(),
+                progress == null ? 0 : progress.completedDay(), today);
+        var rewards = new JsonArray();
+        for (var reward : LoginRewardCalendar.rewards()) {
+            var item = object("day", reward.day(), "kind", reward.kind(), "currency", reward.currency(), "amount", reward.amount());
+            if (reward.itemId() != null) item.addProperty("itemId", reward.itemId());
+            rewards.add(item);
+        }
+        int completedDay = progress == null || next.available() && next.day() == 1 ? 0 : progress.completedDay();
+        return object("completedDay", completedDay, "nextDay", next.day(),
+                "available", next.available(), "streakReset", next.streakReset(),
+                "nextResetAt", today.plusDays(1).atStartOfDay(LOGIN_REWARD_ZONE).toInstant().toString(), "rewards", rewards);
     }
 
     private static JdbcOnlineStore.Player active(JdbcOnlineStore.Tx tx, UUID actor) {

@@ -150,6 +150,7 @@ export function renderMarket(
   const entries =
     category === "crops"
       ? catalog.crops
+          .filter((c) => c.acquisitionSource !== "LOGIN_REWARD")
           .filter((c) => c.vipOnly === (seedGroup === "vip"))
           .map((c) => ({
             id: c.id,

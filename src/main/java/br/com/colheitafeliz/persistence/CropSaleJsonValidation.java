@@ -27,22 +27,38 @@ public final class CropSaleJsonValidation {
     }
 
     public static void validateTerms(GameSnapshot snapshot) {
-        for (var seed : snapshot.seeds()) if (seed.cropSale() != null)
-            throw new IllegalArgumentException("Seed cannot contain crop sale metadata");
-        for (var product : snapshot.produce()) validateTerms(product, false);
-        for (var tile : snapshot.tiles()) if (tile.origin() != null && tile.origin().cropSale() != null) {
-            validateTerms(tile.origin(), true);
-            if (!tile.origin().itemId().equals(tile.cropId()) || tile.origin().quantity() != 1
-                    || tile.season() < 1 || tile.season() > tile.origin().cropSale().seasons())
-                throw new IllegalArgumentException("Inconsistent plant sale metadata");
+        for (var seed : snapshot.seeds()) {
+            Authority.CATALOG.get(seed.itemId()).validateSaleTerms(seed);
+            if (seed.cropSale() != null) throw new IllegalArgumentException("Seed cannot contain crop sale metadata");
         }
-        for (var animal : snapshot.animals()) if (animal.origin().cropSale() != null)
-            throw new IllegalArgumentException("Animal cannot contain crop sale metadata");
+        for (var product : snapshot.produce()) validateTerms(product, false);
+        for (var tile : snapshot.tiles()) {
+            if (tile.cropId() != null && tile.state() != br.com.colheitafeliz.domain.farm.TileState.DEAD) {
+                var crop = Authority.CATALOG.get(tile.cropId());
+                if (tile.origin() != null && tile.origin().cropSale() != null) {
+                    validateTerms(tile.origin(), true);
+                    if (!tile.origin().itemId().equals(tile.cropId()) || tile.origin().quantity() != 1
+                            || tile.season() < 1 || tile.season() > tile.origin().cropSale().seasons())
+                        throw new IllegalArgumentException("Inconsistent plant sale metadata");
+                }
+                if (crop.acquisitionSource() == br.com.colheitafeliz.domain.inventory.AcquisitionSource.LOGIN_REWARD
+                        && (tile.origin() == null || tile.origin().cropSale() == null
+                        || tile.origin().cropSale().seasonIndex() != 0 || tile.season() != 1))
+                    throw new IllegalArgumentException("Reward crop plant is missing sale metadata");
+            }
+        }
+        for (var animal : snapshot.animals()) {
+            if (animal.origin().acquisitionSource() != br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP)
+                throw new IllegalArgumentException("Animal cannot contain login reward origin");
+            if (animal.origin().cropSale() != null) throw new IllegalArgumentException("Animal cannot contain crop sale metadata");
+        }
     }
 
     private static void validateTerms(ItemLot lot, boolean plant) {
-        if (lot.cropSale() == null) return;
+        if (lot.cropSale() == null && lot.acquisitionSource()
+                == br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP) return;
         Authority.CATALOG.get(lot.itemId()).validateSaleTerms(lot);
+        if (lot.cropSale() == null) return;
         if ((lot.cropSale().seasonIndex() == 0) != plant)
             throw new IllegalArgumentException("Product/plant sale index mismatch");
     }
@@ -52,6 +68,29 @@ public final class CropSaleJsonValidation {
     }
 
     private static void validateLot(JsonObject lot) {
+        boolean loginReward = lot.has("acquisitionSource") && lot.get("acquisitionSource").isJsonPrimitive()
+                && "LOGIN_REWARD".equals(lot.get("acquisitionSource").getAsString());
+        if (lot.has("acquisitionSource")) {
+            var source = lot.get("acquisitionSource");
+            if (source == null || !source.isJsonPrimitive() || !source.getAsJsonPrimitive().isString()
+                    || !java.util.Set.of("SHOP", "LOGIN_REWARD").contains(source.getAsString()))
+                throw new IllegalArgumentException("Invalid acquisition source");
+        }
+        if (loginReward) {
+            integer(lot, "quantity");
+            var vipOnly = lot.get("vipOnly");
+            if (vipOnly == null || !vipOnly.isJsonPrimitive() || !vipOnly.getAsJsonPrimitive().isBoolean()
+                    || vipOnly.getAsBoolean()) throw new IllegalArgumentException("Invalid reward VIP marker");
+            var currency = lot.get("currency");
+            var cost = lot.get("unitCost");
+            if (currency == null || !currency.isJsonPrimitive() || !"GREEN".equals(currency.getAsString())
+                    || cost == null || !cost.isJsonPrimitive() || !cost.getAsJsonPrimitive().isNumber()
+                    || cost.getAsBigDecimal().signum() != 0)
+                throw new IllegalArgumentException("Invalid reward lot cost");
+            var animalSale = lot.get("animalSale");
+            if (animalSale != null && !animalSale.isJsonNull())
+                throw new IllegalArgumentException("Login reward cannot contain animal sale terms");
+        }
         if (lot.has("economyVersion")) integer(lot, "economyVersion");
         var terms = lot.get("cropSale");
         if (terms == null || terms.isJsonNull()) return; // ItemLot checks the explicit version marker.

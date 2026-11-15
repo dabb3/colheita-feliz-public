@@ -2,6 +2,7 @@ package br.com.colheitafeliz.server;
 
 import br.com.colheitafeliz.domain.animal.AnimalType;
 import br.com.colheitafeliz.domain.economy.Currency;
+import br.com.colheitafeliz.domain.inventory.AcquisitionSource;
 import br.com.colheitafeliz.game.CropCatalogLoader;
 import br.com.colheitafeliz.game.GameState;
 import com.google.gson.JsonObject;
@@ -137,7 +138,8 @@ class CropEconomyFaithfulSimulationTest {
                 String state = tile(i).get("state").getAsString();
                 if (state.equals("GRASS") || state.equals("DEAD")) assertTrue(action("PLOW", null, null, i % 6, i / 6));
                 if (tile(i).get("state").getAsString().equals("PLOWED")) {
-                    var seed = catalog.all().stream().filter(type -> !type.vipOnly() && type.requiredLevel() <= own.get("level").getAsInt()
+                    var seed = catalog.all().stream().filter(type -> type.acquisitionSource() == AcquisitionSource.SHOP
+                            && !type.vipOnly() && type.requiredLevel() <= own.get("level").getAsInt()
                             && type.seedPrice().getValue().compareTo(balance("coins")) <= 0).reduce((first, second) -> second);
                     if (seed.isPresent()) {
                         assertTrue(action("BUY_SEED", seed.get().id(), "GOLD", null, null));

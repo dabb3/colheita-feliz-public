@@ -26,6 +26,7 @@ const prices = (values: Record<string, number | undefined>) =>
 const catalog: Catalog = {
   crops: crops.map((crop) => ({
     ...crop,
+    acquisitionSource: crop.acquisitionSource === "LOGIN_REWARD" ? "LOGIN_REWARD" as const : "SHOP" as const,
     seedPrices: prices(crop.seedPrices),
   })),
   animals: animals.map((animal) => ({
