@@ -33,7 +33,10 @@ final class OnlineGameService implements AutoCloseable {
     private static final Set<String> PEST_ACTIONS = Set.of("SPREAD_INSECTS", "SPREAD_WEEDS");
     // Decisão de 2026-11-13: furto e cada tipo de praga liberam uma nova tentativa a cada 6 horas.
     static final Duration THEFT_COOLDOWN = Duration.ofHours(6), PEST_COOLDOWN = Duration.ofHours(6);
-    private static final Set<String> VISIT_ACTIONS = Set.of("STEAL", "LOVE", "SPREAD_INSECTS", "SPREAD_WEEDS");
+    private static final Set<String> VISIT_ACTIONS = Set.of("STEAL", "LOVE", "SPREAD_INSECTS", "SPREAD_WEEDS", "CLEAN_WEEDS", "CLEAN_INSECTS");
+    private static final Set<String> CLEAN_ACTIONS = Set.of("CLEAN_WEEDS", "CLEAN_INSECTS");
+    // Orçamento de XP cooperativo por visitante e dia UTC, compartilhado pelas ações de ajuda a amigos.
+    static final int CLEAN_XP = 2, COOPERATIVE_XP_DAILY_CAP = 20;
     private record Loaded(UUID owner, String name, GameState game, long revision, GameSnapshot before, LocalDate allowanceDay) {}
     private final JdbcOnlineStore store;
     private final PublishedNotes publishedNotes;
@@ -232,6 +235,13 @@ final class OnlineGameService implements AutoCloseable {
                                 : visits.spreadWeeds(destination.game(), visitor.game(), command.column(), command.row(), season);
                         if (result.success()) tx.recordPest(actor, command.action(), now);
                     }
+                } else if (CLEAN_ACTIONS.contains(command.action())) {
+                    // The actor lock serializes this read-modify-write of the daily cooperative budget.
+                    LocalDate today = LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC);
+                    int xp = Math.max(0, Math.min(CLEAN_XP, COOPERATIVE_XP_DAILY_CAP - tx.cooperativeXp(actor, today)));
+                    result = visits.cleanPest(destination.game(), visitor.game(), command.column(), command.row(), season,
+                            command.action().equals("CLEAN_INSECTS"), xp);
+                    if (result.success() && xp > 0) tx.addCooperativeXp(actor, today, xp);
                 } else {
                     result = visits.fertilizeVisit(destination.game(), visitor.game(), command.column(), command.row(), "amor", season);
                 }
@@ -266,7 +276,7 @@ final class OnlineGameService implements AutoCloseable {
         var saved = tx.farm(owner);
         Instant now = saved != null && clock.instant().isBefore(saved.time()) ? saved.time() : clock.instant();
         var fixed = Clock.fixed(now, ZoneOffset.UTC);
-        GameState game = saved == null ? new GameState(fixed::instant, fixed, catalog, random)
+        GameState game = saved == null ? GameState.newOnline(fixed, catalog, random)
                 : GameState.restoreOnline(saved.time(),now,catalog,saved.snapshot(),random);
         if (saved == null) game.startNewFarm();
         game.refresh(); game.protectedPlots();

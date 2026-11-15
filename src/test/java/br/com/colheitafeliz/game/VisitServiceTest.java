@@ -52,6 +52,42 @@ class VisitServiceTest {
         assertEquals(TileState.GRASS, owner.farm().tile(1, 0).state());
     }
 
+    @Test void visitorCleaningUsesOwnerPestLogicAndRewardsOnlyTheVisitor() {
+        var helper = GameState.newOnline(clock, CropCatalogLoader.load(), bound -> bound - 1);
+        var tile = plant("morango", false);
+        tile.water(clock.instant());
+        assertTrue(visits.spreadInsects(owner, visitor, 0, 0, tile.harvestRevision()).success());
+        assertTrue(visits.spreadWeeds(owner, visitor, 0, 0, tile.harvestRevision()).success());
+        tile.observePestArrivals(clock.instant());
+        var ownerXp = owner.progress().currentXp();
+        var ownerInventory = owner.inventory().fertilizerSnapshot();
+        var xp = helper.progress().currentXp();
+        var nature = helper.dailyMissions().missions().getLast();
+        var weeds = visits.cleanPest(owner, helper, 0, 0, tile.harvestRevision(), false, 2);
+        assertTrue(weeds.success(), weeds.message());
+        assertEquals(br.com.colheitafeliz.domain.farm.PestState.NONE, tile.pest());
+        assertNull(tile.weedsSince());
+        assertNotNull(tile.insectsSince());
+        assertTrue(tile.crop().paused());
+        assertEquals(0, xp.add(BigDecimal.valueOf(2)).compareTo(helper.progress().currentXp()));
+        assertEquals(1, helper.dailyMissions().progress(nature));
+        var replay = visits.cleanPest(owner, helper, 0, 0, tile.harvestRevision(), false, 2);
+        assertFalse(replay.success());
+        assertEquals(1, helper.dailyMissions().progress(nature));
+        var green = helper.greenCoins();
+        var insects = visits.cleanPest(owner, helper, 0, 0, tile.harvestRevision(), true, 0);
+        assertTrue(insects.success());
+        assertTrue(insects.message().contains("sem XP"), insects.message());
+        assertEquals(0, xp.add(BigDecimal.valueOf(2)).compareTo(helper.progress().currentXp()));
+        assertNull(tile.insectsSince());
+        assertFalse(tile.crop().paused());
+        assertTrue(helper.dailyMissions().completed(nature));
+        assertEquals(0, green.add(BigDecimal.ONE).compareTo(helper.greenCoins()));
+        assertEquals(ownerXp, owner.progress().currentXp());
+        assertEquals(ownerInventory, owner.inventory().fertilizerSnapshot());
+        assertTrue(owner.dailyMissions().completedSnapshot().isEmpty());
+    }
+
     @Test void visitorPestsRejectEmptyUnwateredMatureAndStaleTargets() {
         assertFalse(visits.spreadInsects(owner, visitor, 0, 0, 0).success());
         var tile = plant("nabo", false);

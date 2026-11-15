@@ -54,6 +54,10 @@ test('missions and friends use text nodes and retain target identity',()=>{
  const visits=[];renderFriends(root,[{id:'bob',name:'<Carlos>'}],id=>visits.push(id));
  nodes(root).find(n=>n.textContent==='Visitar <Carlos>').onclick();assert.deepEqual(visits,['bob']);
 });
+test('missions show partial progress against the target',()=>{
+ const {root,renderMissions}=panels();renderMissions(root,{missions:[{id:'nature',title:'Amigo da Natureza',green:0,progress:1,target:2,done:false}]});
+ assert.ok(nodes(root).some(n=>n.textContent==='1/2'));assert.ok(nodes(root).some(n=>n.textContent==='Em andamento'));
+});
 
 test('audio controls keep separate channel toggles and volume',()=>{
  const {root,renderAudioSettings}=panels(),changes=[];

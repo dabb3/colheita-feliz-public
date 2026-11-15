@@ -586,6 +586,13 @@ export function tileCommand(
   return fields;
 }
 
+/** Ferramentas de limpeza na visita só valem em plantas que mostram a praga correspondente. */
+export function visitCleanAvailable(tool: string, tile: Tile) {
+  if (tool === "CLEAN_WEEDS") return tile.weeds;
+  if (tool === "CLEAN_INSECTS") return tile.insects > 0;
+  return false;
+}
+
 export function animalStatusText(
   status: string,
   kind: string,
