@@ -429,6 +429,12 @@ Abrir o jogo, visitar, concluir tutorial ou consultar a fazenda não paga a ajud
 
 O servidor persiste o último dia pago junto com o crédito, sem confiar no relógio ou em valores enviados pelo cliente. Repetição, pedidos simultâneos, logout e reinício não pagam novamente. Retrocesso do relógio não reabre dia já resgatado. Uma transação revertida preserva o saldo e a disponibilidade.
 
+### 12.2. Missões cooperativas online
+
+Somente o online mostra missões cooperativas; o desktop não tem amigos e continua com as duas tarefas acima. São duas: **Amigo da Natureza**, remover 2 pragas (ervas ou insetos) em fazendas de amigos, com progresso parcial persistido (seção 13.2), e **Amigo dos Animais**, alimentar 1 animal faminto de um amigo (seção 13.3). Nenhuma paga verdes próprios.
+
+As missões cooperativas não pagam verdes individualmente. Um **bônus cooperativo de 1 verde** é pago uma única vez por dia UTC, quando todas as missões cooperativas da lista estiverem concluídas. A lista é definida por dados em `DailyMissionBoard.COOPERATIVE` e contém as duas missões, então o bônus exige ambas. Um save do mesmo dia em que o bônus já foi pago só com Amigo da Natureza (antes de Amigo dos Animais existir) continua válido e não paga outro bônus. Decisão do dono do produto: com o bônus, o total online de verdes de tarefas e missões chega a 3 por dia UTC; o limite de 2 verdes acima vale para as tarefas solo.
+
 ## 13. Furto de temporadas
 
 Regra vigente (decisão de 2026-11-13): cinco minutos de exclusividade por temporada e uma tentativa consumida por jogador a cada 6 horas. Histórico: a decisão de 2026-11-09 fixava essa espera em 24 horas. O limite é consumido por furto bem-sucedido ou tentativa válida contra terra protegida, com ou sem mordida. Não há imunidade para iniciantes.
@@ -456,6 +462,18 @@ Durante a visita a um amigo, o jogador pode escolher uma planta e lançar uma mi
 A planta precisa estar em crescimento, já ter recebido a primeira rega e ocupar terreno sem proteção. Plantas prontas, mortas, terras vazias, fazenda própria e terrenos protegidos recusam a ação. Cinco protetores ativos bloqueiam todas as aplicações, conforme 4.3. Solo seco não impede a aplicação após o início do crescimento. Erva e minhoca podem coexistir; não se pode reaplicar um tipo que a planta já tem. Uma aplicação de inseto começa com uma minhoca, sujeita à multiplicação normal até o limite existente.
 
 As pragas pausam o crescimento sem apagar o progresso. O dono usa herbicida para remover ervas e pesticida para remover insetos; se os dois tipos estiverem presentes, só retoma após remover ambos. A limpeza não renova o limite do visitante. Lançar praga não custa moedas ou itens, não concede XP, moedas, tarefas ou produtos e não consome o limite de furto. A janela de cinco minutos da colheita permanece: planta pronta não recebe pragas.
+
+### 13.2. Limpeza feita por visitantes
+
+No online, durante a visita a um amigo ativo, o visitante pode remover ervas (`CLEAN_WEEDS`) ou insetos (`CLEAN_INSECTS`) de uma planta do dono. A remoção usa a mesma lógica de domínio do herbicida e do pesticida do dono, inclusive a limpeza dos horários de chegada usados pelo removedor automático VIP. Ninguém gasta itens. O dono não recebe XP nem progresso de missão; o visitante recebe **2 XP** por limpeza bem-sucedida e 1 ponto na missão Amigo da Natureza.
+
+O XP cooperativo tem teto de **20 XP por visitante por dia UTC**, compartilhado com a alimentação de animais de amigos (seção 13.3). Atingido o teto, a limpeza continua funcionando e contando para a missão, mas concede 0 XP e avisa o jogador. Terrenos protegidos também aceitam limpeza, porque a proteção só impede furto e pragas; as recusas usam a mesma mensagem com ou sem proteção. Planta sem a praga escolhida, temporada desatualizada ou repetição do mesmo pedido não concedem XP nem progresso.
+
+### 13.3. Alimentação feita por visitantes
+
+No online, durante a visita a um amigo ativo, o visitante pode alimentar (FEED_ANIMAL) um animal faminto do dono, escolhendo o tipo de animal e a ração. A ração sai do inventário do **visitante**; o estoque do dono não muda. A alimentação usa a mesma regra do dono: só animal com fome, sem antecipar nem acumular duração; produtor pronto, adulto em crescimento e protetor expirado recusam. Animais de produção aceitam ração de produção; os de crescimento, ração de crescimento; protetores aceitam as duas. Com mais de um animal do tipo, alimenta o primeiro apto. Alimentar um protetor ativa a proteção como na alimentação do dono.
+
+O visitante recebe **2 XP** pelo mesmo teto cooperativo de 20 XP por dia UTC da limpeza e conclui a missão Amigo dos Animais; acima do teto, alimenta sem XP. O dono não recebe XP nem progresso. Ração incompatível, falta de ração, animal sem fome ou repetição do pedido não concedem XP, progresso nem gastam ração. As recusas não mencionam proteção de terrenos.
 
 ## 14. Assets e estado de entrega
 

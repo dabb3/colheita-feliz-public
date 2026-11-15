@@ -365,6 +365,7 @@ export function renderMissions(root: HTMLElement, farm: Farm) {
         mission.done ? "Concluída" : "Em andamento",
         "status-badge",
       ),
+      text("p", `${mission.progress ?? 0}/${mission.target ?? 1}`, "mission-progress"),
       text("p", `${mission.green} moeda(s) verde(s)`),
     );
     grid.append(card);

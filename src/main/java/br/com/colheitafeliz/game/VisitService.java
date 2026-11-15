@@ -92,6 +92,44 @@ public final class VisitService {
         }
     }
 
+    /**
+     * Visitante online remove ervas ou insetos com a mesma lógica de domínio do dono, sem gastar itens de ninguém.
+     * Terreno protegido também aceita a limpeza, e as recusas não revelam proteção.
+     */
+    public ActionResult cleanPest(GameState owner, GameState visitor, int col, int row, long revision, boolean insects, int xp) {
+        synchronized (GameState.class) {
+            FarmTile tile = eligibleTile(owner, visitor, col, row, revision, true);
+            var now = owner.now();
+            if (tile != null) tile.refresh(now);
+            if (tile == null || (insects ? tile.insects() == 0 : tile.pest() != br.com.colheitafeliz.domain.farm.PestState.WEEDS))
+                return ActionResult.fail(insects ? "Não há insetos para remover nesta planta." : "Não há ervas daninhas para remover nesta planta.");
+            if (insects) tile.removeInsects(now);
+            else tile.removePest(now);
+            String reward = visitor.rewardFriendHelp("friend-pest", xp);
+            return ActionResult.ok((insects ? "Insetos removidos" : "Ervas removidas") + " da fazenda do amigo. "
+                    + (xp > 0 ? "+" + xp + " XP." : "Limite diário de XP cooperativo atingido: limpeza sem XP.")
+                    + (reward.isEmpty() ? "" : " " + reward));
+        }
+    }
+
+    /**
+     * Visitante online alimenta um animal faminto do dono pela regra do dono, pagando a ração do próprio estoque.
+     * O dono não recebe XP nem missão; recusas não mencionam terrenos ou proteção.
+     */
+    public ActionResult feedAnimal(GameState owner, GameState visitor, String typeId, String feedId, int xp) {
+        synchronized (GameState.class) {
+            if (owner == null || visitor == null || owner == visitor) return ActionResult.fail("Nenhum animal deste tipo precisa de ração agora.");
+            int index = owner.friendFeedableAnimal(typeId);
+            if (index < 0) return ActionResult.fail("Nenhum animal deste tipo precisa de ração agora.");
+            String refusal = owner.feedWith(index, visitor.inventory(), feedId);
+            if (refusal != null) return ActionResult.fail(refusal);
+            String reward = visitor.rewardFriendHelp("friend-feed", xp);
+            return ActionResult.ok(owner.barn().get(index).type().name() + " do amigo alimentado. "
+                    + (xp > 0 ? "+" + xp + " XP." : "Limite diário de XP cooperativo atingido: alimentação sem XP.")
+                    + (reward.isEmpty() ? "" : " " + reward));
+        }
+    }
+
     private static FarmTile eligibleTile(GameState owner, GameState visitor, int col, int row, long revision) {
         return eligibleTile(owner,visitor,col,row,revision,false);
     }

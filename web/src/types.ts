@@ -80,6 +80,7 @@ export interface Farm {
     target: number;
     done: boolean;
   }[];
+  cooperativeBonus?: { green: number; done: boolean };
   nextPlot?: { column: number; row: number; requiredLevel?:number; price?:string|number; currency?:string; purchasable?:boolean };
 }
 export interface Friend { vipActive?:boolean; id:string; name:string; avatar?:Farm['avatar']; }

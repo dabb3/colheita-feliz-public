@@ -100,15 +100,20 @@ public final class GameState {
     }
 
     public GameState(GameClock clock, CropCatalog catalog, RandomSource random) {
-        this(clock, Clock.systemUTC(), catalog, random, BigDecimal.valueOf(STARTING_COINS), new BigDecimal("5"), 1, BigDecimal.ZERO);
+        this(clock, Clock.systemUTC(), catalog, random, BigDecimal.valueOf(STARTING_COINS), new BigDecimal("5"), 1, BigDecimal.ZERO, false);
     }
 
     public GameState(GameClock clock, Clock realClock, CropCatalog catalog, RandomSource random) {
-        this(clock, realClock, catalog, random, BigDecimal.valueOf(STARTING_COINS), new BigDecimal("5"), 1, BigDecimal.ZERO);
+        this(clock, realClock, catalog, random, BigDecimal.valueOf(STARTING_COINS), new BigDecimal("5"), 1, BigDecimal.ZERO, false);
+    }
+
+    /** Fazenda online nova: relógios iguais e missões cooperativas, que o desktop sem amigos não exibe. */
+    public static GameState newOnline(Clock clock, CropCatalog catalog, RandomSource random) {
+        return new GameState(clock::instant, clock, catalog, random, BigDecimal.valueOf(STARTING_COINS), new BigDecimal("5"), 1, BigDecimal.ZERO, true);
     }
 
     private GameState(GameClock clock, Clock realClock, CropCatalog catalog, RandomSource random,
-                      BigDecimal coins, BigDecimal green, int level, BigDecimal currentXp) {
+                      BigDecimal coins, BigDecimal green, int level, BigDecimal currentXp, boolean online) {
         this.clock = Objects.requireNonNull(clock);
         this.realClock = Objects.requireNonNull(realClock);
         automationCursor = realClock.instant();
@@ -120,7 +125,7 @@ public final class GameState {
         this.random = random;
         pests = new PestSystem(random);
         progress = new PlayerProgress(ProgressionLoader.load(), level, currentXp);
-        dailyMissions = new DailyMissionBoard(LocalDate.ofInstant(realNow(), java.time.ZoneOffset.UTC));
+        dailyMissions = new DailyMissionBoard(LocalDate.ofInstant(realNow(), java.time.ZoneOffset.UTC), online);
         seed = catalog.all().getFirst();
     }
 
@@ -183,7 +188,7 @@ public final class GameState {
         Objects.requireNonNull(savedAt); Objects.requireNonNull(now);
         Instant start = snapshot.automations() == null ? savedAt : Instant.parse(snapshot.automations().cursor());
         if (start.isAfter(now)) throw new IllegalArgumentException("Automation cursor is in the future");
-        var game = restore(() -> now, Clock.fixed(start, java.time.ZoneOffset.UTC), catalog, snapshot, random, false);
+        var game = restore(() -> now, Clock.fixed(start, java.time.ZoneOffset.UTC), catalog, snapshot, random, true);
         game.realClock = Clock.fixed(now, java.time.ZoneOffset.UTC);
         game.automationCursor = start;
         // Unknown historical arrivals must wait from this access, never from an assumed infection time.
@@ -629,14 +634,41 @@ public final class GameState {
             String mission = recordDailyMission("collect", 1);
             return report(ActionResult.ok("Coletou 1× " + type.productName() + ". Animal removido. " + reward + " " + mission));
         }
-        if (!animal.hungryAt(now)) return report(ActionResult.fail(type.name() + " ainda está alimentado."));
-        String feedId = type.feedId();
-        if (type.kind() == AnimalType.Kind.PROTECTOR && inventory.feed("growth") == 0) feedId = "producer";
-        if (inventory.feed(feedId) == 0) return report(ActionResult.fail("Sem ração. Compre na Loja, aba Animais."));
-        Animal fed = animal.feed(now);
-        inventory.useFeed(feedId);
+        String refusal = feedWith(index, inventory, null);
+        if (refusal != null) return report(ActionResult.fail(refusal));
+        return report(ActionResult.ok(type.name() + " alimentado por " + formatDuration(type.foodDuration()) + ". " + recordDailyMission("feed", 1)));
+    }
+
+    /**
+     * Regra única de alimentação de um animal faminto deste celeiro. A ração sai de {@code payer}: o estoque do
+     * dono ou, na visita, o do visitante. Sem {@code feedId}, protetores preferem crescimento e depois produtor.
+     * Devolve a recusa ou null quando alimentou.
+     */
+    String feedWith(int index, Inventory payer, String feedId) {
+        Animal animal = barn.get(index);
+        AnimalType type = animal.type();
+        Instant now = now();
+        if (!animal.hungryAt(now)) return type.name() + " ainda está alimentado.";
+        if (feedId == null) feedId = type.kind() == AnimalType.Kind.PROTECTOR && payer.feed("growth") == 0 ? "producer" : type.feedId();
+        else if (!feedId.equals(type.feedId()) && !(type.kind() == AnimalType.Kind.PROTECTOR && feedId.equals("producer")))
+            return "Essa ração não serve para " + type.name() + ".";
+        if (payer.feed(feedId) == 0) return "Sem ração. Compre na Loja, aba Animais.";
         barn.feed(index, now);
-        return report(ActionResult.ok(type.name() + " alimentado por " + formatDuration(fed.type().foodDuration()) + ". " + recordDailyMission("feed", 1)));
+        payer.useFeed(feedId);
+        return null;
+    }
+
+    /** Índice do animal que a visita pode alimentar: o primeiro do tipo que o dono também alimentaria agora. */
+    int friendFeedableAnimal(String typeId) {
+        Instant now = now();
+        for (int i = 0; i < barn.size(); i++) {
+            Animal animal = barn.get(i);
+            if (!animal.type().id().equals(typeId) || animal.expiredAt(realNow()) || !animal.hungryAt(now)) continue;
+            if (animal.type().kind() == AnimalType.Kind.GROWING && animal.stageAt(now) == Animal.Stage.ADULT) continue;
+            if (animal.type().kind() == AnimalType.Kind.PRODUCER && animal.statusAt(now) == Animal.Status.READY) continue;
+            return i;
+        }
+        return -1;
     }
 
     public ActionResult sellAnimal(int index) {
@@ -707,7 +739,14 @@ public final class GameState {
         List<DailyMissionBoard.Mission> rewards = dailyMissions.record(action, amount, LocalDate.ofInstant(realNow(), java.time.ZoneOffset.UTC));
         int green = rewards.stream().mapToInt(DailyMissionBoard.Mission::green).sum();
         if (green > 0) wallet.credit(Currency.GREEN, BigDecimal.valueOf(green));
-        return orientation + (green == 0 ? "" : " Tarefa concluída: +" + green + " verde(s).");
+        String cooperative = rewards.stream().filter(mission -> mission.green() == 0)
+                .map(mission -> " Missão " + mission.title() + " concluída.").collect(java.util.stream.Collectors.joining());
+        return orientation + cooperative + (green == 0 ? "" : " Tarefa concluída: +" + green + " verde(s).");
+    }
+
+    /** Visitante online: XP já limitado pelo servidor e uma unidade de progresso cooperativo. */
+    public String rewardFriendHelp(String action, int xp) {
+        return (awardXp(BigDecimal.valueOf(xp)) + recordDailyMission(action, 1)).strip();
     }
 
     private String recordTutorial(String action) {
@@ -826,17 +865,18 @@ public final class GameState {
 
     public static GameState restore(GameClock clock, Clock realClock, CropCatalog catalog,
                                     GameSnapshot snapshot, RandomSource random) {
-        return restore(clock, realClock, catalog, snapshot, random, true);
+        return restore(clock, realClock, catalog, snapshot, random, false);
     }
 
+    /** Online: sem refresh, porque restoreOnline repete as automações antes; aceita missões cooperativas. */
     private static GameState restore(GameClock clock, Clock realClock, CropCatalog catalog,
-                                     GameSnapshot snapshot, RandomSource random, boolean refresh) {
+                                     GameSnapshot snapshot, RandomSource random, boolean online) {
         Objects.requireNonNull(snapshot);
         if (snapshot.tiles() == null || snapshot.tiles().size() != COLUMNS * ROWS
                 || snapshot.seeds() == null || snapshot.produce() == null)
             throw new IllegalArgumentException("Invalid farm snapshot");
         GameState game = new GameState(clock, realClock, catalog, random, snapshot.coins(), snapshot.greenCoins(),
-                snapshot.level(), snapshot.currentXp());
+                snapshot.level(), snapshot.currentXp(), online);
         AnimalSaleValidation.validate(snapshot, game.animalTypes);
         game.notifications = new br.com.colheitafeliz.domain.notification.NotificationInbox(snapshot.notifications());
         game.avatar=snapshot.avatar();
@@ -910,7 +950,7 @@ public final class GameState {
                         weeds == null ? null : Instant.parse(weeds), insects == null ? null : Instant.parse(insects));
             }
         }
-        if (refresh) game.refresh();
+        if (!online) game.refresh();
         game.message = "Jogo carregado.";
         return game;
     }

@@ -1,5 +1,6 @@
 package br.com.colheitafeliz.server;
 
+import br.com.colheitafeliz.game.DailyMissionBoard;
 import br.com.colheitafeliz.game.GameState;
 import br.com.colheitafeliz.game.LandExpansion;
 import com.google.gson.Gson;
@@ -107,6 +108,8 @@ final class OnlineViews {
                 "green", mission.green(), "progress", game.dailyMissions().progress(mission), "target", mission.target(),
                 "done", game.dailyMissions().completed(mission)));
         view.add("missions", missions);
+        if (game.dailyMissions().cooperative()) view.add("cooperativeBonus", object("green", DailyMissionBoard.COOPERATIVE_BONUS.green(),
+                "done", game.dailyMissions().cooperativeBonusPaid()));
         LandExpansion.Plot next = game.land().next();
         view.add("nextPlot",next==null?com.google.gson.JsonNull.INSTANCE:object("id",next.id(),"column",next.column(),"row",next.row(),"requiredLevel",next.requiredLevel(),"price",next.price(),"currency",next.currency()));
         return view;
