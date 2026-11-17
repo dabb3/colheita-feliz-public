@@ -29,3 +29,9 @@ test('animated weed and insect frames use desktop assets',()=>{
 test('music loop and action sound cues exist locally',()=>{
  for(const name of ['farm_loop.mp3','noite.mp3',...['click_button','plant','water','harvest','buy','sell','weed','levelup'].map(id=>`${id}.wav`)])assert.ok(existsSync(new URL(`../../assets/sounds/${name}`,import.meta.url)),name);
 });
+
+test('advanced fertilizer icons and tool cursors ship in both original and web overlay',()=>{
+ for(const id of ['ultra','mega']){
+  for(const path of ['../../assets/classic/icons/adubo-'+id+'.png','../public/assets/classic/icons/adubo-'+id+'.png','../public/assets/classic/icons/cursors/adubo-'+id+'.png'])assert.ok(existsSync(new URL(path,import.meta.url)),path);
+ }
+});

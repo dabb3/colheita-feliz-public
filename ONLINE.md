@@ -365,3 +365,9 @@ Com VAPID válido, a API disponibiliza as quatro categorias e inicia o mesmo tra
 Mensagens de uma categoria preservam o formato anterior; lotes mistos usam `BATCH`, tipos conhecidos e binding. O Service Worker exige consentimento literal para todos os tipos, revalida o vínculo antes/depois de exibir e assume as abas abertas após instalar a atualização. Logout offline e troca de conta continuam suprimindo mensagens antigas. Mensagens não incluem detalhes econômicos, identificação de amigos ou metadados dos eventos.
 
 Antes de publicar, usar API e frontend compatíveis e atualizar todos os produtores. Não misturar servidores antigos com o consumo habilitado. No rollback, desligar primeiro os envios e preservar tabelas e cursores. Testes locais usam PostgreSQL descartável e transporte simulado; aceite do provedor não comprova entrega no aparelho.
+
+## Fertilizantes e painéis móveis
+
+O catálogo compartilhado define os seis fertilizantes da seção 5 de game-rule.md. Rápido, Super, Ultra e Mega são exclusivos de verdes; Amor custa ouro. Compras anteriores mantêm seu estoque, sem migração. Ultra reduz 9 horas e Mega reduz 14 horas da temporada atual; o excedente não passa à próxima.
+
+Amigos permite quebra dos nomes e botões em telas estreitas. O popup de planta respeita a viewport visível e o topo das ferramentas, acompanha zoom e permite rolagem quando necessário.

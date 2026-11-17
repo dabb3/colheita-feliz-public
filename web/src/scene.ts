@@ -132,7 +132,8 @@ export class Scene {
     );
     canvas.addEventListener(
       "pointerleave",
-      () => {
+      (e) => {
+        if ((e?.relatedTarget as HTMLElement | null)?.closest?.("#plant-health")) return;
         if (this.hoveredAnimal) onAnimalHover(null);
         this.clearAnimalHover();
         this.hover = null;

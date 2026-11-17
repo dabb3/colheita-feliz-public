@@ -981,6 +981,41 @@ class OnlineGameIntegrationTest {
                 visit.getAsJsonArray("tiles").get(0).getAsJsonObject().get("harvestRevision").getAsString());
     }
 
+    @Test void advancedFertilizerPurchasesAndApplicationsAreAtomicAndReplayable() throws Exception {
+        for (String id : new String[]{"ultra", "mega"}) {
+            prepare(alice, null, false, false);
+            var before = service.farm(alice);
+            var buy = new Command(requestId(), before.get("revision").getAsString(), "BUY_FERTILIZER", id, "GREEN", null, null, null);
+            var start = new java.util.concurrent.CyclicBarrier(2);
+            try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+                var first = executor.submit(() -> { start.await(); return service.command(alice, buy); });
+                var second = executor.submit(() -> { start.await(); return service.command(alice, buy); });
+                assertEquals(first.get(), second.get());
+            }
+            assertEquals(1, service.farm(alice).getAsJsonObject("fertilizers").get(id).getAsInt());
+            assertEquals(service.command(alice, buy), service.command(alice, buy));
+            var farm = service.farm(alice);
+            var wrong = new Command(requestId(), farm.get("revision").getAsString(), "BUY_FERTILIZER", id, "GOLD", null, null, null);
+            assertFalse(service.command(alice, wrong).getAsJsonObject("result").get("success").getAsBoolean());
+            store.transaction(alice, tx -> {
+                tx.lockFarms(alice);
+                var saved = tx.farm(alice);
+                var game = br.com.colheitafeliz.game.GameState.restore(clock::instant, clock,
+                        br.com.colheitafeliz.game.CropCatalogLoader.load(), saved.snapshot(), bound -> 99);
+                var tile = game.farm().tile(0, id.equals("ultra") ? 0 : 1);
+                tile.plow(); tile.plant(game.catalog().get("morango"), clock.instant()); tile.water(clock.instant());
+                tx.save(alice, game.snapshot(), saved.revision() + 1, clock.instant());
+                return null;
+            });
+            farm = service.farm(alice);
+            var apply = new Command(requestId(), farm.get("revision").getAsString(), "FERTILIZE", id, null, 0, id.equals("ultra") ? 0 : 1, null);
+            var reply = service.command(alice, apply);
+            assertTrue(reply.getAsJsonObject("result").get("success").getAsBoolean(), reply.toString());
+            assertEquals(reply, service.command(alice, apply));
+            assertEquals(0, service.farm(alice).getAsJsonObject("fertilizers").get(id).getAsInt());
+        }
+    }
+
     private UUID requestId() { return UUID.fromString(service.requestId().get("requestId").getAsString()); }
 
     private void connectFriends() {

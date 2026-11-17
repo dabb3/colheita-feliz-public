@@ -82,3 +82,15 @@ test('market scrolls through all common crops, keeps VIP separate and preserves 
  all=nodes(root);assert.equal(all.filter(n=>n.tag==='article').length,0);
  assert.ok(all.some(n=>n.textContent==='Nenhuma semente VIP disponível.'));
 });
+
+test('fertilizer market uses authoritative prices, level locks and icon paths',()=>{
+ const {renderMarket,root}=ui(),commands=[];
+ const fertilizers=JSON.parse(readFileSync(new URL('../../assets/data/fertilizers.json',import.meta.url),'utf8'));
+ renderMarket(root,{crops:[],animals:[],fertilizers},{level:39,animals:[]},'fertilizers','common',()=>{},c=>commands.push(c));
+ const all=nodes(root);
+ for(const id of ['ultra','mega'])assert.ok(all.some(n=>n.tag==='img'&&n.src==='/assets/classic/icons/adubo-'+id+'.png'));
+ assert.ok(all.some(n=>n.textContent==='Nível 40'));assert.ok(all.some(n=>n.textContent==='Nível 50'));
+ assert.ok(!all.some(n=>n.attributes?.['aria-label']==='Comprar Fertilizante rápido por 350 ouro'));
+ const buy=all.find(n=>n.attributes?.['aria-label']==='Comprar Fertilizante rápido por 1 verdes');assert.ok(buy);buy.onclick();
+ assert.equal(commands[0].currency,'GREEN');
+});

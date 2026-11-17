@@ -187,10 +187,12 @@ Os dados desta seção representam regras documentadas, não uma confirmação d
 |---|---:|---|---:|
 | Alimento genérico: animais que crescem | 80 ouro | Alimentava por 12 h | 1 |
 | Alimento genérico: animais que produzem | 120 ouro | Alimentava por 8 h | 1 |
-| Fertilizante comum | 50 ouro | Reduzia 1 h | 10 |
-| Fertilizante rápido | 350 ouro ou 1 verde | Reduzia 2 h 30 min | 20 |
-| Superfertilizante | 1.000 ouro ou 2 verdes | Reduzia 5 h 30 min | 35 |
-| Fertilizante do amor | 1 verde | Reduzia 1 h na plantação de amigos | 15 |
+| Fertilizante comum | 1.000 ouro | Reduz 1 h | 10 |
+| Fertilizante rápido | 1 verde | Reduz 2 h 30 min | 20 |
+| Superfertilizante | 2 verdes | Reduz 5 h 30 min | 30 |
+| Ultrafertilizante | 3 verdes | Reduz 9 h | 40 |
+| Megafertilizante | 5 verdes | Reduz 14 h | 50 |
+| Fertilizante do amor | 2.000 ouro | Reduz 1 h na plantação de amigos | 15 |
 | Cartão VIP | 100 verdes | Acesso VIP por 30 dias | 1 |
 
 Cada compra de ração alimenta apenas um animal. Animais de crescimento usam ração genérica de crescimento; animais produtores usam ração genérica de produtor. Não é permitido acumular duração de alimentação. Os protetores seguem o intervalo específico de 6 h da seção 4.3.
