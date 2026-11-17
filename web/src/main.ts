@@ -880,12 +880,6 @@ document.addEventListener('visibilitychange',()=>{syncMusic();if(!document.hidde
 window.setInterval(()=>{if(!document.hidden)void refresh();},30_000);
 void start();
 
-function notifications(){
- if(!own)return;dialog('Notificações');refreshDialog=notifications;
- renderNotifications(content,own.notifications??[],id=>{void action({action:'READ_NOTIFICATION',itemId:id});},()=>{void action({action:'READ_ALL_NOTIFICATIONS'});},id=>{void action({action:'DISMISS_NOTIFICATION',itemId:id});},()=>{void action({action:'DISMISS_READ_NOTIFICATIONS'});});
-}
-
-
 function eventNow(){return ownServerClock?.owner===own?.owner?ownServerClock!.server+performance.now()-ownServerClock!.client:Number.NaN;}
 function stopEvents(){window.clearInterval(eventsTimer);eventsTimer=undefined;eventsBoundary='';}
 function events(){
@@ -895,4 +889,9 @@ function events(){
  refreshDialog=paint;paint();button('Atualizar eventos',()=>void reload(),modalFooter);modalFooter.hidden=false;
  eventsTimer=window.setInterval(()=>{if(session!==sessionGeneration||panel!==dialogGeneration||!modal.open){stopEvents();return;}const countdown=content.querySelector<HTMLElement>('.event-countdown');if(countdown)countdown.textContent=eventCountdown(eventStatus(own?.sundayHarvestEvent,eventNow()));const event=own?.sundayHarvestEvent,now=eventNow();if(event&&((event.state==='UPCOMING'&&now>=Date.parse(event.startsAt))||(event.state==='ACTIVE'&&now>=Date.parse(event.endsAt)))&&eventsBoundary!==event.id){eventsBoundary=event.id;void reload();}},1000);
  if(!own?.sundayHarvestEvent)void reload();
+}
+
+function notifications(){
+ if(!own)return;dialog('Notificações');refreshDialog=notifications;
+ renderNotifications(content,own.notifications??[],id=>{void action({action:'READ_NOTIFICATION',itemId:id});},()=>{void action({action:'READ_ALL_NOTIFICATIONS'});},id=>{void action({action:'DISMISS_NOTIFICATION',itemId:id});},()=>{void action({action:'DISMISS_READ_NOTIFICATIONS'});});
 }

@@ -203,6 +203,14 @@ O cachorro mantém a mesma altura visível ao alternar entre parado e andando, u
 
 O piloto foi desenhado para Chrome/Edge em desktop, a partir de 1280×720. Não há promessa de suporte móvel ou reprodução visual idêntica ao desktop. Sons de ferramentas existentes são opcionais; novos sons de animais não foram gerados.
 
+## Domingos de colheita
+
+A partir de 22/11/2026, toda colheita própria válida de cultura comum recebe 2× XP aos domingos, de 00h até segunda-feira 00h exclusiva em America/Sao_Paulo. O servidor decide pelo horário da colheita, mesmo quando a planta ficou pronta antes do domingo. Se ficar pronta no domingo e for colhida na segunda, concede XP normal.
+
+Todas as culturas comuns da loja participam; culturas VIP e sementes especiais Bronze, Prata, Ouro e Diamante ficam excluídas. Não há rotação. Nas temporadas seguintes, dobra o XP fracionário daquela temporada, sem bônus adicional por VIP. Moedas, produção, venda, furto e XP de outras ações não mudam.
+
+A fazenda expõe sundayHarvestEvent com ID, estado, multiplicador, cropIds, timezone e datas startsAt/endsAt/nextStartsAt/nextEndsAt em ISO 8601. O menu Eventos mostra culturas, imagem, XP normal/dobrado e contagem baseada no serverTime mais tempo monotônico do cliente. Falha de atualização não bloqueia a fazenda; há atualização manual. Sem jobs ou migração de save.
+
 ## Publicação gratuita proposta
 
 Os artefatos estão preparados, mas contas, OAuth e deploy externo ainda precisam ser configurados pelo responsável. Não ative planos pagos, cartão obrigatório ou pings para manter instâncias acordadas. Confira as quotas dos provedores no dia da publicação.
@@ -365,11 +373,3 @@ Com VAPID válido, a API disponibiliza as quatro categorias e inicia o mesmo tra
 Mensagens de uma categoria preservam o formato anterior; lotes mistos usam `BATCH`, tipos conhecidos e binding. O Service Worker exige consentimento literal para todos os tipos, revalida o vínculo antes/depois de exibir e assume as abas abertas após instalar a atualização. Logout offline e troca de conta continuam suprimindo mensagens antigas. Mensagens não incluem detalhes econômicos, identificação de amigos ou metadados dos eventos.
 
 Antes de publicar, usar API e frontend compatíveis e atualizar todos os produtores. Não misturar servidores antigos com o consumo habilitado. No rollback, desligar primeiro os envios e preservar tabelas e cursores. Testes locais usam PostgreSQL descartável e transporte simulado; aceite do provedor não comprova entrega no aparelho.
-
-## Domingos de colheita
-
-A partir de 22/11/2026, toda colheita própria válida de cultura comum recebe 2× XP aos domingos, de 00h até segunda-feira 00h exclusiva em America/Sao_Paulo. O servidor decide pelo horário da colheita, mesmo quando a planta ficou pronta antes do domingo. Se ficar pronta no domingo e for colhida na segunda, concede XP normal.
-
-Todas as culturas comuns da loja participam; culturas VIP e sementes especiais Bronze, Prata, Ouro e Diamante ficam excluídas. Não há rotação. Nas temporadas seguintes, dobra o XP fracionário daquela temporada, sem bônus adicional por VIP. Moedas, produção, venda, furto e XP de outras ações não mudam.
-
-A fazenda expõe sundayHarvestEvent com ID, estado, multiplicador, cropIds, timezone e datas startsAt/endsAt/nextStartsAt/nextEndsAt em ISO 8601. O menu Eventos mostra culturas, imagem, XP normal/dobrado e contagem baseada no serverTime mais tempo monotônico do cliente. Falha de atualização não bloqueia a fazenda; há atualização manual. Sem jobs ou migração de save.
