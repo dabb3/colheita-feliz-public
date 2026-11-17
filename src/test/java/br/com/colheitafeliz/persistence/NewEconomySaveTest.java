@@ -154,6 +154,7 @@ class NewEconomySaveTest {
         var state = session.state();
         while (state.progress().level() < 10)
             state.progress().award(state.progress().xpToNext().subtract(state.progress().currentXp()));
+        state.wallet().credit(1000);
         assertTrue(state.buyFertilizer("comum", Currency.GOLD).success());
         session.save();
         String bytes = Files.readString(file);

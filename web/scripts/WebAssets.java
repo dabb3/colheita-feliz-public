@@ -11,7 +11,7 @@ class WebAssets {
         resize("buildings/dog-house.png", 320);
         for (String id : new String[]{"avatar_masculino", "avatar_masculino2", "avatar_masculino3", "avatar_feminino", "avatar_feminino2", "avatar_feminino3", "amigos", "moeda-comum", "moeda-verde", "icon-shop", "deposit-icon"})
             resize("icons/" + id + ".png", 128);
-        for (String id : new String[]{"comum", "rapido", "super", "amor"}) {
+        for (String id : new String[]{"comum", "rapido", "super", "ultra", "mega", "amor"}) {
             resize("icons/adubo-" + id + ".png", 96);
             toolCursor("icons/adubo-" + id + ".png", "adubo-" + id);
         }

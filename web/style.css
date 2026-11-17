@@ -682,3 +682,10 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 @media(max-width:760px){.login-rewards-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}
 @media(max-width:560px){.calendar-menu-icon{width:32px;height:32px;font-size:28px}.login-calendar-dialog[open]{width:calc(100vw - 16px);max-height:92vh;max-height:92dvh}.login-calendar-dialog #modal-content{padding:12px}.login-rewards-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.login-reward-card{min-height:116px;padding:7px 3px}.login-reward-icon{width:36px;height:36px}}
 @media(max-width:380px){.login-rewards-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* Friends actions remain reachable in narrow dialogs and with long names. */
+.friend-card{flex-wrap:wrap;min-width:0}
+.friend-card strong{min-width:0;overflow-wrap:anywhere;flex:1 1 100px}
+.friend-card button{min-width:0;max-width:100%;white-space:normal;flex:1 1 110px}
+.invite-card input{min-width:0;flex:1 1 180px}
+#game #plant-health{overflow-y:auto;pointer-events:auto;overscroll-behavior:contain}

@@ -1,6 +1,8 @@
 [
-  {"id":"comum", "name":"Fertilizante comum", "prices":{"GOLD":50}, "requiredLevel":10, "reductionSeconds":3600, "friendsOnly":false},
-  {"id":"rapido", "name":"Fertilizante rápido", "prices":{"GOLD":350, "GREEN":1}, "requiredLevel":20, "reductionSeconds":9000, "friendsOnly":false},
-  {"id":"super", "name":"Superfertilizante", "prices":{"GOLD":1000, "GREEN":2}, "requiredLevel":35, "reductionSeconds":19800, "friendsOnly":false},
-  {"id":"amor", "name":"Fertilizante do amor", "prices":{"GREEN":1}, "requiredLevel":15, "reductionSeconds":3600, "friendsOnly":true}
+  {"id":"comum","name":"Fertilizante comum","prices":{"GOLD":1000},"requiredLevel":10,"reductionSeconds":3600,"friendsOnly":false},
+  {"id":"rapido","name":"Fertilizante rápido","prices":{"GREEN":1},"requiredLevel":20,"reductionSeconds":9000,"friendsOnly":false},
+  {"id":"super","name":"Superfertilizante","prices":{"GREEN":2},"requiredLevel":30,"reductionSeconds":19800,"friendsOnly":false},
+  {"id":"ultra","name":"Ultrafertilizante","prices":{"GREEN":3},"requiredLevel":40,"reductionSeconds":32400,"friendsOnly":false},
+  {"id":"mega","name":"Megafertilizante","prices":{"GREEN":5},"requiredLevel":50,"reductionSeconds":50400,"friendsOnly":false},
+  {"id":"amor","name":"Fertilizante do amor","prices":{"GOLD":2000},"requiredLevel":15,"reductionSeconds":3600,"friendsOnly":true}
 ]

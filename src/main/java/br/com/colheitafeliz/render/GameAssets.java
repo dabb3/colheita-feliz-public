@@ -77,7 +77,8 @@ public final class GameAssets implements AutoCloseable {
     public final Texture greenCoin = load("classic/icons/moeda-verde.png");
     private final Map<String, Texture> fertilizers = Map.of(
             "comum", load("classic/icons/adubo-comum.png"), "rapido", load("classic/icons/adubo-rapido.png"),
-            "super", load("classic/icons/adubo-super.png"), "amor", load("classic/icons/adubo-amor.png"));
+            "super", load("classic/icons/adubo-super.png"),
+            "ultra", load("classic/icons/adubo-ultra.png"), "mega", load("classic/icons/adubo-mega.png"), "amor", load("classic/icons/adubo-amor.png"));
     public final Texture vipCard = load("classic/icons/cartao-vip.png");
     public final Texture vipWatering = load("classic/icons/vip/upgrade_vip_regador.png");
     public final Texture vipPestControl = load("classic/icons/vip/upgrade_vip_praga.png");

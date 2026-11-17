@@ -248,6 +248,8 @@ class SaveRoundTripTest {
         GameState state = session.state();
         state.inventory().addFertilizer("comum", 2);
         state.inventory().addFertilizer("super", 1);
+        state.inventory().addFertilizer("ultra", 3);
+        state.inventory().addFertilizer("mega", 4);
         FarmTile tile = state.farm().tile(0, 0);
         tile.plow();
         tile.plant(state.catalog().get("nabo"), clock.instant());
@@ -262,6 +264,8 @@ class SaveRoundTripTest {
         GameState restored = GameSession.open(clock, CropCatalogLoader.load(), repository, bound -> 99).state();
         assertEquals(1, restored.inventory().fertilizer("comum"));
         assertEquals(1, restored.inventory().fertilizer("super"));
+        assertEquals(3, restored.inventory().fertilizer("ultra"));
+        assertEquals(4, restored.inventory().fertilizer("mega"));
         assertEquals("super", restored.selectedFertilizer().id());
         assertTrue(restored.farm().tile(0, 0).fertilized());
         restored.selectTool(Tool.FERTILIZER);
