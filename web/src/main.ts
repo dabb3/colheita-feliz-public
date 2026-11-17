@@ -513,7 +513,8 @@ function positionHealth(panel:HTMLElement,game:HTMLElement,point:{x:number;y:num
  const bounds=game.getBoundingClientRect(),canvas=element('farm').getBoundingClientRect(),projected=worldToScreen(point,sceneTransform(canvas.width,canvas.height)),x=canvas.left-bounds.left+projected.x,y=canvas.top-bounds.top+projected.y;
  const viewport=window.visualViewport,margin=12,tools=element('tools-bar').getBoundingClientRect();
  const visibleLeft=Math.max(bounds.left,viewport?.offsetLeft??0)-bounds.left+margin,visibleRight=Math.min(bounds.right??bounds.left+bounds.width,(viewport?.offsetLeft??0)+(viewport?.width??window.innerWidth??bounds.left+bounds.width))-bounds.left-margin;
- const visibleTop=Math.max(bounds.top,viewport?.offsetTop??0)-bounds.top+margin,visibleBottom=Math.min(bounds.bottom??bounds.top+bounds.height,(viewport?.offsetTop??0)+(viewport?.height??window.innerHeight??bounds.top+bounds.height),tools.top>bounds.top?tools.top:Infinity)-bounds.top-margin;
+ const header=element('farm-header')?.getBoundingClientRect(),headerBottom=header?(header.bottom??header.top+header.height):bounds.top;
+ const visibleTop=Math.max(bounds.top,viewport?.offsetTop??0,headerBottom)-bounds.top+margin,visibleBottom=Math.min(bounds.bottom??bounds.top+bounds.height,(viewport?.offsetTop??0)+(viewport?.height??window.innerHeight??bounds.top+bounds.height),tools.top>bounds.top?tools.top:Infinity)-bounds.top-margin;
  const width=Math.max(0,Math.min(360,visibleRight-visibleLeft));panel.style.width=`${width}px`;panel.style.maxHeight=`${Math.max(0,visibleBottom-visibleTop)}px`;
  const height=panel.getBoundingClientRect().height,tileGap=66;let left=x-width/2,top=y-height-tileGap,placement='above';
  if(top<visibleTop&&y+tileGap+height<=visibleBottom){top=y+tileGap;placement='below';}
