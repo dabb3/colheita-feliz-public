@@ -14,6 +14,19 @@ import static org.junit.jupiter.api.Assertions.*;
 class OnlineViewsTimingTest {
     private static final UUID OWNER = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
+    @Test void eventProjectionUsesServerClockAndExcludesLoginRewardAndVipCrops() {
+        var clock = Clock.fixed(Instant.parse("2026-11-22T03:00:00Z"), ZoneOffset.UTC);
+        var game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
+        var event = OnlineViews.farm(OWNER, "Fixture", game, 0, true).getAsJsonObject("sundayHarvestEvent");
+        assertEquals("ACTIVE", event.get("state").getAsString());
+        assertEquals("2026-11-23T03:00:00Z", event.get("endsAt").getAsString());
+        assertEquals(2, event.get("multiplier").getAsInt());
+        for (var crop : game.catalog().all()) {
+            boolean included = event.getAsJsonArray("cropIds").contains(new com.google.gson.JsonPrimitive(crop.id()));
+            assertEquals(!crop.vipOnly() && crop.acquisitionSource() == br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP, included);
+        }
+    }
+
     @Test void farmProjectionSeparatesWallClockEtaFromNominalGrowthAcrossCropStates() {
         var clock = new TestClock();
         var game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> bound - 1);

@@ -1,3 +1,4 @@
+import {renderEvents} from '../src/events.ts';
 import {renderNotifications} from '../src/notifications.ts';
 import { Scene } from "../src/scene.ts";
 import { GameAudio } from "../src/audio.ts";
@@ -274,3 +275,8 @@ if(params.get('panel')==='notifications')openPanel('Notificações',(root)=>rend
  {id:'review-unread',type:'THEFT',message:'Amigo furtou 1 Morango.',createdAt:'2026-11-06T12:00:00Z',read:false,metadata:{}},
  {id:'review-read',type:'CHRISTMAS_GIFT',message:'Presente de Natal recebido.',createdAt:'2026-11-06T11:00:00Z',read:true,metadata:{}}
 ],demonstration,demonstration,demonstration,demonstration));
+
+if(params.get('panel')==='events') {
+ const active=params.get('state')==='active',now=active?'2026-11-22T15:00:00Z':'2026-11-21T15:00:00Z';
+ openPanel('Eventos',(root)=>renderEvents(root,{id:'sunday-harvest-2026-11-22',state:active?'ACTIVE':'UPCOMING',multiplier:2,startsAt:'2026-11-22T03:00:00Z',endsAt:'2026-11-23T03:00:00Z',nextStartsAt:active?'2026-11-29T03:00:00Z':'2026-11-22T03:00:00Z',nextEndsAt:active?'2026-11-30T03:00:00Z':'2026-11-23T03:00:00Z',cropIds:catalog.crops.filter(c=>!c.vipOnly&&c.acquisitionSource!=='LOGIN_REWARD').map(c=>c.id),timezone:'America/Sao_Paulo'},catalog,Date.parse(now)));
+}

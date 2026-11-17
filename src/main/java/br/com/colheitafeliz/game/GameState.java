@@ -433,7 +433,8 @@ public final class GameState {
             BigDecimal xp = switch (tool) {
                 case SEED -> BigDecimal.valueOf(progress.rules().plantXp());
                 case WATER -> BigDecimal.valueOf(progress.rules().waterXp());
-                case HAND -> harvested.harvestXp(harvestedSeason);
+                case HAND -> harvested.harvestXp(harvestedSeason).multiply(
+                        BigDecimal.valueOf(SundayHarvestEvent.multiplier(harvested, realNow())));
                 case WEEDER, PESTICIDE -> BigDecimal.valueOf(progress.rules().removePestXp());
                 case HOE -> BigDecimal.valueOf(cleared ? progress.rules().clearDeadXp() : 0);
                 case CURSOR, FERTILIZER -> BigDecimal.ZERO;
