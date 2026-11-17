@@ -982,6 +982,7 @@ class OnlineGameIntegrationTest {
     }
 
     @Test void advancedFertilizerPurchasesAndApplicationsAreAtomicAndReplayable() throws Exception {
+        service.farm(alice);
         for (String id : new String[]{"ultra", "mega"}) {
             prepare(alice, null, false, false);
             var before = service.farm(alice);
