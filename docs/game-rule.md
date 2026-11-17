@@ -123,6 +123,12 @@ O nabo, com primeira colheita de 10 h, concede 15 XP. O morango, com 31 h e trê
 O XP preserva integralmente os valores fracionários resultantes da fórmula, sem arredondamento ou truncamento, tanto na concessão por colheita quanto no saldo acumulado. Por exemplo, 11,625 XP e 2,8125 XP são valores válidos. A regra de arredondamento de moedas da seção 9.1 não se aplica ao XP.
 
 
+### 3.2. Domingos de colheita
+
+Desde 22/11/2026, domingos de 00h a segunda-feira 00h exclusiva em America/Sao_Paulo dobram o XP de toda colheita própria válida de cultura comum. O horário autoritativo da colheita determina o bônus, independentemente do plantio e da maturação. Culturas VIP e culturas do calendário Bronze, Prata, Ouro e Diamante não participam. Não há rotação.
+
+A fórmula base da seção 3.1 permanece: aplica-se 2× ao XP exato da temporada após a colheita bem-sucedida. VIP não acrescenta outro multiplicador. Ouro, verdes, produção, venda, furto e XP de outras ações permanecem iguais. Recibos e transações impedem duplicação por replay ou concorrência.
+
 ## 4. Animais
 
 ### 4.1. Tabela consolidada

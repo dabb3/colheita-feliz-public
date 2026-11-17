@@ -24,6 +24,43 @@ class OnlineGameIntegrationTest {
 
     @AfterEach void closeStore() { if (store != null) store.close(); }
 
+    @Test void sundayHarvestCreditsDoubleXpOnceAcrossConcurrentReplayAndRestart() throws Exception {
+        service.farm(alice);
+        clock.advanceSeconds(java.time.Duration.between(clock.instant(), Instant.parse("2026-11-21T03:00:00Z")).toSeconds());
+        prepare(alice, "nabo", true, false);
+        clock.advanceSeconds(java.time.Duration.between(clock.instant(), Instant.parse("2026-11-22T03:00:00Z")).toSeconds());
+        var farm = service.farm(alice);
+        assertEquals("ACTIVE", farm.getAsJsonObject("sundayHarvestEvent").get("state").getAsString());
+        var command = new Command(requestId(), farm.get("revision").getAsString(), "HARVEST", null, null, 0, 0, null);
+        var start = new java.util.concurrent.CyclicBarrier(2);
+        JsonObject reply;
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> { start.await(); return service.command(alice, command); });
+            var second = executor.submit(() -> { start.await(); return service.command(alice, command); });
+            reply = first.get(); assertEquals(reply, second.get());
+        }
+        assertTrue(reply.getAsJsonObject("result").get("success").getAsBoolean());
+        var after = service.farm(alice);
+        assertEquals(0, new BigDecimal(after.get("currentXp").getAsString()).subtract(new BigDecimal(farm.get("currentXp").getAsString())).compareTo(new BigDecimal("30")));
+        assertEquals(farm.get("coins"), after.get("coins"));assertEquals(1, quantity(after));
+        store.close();store = new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"), "postgres", "", testSchema);
+        service = new OnlineGameService(store, clock, bound -> 99, 5);
+        assertEquals(reply, service.command(alice, command));
+        assertEquals(after.get("currentXp"), service.farm(alice).get("currentXp"));
+    }
+
+    @Test void plantReadyOnSundayButHarvestedOnMondayGetsNormalXp() {
+        service.farm(alice);
+        clock.advanceSeconds(java.time.Duration.between(clock.instant(), Instant.parse("2026-11-22T03:00:00Z")).toSeconds());
+        prepare(alice, "cenoura", true, false);
+        clock.advanceSeconds(java.time.Duration.between(clock.instant(), Instant.parse("2026-11-23T03:00:00Z")).toSeconds());
+        var before = service.farm(alice);
+        var command = new Command(requestId(), before.get("revision").getAsString(), "HARVEST", null, null, 0, 0, null);
+        assertTrue(service.command(alice, command).getAsJsonObject("result").get("success").getAsBoolean());
+        var after = service.farm(alice);
+        assertEquals(0, new BigDecimal(after.get("currentXp").getAsString()).subtract(new BigDecimal(before.get("currentXp").getAsString())).compareTo(new BigDecimal("22.5")));
+    }
+
     @Test void productionLimitAdmitsTwentyActiveParticipantsIncludingOwnerAndRejectsTwentyFirst() {
         service = new OnlineGameService(store, clock, bound -> bound - 1, ServerMain.PARTICIPANT_LIMIT);
         for (int count = 2; count <= 20; count++) {
@@ -326,9 +363,10 @@ class OnlineGameIntegrationTest {
     }
 
     @Test void stolenV1SeasonKeepsItsPriceAndOnlyVisitorCanSellItWithoutHarvestXp() {
+        clock.advanceSeconds(java.time.Duration.between(clock.instant(), Instant.parse("2026-11-20T03:00:00Z")).toSeconds());
         connectFriends();
         prepare(alice, "morango", true, false);
-        clock.advanceSeconds(300);
+        clock.advanceSeconds(java.time.Duration.between(clock.instant(), Instant.parse("2026-11-22T15:00:00Z")).toSeconds());
         JsonObject ownerBefore = service.farm(alice), visitorBefore = service.farm(bob);
         JsonObject visit = service.visit(bob, alice);
         String harvestRevision = visit.getAsJsonArray("tiles").get(0).getAsJsonObject().get("harvestRevision").getAsString();

@@ -8,6 +8,7 @@ import * as presentation from '../src/presentation.ts';
 import * as uiPresentation from '../src/ui-presentation.ts';
 import * as avatar from '../src/avatar.ts';
 import * as inviteUrl from '../src/invite-url.ts';
+import * as events from '../src/events.ts';
 
 const farm=owner=>({owner,name:owner,revision:'1',tiles:[],animals:[],seedCounts:{}});
 function deferred(){let resolve,reject;const promise=new Promise((accept,fail)=>{resolve=accept;reject=fail;});return{promise,resolve,reject};}
@@ -147,8 +148,9 @@ function app(preferences=new Map(),pushLogoutOptions){
  runInNewContext(stripTypeScriptTypes(panelsSource),ctx);
  const notificationSource=readFileSync(new URL('../src/notifications.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(notificationSource),ctx);
+ const eventsSource=readFileSync(new URL('../src/events.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');runInNewContext(stripTypeScriptTypes(eventsSource),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,friends,presentGift,closeGiftComposer,receive,dialog,health,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
+ source+='\nglobalThis.h={events,updateOwnFarm,refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,friends,presentGift,closeGiftComposer,receive,dialog,health,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:{...ctx.h,runTimeouts(){for(const [id,callback]of [...timeouts]){timeouts.delete(id);callback();}}},elements,listeners,audioClips,observers,ctx,intervals};
 }
 function text(node){return(node.textContent??'')+(node.children??[]).map(child=>typeof child==='object'?text(child):child).join('');}
@@ -924,4 +926,21 @@ test('reconnecting re-syncs the mobile camera without stacking camera listeners'
  for(let round=0;round<3;round++){h.set({own:undefined});await h.connect('alice',async()=> 'synthetic-token');await h.logout();}
  assert.equal(ctx.cameraSyncs,3,'each new Scene restores the camera resolution');
  assert.equal(elements.get('farm').listenerCounts.camerachange,1);
+});
+
+const sundayFixture={id:'sunday-harvest-2026-11-22',state:'ACTIVE',multiplier:2,startsAt:'2026-11-22T03:00:00Z',endsAt:'2026-11-23T03:00:00Z',nextStartsAt:'2026-11-29T03:00:00Z',nextEndsAt:'2026-11-30T03:00:00Z',cropIds:['nabo'],timezone:'America/Sao_Paulo'};
+test('events dialog renders countdown and XP from server time, survives failures and stops on close',async()=>{
+ const {h,elements,intervals}=app();
+ h.set({own:{...farm('alice'),serverTime:sundayFixture.startsAt,sundayHarvestEvent:sundayFixture},catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:36000}],animals:[],fertilizers:[]},api:{get:async()=>{throw Error('offline');}}});
+ h.updateOwnFarm({...h.get().own});h.events();
+ assert.ok(text(elements.get('modal-content')).includes('15 XP / 30 XP no evento'));
+ assert.ok(text(elements.get('modal-content')).includes('Termina em 1d'));
+ const content=elements.get('modal-content'),first=content.children[0];h.setNow(10000);intervals.get(1000)();assert.equal(content.children[0],first,'timer preserves cards and scroll');
+ await elements.get('modal-footer').children[0].onclick();await new Promise(r=>setTimeout(r,0));
+ assert.ok(text(content).includes('Não foi possível atualizar'));assert.ok(h.get().own);
+ h.dialog('Loja');assert.equal(intervals.has(1000),false);
+});
+test('missing event information leaves game accessible and shows retry',async()=>{
+ const {h,elements}=app();h.set({own:farm('alice'),api:{get:async()=>{throw Error('offline');}}});h.events();await new Promise(r=>setTimeout(r,0));
+ assert.ok(text(elements.get('modal-content')).includes('indisponíveis'));assert.ok(h.get().own);assert.equal(elements.get('modal-footer').children[0].textContent,'Atualizar eventos');
 });

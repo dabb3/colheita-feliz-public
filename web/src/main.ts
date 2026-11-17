@@ -1,3 +1,4 @@
+import {renderEvents,eventBoosted,eventStatus,eventCountdown} from './events.ts';
 import {connectPush,suspendPush,reconcilePush,renderPushSettings} from './push.ts';
 import {createClient} from '@supabase/supabase-js';
 import type {Farm,Catalog,Tile,Animal,AnimalType,Reply,CommandFields,Friend,Gifts} from './types.ts';
@@ -12,6 +13,7 @@ import {PROTECTED_ICON,notificationCount,renderNotifications} from './notificati
 import {GAME_AVATARS,googleAvatar,avatarSource,avatarImport,type AvatarChoice} from './avatar.ts';
 import {musicArtPath,seedArtPath,periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalSoundPath,animalStatusText,animalActionLabel,animalClickCommand,friendFeedOptions,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
 
+let eventsTimer:number|undefined,eventsBoundary='';
 const config=window.COLHEITA_CONFIG;
 const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const modal=element<HTMLDialogElement>('modal'),content=element('modal-content'),modalFooter=element('modal-footer');
@@ -125,7 +127,7 @@ async function fadeSoldDepositRows(fields:CommandFields,farm:Farm){
 }
 let missionsTimer:number|undefined;
 function stopCalendar(){window.clearInterval(calendarTimer);calendarTimer=undefined;calendarContext=undefined;}
-function dialog(title:string){stopCalendar();giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;modal.classList.remove('bite-dialog');modal.removeAttribute('aria-describedby');dialogGeneration++;refreshDialog=undefined;closeHealth();element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');modal.classList.toggle('missions-dialog',title==='Missões');modal.classList.toggle('gift-dialog',title==='Presentear');modal.classList.toggle('login-calendar-dialog',title==='Calendário de Recompensas');if(title!=='Missões'){window.clearInterval(missionsTimer);missionsTimer=undefined;}content.className='';content.replaceChildren();content.scrollTop=0;modalFooter.className='';modalFooter.replaceChildren();modalFooter.hidden=true;if(!modal.open)modal.showModal();}
+function dialog(title:string){stopEvents();stopCalendar();giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;modal.classList.remove('bite-dialog');modal.removeAttribute('aria-describedby');dialogGeneration++;refreshDialog=undefined;closeHealth();element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');modal.classList.toggle('missions-dialog',title==='Missões');modal.classList.toggle('gift-dialog',title==='Presentear');modal.classList.toggle('login-calendar-dialog',title==='Calendário de Recompensas');if(title!=='Missões'){window.clearInterval(missionsTimer);missionsTimer=undefined;}content.className='';content.replaceChildren();content.scrollTop=0;modalFooter.className='';modalFooter.replaceChildren();modalFooter.hidden=true;if(!modal.open)modal.showModal();}
 const shownBites=new Set<string>();
 function showBite(reply:Reply,actionName?:string){
  if(actionName!=='STEAL'||reply.theftOutcome?.kind!=='BITTEN'||!reply.farm||reply.farm.owner!==own?.owner)return false;
@@ -220,7 +222,7 @@ function avatarSettings(){
  }
  if(!googlePhoto)paragraph('A foto do Google não está disponível nesta sessão.');
 }
-async function logout(){const suppression=suspendPush(api).catch(()=>{});stopCalendar();ownServerClock=undefined;giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner="";sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;setLoginStep('login');syncPending();await suppression;if(supabase)await supabase.auth.signOut();}
+async function logout(){const suppression=suspendPush(api).catch(()=>{});stopCalendar();ownServerClock=undefined;giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner="";sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;setLoginStep('login');syncPending();stopEvents();await suppression;if(supabase)await supabase.auth.signOut();}
 function showConnection(message?:string){element('connection').hidden=!message;element('connection').textContent=message??'';}
 function syncPending(){element('pending').hidden=!api?.pending;element<HTMLButtonElement>('retry').disabled=!!api?.busy;}
 async function retryPending(context?:NonNullable<typeof giftContext>){
@@ -483,6 +485,7 @@ function renderHealth(tile:Tile,point:{x:number;y:number},force=false){
  healthKey=key;healthTile=tile;healthPoint=point;panel.hidden=false;panel.replaceChildren();
  const remaining=healthRemaining(tile),ready=tile.state==='READY'||tile.state==='GROWING'&&remaining<=0,dead=tile.state==='DEAD',paused=tile.paused;
  const heading=document.createElement('div');heading.className='crop-tooltip-head';const icon=document.createElement('img');icon.className='crop-tooltip-icon';icon.src=`/assets/${seedArtPath(crop.spriteStem)}`;icon.alt='';const name=document.createElement('strong');name.textContent=crop.name;heading.append(icon,name);
+ if(!visited&&eventBoosted(own?.sundayHarvestEvent,crop.id,eventNow()))heading.append(text('span','2× XP','event-badge'));
  if(crop.vipOnly){const vip=document.createElement('span');vip.className='crop-vip-badge';vip.textContent='VIP';heading.append(vip);}
  const state=document.createElement('span');state.className=`crop-state-badge${ready?' is-ready':dead?' is-dead':paused||tile.dry?' is-problem':''}`;state.textContent=dead?'Morta':ready?'Pronta':paused?'Parada':tile.dry?'Seca':'Saudável';heading.append(state);panel.append(heading);
  const growth=document.createElement('section');growth.className='crop-growth';const caption=document.createElement('div');caption.className='crop-progress-caption';caption.append(document.createElement('span'));caption.firstElementChild!.textContent='CRESCIMENTO';const value=document.createElement('strong');value.className='crop-growth-value';caption.append(value);const track=document.createElement('div');track.className='crop-growth-track';track.setAttribute('role','progressbar');track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax','100');track.setAttribute('aria-label','Progresso de crescimento');const fill=document.createElement('span');fill.className='crop-growth-fill';track.append(fill);const estimate=document.createElement('p');estimate.className='crop-growth-estimate';const nominal=document.createElement('p');nominal.className='crop-growth-nominal';const condition=document.createElement('p');condition.className='crop-growth-condition';growth.append(caption,track,nominal,condition,estimate);panel.append(growth);
@@ -525,7 +528,7 @@ function scheduleHealthClock(){window.clearTimeout(healthClockTimer);const tile=
 function tileList(){dialog('Terras da fazenda');const states:Record<string,string>={GRASS:'grama',PLOWED:'arada',DEAD:'planta morta',READY:'pronta',GROWING:'crescendo'};const grid=document.createElement('div');grid.className='tile-list';content.append(grid);for(const tile of display()?.tiles??[]){const crop=catalog.crops.find(c=>c.id===tile.cropId);const b=button(`Terra ${tile.column+1}, ${tile.row+1}: ${!tile.unlocked?'bloqueada':crop?.name??states[tile.state]}`,async()=>{modal.close();await tileAction(tile);},grid);b.title='Aplicar a ferramenta selecionada';}}
 function card(name:string,image?:string){const c=document.createElement('article');c.className='card';if(image){const img=document.createElement('img');img.loading='lazy';img.src='/assets/'+image;img.alt='';c.append(img);}const title=document.createElement('strong');title.textContent=name;c.append(title);return c;}
 function marketCard(name:string,imagePath:string,details:string,level:number,prices:Record<string,number>,kind:string,id:string,vip=false){
- const c=document.createElement('article');c.className='card market-card';const title=document.createElement('h3');title.textContent=name;const art=image(imagePath,'market-art','lazy');const description=paragraph(details,c);description.className='market-details';const levelLabel=document.createElement('small');levelLabel.textContent=`Nível ${level}${vip?' · VIP':''}`;
+ const c=document.createElement('article');c.className='card market-card';if(kind==='BUY_SEED'&&eventBoosted(own?.sundayHarvestEvent,id,eventNow()))c.append(text('span','2× XP','event-badge'));const title=document.createElement('h3');title.textContent=name;const art=image(imagePath,'market-art','lazy');const description=paragraph(details,c);description.className='market-details';const levelLabel=document.createElement('small');levelLabel.textContent=`Nível ${level}${vip?' · VIP':''}`;
  const locked=(own?.level??0)<level||vip&&!own?.vipActive;if(locked)c.classList.add('locked');c.prepend(title);c.insertBefore(art,description);c.append(levelLabel);
  if(locked){const badge=document.createElement('span');badge.className='lock-badge';badge.textContent=(own?.level??0)<level?`Nível ${level}`:'Exige VIP';c.append(badge);}
  for(const [currency,price]of Object.entries(prices)){const label=currency==='GOLD'?'ouro':'verdes',buy=button(`Comprar · ${price}`,()=>action({action:kind,itemId:id,currency}),c,`buy:${kind}:${id}:${currency}`);buy.className='market-buy';buy.disabled=locked;buy.setAttribute('aria-label',`Comprar ${name} por ${price} ${label}`);buy.title=locked?((own?.level??0)<level?`Nível ${level}`:'Exige VIP'):`${price} ${label}`;const coin=document.createElement('img');coin.className='price-coin';coin.src=`/assets/classic/icons/moeda-${currency==='GOLD'?'comum':'verde'}.png`;coin.alt='';buy.append(coin);}
@@ -872,7 +875,7 @@ async function start(){
   }
  }catch(error){showConnection();notify(error instanceof Error?error.message:'Servidor indisponível.');button('Tentar conectar novamente',start,login);}
 }
-element('notifications').onclick=notifications;element('calendar').onclick=loginCalendar;
+element('notifications').onclick=notifications;element('calendar').onclick=loginCalendar;element('events').onclick=events;
 element('shop').onclick=()=>shop();element('deposit').onclick=deposit;element('missions').onclick=missions;element('friends').onclick=()=>void friends();
 element('home').onclick=()=>{navigationGeneration++;visited=undefined;tool='PLOW';render();};element('settings').onclick=()=>shortcutPanel('Ajustes',settings);element('close-modal').onclick=()=>{if(element('modal-title').textContent==='Presentear'){closeGiftComposer();return;}modal.close();showUpdateNotes();};
 modal.addEventListener('cancel',event=>{if(element('modal-title').textContent!=='Presentear')return;event.preventDefault();closeGiftComposer();});
@@ -882,11 +885,22 @@ element('retry').onclick=()=>retryPending();
 window.addEventListener('offline',()=>showConnection('Sem conexão. Reconecte antes de agir.'));
 window.addEventListener('online',()=>{void refresh();if(api)void reconcilePush(avatarUser,api).catch(()=>{});});
 document.addEventListener('pointerdown',event=>{if(healthPinned&&!element('farm').contains(event.target as Node)&&!element('plant-health').contains(event.target as Node))closeHealth();});
-modal.addEventListener('close',()=>{if(element('modal-title').textContent==='Calendário de Recompensas')stopCalendar();health(healthTile,healthPoint);window.clearInterval(missionsTimer);missionsTimer=undefined;});
+modal.addEventListener('close',()=>{stopEvents();if(element('modal-title').textContent==='Calendário de Recompensas')stopCalendar();health(healthTile,healthPoint);window.clearInterval(missionsTimer);missionsTimer=undefined;});
 document.addEventListener('keydown',event=>{if(!own||event.repeat||event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement||(event.target as HTMLElement)?.tagName==='TEXTAREA')return;const shortcut=gameShortcut(event.key,!!visited);if(!shortcut)return;if(shortcut.action==='tool'){if(!modal.open)pickTool(shortcut.tool);return;}if(shortcut.action==='shop')shortcutPanel('Loja',()=>shop());else if(shortcut.action==='deposit')shortcutPanel('Depósito',deposit);else if(shortcut.action==='missions')shortcutPanel('Missões',missions);else if(shortcut.action==='plots')shortcutPanel('Terras da fazenda',tileList);else if(shortcut.action==='music')toggleMusic();else if(shortcut.action==='effects')toggleEffects();});
 document.addEventListener('visibilitychange',()=>{syncMusic();if(!document.hidden)void refresh();});
 window.setInterval(()=>{if(!document.hidden)void refresh();},30_000);
 void start();
+
+function eventNow(){return ownServerClock?.owner===own?.owner?ownServerClock!.server+performance.now()-ownServerClock!.client:Number.NaN;}
+function stopEvents(){window.clearInterval(eventsTimer);eventsTimer=undefined;eventsBoundary='';}
+function events(){
+ dialog('Eventos');const session=sessionGeneration,panel=dialogGeneration,client=api;
+ const paint=()=>renderEvents(content,own?.sundayHarvestEvent,catalog,eventNow());
+ const reload=async()=>{if(!client)return;try{const farm=await client.get<Farm>('/v1/me/farm');if(session!==sessionGeneration||panel!==dialogGeneration||!modal.open)return;updateOwnFarm(farm);render();paint();}catch{if(session===sessionGeneration&&panel===dialogGeneration&&modal.open){paint();paragraph('Não foi possível atualizar os eventos. Tente novamente.');}}};
+ refreshDialog=paint;paint();button('Atualizar eventos',()=>void reload(),modalFooter);modalFooter.hidden=false;
+ eventsTimer=window.setInterval(()=>{if(session!==sessionGeneration||panel!==dialogGeneration||!modal.open){stopEvents();return;}const countdown=content.querySelector<HTMLElement>('.event-countdown');if(countdown)countdown.textContent=eventCountdown(eventStatus(own?.sundayHarvestEvent,eventNow()));const event=own?.sundayHarvestEvent,now=eventNow();if(event&&((event.state==='UPCOMING'&&now>=Date.parse(event.startsAt))||(event.state==='ACTIVE'&&now>=Date.parse(event.endsAt)))&&eventsBoundary!==event.id){eventsBoundary=event.id;void reload();}},1000);
+ if(!own?.sundayHarvestEvent)void reload();
+}
 
 function notifications(){
  if(!own)return;dialog('Notificações');refreshDialog=notifications;

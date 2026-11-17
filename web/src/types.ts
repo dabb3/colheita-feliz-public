@@ -45,6 +45,7 @@ export interface Farm {
   name: string;
   revision: string;
   serverTime: string;
+  sundayHarvestEvent?: SundayHarvestEvent;
   own: boolean;
   tiles: Tile[];
   animals: Animal[];
@@ -167,3 +168,5 @@ declare global {
     COLHEITA_CONFIG: Config;
   }
 }
+
+export interface SundayHarvestEvent {id:string;state:'ACTIVE'|'UPCOMING';multiplier:number;startsAt:string;endsAt:string;nextStartsAt:string;nextEndsAt:string;cropIds:string[];timezone:string}

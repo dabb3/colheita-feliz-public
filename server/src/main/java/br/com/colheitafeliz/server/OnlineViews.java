@@ -70,7 +70,9 @@ final class OnlineViews {
         view.addProperty("currentXp", game.progress().currentXp().toPlainString());
         view.addProperty("xpToNext", game.progress().xpToNext().toPlainString());
         view.addProperty("vipActive",game.vipActive());
+        view.add("sundayHarvestEvent", JSON.toJsonTree(br.com.colheitafeliz.game.SundayHarvestEvent.at(game.realNow(), game.catalog())));
         if (!own) return view;
+
         view.addProperty("avatarSelected",game.avatar()!=null);
         view.add("notifications",JSON.toJsonTree(game.notifications().entries()));
         view.addProperty("unreadNotifications",game.notifications().unread());
