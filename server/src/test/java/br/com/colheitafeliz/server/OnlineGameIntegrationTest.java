@@ -1013,7 +1013,7 @@ class OnlineGameIntegrationTest {
             var reply = service.command(alice, apply);
             assertTrue(reply.getAsJsonObject("result").get("success").getAsBoolean(), reply.toString());
             assertEquals(reply, service.command(alice, apply));
-            assertEquals(0, service.farm(alice).getAsJsonObject("fertilizers").get(id).getAsInt());
+            assertFalse(service.farm(alice).getAsJsonObject("fertilizers").has(id), "estoque zerado é omitido após restauração");
         }
     }
 
