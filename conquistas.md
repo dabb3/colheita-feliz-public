@@ -75,7 +75,7 @@
 |---|---|
 | Liberar 10 terrenos | •° Dono do Pedaço °• |
 | Liberar 20 terrenos | ★ Fã de Carteirinha ★ |
-| Liberar 30 terrenos | ♛ Fαzєи∂єιяσ VIP ♛ |
+| Liberar 30 terrenos | ♛ Rei do Gado ♛ |
 
 ## 🐮 Todos os animais (15/15)
 
