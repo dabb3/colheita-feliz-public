@@ -686,7 +686,7 @@ function animalPopup(id:string){
   const label=animalActionLabel(animal.status,type.kind,animal.stage);if(label)button(label,()=>{modal.close();void action({action:'TEND_ANIMAL',itemId:id});},detail);
   const feedId=type.kind==='PRODUCER'?'producer':'growth';
   button(`Comprar ração · ${catalog.feedPrices[feedId]} ouro`,()=>{modal.close();void action({action:'BUY_FEED',itemId:feedId});},detail);
-  if(type.kind==='GROWING')button('Vender adulto',()=>{modal.close();void action({action:'SELL_ANIMAL',itemId:id});},detail);
+  if(type.kind==='GROWING'&&animal.stage==='ADULT'&&label!=='Vender adulto')button('Vender adulto',()=>{modal.close();void action({action:'SELL_ANIMAL',itemId:id});},detail);
  }else if(visited&&animal.status==='HUNGRY'){
   const owner=visited.owner,options=friendFeedOptions(type.kind,animal.status,own?.feed);
   if(!options.length)paragraph('Você não tem ração compatível. Compre na Loja, aba Animais.',detail);
