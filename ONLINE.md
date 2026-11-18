@@ -275,8 +275,11 @@ por hover, clique ou toque; selecionar outra ferramenta fecha o painel e cancela
 a abertura pendente, preservando as ações na própria fazenda e nas visitas.
 Até 1100 CSS px, o painel compacto fica fixo acima das ferramentas; no desktop,
 acompanha a terra dentro da área visível. Em paisagem até 650 CSS px de altura,
-usa duas colunas. O conteúdo não possui rolagem interna nem informações cortadas.
-A atualização recebida da API renova o painel mesmo com o cursor parado.
+usa duas colunas. O conteúdo não possui rolagem interna. A verificação visual
+cobriu tamanhos de 320 × 568 a 1366 × 768 CSS px, em retrato e paisagem, com zoom
+de página padrão. Se o zoom de página reduzir a área visível abaixo da altura do
+conteúdo, o painel pode ultrapassar essa área; a fonte não é reduzida para forçar
+o encaixe. A atualização recebida da API renova o painel mesmo com o cursor parado.
 
 Clique em animal abre o alvo escolhido. Ações de alimentação, coleta ou venda
 seguem espécie, estágio e estado projetados pelo servidor. Animais da fazenda
