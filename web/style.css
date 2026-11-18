@@ -718,3 +718,11 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 .friend-card button{min-width:0;max-width:100%;white-space:normal;flex:1 1 110px}
 .invite-card input{min-width:0;flex:1 1 180px}
 #game #plant-health{overflow-y:auto;pointer-events:auto;overscroll-behavior:contain}
+
+/* When inspection cannot fit between controls, only the document scrolls. */
+#game.inspection-flow{display:grid;grid-template-rows:auto auto auto auto;height:auto;min-height:100dvh;aspect-ratio:auto;overflow:visible;gap:0}
+#game.inspection-flow header{position:relative;grid-row:1;inset:auto}
+#game.inspection-flow #scene{display:none}
+#game.inspection-flow #plant-health{grid-row:2;justify-self:center;margin:12px}
+#game.inspection-flow #tool-tray{position:relative;grid-row:3;justify-self:center;inset:auto;transform:none;width:calc(100% - 24px);max-height:none;margin:0 12px 12px}
+#game.inspection-flow footer{position:relative;grid-row:4;justify-self:stretch;inset:auto;transform:none;width:auto;max-width:100%;margin:0}

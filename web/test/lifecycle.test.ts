@@ -961,23 +961,41 @@ test('the scene inspection gate tracks toolbar changes and delayed renders canno
  h.pickTool('CURSOR');assert.equal(canInspect(),true);
 });
 
-test('plant panels stay above tools and open trays in portrait and low landscape viewports',()=>{
- for(const [width,height,panelHeight,toolsTop,trayTop]of [[390,844,360,640,520],[844,390,220,330,300],[390,667,360,470,440]]){
+test('plant panels stay between real controls or switch to document flow when space is insufficient',()=>{
+ for(const [width,height,panelHeight,toolsTop,trayTop,headerHeight]of [[390,844,260,640,520,176],[844,390,160,330,300,90],[390,667,360,470,440,176]]){
   const {h,ctx}=app();ctx.window.innerWidth=width;ctx.window.innerHeight=height;
-  ctx.window.matchMedia=()=>({matches:true});
+  ctx.window.matchMedia=query=>({matches:query.includes('orientation:landscape')?width>height&&height<=650:width<=1100});
   const bounds={left:0,top:0,width,height};
   for(const id of ['game','farm'])ctx.document.getElementById(id).getBoundingClientRect=()=>bounds;
+  ctx.document.getElementById('farm-header').getBoundingClientRect=()=>({top:0,height:headerHeight});
   ctx.document.getElementById('tools-bar').getBoundingClientRect=()=>({left:0,top:toolsTop,width,height:height-toolsTop});
   const tray=ctx.document.getElementById('tool-tray');tray.hidden=false;tray.getBoundingClientRect=()=>({left:0,top:trayTop,width,height:50});
   const panel=ctx.document.getElementById('plant-health');panel.className='crop-tooltip';panel.getBoundingClientRect=()=>({width:Number.parseFloat(panel.style.width)||360,height:panelHeight});
   h.positionHealth(panel,ctx.document.getElementById('game'),{x:585,y:400});
+  if(panelHeight>trayTop-headerHeight-24){
+   assert.equal(panel.dataset.layout,'flow');assert.equal(panel.style.position,'relative');assert.equal(panel.style.maxHeight,'none');continue;
+  }
   assert.equal(panel.style.position,'fixed');assert.equal(panel.dataset.layout,'fixed');
   const left=Number.parseFloat(panel.style.left),top=Number.parseFloat(panel.style.top),panelWidth=Number.parseFloat(panel.style.width);
   assert.ok(left>=12&&left+panelWidth<=width-12);
-  assert.ok(top>=12&&top+panelHeight<=trayTop-12,`${width}×${height}: the entire panel must fit above the tray`);
+  assert.ok(top>=headerHeight+12&&top+panelHeight<=trayTop-12,`${width}×${height}: the entire panel must fit between header and tray`);
   tray.hidden=true;h.positionHealth(panel,ctx.document.getElementById('game'),{x:585,y:400});
   assert.equal(Number.parseFloat(panel.style.top)+panelHeight,toolsTop-12);
  }
+});
+
+test('leaving inspection restores the scene after the flow fallback',()=>{
+ const {h,ctx,listeners}=app(),classes=new Set();h.set({own:farm('alice'),catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:3600}],animals:[],fertilizers:[]}});
+ const game=ctx.document.getElementById('game');game.classList={add:name=>classes.add(name),remove:name=>classes.delete(name)};
+ ctx.window.innerWidth=390;ctx.window.innerHeight=667;ctx.window.matchMedia=query=>({matches:!query.includes('orientation:landscape')});
+ game.getBoundingClientRect=()=>({left:0,top:0,width:390,height:667});ctx.document.getElementById('farm').getBoundingClientRect=game.getBoundingClientRect;
+ ctx.document.getElementById('farm-header').getBoundingClientRect=()=>({top:0,height:176});ctx.document.getElementById('tools-bar').getBoundingClientRect=()=>({top:470});ctx.document.getElementById('tool-tray').hidden=true;
+ ctx.document.getElementById('plant-health').getBoundingClientRect=()=>({height:360});
+ h.health({column:0,row:0,cropId:'nabo',state:'GROWING',watered:true,remainingSeconds:600,nominalRemainingSeconds:600,season:1,seasons:1},{x:585,y:400},'mouse');h.runTimeouts();
+ assert.equal(classes.has('inspection-flow'),true);
+ h.health(null,null,'mouse');assert.equal(ctx.document.getElementById('plant-health').hidden,false,'hiding the canvas must not dismiss inspection');
+ for(const id of ['tools-bar','tool-tray','farm-header']){listeners.get('pointerdown')({target:ctx.document.getElementById(id)});assert.equal(classes.has('inspection-flow'),true,'controls must not move before their click');}
+ h.pickTool('WATER');assert.equal(classes.has('inspection-flow'),false);assert.equal(ctx.document.getElementById('plant-health').hidden,true);
 });
 
 test('desktop plant popups respect visible bounds and tools while animal positioning stays anchored',()=>{
