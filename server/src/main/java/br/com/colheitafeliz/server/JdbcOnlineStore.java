@@ -125,7 +125,8 @@ final class JdbcOnlineStore implements AutoCloseable {
             cropPushStore().initialize(tx);
             socialPushStore().initialize(tx);
             tx.execute("CREATE TABLE IF NOT EXISTS "+schema+".away_reports (owner uuid PRIMARY KEY REFERENCES "+schema
-                    +".players(id), last_seen_at timestamptz NOT NULL, ledger jsonb NOT NULL)");
+                    +".players(id), last_seen_at timestamptz NOT NULL, ledger jsonb NOT NULL, pending jsonb)");
+            tx.execute("ALTER TABLE "+schema+".away_reports ADD COLUMN IF NOT EXISTS pending jsonb");
             tx.execute("REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
             for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "pest_origins", "daily_allowances", "login_reward_progress", "cooperative_xp", "update_note_views", "seed_gifts", "push_subscriptions", "push_tests", "push_events", "crop_push_jobs", "crop_push_deliveries", "social_push_devices", "social_push_cursors", "social_push_deliveries", "away_reports")) {
                 tx.execute("ALTER TABLE " + schema + "." + table + " ENABLE ROW LEVEL SECURITY");
@@ -236,6 +237,18 @@ final class JdbcOnlineStore implements AutoCloseable {
             execute("INSERT INTO " + schema + ".away_reports (owner,last_seen_at,ledger) VALUES (?,?,?::jsonb) "
                     + "ON CONFLICT(owner) DO UPDATE SET last_seen_at=EXCLUDED.last_seen_at,ledger=EXCLUDED.ledger",
                     owner, java.sql.Timestamp.from(ledger.lastSeenAt()), ledger.toJson().toString());
+        }
+        /** The report waiting for the client's acknowledgement; it survives lost responses and reloads. */
+        JsonObject pendingAwayReport(UUID owner) {
+            return first(query("SELECT pending FROM " + schema + ".away_reports WHERE owner=? AND pending IS NOT NULL",
+                    r -> JsonParser.parseString(r.getString(1)).getAsJsonObject(), owner));
+        }
+        void savePendingAwayReport(UUID owner, JsonObject report) {
+            execute("UPDATE " + schema + ".away_reports SET pending=?::jsonb WHERE owner=?", report.toString(), owner);
+        }
+        /** Idempotent: only the report with this id is cleared, so a stale acknowledgement never hides a newer one. */
+        void acknowledgeAwayReport(UUID owner, String id) {
+            execute("UPDATE " + schema + ".away_reports SET pending=NULL WHERE owner=? AND pending->>'id'=?", owner, id);
         }
         void recordTheft(UUID actor, Instant now) {
             execute("INSERT INTO " + schema + ".theft_cooldowns (actor,last_stolen_at) VALUES (?,?) "

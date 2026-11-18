@@ -20,7 +20,8 @@ final class AwayReports {
     static JsonObject build(GameState game, AwayLedger ledger, Instant now) {
         Instant since = ledger.lastSeenAt();
         var harvests = harvests(game, since, now);
-        var products = products(game, ledger, since, now);
+        var products = products(game, ledger.collected());
+        var readyProducts = products(game, readyProducers(game, since, now));
         var thefts = new JsonArray(); var defenses = new JsonArray();
         for (var event : ledger.events()) {
             var item = new JsonObject();
@@ -32,25 +33,22 @@ final class AwayReports {
                 item.addProperty("itemId", event.itemId()); item.addProperty("name", crop.name());
                 item.addProperty("stem", crop.spriteStem()); item.addProperty("quantity", event.quantity());
                 thefts.add(item);
-            } else {
-                item.addProperty("protectorId", event.protectorId());
-                item.addProperty("protectorName", game.animalTypes().stream().filter(type -> type.id().equals(event.protectorId()))
-                        .map(type -> type.name()).findFirst().orElse("Protetor"));
-                defenses.add(item);
-            }
+            } else defenses.add(item);
         }
         var pending = pending(game, since, now);
         int care = ledger.waterings() + ledger.pestsRemoved() + ledger.animalCares();
-        if (harvests.isEmpty() && products.isEmpty() && thefts.isEmpty() && defenses.isEmpty() && care == 0 && pending.isEmpty()) return null;
+        // Old, still-open pendings ride along with news but never trigger a report on their own.
+        if (harvests.isEmpty() && products.isEmpty() && readyProducts.isEmpty() && thefts.isEmpty() && defenses.isEmpty() && care == 0
+                && !pending.openedInWindow()) return null;
         var report = new JsonObject();
         report.addProperty("awaySeconds", Duration.between(since, now).getSeconds());
-        report.add("harvests", harvests); report.add("products", products);
+        report.add("harvests", harvests); report.add("products", products); report.add("readyProducts", readyProducts);
         report.add("thefts", thefts); report.add("defenses", defenses);
         var careJson = new JsonObject();
         careJson.addProperty("waterings", ledger.waterings()); careJson.addProperty("pestsRemoved", ledger.pestsRemoved());
         careJson.addProperty("animalCares", ledger.animalCares());
         report.add("care", careJson);
-        report.add("pending", pending);
+        report.add("pending", pending.items());
         return report;
     }
 
@@ -73,8 +71,9 @@ final class AwayReports {
         return list;
     }
 
-    private static JsonArray products(GameState game, AwayLedger ledger, Instant since, Instant now) {
-        var byProduct = new LinkedHashMap<>(ledger.collected());
+    /** Producers that became ready in the window and still wait in the barn; collected output is counted apart. */
+    private static Map<String,Integer> readyProducers(GameState game, Instant since, Instant now) {
+        var byProduct = new LinkedHashMap<String,Integer>();
         for (Animal animal : game.barn().animals()) {
             var type = animal.type();
             if (type.kind() != AnimalType.Kind.PRODUCER || animal.statusAt(game.now()) != Animal.Status.READY) continue;
@@ -82,6 +81,10 @@ final class AwayReports {
             if (inWindow(animal.growthAnchorAt().plusMillis(type.requiredMillis() - animal.grownAtAnchorMillis()), since, now))
                 byProduct.merge(type.productId(), 1, Integer::sum);
         }
+        return byProduct;
+    }
+
+    private static JsonArray products(GameState game, Map<String,Integer> byProduct) {
         var list = new JsonArray();
         byProduct.forEach((productId, quantity) -> game.animalTypes().stream()
                 .filter(t -> t.kind() == AnimalType.Kind.PRODUCER && t.productId().equals(productId)).findFirst().ifPresent(type -> {
@@ -93,31 +96,33 @@ final class AwayReports {
         return list;
     }
 
-    private static JsonArray pending(GameState game, Instant since, Instant now) {
-        var list = new JsonArray();
+    private record Pending(JsonArray items, boolean openedInWindow) {}
+
+    /** What still needs the player now, whenever it started; the window only says whether it is news. */
+    private static Pending pending(GameState game, Instant since, Instant now) {
+        var list = new JsonArray(); boolean fresh = false;
         for (String id : java.util.List.of("water", "pests", "animals")) {
             Instant expiry = game.automationExpiresAt(id);
-            if (inWindow(expiry, since, now)) {
-                var item = new JsonObject();
-                item.addProperty("kind", "AUTOMATION"); item.addProperty("serviceId", id);
-                item.addProperty("name", SERVICE_NAMES.get(id)); item.addProperty("expiredAt", expiry.toString());
-                list.add(item);
-            }
-        }
-        if (inWindow(game.vip().expiresAt(), since, now) && !game.vipActive()) {
+            if (expiry == null || expiry.isAfter(now)) continue;
             var item = new JsonObject();
-            item.addProperty("kind", "VIP"); item.addProperty("expiredAt", game.vip().expiresAt().toString());
-            list.add(item);
+            item.addProperty("kind", "AUTOMATION"); item.addProperty("serviceId", id);
+            item.addProperty("name", SERVICE_NAMES.get(id)); item.addProperty("expiredAt", expiry.toString());
+            list.add(item); fresh |= inWindow(expiry, since, now);
+        }
+        Instant vipExpiry = game.vip().expiresAt();
+        if (vipExpiry != null && !game.vipActive()) {
+            var item = new JsonObject();
+            item.addProperty("kind", "VIP"); item.addProperty("expiredAt", vipExpiry.toString());
+            list.add(item); fresh |= inWindow(vipExpiry, since, now);
         }
         for (Animal animal : game.barn().animals()) {
-            if (animal.type().kind() != AnimalType.Kind.PROTECTOR || animal.expiredAt(now) || !animal.hungryAt(game.now())
-                    || !inWindow(animal.fedUntil(), since, now)) continue;
+            if (animal.type().kind() != AnimalType.Kind.PROTECTOR || animal.expiredAt(now) || !animal.hungryAt(game.now())) continue;
             var item = new JsonObject();
             item.addProperty("kind", "FEED"); item.addProperty("animalId", animal.type().id());
             item.addProperty("name", animal.type().name());
             item.addProperty("stock", game.inventory().feed("growth") + game.inventory().feed("producer"));
-            list.add(item);
+            list.add(item); fresh |= inWindow(animal.fedUntil(), since, now);
         }
-        return list;
+        return new Pending(list, fresh);
     }
 }

@@ -119,6 +119,8 @@ final class GameHttpServer implements AutoCloseable {
                 response = service.sendGift(actor, UUID.fromString(string(body, "recipientId", true)), string(body, "cropId", true),
                         integer(body, "quantity"), UUID.fromString(string(body, "requestId", true)));
             }
+            else if (method.equals("POST") && path.equals("/v1/me/away-report/ack"))
+                response = service.acknowledgeAwayReport(actor, string(read(exchange, raw, Set.of("id")), "id", true));
             else if (method.equals("POST") && path.equals("/v1/me/actions")) response = service.command(actor, command(read(exchange, raw, COMMAND_FIELDS)));
             else if (method.equals("POST") && path.equals("/v1/friend-invitations")) response = service.createInvitation(actor,
                     UUID.fromString(string(read(exchange, raw, Set.of("requestId")), "requestId", true)));

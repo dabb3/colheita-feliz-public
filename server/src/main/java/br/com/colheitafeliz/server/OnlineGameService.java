@@ -101,13 +101,26 @@ final class OnlineGameService implements AutoCloseable {
             var ledger = tx.awayLedger(actor);
             if (ledger != null && Duration.between(ledger.lastSeenAt(), now).compareTo(AwayReports.MIN_ABSENCE) >= 0) {
                 var report = AwayReports.build(farm.game(), ledger, now);
-                if (report != null) view.add("awayReport", report);
+                // A newer absence supersedes a report the client never acknowledged.
+                if (report != null) { report.addProperty("id", UUID.randomUUID().toString()); tx.savePendingAwayReport(actor, report); }
             }
             // Every own visit starts a new window; shorter absences are seen in the farm itself.
             tx.saveAwayLedger(actor, AwayLedger.empty(now));
+            var pendingReport = tx.pendingAwayReport(actor);
+            if (pendingReport != null) view.add("awayReport", pendingReport);
             if(publishedNotes!=null&&tx.claimUpdateNotes(actor,publishedNotes.version(),publishedNotes.day(clock.instant())))
                 view.add("updateNotes",publishedNotes.view(clock.instant()));
             return view;
+    }
+
+    /** The client confirms it showed the report; repeating it, or naming an older report, changes nothing. */
+    JsonObject acknowledgeAwayReport(UUID actor, String reportId) {
+        try { UUID.fromString(reportId); } catch (RuntimeException e) { throw new ApiFailure(400, "Relatório inválido."); }
+        return store.transaction(actor, tx -> {
+            active(tx, actor);
+            tx.acknowledgeAwayReport(actor, reportId);
+            return object("ok", true);
+        });
     }
 
     JsonObject command(UUID actor, Command command) {
@@ -245,7 +258,7 @@ final class OnlineGameService implements AutoCloseable {
                         var target = destination.game().farm().tile(command.column(), command.row()).crop();
                         theft = stealAfterOwnerWindow(visits, destination, visitor, command, season, now);
                         if (theft.consumesCooldown()) tx.recordTheft(actor, now);
-                        var event = awayEvent(theft, destination, visitor.name(), target, now);
+                        var event = awayEvent(theft, visitor.name(), target, now);
                         if (event != null) ownerEvents.add(event);
                     }
                     result=theft.result();
@@ -396,14 +409,12 @@ final class OnlineGameService implements AutoCloseable {
     }
 
     /** Owner-facing record of a theft attempt; blocked attempts (cooldown, window, invalid) are not reported. */
-    private static AwayLedger.Event awayEvent(br.com.colheitafeliz.game.TheftAttempt theft, Loaded destination, String visitorName,
+    private static AwayLedger.Event awayEvent(br.com.colheitafeliz.game.TheftAttempt theft, String visitorName,
                                               br.com.colheitafeliz.domain.crop.Crop target, Instant now) {
         return switch (theft.kind()) {
             case STOLEN -> new AwayLedger.Event("THEFT", now.toString(), visitorName, target.type().id(), 1, null);
-            case PROTECTED, BITTEN -> new AwayLedger.Event("DEFENDED", now.toString(), visitorName, null, 0,
-                    destination.game().barn().animals().stream()
-                            .filter(a -> a.type().kind() == br.com.colheitafeliz.domain.animal.AnimalType.Kind.PROTECTOR && !a.expiredAt(now))
-                            .map(a -> a.type().id()).findFirst().orElse(null));
+            // Plot protection is collective, so the defense is not credited to a specific animal.
+            case PROTECTED, BITTEN -> new AwayLedger.Event("DEFENDED", now.toString(), visitorName, null, 0, null);
             case BLOCKED -> null;
         };
     }

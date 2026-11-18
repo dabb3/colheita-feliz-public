@@ -94,7 +94,7 @@ class AwayReportIntegrationTest {
         matureCrop(true);
         assertEquals("PROTECTED", steal().getAsJsonObject("theftOutcome").get("kind").getAsString());
         var defense = ledger(owner).events().getLast();
-        assertEquals("DEFENDED", defense.kind()); assertEquals("Amiga", defense.actor()); assertNotNull(defense.protectorId());
+        assertEquals("DEFENDED", defense.kind()); assertEquals("Amiga", defense.actor()); assertNull(defense.protectorId());
     }
 
     @Test void rolledBackVisitDoesNotDoubleCount() {
@@ -130,13 +130,50 @@ class AwayReportIntegrationTest {
         assertEquals(clock.instant(), ledger(fresh).lastSeenAt());
     }
 
-    @Test void deliversOnceAfterThreeHours() {
+    private String reportId(UUID player) {
+        var view = service.farm(player);
+        return view.has("awayReport") ? view.getAsJsonObject("awayReport").get("id").getAsString() : null;
+    }
+
+    @Test void reportStaysUntilAcknowledged() {
         service.farm(owner);
         clock.advance(3 * 3600); matureCrop(false);
         var view = service.farm(owner);
-        assertTrue(view.has("awayReport"));
         assertEquals(3 * 3600, view.getAsJsonObject("awayReport").get("awaySeconds").getAsLong());
-        assertFalse(hasReport(owner));
+        String id = view.getAsJsonObject("awayReport").get("id").getAsString();
+        // A lost response or a reload gets the same report again.
+        assertEquals(id, reportId(owner));
+        service.acknowledgeAwayReport(owner, id);
+        assertNull(reportId(owner));
+        service.acknowledgeAwayReport(owner, id); // repeated ack is harmless
+        assertNull(reportId(owner));
+    }
+
+    @Test void staleAcknowledgementKeepsNewerReport() {
+        service.farm(owner);
+        clock.advance(3 * 3600); matureCrop(false);
+        String first = reportId(owner);
+        clock.advance(3 * 3600); matureCrop(false);
+        String second = reportId(owner);
+        assertNotEquals(first, second, "a newer absence supersedes the unacknowledged report");
+        service.acknowledgeAwayReport(owner, first);
+        assertEquals(second, reportId(owner));
+        service.acknowledgeAwayReport(owner, UUID.randomUUID().toString());
+        assertEquals(second, reportId(owner));
+    }
+
+    @Test void identicalAbsencesGetDistinctIds() {
+        service.farm(owner);
+        clock.advance(3 * 3600); matureCrop(false);
+        String first = reportId(owner); service.acknowledgeAwayReport(owner, first);
+        clock.advance(3 * 3600); matureCrop(false);
+        String second = reportId(owner);
+        assertNotNull(second); assertNotEquals(first, second);
+    }
+
+    @Test void invalidAcknowledgementIsRejected() {
+        var failure = assertThrows(ApiFailure.class, () -> service.acknowledgeAwayReport(owner, "nao-e-uuid"));
+        assertEquals(400, failure.status());
     }
 
     @Test void underThreeHoursDiscards() {
@@ -147,13 +184,13 @@ class AwayReportIntegrationTest {
         assertFalse(hasReport(owner));
     }
 
-    @Test void concurrentGetsDeliverOnce() throws Exception {
+    @Test void concurrentGetsShareOneReport() throws Exception {
         service.farm(owner);
         clock.advance(3 * 3600); matureCrop(false);
         var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
         try {
-            var first = pool.submit(() -> hasReport(owner)); var second = pool.submit(() -> hasReport(owner));
-            assertEquals(1, (first.get() ? 1 : 0) + (second.get() ? 1 : 0));
+            var first = pool.submit(() -> reportId(owner)); var second = pool.submit(() -> reportId(owner));
+            assertNotNull(first.get()); assertEquals(first.get(), second.get());
         } finally { pool.shutdownNow(); }
     }
 
