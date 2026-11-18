@@ -81,12 +81,12 @@ function task(parent:HTMLElement,art:string,title:string,detail:string,actionLab
 }
 
 /** Products share one line: a single kind shows its art, several show a total and the list. */
-function productLine(parent:HTMLElement,products:AwayReport['products'],where:string,groupArt:string){
+function productLine(parent:HTMLElement,products:AwayReport['products'],[one,many]:[string,string],groupArt:string){
  if(!products.length)return;
  const sub=document.createElement('div');sub.className='away-sub';const copy=document.createElement('div');
- if(products.length===1){const only=products[0];sub.append(image(productArt(only.animalId)));copy.append(text('span',`${pluralItem(only.name,only.quantity)} ${where}`,'away-label'));}
+ if(products.length===1){const only=products[0];sub.append(image(productArt(only.animalId)));copy.append(text('span',`${pluralItem(only.name,only.quantity)} ${only.quantity===1?one:many}`,'away-label'));}
  else{const total=products.reduce((sum,item)=>sum+item.quantity,0);sub.append(image(groupArt));const headline=document.createElement('div');
-  headline.append(text('span',String(total),'away-big'),' ',text('span',`produtos ${where}`,'away-label'));
+  headline.append(text('span',String(total),'away-big'),' ',text('span',`produtos ${many}`,'away-label'));
   copy.append(headline);itemLine(copy,products.map(item=>({art:productArt(item.animalId),label:pluralItem(item.name,item.quantity)})));}
  sub.append(copy);parent.append(sub);
 }
@@ -112,8 +112,8 @@ export function renderAwayReport(parent:HTMLElement,footer:HTMLElement,report:Aw
    copy.append(headline);itemLine(copy,report.harvests.map(item=>({art:cropArt(item.stem),label:pluralItem(item.name,item.quantity)})));
    hero.append(art,copy);reward.append(hero);
   }
-  productLine(reward,report.products,'no depósito','classic/icons/deposit-icon.png');
-  productLine(reward,report.readyProducts,'prontos para recolher no celeiro','classic/icons/deposit-icon.png');
+  productLine(reward,report.products,['no depósito','no depósito'],'classic/icons/deposit-icon.png');
+  productLine(reward,report.readyProducts,['pronto para recolher no celeiro','prontos para recolher no celeiro'],'classic/icons/deposit-icon.png');
  }
  if(report.thefts.length){const visits=section(body,'is-theft','Visitas','Visitas na sua fazenda');
   for(const theft of report.thefts)event(visits,cropArt(theft.stem),[`${theft.actor} levou ${pluralItem(theft.name,theft.quantity)}.`],theft.at);}
@@ -122,6 +122,8 @@ export function renderAwayReport(parent:HTMLElement,footer:HTMLElement,report:Aw
  const care=report.care,careTotal=care.waterings+care.pestsRemoved+care.animalCares;
  if(careTotal){
   const box=section(body,'is-vip','Cuidados automáticos');const details=document.createElement('details') as HTMLDetailsElement;details.open=handlers.careOpen;
+  // Tracks the intended state: the closing animation only clears details.open when it finishes.
+  let careOpen=handlers.careOpen;
   const summary=document.createElement('summary');summary.append(image('classic/icons/cartao-vip.png'),text('span',''),text('span','','away-chevron'));
   (summary.children[1] as HTMLElement).append(text('b',String(careTotal)),' cuidados automáticos');
   const cards=document.createElement('div');cards.className='away-care';
@@ -129,7 +131,7 @@ export function renderAwayReport(parent:HTMLElement,footer:HTMLElement,report:Aw
    const card=document.createElement('div');card.append(image(art),text('b',String(count)),text('span',label));cards.append(card);
   }
   details.append(summary,cards);box.append(details);
-  summary.onclick=(event:Event)=>{event.preventDefault();toggleCare(details,cards,!details.open);handlers.onCareToggle(details.open);};
+  summary.onclick=(event:Event)=>{event.preventDefault();const next=!careOpen;careOpen=next;toggleCare(details,cards,next);handlers.onCareToggle(next);};
  }
  if(report.pending.length){
   const todo=section(body,'is-todo','Pendências','Precisa da sua atenção');
@@ -149,6 +151,8 @@ export function renderAwayReport(parent:HTMLElement,footer:HTMLElement,report:Aw
 const still=()=>typeof matchMedia!=='function'||matchMedia('(prefers-reduced-motion: reduce)').matches;
 /** Height animation for the care cards; instant when the player prefers reduced motion. */
 function toggleCare(details:HTMLDetailsElement,cards:HTMLElement,open:boolean){
+ // A quick second click cancels the running animation, so a late close never undoes a reopen.
+ if(typeof cards.getAnimations==='function')for(const running of cards.getAnimations())running.cancel();
  if(still()||typeof cards.animate!=='function'){details.open=open;return;}
  if(open){details.open=true;const height=cards.offsetHeight;cards.classList.remove('is-entering');void cards.offsetWidth;cards.classList.add('is-entering');
   cards.animate([{height:'0px',opacity:0},{height:`${height}px`,opacity:1}],{duration:240,easing:'cubic-bezier(.2,0,0,1)'});}

@@ -881,6 +881,13 @@ test('reversed GET replies show the report once and resend a lost acknowledgemen
  h.receive({farm:{...farm('alice'),revision:'4',awayReport}});await new Promise(r=>setTimeout(r,0));
  assert.equal(elements.get('modal').open,false);assert.deepEqual(acks,[awayReport.id,awayReport.id]);
 });
+test('a report that fails to render is not acknowledged and shows on the next reply',async()=>{
+ const {h,elements}=app(),acks=[];h.set({own:farm('alice'),api:{pending:null,ackAwayReport:async id=>{acks.push(id);}}});
+ h.receive({farm:{...farm('alice'),revision:'2',awayReport:{...awayReport,harvests:null}}});
+ await new Promise(r=>setTimeout(r,0));assert.deepEqual(acks,[]);assert.equal(elements.get('modal').open,false);
+ h.receive({farm:{...farm('alice'),revision:'3',awayReport}});
+ assert.match(text(elements.get('modal-content')),/Sua fazenda rendeu!/);await new Promise(r=>setTimeout(r,0));assert.deepEqual(acks,[awayReport.id]);
+});
 test('a reload before the acknowledgement shows the report again',()=>{
  for(let run=0;run<2;run++){const {h,elements}=app();h.set({own:farm('alice')});
   h.receive({farm:{...farm('alice'),revision:'2',awayReport}});assert.match(text(elements.get('modal-content')),/Sua fazenda rendeu!/);}

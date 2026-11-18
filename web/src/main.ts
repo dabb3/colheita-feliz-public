@@ -171,10 +171,12 @@ async function awayCommand(fields:CommandFields){
 /** The away report goes first: it is about the player's own farm. */
 function showAwayReport(){
  if(!own||modal.open||!pendingAway)return false;
- const report=pendingAway;pendingAway=undefined;shownAway.add(report.id);dialog(AWAY_TITLE);acknowledgeAway(report.id);
+ const report=pendingAway;pendingAway=undefined;dialog(AWAY_TITLE);
  const stopLeaves=document.body?startAwayLeaves(document.body):()=>{};modal.addEventListener('close',stopLeaves,{once:true});
  modalFooter.hidden=false;
- const close=renderAwayReport(content,modalFooter,report,{
+ let close:HTMLButtonElement;
+ // Acknowledge only after the panel is built: a failed render keeps the report on the server for the next reply.
+ try{close=renderAwayReport(content,modalFooter,report,{
   renew:serviceId=>awayCommand({action:'BUY_AUTOMATION',itemId:serviceId}),
   feed:animalId=>awayCommand({action:'TEND_ANIMAL',itemId:animalId}),
   renewVip:()=>{modal.close();shop('vip');},
@@ -183,7 +185,8 @@ function showAwayReport(){
   careOpen:awayCareOpen(),
   vipActive:!!own.vipActive,
   onCareToggle:open=>{try{window.localStorage.setItem(awayCareKey(),open?'1':'0');}catch{}},
- });
+ });}catch{modal.close();return false;}
+ shownAway.add(report.id);acknowledgeAway(report.id);
  close.focus({preventScroll:true});
  return true;
 }

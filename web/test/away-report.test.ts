@@ -90,7 +90,7 @@ test('ready products in the barn are not described as collected',()=>{
 test('collected and ready products are listed apart',()=>{
  const {ctx,make,all}=dom();const root=make('div'),foot=make('div');
  ctx.render(root,foot,{...base,products:[{productId:'ovo',name:'Ovo',animalId:'galinha',quantity:3}],readyProducts:[{productId:'leite',name:'Leite',animalId:'vaca',quantity:1}]},handlers());
- assert.match(all(root),/3 ovos no depósito/);assert.match(all(root),/1 leite prontos para recolher no celeiro/);
+ assert.match(all(root),/3 ovos no depósito/);assert.match(all(root),/1 leite pronto para recolher no celeiro/);
 });
 test('automation with expired VIP points to the VIP card instead of a purchase that would be refused',()=>{
  const {ctx,make,nodes,all}=dom();const root=make('div'),foot=make('div');let renews=0,vip=0;
@@ -98,4 +98,30 @@ test('automation with expired VIP points to the VIP card instead of a purchase t
   handlers({vipActive:false,renew:async()=>{renews++;},renewVip:()=>vip++}));
  assert.match(all(root),/Renove o cartão VIP para reativar/);assert.doesNotMatch(all(root),/100 verdes/);
  nodes(root).find(n=>n.textContent==='Renovar VIP').onclick();assert.equal(vip,1);assert.equal(renews,0);
+});
+test('ready products agree in number',()=>{
+ for(const [quantity,expected] of [[1,/1 ovo pronto para recolher no celeiro/],[2,/2 ovos prontos para recolher no celeiro/]]){
+  const {ctx,make,all}=dom();const root=make('div');
+  ctx.render(root,make('div'),{...base,readyProducts:[{productId:'ovo',name:'Ovo',animalId:'galinha',quantity}]},handlers());
+  assert.match(all(root),expected);
+ }
+});
+const careReport={...base,care:{waterings:2,pestsRemoved:0,animalCares:0}};
+const summaryOf=(nodes,root)=>nodes(root).find(n=>n.tag==='summary');
+test('care preference saves the intended state with reduced motion',()=>{
+ const {ctx,make,nodes}=dom();const root=make('div'),saved=[];
+ ctx.render(root,make('div'),careReport,handlers({onCareToggle:open=>saved.push(open)}));
+ const summary=summaryOf(nodes,root),click=()=>summary.onclick({preventDefault(){}});
+ click();click();assert.deepEqual(saved,[true,false]);
+});
+test('care preference saves the intended state while the closing animation runs, also on quick clicks',()=>{
+ const {ctx,make,nodes}=dom();ctx.matchMedia=()=>({matches:false});const root=make('div'),saved=[],animations=[];
+ const realMake=ctx.document.createElement;ctx.document.createElement=tag=>{const node=realMake(tag);
+  node.animate=()=>{const animation={onfinish:null,cancelled:false,cancel(){this.cancelled=true;}};animations.push(animation);return animation;};
+  node.getAnimations=()=>animations.filter(a=>!a.cancelled&&!a.finished);return node;};
+ ctx.render(root,make('div'),careReport,handlers({careOpen:true,onCareToggle:open=>saved.push(open)}));
+ const summary=summaryOf(nodes,root),details=nodes(root).find(n=>n.tag==='details'),click=()=>summary.onclick({preventDefault(){}});
+ click();assert.deepEqual(saved,[false]);assert.equal(details.open,true,'still animating');
+ click();assert.deepEqual(saved,[false,true]);assert.ok(animations[0].cancelled,'reopening cancels the pending close');
+ animations[1].onfinish?.();assert.equal(details.open,true,'a cancelled close never finishes, so the panel stays open');
 });
