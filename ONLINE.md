@@ -333,7 +333,7 @@ precisam de ensaio; testes automatizados não comprovam esses resultados.
 
 ## Relatório do período offline
 
-Depois de 3 horas ou mais fora, a primeira abertura da própria fazenda mostra uma vez o painel "Sua fazenda rendeu!" com colheitas, produtos, visitas, proteção, cuidados automáticos e pendências do período, antes das notas de atualização. A regra completa está em [Relatório do período offline](docs/game-rule.md#19-relatório-do-período-offline). O painel usa a fonte Fredoka (OFL), servida localmente em `web/public/fonts`.
+Depois de 3 horas ou mais fora, a abertura da própria fazenda mostra o painel "Sua fazenda rendeu!" com colheitas, produtos, visitas, proteção, cuidados automáticos e pendências do período, antes das notas de atualização. O servidor guarda o relatório até o cliente confirmar a exibição. A regra completa está em [Relatório do período offline](docs/game-rule.md#19-relatório-do-período-offline). O painel usa a fonte Fredoka (OFL), servida localmente em `web/public/fonts`.
 
 ## Tempos exibidos no cultivo
 
