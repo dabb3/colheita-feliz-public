@@ -27,8 +27,8 @@ function dom(){
  const all=n=>flat(n);
  return {ctx,make,nodes,all};
 }
-const base={awaySeconds:33600,harvests:[],products:[],thefts:[],defenses:[],care:{waterings:0,pestsRemoved:0,animalCares:0},pending:[]};
-function handlers(over={}){return{renew:async()=>undefined,renewVip(){},feed:async()=>undefined,buyFeed(){},close(){},careOpen:false,onCareToggle(){},...over};}
+const base={id:'r1',awaySeconds:33600,harvests:[],products:[],readyProducts:[],thefts:[],defenses:[],care:{waterings:0,pestsRemoved:0,animalCares:0},pending:[]};
+function handlers(over={}){return{renew:async()=>undefined,renewVip(){},feed:async()=>undefined,buyFeed(){},close(){},careOpen:false,vipActive:true,onCareToggle(){},...over};}
 
 test('empty sections are omitted and a single product reads on one line',()=>{
  const {ctx,make,all}=dom();const root=make('div'),foot=make('div');
@@ -44,11 +44,11 @@ test('several products, harvests, thefts, defense and care render with the appro
   harvests:[{cropId:'morango',name:'Morango',stem:'morango',quantity:12},{cropId:'abobora',name:'Abóbora',stem:'abobora',quantity:6}],
   products:[{productId:'ovo',name:'Ovo',animalId:'galinha',quantity:3},{productId:'leite',name:'Leite',animalId:'vaca',quantity:1}],
   thefts:[{at:'2026-11-13T02:48:00Z',actor:'Bob',itemId:'morango',name:'Morango',stem:'morango',quantity:2}],
-  defenses:[{at:'2026-11-13T04:15:00Z',actor:'Carol',protectorId:'cachorro-robo',protectorName:'Cachorro'}],
+  defenses:[{at:'2026-11-13T04:15:00Z',actor:'Carol'}],
   care:{waterings:18,pestsRemoved:6,animalCares:3}},handlers());
  const text=all(root);
  for(const piece of['18','colheitas prontas','12 morangos','6 abóboras','4 produtos no depósito','3 ovos','1 leite','Bob levou 2 morangos.',
-  'Seu cachorro protegeu a fazenda','Tentativa de Carol impedida.','27','cuidados automáticos','regas','pragas removidas','refeições'])assert.ok(text.includes(piece),piece);
+  'Seus protetores impediram a tentativa','Tentativa de Carol impedida.','27','cuidados automáticos','regas','pragas removidas','refeições'])assert.ok(text.includes(piece),piece);
 });
 test('renew asks for cost first, confirms once and shows the result',async()=>{
  const {ctx,make,nodes,all}=dom();const root=make('div'),foot=make('div');let calls=0,release;
@@ -81,4 +81,21 @@ test('feed uses stock, offers buying when empty and VIP opens the shop',async()=
  const empty=dom(),r2=empty.make('div');
  empty.ctx.render(r2,empty.make('div'),{...base,pending:[{kind:'FEED',animalId:'cachorro-robo',name:'Cachorro',stock:0}]},handlers({buyFeed:()=>bought++}));
  empty.nodes(r2).find(n=>n.textContent==='Comprar ração').onclick();assert.equal(bought,1);
+});
+test('ready products in the barn are not described as collected',()=>{
+ const {ctx,make,all}=dom();const root=make('div'),foot=make('div');
+ ctx.render(root,foot,{...base,readyProducts:[{productId:'ovo',name:'Ovo',animalId:'galinha',quantity:2}]},handlers());
+ assert.match(all(root),/2 ovos prontos para recolher no celeiro/);assert.doesNotMatch(all(root),/no depósito/);
+});
+test('collected and ready products are listed apart',()=>{
+ const {ctx,make,all}=dom();const root=make('div'),foot=make('div');
+ ctx.render(root,foot,{...base,products:[{productId:'ovo',name:'Ovo',animalId:'galinha',quantity:3}],readyProducts:[{productId:'leite',name:'Leite',animalId:'vaca',quantity:1}]},handlers());
+ assert.match(all(root),/3 ovos no depósito/);assert.match(all(root),/1 leite prontos para recolher no celeiro/);
+});
+test('automation with expired VIP points to the VIP card instead of a purchase that would be refused',()=>{
+ const {ctx,make,nodes,all}=dom();const root=make('div'),foot=make('div');let renews=0,vip=0;
+ ctx.render(root,foot,{...base,pending:[{kind:'AUTOMATION',serviceId:'water',name:'Rega automática',expiredAt:'2026-11-13T06:12:00Z'}]},
+  handlers({vipActive:false,renew:async()=>{renews++;},renewVip:()=>vip++}));
+ assert.match(all(root),/Renove o cartão VIP para reativar/);assert.doesNotMatch(all(root),/100 verdes/);
+ nodes(root).find(n=>n.textContent==='Renovar VIP').onclick();assert.equal(vip,1);assert.equal(renews,0);
 });

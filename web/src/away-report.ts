@@ -10,6 +10,8 @@ export interface AwayHandlers {
   buyFeed():void;
   close():void;
   careOpen:boolean;
+  /** Automation can only be bought with an active VIP card. */
+  vipActive:boolean;
   onCareToggle(open:boolean):void;
 }
 
@@ -78,8 +80,19 @@ function task(parent:HTMLElement,art:string,title:string,detail:string,actionLab
  return {setDetail:(value:string)=>{detailNode.textContent=value;}};
 }
 
+/** Products share one line: a single kind shows its art, several show a total and the list. */
+function productLine(parent:HTMLElement,products:AwayReport['products'],where:string,groupArt:string){
+ if(!products.length)return;
+ const sub=document.createElement('div');sub.className='away-sub';const copy=document.createElement('div');
+ if(products.length===1){const only=products[0];sub.append(image(productArt(only.animalId)));copy.append(text('span',`${pluralItem(only.name,only.quantity)} ${where}`,'away-label'));}
+ else{const total=products.reduce((sum,item)=>sum+item.quantity,0);sub.append(image(groupArt));const headline=document.createElement('div');
+  headline.append(text('span',String(total),'away-big'),' ',text('span',`produtos ${where}`,'away-label'));
+  copy.append(headline);itemLine(copy,products.map(item=>({art:productArt(item.animalId),label:pluralItem(item.name,item.quantity)})));}
+ sub.append(copy);parent.append(sub);
+}
+
 export function renderAwayReport(parent:HTMLElement,footer:HTMLElement,report:AwayReport,handlers:AwayHandlers){
- const best=[...report.harvests].sort((a,b)=>b.quantity-a.quantity)[0],bestProduct=[...report.products].sort((a,b)=>b.quantity-a.quantity)[0];
+ const best=[...report.harvests].sort((a,b)=>b.quantity-a.quantity)[0],bestProduct=[...report.products,...report.readyProducts].sort((a,b)=>b.quantity-a.quantity)[0];
  const header=document.createElement('div');header.className='away-header';
  const basket=document.createElement('div');basket.className='away-basket';basket.append(image('classic/animals/ovelha/cesta-vazia.png','away-basket-base'));
  if(best||bestProduct)basket.append(image(best?cropArt(best.stem):productArt(bestProduct!.animalId),'away-basket-fill'));
@@ -89,7 +102,7 @@ export function renderAwayReport(parent:HTMLElement,footer:HTMLElement,report:Aw
  header.append(basket,titleRow,subtitle);parent.append(header);
  const body=document.createElement('div');body.className='away-body';parent.append(body);
 
- if(report.harvests.length||report.products.length){
+ if(report.harvests.length||report.products.length||report.readyProducts.length){
   const reward=section(body,'is-reward','Recompensas');
   if(report.harvests.length){
    const total=report.harvests.reduce((sum,item)=>sum+item.quantity,0);
@@ -99,19 +112,13 @@ export function renderAwayReport(parent:HTMLElement,footer:HTMLElement,report:Aw
    copy.append(headline);itemLine(copy,report.harvests.map(item=>({art:cropArt(item.stem),label:pluralItem(item.name,item.quantity)})));
    hero.append(art,copy);reward.append(hero);
   }
-  if(report.products.length){
-   const sub=document.createElement('div');sub.className='away-sub';const total=report.products.reduce((sum,item)=>sum+item.quantity,0);
-   const copy=document.createElement('div');
-   if(report.products.length===1){const only=report.products[0];sub.append(image(productArt(only.animalId)));copy.append(text('span',pluralItem(only.name,only.quantity)+' no depósito','away-label'));}
-   else{sub.append(image('classic/icons/deposit-icon.png'));const headline=document.createElement('div');headline.append(text('span',String(total),'away-big'),' ',text('span','produtos no depósito','away-label'));
-    copy.append(headline);itemLine(copy,report.products.map(item=>({art:productArt(item.animalId),label:pluralItem(item.name,item.quantity)})));}
-   sub.append(copy);reward.append(sub);
-  }
+  productLine(reward,report.products,'no depósito','classic/icons/deposit-icon.png');
+  productLine(reward,report.readyProducts,'prontos para recolher no celeiro','classic/icons/deposit-icon.png');
  }
  if(report.thefts.length){const visits=section(body,'is-theft','Visitas','Visitas na sua fazenda');
   for(const theft of report.thefts)event(visits,cropArt(theft.stem),[`${theft.actor} levou ${pluralItem(theft.name,theft.quantity)}.`],theft.at);}
  if(report.defenses.length){const guard=section(body,'is-guard','Proteção','Proteção da fazenda');
-  for(const defense of report.defenses)event(guard,'classic/animals/cachorro/cachorro.png',[`Seu ${lower(defense.protectorName)} protegeu a fazenda`,`Tentativa de ${defense.actor} impedida.`],defense.at,'is-defense');}
+  for(const defense of report.defenses)event(guard,'classic/animals/cachorro/cachorro.png',['Seus protetores impediram a tentativa',`Tentativa de ${defense.actor} impedida.`],defense.at,'is-defense');}
  const care=report.care,careTotal=care.waterings+care.pestsRemoved+care.animalCares;
  if(careTotal){
   const box=section(body,'is-vip','Cuidados automáticos');const details=document.createElement('details') as HTMLDetailsElement;details.open=handlers.careOpen;
@@ -127,7 +134,8 @@ export function renderAwayReport(parent:HTMLElement,footer:HTMLElement,report:Aw
  if(report.pending.length){
   const todo=section(body,'is-todo','Pendências','Precisa da sua atenção');
   for(const item of report.pending){
-   if(item.kind==='AUTOMATION')task(todo,'classic/icons/vip/upgrade_vip_regador.png',`${item.name} expirou`,`às ${clock(item.expiredAt)}`,'Renovar','Renovar por 30 dias: 100 verdes',()=>handlers.renew(item.serviceId),`${item.name} ativa ✓`);
+   if(item.kind==='AUTOMATION'&&!handlers.vipActive)task(todo,'classic/icons/vip/upgrade_vip_regador.png',`${item.name} expirou`,'Renove o cartão VIP para reativar','Renovar VIP',undefined,()=>handlers.renewVip());
+   else if(item.kind==='AUTOMATION')task(todo,'classic/icons/vip/upgrade_vip_regador.png',`${item.name} expirou`,`às ${clock(item.expiredAt)}`,'Renovar','Renovar por 30 dias: 100 verdes',()=>handlers.renew(item.serviceId),`${item.name} ativa ✓`);
    else if(item.kind==='VIP')task(todo,'classic/icons/cartao-vip.png','Seu cartão VIP expirou',`às ${clock(item.expiredAt)}`,'Renovar',undefined,()=>handlers.renewVip());
    else if(item.stock<=0)task(todo,'classic/icons/racao-generica.png',`Seu ${lower(item.name)} está sem ração`,'Você não tem ração no estoque','Comprar ração',undefined,()=>handlers.buyFeed());
    else{let stock=item.stock;const row=task(todo,'classic/icons/racao-generica.png',`Seu ${lower(item.name)} está sem ração`,`Você tem ${stock} rações no estoque`,'Alimentar','Usa 1 das suas rações',

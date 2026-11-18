@@ -143,14 +143,23 @@ function showBite(reply:Reply,actionName?:string){
 let pendingUpdateNotes: NonNullable<Farm['updateNotes']>[] = [], notesOwner = '';
 const shownUpdateNotes = new Set<string>();
 const AWAY_TITLE='Sua fazenda rendeu!';
-let pendingAway:AwayReport|undefined;const shownAway=new Set<string>();
+let pendingAway:AwayReport|undefined;const shownAway=new Set<string>(),ackingAway=new Set<string>();
 function collectUpdateNotes(farm:Farm){
  if(notesOwner!==farm.owner){notesOwner=farm.owner;shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();pendingAway=undefined;shownAway.clear();}
- if(farm.awayReport){const key=JSON.stringify(farm.awayReport);if(!shownAway.has(key)){shownAway.add(key);pendingAway=farm.awayReport;}}
  const notes=farm.updateNotes;
  if(!notes?.version?.trim()||!Number.isInteger(notes.prNumber)||notes.prNumber<=0||!/^\d{4}-\d{2}-\d{2}$/.test(notes.date)||!notes.items?.length||!notes.items.every(item=>typeof item==='string'&&item.trim()))return;
  const key=JSON.stringify([notes.version,notes.date]);if(shownUpdateNotes.has(key))return;
  shownUpdateNotes.add(key);pendingUpdateNotes.push(notes);
+}
+/** Read from every own-farm reply, even one whose snapshot loses to a newer revision: the report is not farm state. */
+function collectAwayReport(farm:Farm){
+ const report=farm.awayReport;if(!report?.id||farm.owner!==own?.owner)return;
+ // Already shown: the server still has it, so the acknowledgement was lost; send it again.
+ if(shownAway.has(report.id))acknowledgeAway(report.id);else if(pendingAway?.id!==report.id)pendingAway=report;
+}
+function acknowledgeAway(id:string){
+ const client=api;if(!client||ackingAway.has(id))return;ackingAway.add(id);
+ void client.ackAwayReport(id).catch(()=>{}).finally(()=>ackingAway.delete(id));
 }
 const awayCareKey=()=>`colheita:away-care-open:${own?.owner??''}`;
 function awayCareOpen(){try{return window.localStorage.getItem(awayCareKey())==='1';}catch{return false;}}
@@ -162,7 +171,7 @@ async function awayCommand(fields:CommandFields){
 /** The away report goes first: it is about the player's own farm. */
 function showAwayReport(){
  if(!own||modal.open||!pendingAway)return false;
- const report=pendingAway;pendingAway=undefined;dialog(AWAY_TITLE);
+ const report=pendingAway;pendingAway=undefined;shownAway.add(report.id);dialog(AWAY_TITLE);acknowledgeAway(report.id);
  const stopLeaves=document.body?startAwayLeaves(document.body):()=>{};modal.addEventListener('close',stopLeaves,{once:true});
  modalFooter.hidden=false;
  const close=renderAwayReport(content,modalFooter,report,{
@@ -172,6 +181,7 @@ function showAwayReport(){
   buyFeed:()=>{modal.close();shop('animals');},
   close:()=>{modal.close();showUpdateNotes();},
   careOpen:awayCareOpen(),
+  vipActive:!!own.vipActive,
   onCareToggle:open=>{try{window.localStorage.setItem(awayCareKey(),open?'1':'0');}catch{}},
  });
  close.focus({preventScroll:true});
@@ -425,6 +435,7 @@ function updateOwnFarm(farm:Farm){
  own=acceptFarm(own,farm);
  if(own===farm){const server=Date.parse(farm.serverTime??'');if(Number.isFinite(server))ownServerClock={owner:farm.owner,server,client:performance.now()};}
  if(own===farm)collectUpdateNotes(farm);
+ collectAwayReport(farm);
  if(previous&&own!==previous&&own.tiles.some(tile=>tile.state==='READY'&&previous.tiles.some(old=>
   old.column===tile.column&&old.row===tile.row&&old.cropId===tile.cropId&&old.season===tile.season&&old.state==='GROWING'
  )))playEffect('planta-pronta-para-colher');
