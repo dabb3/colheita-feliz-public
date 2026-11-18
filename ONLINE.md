@@ -283,8 +283,10 @@ aberta for insuficiente, a inspeção ocupa o lugar da cena no fluxo da página:
 cabeçalho, painel, bandeja e ferramentas ficam em sequência, sem sobreposição.
 Apenas a página inteira pode rolar; o painel mantém a fonte e todo o conteúdo.
 Fechar a inspeção ou escolher outra ferramenta restaura a cena. O mesmo fallback
-atende uma área visual reduzida pelo zoom de página. A atualização recebida da
-API renova o painel mesmo com o cursor parado.
+atende uma área visual reduzida pelo zoom de página. Ao sair do fallback após um
+redimensionamento, uma inspeção aberta por hover volta a fechar com a saída do
+ponteiro; somente a abertura explícita por clique ou toque mantém a fixação.
+A atualização recebida da API renova o painel mesmo com o cursor parado.
 
 Clique em animal abre o alvo escolhido. Ações de alimentação, coleta ou venda
 seguem espécie, estágio e estado projetados pelo servidor. Animais da fazenda

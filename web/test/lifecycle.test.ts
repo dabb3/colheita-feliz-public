@@ -998,6 +998,25 @@ test('leaving inspection restores the scene after the flow fallback',()=>{
  h.pickTool('WATER');assert.equal(classes.has('inspection-flow'),false);assert.equal(ctx.document.getElementById('plant-health').hidden,true);
 });
 
+for(const pointer of ['mouse','tap'])test(`${pointer} inspection restores its pinning intent after flow and resize`,()=>{
+ for(const [width,height,layout]of [[390,844,'fixed'],[1366,900,'anchored']]){
+  const {h,ctx}=app();h.set({own:farm('alice'),catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:3600}],animals:[],fertilizers:[]}});
+  let size={left:0,top:0,width:390,height:667};
+  ctx.window.innerWidth=size.width;ctx.window.innerHeight=size.height;ctx.window.matchMedia=query=>({matches:query.includes('orientation:landscape')?size.width>size.height&&size.height<=650:size.width<=1100});
+  const game=ctx.document.getElementById('game'),panel=ctx.document.getElementById('plant-health');
+  game.getBoundingClientRect=()=>size;ctx.document.getElementById('farm').getBoundingClientRect=()=>size;
+  ctx.document.getElementById('farm-header').getBoundingClientRect=()=>({top:0,height:176});ctx.document.getElementById('tools-bar').getBoundingClientRect=()=>({top:size.height-184});ctx.document.getElementById('tool-tray').hidden=true;
+  panel.hidden=true;panel.getBoundingClientRect=()=>({height:360});
+  const tile={column:0,row:0,cropId:'nabo',state:'GROWING',watered:true,remainingSeconds:600,nominalRemainingSeconds:600,season:1,seasons:1},point={x:585,y:400};
+  h.health(tile,point,pointer);h.runTimeouts();assert.equal(panel.dataset.layout,'flow');
+  h.health(null,null,'mouse');assert.equal(panel.hidden,false,'flow temporarily retains both hover and tap inspections');
+  size={left:0,top:0,width,height};ctx.window.innerWidth=width;ctx.window.innerHeight=height;
+  h.health(tile,point,'resize');assert.equal(panel.dataset.layout,layout);
+  h.health(null,null,'mouse');assert.equal(panel.hidden,pointer==='mouse','only an explicit tap stays pinned after resize');
+  panel.listeners.pointerleave();assert.equal(panel.hidden,pointer==='mouse');
+ }
+});
+
 test('desktop plant popups respect visible bounds and tools while animal positioning stays anchored',()=>{
  const {h,ctx}=app();ctx.window.innerWidth=1366;ctx.window.innerHeight=768;
  const game=ctx.document.getElementById('game'),panel=ctx.document.getElementById('plant-health');

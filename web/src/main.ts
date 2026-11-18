@@ -457,9 +457,9 @@ async function tileAction(tile:Tile){
  if(tool==='CURSOR')return;
  await action(tileCommand(tool,tile,selectedSeed,selectedFertilizer));
 }
-let healthKey='',healthDataKey='',healthOpenTimer:number|undefined,healthClockTimer:number|undefined,healthPinned=false,healthAnchorAt=0,healthBaseRemaining=0,healthBaseNominal=0;
+let healthKey='',healthDataKey='',healthOpenTimer:number|undefined,healthClockTimer:number|undefined,healthPinned=false,healthTapPinned=false,healthAnchorAt=0,healthBaseRemaining=0,healthBaseNominal=0;
 function clearHealthTimers(){window.clearTimeout(healthOpenTimer);window.clearTimeout(healthClockTimer);healthOpenTimer=undefined;healthClockTimer=undefined;}
-function closeHealth(){element('game').classList.remove('inspection-flow');clearHealthTimers();healthPinned=false;healthTile=null;healthPoint=null;animalTooltipId='';animalTooltipPoint=null;healthKey='';healthDataKey='';const panel=element('plant-health');panel.className='crop-tooltip';panel.hidden=true;}
+function closeHealth(){element('game').classList.remove('inspection-flow');clearHealthTimers();healthPinned=false;healthTapPinned=false;healthTile=null;healthPoint=null;animalTooltipId='';animalTooltipPoint=null;healthKey='';healthDataKey='';const panel=element('plant-health');panel.className='crop-tooltip';panel.hidden=true;}
 function health(tile:Tile|null,point:{x:number;y:number}|null,pointerType='mouse'){
  if(tool!=='CURSOR'&&(tile?.cropId||healthTile)){closeHealth();return;}
  if(healthPinned&&!['tap','resize','refresh'].includes(pointerType))return;
@@ -474,7 +474,7 @@ function health(tile:Tile|null,point:{x:number;y:number}|null,pointerType='mouse
   if(sameTile&&healthOpenTimer!==undefined)return;
   window.clearTimeout(healthOpenTimer);healthOpenTimer=window.setTimeout(()=>{healthOpenTimer=undefined;if(healthTile?.column===tile.column&&healthTile?.row===tile.row&&healthPoint)renderHealth(healthTile,healthPoint);},150);return;
  }
- if(pointerType==='tap')healthPinned=true;
+ if(pointerType==='tap'){healthTapPinned=true;healthPinned=true;}
  renderHealth(tile,point);
 }
 function renderHealth(tile:Tile,point:{x:number;y:number},force=false){
@@ -515,6 +515,7 @@ function formatRemaining(seconds:number){const total=Math.max(0,Math.ceil(second
 function addChip(parent:HTMLElement,label:string,iconPath:string,kind:'problem'|'benefit'){const chip=document.createElement('span');chip.className=`crop-status-chip is-${kind}`;const icon=document.createElement('img');icon.src=iconPath;icon.alt='';chip.append(icon,document.createTextNode(label));parent.append(chip);}
 function healthAction(tile:Tile,ready:boolean,dead:boolean){if(visited){if(tool==='CURSOR')return undefined;if(tool==='CLEAN_WEEDS'||tool==='CLEAN_INSECTS'){if(dead||!visitCleanAvailable(tool,tile))return undefined;return tool==='CLEAN_WEEDS'?{label:'Tirar ervas do amigo',icon:'/assets/classic/icons/hud/herbicida-ui.png'}:{label:'Matar insetos do amigo',icon:'/assets/classic/icons/hud/pesticida-ui.png'};}if(tool==='SPREAD_INSECTS'||tool==='SPREAD_WEEDS'){if(ready||dead||!tile.watered||(tool==='SPREAD_INSECTS'?tile.insects>0:tile.weeds))return undefined;return tool==='SPREAD_INSECTS'?{label:'Lançar inseto nesta planta · 1/6h',icon:'/assets/classic/effects/verme_1.png'}:{label:'Lançar erva nesta planta · 1/6h',icon:'/assets/classic/effects/erva_daninha_1.png'};}return ready?{label:'Furtar colheita',icon:'/assets/classic/icons/hud/mao-restaurada.png'}:undefined;}if(dead)return{label:'Remover com a pá',icon:'/assets/classic/icons/hud/pa-ui.png',key:'2'};if(tile.weeds)return{label:'Tirar ervas',icon:'/assets/classic/icons/hud/herbicida-ui.png',key:'5'};if(tile.insects>0)return{label:'Matar insetos',icon:'/assets/classic/icons/hud/pesticida-ui.png',key:'6'};if(tile.dry&&tile.state==='GROWING')return{label:'Regar',icon:'/assets/classic/icons/hud/regador-ui.png',key:'4'};if(ready)return{label:'Colher com a luvinha',icon:'/assets/classic/icons/hud/mao-restaurada.png',key:'7'};return undefined;}
 function positionHealth(panel:HTMLElement,game:HTMLElement,point:{x:number;y:number}){
+ healthPinned=healthTapPinned;
  const animal=panel.className.includes('animal-tooltip'),fixed=!animal&&window.matchMedia('(max-width:1100px)').matches;
  const scrollLeft=window.scrollX||0,scrollTop=window.scrollY||0;
  // Measure the normal scene before deciding whether inspection needs its own flow row.
@@ -708,7 +709,7 @@ function animalTooltip(id:string|null,point?:{x:number;y:number}){
  const farm=display(),animal=farm?.animals.find(item=>item.id===id),type=catalog.animals.find(item=>item.id===id);
  if(!farm||!animal||!type){animalTooltip(null);return;}
  if(modal.open||healthPinned)return;
- animalTooltipId=id;animalTooltipPoint=point;healthTile=null;healthPoint=point;healthPinned=false;clearHealthTimers();
+ animalTooltipId=id;animalTooltipPoint=point;healthTile=null;healthPoint=point;healthPinned=false;healthTapPinned=false;clearHealthTimers();
  const panel=element('plant-health'),game=element('game'),key=JSON.stringify([id,animal.stage,animal.status,animal.remainingSeconds,farm.serverTime,visited?.owner]);
  if(!panel.hidden&&panel.className.includes('animal-tooltip')&&key===healthDataKey){positionHealth(panel,game,point);return;}
  healthDataKey=key;panel.className='crop-tooltip animal-tooltip';panel.hidden=false;panel.replaceChildren();
