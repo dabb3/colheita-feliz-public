@@ -270,9 +270,13 @@ daquele item. Não há venda unitária nem preço estimado no cliente. Lotes VIP
 bloqueados permanecem no estoque e não impedem a operação Vender tudo.
 
 O popup da planta informa temporada, estágio, condições e dois tempos com rótulos
-distintos: com rega contínua e sem nova rega. A posição acompanha a terra; em
-painéis estreitos, a informação aparece fora do canvas. A atualização recebida da
-API renova o popup mesmo com o cursor parado.
+distintos: com rega contínua e sem nova rega. Somente `CURSOR` abre a inspeção,
+por hover, clique ou toque; selecionar outra ferramenta fecha o painel e cancela
+a abertura pendente, preservando as ações na própria fazenda e nas visitas.
+Até 1100 CSS px, o painel compacto fica fixo acima das ferramentas; no desktop,
+acompanha a terra dentro da área visível. Em paisagem até 650 CSS px de altura,
+usa duas colunas. O conteúdo não possui rolagem interna nem informações cortadas.
+A atualização recebida da API renova o painel mesmo com o cursor parado.
 
 Clique em animal abre o alvo escolhido. Ações de alimentação, coleta ou venda
 seguem espécie, estágio e estado projetados pelo servidor. Animais da fazenda

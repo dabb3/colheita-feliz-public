@@ -147,6 +147,33 @@ html, body, #app { width: 100%; height: 100%; min-height: 100%; margin: 0; }
 #game{isolation:isolate}
 #game #plant-health{transform:none;max-width:calc(100% - 24px)}
 
+/* Plant inspection shares its content across the anchored popup and the fixed mobile panel. */
+#game #plant-health:not(.animal-tooltip){z-index:4;padding:10px;max-height:none;overflow:visible;line-height:1.3}
+#game #plant-health[data-layout=fixed]{max-width:calc(100vw - 24px)}
+#plant-health[data-placement=fixed]::after{display:none}
+#plant-health:not(.animal-tooltip) .crop-tooltip-head{min-height:28px;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+#plant-health:not(.animal-tooltip) .crop-tooltip-icon{width:28px;height:28px}
+#plant-health:not(.animal-tooltip) .crop-tooltip-head strong{flex:1;min-width:90px;font-size:16px;overflow-wrap:anywhere}
+#plant-health:not(.animal-tooltip) .crop-state-badge,#plant-health:not(.animal-tooltip) .crop-vip-badge{padding:3px 6px;font-size:12px}
+#plant-health:not(.animal-tooltip) .crop-growth{min-width:0;margin-bottom:6px}
+#plant-health:not(.animal-tooltip) .crop-progress-caption{gap:8px;margin-bottom:4px}
+#plant-health:not(.animal-tooltip) .crop-progress-caption>span{font-size:12px;letter-spacing:0}
+#plant-health:not(.animal-tooltip) .crop-progress-caption>strong{font-size:13px}
+#plant-health:not(.animal-tooltip) .crop-growth p{margin:4px 0 0;font-size:12px;overflow-wrap:anywhere}
+#plant-health:not(.animal-tooltip) .crop-season{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:8px;margin-bottom:6px}
+#plant-health:not(.animal-tooltip) .crop-season-label{margin:0;font-size:12px}
+#plant-health:not(.animal-tooltip) .crop-vip-warning{margin:0 0 6px;font-size:12px}
+#plant-health:not(.animal-tooltip) .crop-status-chips{gap:4px;margin-bottom:6px}
+#plant-health:not(.animal-tooltip) .crop-status-chip{padding:2px 5px;font-size:12px}
+#plant-health:not(.animal-tooltip) .crop-action-hint{min-height:24px;gap:6px;padding-top:4px}
+#plant-health:not(.animal-tooltip) .crop-action-hint img{width:20px;height:20px}
+@media(max-width:1100px) and (orientation:landscape) and (max-height:650px){
+ #game #plant-health:not(.animal-tooltip){display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:6px 12px}
+ #plant-health:not(.animal-tooltip) .crop-tooltip-head{grid-column:1/-1;margin:0}
+ #plant-health:not(.animal-tooltip) .crop-growth{grid-column:1;grid-row:2 / span 4;margin:0}
+ #plant-health:not(.animal-tooltip)>:not(.crop-tooltip-head):not(.crop-growth){grid-column:2;margin-bottom:0}
+}
+
 /* The profile and tutorial share a flow so long names never cover the menu. */
 #game header{z-index:2;gap:16px}
 .player-panel{width:360px;max-width:100%;min-width:0;display:grid;gap:8px}

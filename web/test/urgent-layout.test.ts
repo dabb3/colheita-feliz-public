@@ -7,8 +7,8 @@ import {runInNewContext} from 'node:vm';
 // Execute the production positioning function against real browser geometry contracts.
 const source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
 function place({game,canvas,viewport,tools,point,height=290,header={top:0,height:0}}){
- const panel={style:{setProperty(){}},dataset:{},getBoundingClientRect(){return {height:Math.min(height,parseFloat(this.style.maxHeight)||Infinity)};}};
- const context={element:id=>id==='farm'?{getBoundingClientRect:()=>canvas}:id==='tools-bar'?{getBoundingClientRect:()=>tools}:id==='farm-header'?{getBoundingClientRect:()=>header}:null,window:{innerWidth:viewport.width,innerHeight:viewport.height,visualViewport:viewport},document:{documentElement:{clientWidth:viewport.width,clientHeight:viewport.height}},worldToScreen:p=>p,sceneTransform:()=>({})};
+ const panel={className:'crop-tooltip',style:{setProperty(){}},dataset:{},getBoundingClientRect(){return {height:Math.min(height,parseFloat(this.style.maxHeight)||Infinity)};}};
+ const context={element:id=>id==='farm'?{getBoundingClientRect:()=>canvas}:id==='tools-bar'?{getBoundingClientRect:()=>tools}:id==='farm-header'?{getBoundingClientRect:()=>header}:{hidden:true,getBoundingClientRect:()=>({top:0,height:0})},window:{innerWidth:viewport.width,innerHeight:viewport.height,visualViewport:viewport,matchMedia:()=>({matches:viewport.width<=1100})},document:{documentElement:{clientWidth:viewport.width,clientHeight:viewport.height}},worldToScreen:p=>p,sceneTransform:()=>({})};
  runInNewContext(stripTypeScriptTypes(source.slice(source.indexOf('function positionHealth('),source.indexOf('function scheduleHealthClock(')))+'\nglobalThis.positionHealth=positionHealth;',context);
  context.positionHealth(panel,{getBoundingClientRect:()=>game},point);
  return {left:parseFloat(panel.style.left),top:parseFloat(panel.style.top),height:Math.min(height,parseFloat(panel.style.maxHeight)||Infinity),width:parseFloat(panel.style.width)};

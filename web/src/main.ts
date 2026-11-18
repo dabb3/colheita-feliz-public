@@ -287,7 +287,7 @@ function renderTools(){
 }
 // Friends-only fertilizers keep their own selection so a visit never changes the home Adubar tool.
 function toolFertilizer(){return tool==='LOVE'?selectedLoveFertilizer:selectedFertilizer;}
-function pickTool(id:string){const previous=tool;trayOpen=toolbarTrayToggle(previous,id,trayOpen);tool=id;renderTools();if(healthTile&&healthPoint)renderHealth(healthTile,healthPoint,true);if(id==='SPREAD_INSECTS'||id==='SPREAD_WEEDS')notify('Escolha uma planta de um amigo, em crescimento e já regada. Se a tentativa for bloqueada, ela consome o limite de 6h.');if(id==='CLEAN_WEEDS'||id==='CLEAN_INSECTS')notify('Escolha uma planta do amigo com ervas ou insetos. Limpeza elegível dá 2 XP, até 20 XP de ajuda por dia; limpar a própria praga não dá recompensa.');}
+function pickTool(id:string){const previous=tool;trayOpen=toolbarTrayToggle(previous,id,trayOpen);tool=id;renderTools();if(healthTile&&id!=='CURSOR')closeHealth();else if(healthTile&&healthPoint)renderHealth(healthTile,healthPoint,true);if(id==='SPREAD_INSECTS'||id==='SPREAD_WEEDS')notify('Escolha uma planta de um amigo, em crescimento e já regada. Se a tentativa for bloqueada, ela consome o limite de 6h.');if(id==='CLEAN_WEEDS'||id==='CLEAN_INSECTS')notify('Escolha uma planta do amigo com ervas ou insetos. Limpeza elegível dá 2 XP, até 20 XP de ajuda por dia; limpar a própria praga não dá recompensa.');}
 function renderToolTray(){
  const tray=element('tool-tray');tray.replaceChildren();const seeds=tool==='PLANT',fertilizers=tool==='FERTILIZE'||tool==='LOVE';
  tray.hidden=!trayOpen||(!seeds&&!fertilizers);if(tray.hidden)return;
@@ -461,6 +461,7 @@ let healthKey='',healthDataKey='',healthOpenTimer:number|undefined,healthClockTi
 function clearHealthTimers(){window.clearTimeout(healthOpenTimer);window.clearTimeout(healthClockTimer);healthOpenTimer=undefined;healthClockTimer=undefined;}
 function closeHealth(){clearHealthTimers();healthPinned=false;healthTile=null;healthPoint=null;animalTooltipId='';animalTooltipPoint=null;healthKey='';healthDataKey='';const panel=element('plant-health');panel.className='crop-tooltip';panel.hidden=true;}
 function health(tile:Tile|null,point:{x:number;y:number}|null,pointerType='mouse'){
+ if(tool!=='CURSOR'&&(tile?.cropId||healthTile)){closeHealth();return;}
  if(healthPinned&&!['tap','resize','refresh'].includes(pointerType))return;
  const panel=element('plant-health');
  if(pointerType==='touch')return;
@@ -477,6 +478,7 @@ function health(tile:Tile|null,point:{x:number;y:number}|null,pointerType='mouse
  renderHealth(tile,point);
 }
 function renderHealth(tile:Tile,point:{x:number;y:number},force=false){
+ if(tool!=='CURSOR'){closeHealth();return;}
  const panel=element('plant-health'),game=element('game'),farm=display(),crop=catalog.crops.find(item=>item.id===tile.cropId);if(!crop||!farm)return;panel.className='crop-tooltip';
  const dataKey=JSON.stringify([tile.cropId,tile.state,tile.stage,tile.season,tile.seasons,tile.remainingSeconds,tile.nominalRemainingSeconds,tile.watered,tile.dry,tile.paused,tile.weeds,tile.insects,tile.fertilized,tile.protected,farm.serverTime,(visited?own?.vipActive:farm.vipActive)]);
  const key=JSON.stringify([dataKey,tool]);
@@ -513,16 +515,32 @@ function formatRemaining(seconds:number){const total=Math.max(0,Math.ceil(second
 function addChip(parent:HTMLElement,label:string,iconPath:string,kind:'problem'|'benefit'){const chip=document.createElement('span');chip.className=`crop-status-chip is-${kind}`;const icon=document.createElement('img');icon.src=iconPath;icon.alt='';chip.append(icon,document.createTextNode(label));parent.append(chip);}
 function healthAction(tile:Tile,ready:boolean,dead:boolean){if(visited){if(tool==='CURSOR')return undefined;if(tool==='CLEAN_WEEDS'||tool==='CLEAN_INSECTS'){if(dead||!visitCleanAvailable(tool,tile))return undefined;return tool==='CLEAN_WEEDS'?{label:'Tirar ervas do amigo',icon:'/assets/classic/icons/hud/herbicida-ui.png'}:{label:'Matar insetos do amigo',icon:'/assets/classic/icons/hud/pesticida-ui.png'};}if(tool==='SPREAD_INSECTS'||tool==='SPREAD_WEEDS'){if(ready||dead||!tile.watered||(tool==='SPREAD_INSECTS'?tile.insects>0:tile.weeds))return undefined;return tool==='SPREAD_INSECTS'?{label:'Lançar inseto nesta planta · 1/6h',icon:'/assets/classic/effects/verme_1.png'}:{label:'Lançar erva nesta planta · 1/6h',icon:'/assets/classic/effects/erva_daninha_1.png'};}return ready?{label:'Furtar colheita',icon:'/assets/classic/icons/hud/mao-restaurada.png'}:undefined;}if(dead)return{label:'Remover com a pá',icon:'/assets/classic/icons/hud/pa-ui.png',key:'2'};if(tile.weeds)return{label:'Tirar ervas',icon:'/assets/classic/icons/hud/herbicida-ui.png',key:'5'};if(tile.insects>0)return{label:'Matar insetos',icon:'/assets/classic/icons/hud/pesticida-ui.png',key:'6'};if(tile.dry&&tile.state==='GROWING')return{label:'Regar',icon:'/assets/classic/icons/hud/regador-ui.png',key:'4'};if(ready)return{label:'Colher com a luvinha',icon:'/assets/classic/icons/hud/mao-restaurada.png',key:'7'};return undefined;}
 function positionHealth(panel:HTMLElement,game:HTMLElement,point:{x:number;y:number}){
- const bounds=game.getBoundingClientRect(),canvas=element('farm').getBoundingClientRect(),projected=worldToScreen(point,sceneTransform(canvas.width,canvas.height)),x=canvas.left-bounds.left+projected.x,y=canvas.top-bounds.top+projected.y;
- const viewport=window.visualViewport,margin=12,tools=element('tools-bar').getBoundingClientRect();
- const visibleLeft=Math.max(bounds.left,viewport?.offsetLeft??0)-bounds.left+margin,visibleRight=Math.min(bounds.right??bounds.left+bounds.width,(viewport?.offsetLeft??0)+(viewport?.width??window.innerWidth??bounds.left+bounds.width))-bounds.left-margin;
- const header=element('farm-header')?.getBoundingClientRect(),headerBottom=header?(header.bottom??header.top+header.height):bounds.top;
- const visibleTop=Math.max(bounds.top,viewport?.offsetTop??0,headerBottom)-bounds.top+margin,visibleBottom=Math.min(bounds.bottom??bounds.top+bounds.height,(viewport?.offsetTop??0)+(viewport?.height??window.innerHeight??bounds.top+bounds.height),tools.top>bounds.top?tools.top:Infinity)-bounds.top-margin;
- const width=Math.max(0,Math.min(360,visibleRight-visibleLeft));panel.style.width=`${width}px`;panel.style.maxHeight=`${Math.max(0,visibleBottom-visibleTop)}px`;
- const height=panel.getBoundingClientRect().height,tileGap=66;let left=x-width/2,top=y-height-tileGap,placement='above';
- if(top<visibleTop&&y+tileGap+height<=visibleBottom){top=y+tileGap;placement='below';}
- left=Math.max(visibleLeft,Math.min(visibleRight-width,left));top=Math.max(visibleTop,Math.min(visibleBottom-height,top));
- panel.style.left=`${left}px`;panel.style.top=`${top}px`;panel.dataset.placement=placement;panel.style.setProperty('--caret-x',`${Math.max(16,Math.min(width-16,x-left))}px`);panel.style.setProperty('--caret-y',`${Math.max(16,Math.min(height-16,y-top))}px`);
+ const bounds=game.getBoundingClientRect(),canvas=element('farm').getBoundingClientRect(),animal=panel.className.includes('animal-tooltip');
+ const viewport=window.visualViewport,viewportLeft=viewport?.offsetLeft??0,viewportTop=viewport?.offsetTop??0;
+ const viewportWidth=viewport?.width||window.innerWidth||bounds.width,viewportHeight=viewport?.height||window.innerHeight||bounds.height,margin=12;
+ const fixed=!animal&&window.matchMedia('(max-width:1100px)').matches;
+ const wide=fixed&&window.matchMedia('(orientation:landscape) and (max-height:650px)').matches;
+ const visibleLeft=Math.max(bounds.left,viewportLeft)+margin,visibleRight=Math.min(bounds.left+bounds.width,viewportLeft+viewportWidth)-margin;
+ const visibleTop=Math.max(bounds.top,viewportTop)+margin;
+ let bottom=Math.min(bounds.top+bounds.height,viewportTop+viewportHeight);
+ for(const id of ['tools-bar','tool-tray']){const control=element(id),rect=control.getBoundingClientRect();if(!control.hidden&&rect.top>visibleTop-margin)bottom=Math.min(bottom,rect.top);}
+ const header=element('farm-header').getBoundingClientRect(),headerBottom=Math.max(visibleTop,header.top+header.height+margin);
+ const width=Math.max(0,Math.min(wide?viewportWidth-24:fixed?420:360,visibleRight-visibleLeft));
+ panel.style.position=fixed?'fixed':'absolute';panel.dataset.layout=fixed?'fixed':'anchored';panel.style.width=width+'px';
+ panel.style.maxHeight=animal?Math.max(0,bottom-margin-headerBottom)+'px':'none';
+ const height=panel.getBoundingClientRect().height;
+ if(fixed){panel.style.left=(visibleLeft+visibleRight-width)/2+'px';panel.style.top=Math.max(visibleTop,bottom-height-margin)+'px';panel.dataset.placement='fixed';return;}
+ const projected=worldToScreen(point,sceneTransform(canvas.width,canvas.height)),x=canvas.left-bounds.left+projected.x,y=canvas.top-bounds.top+projected.y;
+ const minTop=(height<=bottom-margin-headerBottom?headerBottom:visibleTop)-bounds.top,maxBottom=bottom-bounds.top-margin,tileTop=54,tileSide=54;
+ let left=x-width/2,top=y-height-tileTop-margin,placement='above';
+ if(top<minTop){
+  if(y+tileTop+height+margin<=maxBottom){top=y+tileTop+margin;placement='below';}
+  else if(x+tileSide+width+margin<=visibleRight-bounds.left){left=x+tileSide+margin;top=y-height/2;placement='right';}
+  else if(x-tileSide-width-margin>=visibleLeft-bounds.left){left=x-tileSide-width-margin;top=y-height/2;placement='left';}
+ }
+ left=Math.max(visibleLeft-bounds.left,Math.min(visibleRight-bounds.left-width,left));top=Math.max(minTop,Math.min(maxBottom-height,top));
+ panel.style.left=left+'px';panel.style.top=top+'px';panel.dataset.placement=placement;
+ panel.style.setProperty('--caret-x',Math.max(16,Math.min(width-16,x-left))+'px');panel.style.setProperty('--caret-y',Math.max(16,Math.min(height-16,y-top))+'px');
 }
 function scheduleHealthClock(){window.clearTimeout(healthClockTimer);const tile=healthTile,panel=element('plant-health');if(panel.hidden||!tile||tile.state!=='GROWING'||!tile.watered||tile.paused||healthRemaining(tile)<=0)return;const remaining=healthRemaining(tile),delay=remaining<60?1000:Math.min(60_000,Math.max(1000,(remaining-59)*1000));healthClockTimer=window.setTimeout(()=>{if(!healthTile||!healthPoint)return;const current=healthTile,point=healthPoint,left=healthRemaining(current);updateHealthDisplay(current,left);if(left<=0)renderHealth(current,point,true);else scheduleHealthClock();},delay);}
 function tileList(){dialog('Terras da fazenda');const states:Record<string,string>={GRASS:'grama',PLOWED:'arada',DEAD:'planta morta',READY:'pronta',GROWING:'crescendo'};const grid=document.createElement('div');grid.className='tile-list';content.append(grid);for(const tile of display()?.tiles??[]){const crop=catalog.crops.find(c=>c.id===tile.cropId);const b=button(`Terra ${tile.column+1}, ${tile.row+1}: ${!tile.unlocked?'bloqueada':crop?.name??states[tile.state]}`,async()=>{modal.close();await tileAction(tile);},grid);b.title='Aplicar a ferramenta selecionada';}}
@@ -841,9 +859,9 @@ async function connect(user:string,token:()=>Promise<string>,photo?:unknown,disp
  shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner='';sessionGeneration++;navigationGeneration++;busy=false;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;ownServerClock=undefined;stopCalendar();closeScene();const generation=sessionGeneration;
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
  avatarUser=`${config.api}:${user}`;void connectPush(avatarUser,api).catch(()=>{});googlePhoto=googleAvatar(photo);avatarChoice='classic';loadAudioSettings();
- scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>{if(healthPinned&&!(tool==='CURSOR'&&tile.cropId))closeHealth();void tileAction(tile);},(id,pointerType)=>{if(pointerType==='touch'&&tool==='CURSOR'){playAnimalSound(id);animalPopup(id);return;}const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health,syncMusic,()=>{if(healthPinned)closeHealth();},(id,point)=>{if(id&&point){playAnimalSound(id);animalTooltip(id,point);}else animalTooltip(null);});
+ scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>{if(healthPinned&&!(tool==='CURSOR'&&tile.cropId))closeHealth();void tileAction(tile);},(id,pointerType)=>{if(pointerType==='touch'&&tool==='CURSOR'){playAnimalSound(id);animalPopup(id);return;}const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health,syncMusic,()=>{if(healthPinned)closeHealth();},(id,point)=>{if(id&&point){playAnimalSound(id);animalTooltip(id,point);}else animalTooltip(null);},()=>tool==='CURSOR');
 syncMobileCamera();
-sceneResize=new ResizeObserver(()=>{layoutHud();health(healthTile,healthPoint,'resize');});for(const id of ['farm','farm-header','tools-bar','notice'])sceneResize.observe(element(id));
+sceneResize=new ResizeObserver(()=>{layoutHud();health(healthTile,healthPoint,'resize');});for(const id of ['farm','farm-header','tools-bar','tool-tray','notice'])sceneResize.observe(element(id));
  try{await refresh();if(generation===sessionGeneration)await migrateAvatar();if(generation===sessionGeneration&&!own)setLoginStep('invite',displayName||user);}
  catch(error){handleError(error);}
 }

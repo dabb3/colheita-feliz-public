@@ -83,10 +83,12 @@ export class Scene {
     onHover: (
       tile: Tile | null,
       point: { x: number; y: number } | null,
+      pointerType?: string,
     ) => void,
     onPeriodChange: (period: ReturnType<typeof periodAt>) => void = () => {},
     onEmptyTap: () => void = () => {},
     onAnimalHover: (id: string | null, point?: { x: number; y: number }) => void = () => {},
+    canInspect: () => boolean = () => true,
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
@@ -123,8 +125,8 @@ export class Scene {
             ) ?? null)
           : null;
         this.onHover(
-          this.hover,
-          pick ? tileCenter(pick.column, pick.row) : null,
+          canInspect() ? this.hover : null,
+          canInspect() && pick ? tileCenter(pick.column, pick.row) : null,
           e.pointerType,
         );
       },
