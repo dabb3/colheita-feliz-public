@@ -161,4 +161,28 @@ class AwayReportsTest {
         var report = AwayReports.build(game, AwayLedger.empty(ago(3 * 3600)), clock.instant());
         assertTrue(report.getAsJsonArray("pending").asList().stream().anyMatch(p -> p.getAsJsonObject().get("kind").getAsString().equals("FEED")));
     }
+
+    @Test void mergeAddsCountsKeepsEventsAndTakesCurrentPendings() {
+        var older = com.google.gson.JsonParser.parseString("""
+                {"awaySeconds":10800,"harvests":[{"cropId":"cenoura","name":"Cenoura","stem":"cenoura","quantity":2}],
+                 "products":[{"productId":"ovo","name":"Ovo","animalId":"galinha","quantity":1}],"readyProducts":[],
+                 "thefts":[{"at":"2026-11-13T01:00:00Z","actor":"Bob","itemId":"cenoura","name":"Cenoura","stem":"cenoura","quantity":1}],
+                 "defenses":[],"care":{"waterings":3,"pestsRemoved":1,"animalCares":0},
+                 "pending":[{"kind":"VIP","expiredAt":"2026-11-13T00:00:00Z"}],"id":"old"}""").getAsJsonObject();
+        var newer = com.google.gson.JsonParser.parseString("""
+                {"awaySeconds":14400,"harvests":[{"cropId":"cenoura","name":"Cenoura","stem":"cenoura","quantity":1},{"cropId":"milho","name":"Milho","stem":"milho","quantity":4}],
+                 "products":[],"readyProducts":[{"productId":"ovo","name":"Ovo","animalId":"galinha","quantity":1}],
+                 "thefts":[],"defenses":[{"at":"2026-11-13T09:00:00Z","actor":"Carol"}],
+                 "care":{"waterings":2,"pestsRemoved":0,"animalCares":5},"pending":[]}""").getAsJsonObject();
+        var merged = AwayReports.merge(older, newer);
+        assertEquals(25200, merged.get("awaySeconds").getAsLong());
+        assertEquals(7, quantity(merged, "harvests")); assertEquals(2, merged.getAsJsonArray("harvests").size());
+        assertEquals(3, merged.getAsJsonArray("harvests").get(0).getAsJsonObject().get("quantity").getAsInt());
+        assertEquals(1, quantity(merged, "products")); assertEquals(1, quantity(merged, "readyProducts"));
+        assertEquals(1, merged.getAsJsonArray("thefts").size()); assertEquals(1, merged.getAsJsonArray("defenses").size());
+        assertEquals(5, merged.getAsJsonObject("care").get("waterings").getAsInt());
+        assertEquals(5, merged.getAsJsonObject("care").get("animalCares").getAsInt());
+        assertEquals(0, merged.getAsJsonArray("pending").size(), "pendings reflect the farm now");
+        assertFalse(merged.has("id"));
+    }
 }

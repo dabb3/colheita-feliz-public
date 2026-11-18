@@ -155,11 +155,24 @@ class AwayReportIntegrationTest {
         String first = reportId(owner);
         clock.advance(3 * 3600); matureCrop(false);
         String second = reportId(owner);
-        assertNotEquals(first, second, "a newer absence supersedes the unacknowledged report");
+        assertNotEquals(first, second, "the consolidated report is a new delivery");
         service.acknowledgeAwayReport(owner, first);
         assertEquals(second, reportId(owner));
         service.acknowledgeAwayReport(owner, UUID.randomUUID().toString());
         assertEquals(second, reportId(owner));
+    }
+
+    @Test void unacknowledgedReportIsFoldedIntoTheNextAbsence() {
+        service.farm(owner);
+        clock.advance(3 * 3600); matureCrop(false);
+        assertTrue(steal().getAsJsonObject("result").get("success").getAsBoolean());
+        assertNotNull(reportId(owner)); // first absence: delivered but never acknowledged
+        clock.advance(24 * 3600 + 1); matureCrop(true);
+        assertEquals("PROTECTED", steal().getAsJsonObject("theftOutcome").get("kind").getAsString());
+        var report = service.farm(owner).getAsJsonObject("awayReport");
+        assertEquals(1, report.getAsJsonArray("thefts").size(), "the theft from the first absence survives");
+        assertEquals(1, report.getAsJsonArray("defenses").size());
+        assertEquals(27 * 3600 + 1, report.get("awaySeconds").getAsLong());
     }
 
     @Test void identicalAbsencesGetDistinctIds() {

@@ -101,8 +101,13 @@ final class OnlineGameService implements AutoCloseable {
             var ledger = tx.awayLedger(actor);
             if (ledger != null && Duration.between(ledger.lastSeenAt(), now).compareTo(AwayReports.MIN_ABSENCE) >= 0) {
                 var report = AwayReports.build(farm.game(), ledger, now);
-                // A newer absence supersedes a report the client never acknowledged.
-                if (report != null) { report.addProperty("id", UUID.randomUUID().toString()); tx.savePendingAwayReport(actor, report); }
+                if (report != null) {
+                    // An unacknowledged report is folded into the new one, so no period is lost before the ACK.
+                    var previous = tx.pendingAwayReport(actor);
+                    if (previous != null) report = AwayReports.merge(previous, report);
+                    report.addProperty("id", UUID.randomUUID().toString());
+                    tx.savePendingAwayReport(actor, report);
+                }
             }
             // Every own visit starts a new window; shorter absences are seen in the farm itself.
             tx.saveAwayLedger(actor, AwayLedger.empty(now));

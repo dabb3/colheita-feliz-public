@@ -52,6 +52,51 @@ final class AwayReports {
         return report;
     }
 
+    /**
+     * Joins an unacknowledged report with the next one: counts add up, visit events keep the newest
+     * {@link AwayLedger#MAX_EVENTS}, and pendings come from the newer report because they reflect the farm now.
+     */
+    static JsonObject merge(JsonObject older, JsonObject newer) {
+        var merged = new JsonObject();
+        merged.addProperty("awaySeconds", older.get("awaySeconds").getAsLong() + newer.get("awaySeconds").getAsLong());
+        merged.add("harvests", sumBy(older, newer, "harvests", "cropId"));
+        merged.add("products", sumBy(older, newer, "products", "productId"));
+        merged.add("readyProducts", sumBy(older, newer, "readyProducts", "productId"));
+        merged.add("thefts", latest(older, newer, "thefts"));
+        merged.add("defenses", latest(older, newer, "defenses"));
+        var care = new JsonObject();
+        for (String field : java.util.List.of("waterings", "pestsRemoved", "animalCares"))
+            care.addProperty(field, older.getAsJsonObject("care").get(field).getAsInt() + newer.getAsJsonObject("care").get(field).getAsInt());
+        merged.add("care", care);
+        merged.add("pending", newer.getAsJsonArray("pending").deepCopy());
+        return merged;
+    }
+
+    private static JsonArray list(JsonObject report, String name) {
+        return report.has(name) ? report.getAsJsonArray(name) : new JsonArray();
+    }
+
+    private static JsonArray sumBy(JsonObject older, JsonObject newer, String name, String key) {
+        var byKey = new LinkedHashMap<String,JsonObject>();
+        for (var report : java.util.List.of(older, newer))
+            for (var element : list(report, name)) {
+                var item = element.getAsJsonObject();
+                var existing = byKey.get(item.get(key).getAsString());
+                if (existing == null) byKey.put(item.get(key).getAsString(), item.deepCopy());
+                else existing.addProperty("quantity", existing.get("quantity").getAsInt() + item.get("quantity").getAsInt());
+            }
+        var result = new JsonArray(); byKey.values().forEach(result::add);
+        return result;
+    }
+
+    private static JsonArray latest(JsonObject older, JsonObject newer, String name) {
+        var all = new java.util.ArrayList<com.google.gson.JsonElement>();
+        list(older, name).forEach(item -> all.add(item.deepCopy())); list(newer, name).forEach(item -> all.add(item.deepCopy()));
+        var result = new JsonArray();
+        all.subList(Math.max(0, all.size() - AwayLedger.MAX_EVENTS), all.size()).forEach(result::add);
+        return result;
+    }
+
     private static boolean inWindow(Instant at, Instant since, Instant now) { return at != null && at.isAfter(since) && !at.isAfter(now); }
 
     private static JsonArray harvests(GameState game, Instant since, Instant now) {
