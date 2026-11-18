@@ -7,7 +7,7 @@ import * as presentation from '../src/presentation.ts';
 
 test('scene draws stage-sized plants, real pests, ready props and trimmed hive without economic calls',()=>{
  const drawn=[],texts=[],pending=[],images=[],events=new Map(),selected=[],hovered=[];
- let tick,now=0,timers=0,ellipses=0,period='day';const periods=[];const cancelled=[];
+ let tick,now=0,timers=0,ellipses=0,period='day',canInspect=true;const periods=[],tilesSelected=[];const cancelled=[];
  const context={clearRect(){},fillRect(){},save(){},restore(){},translate(){},scale(){},rotate(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},stroke(){},fill(){},
   drawImage(image,...args){drawn.push({path:image.src,args});},fillText(text){texts.push(text);},ellipse(){ellipses++;},
   createRadialGradient(){return{addColorStop(){}};},getImageData(x,y,w,h){const data=new Uint8ClampedArray(w*h*4);for(let row=0;row<h;row++)for(let col=0;col<w;col++)if(row<h*.88||col<w*.25)data[(row*w+col)*4+3]=255;return{data};}};
@@ -16,7 +16,7 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
   Image:class{width=100;height=200;onload;onerror;src;constructor(){pending.push(this);images.push(this);}}};
  const source=readFileSync(new URL('../src/scene.ts',import.meta.url),'utf8').replace(/^import\b[\s\S]*?;\s*/gm,'').replace('export class Scene','class Scene');
  runInNewContext(stripTypeScriptTypes(source)+'\nglobalThis.Scene=Scene;',environment);
- const scene=new environment.Scene(canvas,{crops:[{id:'nabo',spriteStem:'nabo'}],animals:[{id:'vaca',kind:'PRODUCER'},{id:'abelha',kind:'PROTECTOR'},{id:'cachorro-robo',kind:'PROTECTOR'}]},()=>{},id=>selected.push(id),tile=>hovered.push(tile),value=>periods.push(value));
+ const scene=new environment.Scene(canvas,{crops:[{id:'nabo',spriteStem:'nabo'}],animals:[{id:'vaca',kind:'PRODUCER'},{id:'abelha',kind:'PROTECTOR'},{id:'cachorro-robo',kind:'PROTECTOR'}]},(tile,pointer)=>tilesSelected.push({tile,pointer}),id=>selected.push(id),tile=>hovered.push(tile),value=>periods.push(value),()=>{},()=>{},()=>canInspect);
  const tile={column:0,row:0,unlocked:true,state:'READY',cropId:'nabo',stage:3,weeds:true,insects:2};
  const farm={owner:'alice',own:true,nextPlot:{column:1,row:0},tiles:[tile,{column:0,row:1,unlocked:true,state:'GRASS'}],animals:[{id:'vaca',stage:'ADULT',status:'READY'},{id:'abelha',stage:'ADULT',status:'PRODUCING'},{id:'cachorro-robo',stage:'ADULT',status:'PRODUCING'}]};
  scene.update(farm);
@@ -36,6 +36,15 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  events.get('click')({clientX:1515,clientY:400});
  assert.deepEqual(selected,['vaca']);
  events.get('pointermove')({clientX:585,clientY:400});assert.equal(hovered.at(-1).state,'READY');
+ canInspect=false;
+ for(const pointerType of ['mouse','touch']){
+  events.get('pointermove')({clientX:585,clientY:400,pointerType});
+  assert.equal(hovered.at(-1),null,'tools must not send plant hover to the popup controller');
+  events.get('click')({clientX:585,clientY:400,pointerType});
+  assert.equal(tilesSelected.at(-1).tile,tile,'tool clicks still reach their normal action');
+  assert.equal(tilesSelected.at(-1).pointer,pointerType);
+ }
+ canInspect=true;
  drawn.length=0;
  const beforeEffects=ellipses;now=100;scene.update({owner:'alice',tiles:[{...tile,state:'DEAD',weeds:false}],animals:[{id:'vaca',stage:'ADULT',status:'PRODUCING'}]});
  while(pending.length)pending.shift().onload();

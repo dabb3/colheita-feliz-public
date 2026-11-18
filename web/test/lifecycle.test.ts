@@ -150,7 +150,7 @@ function app(preferences=new Map(),pushLogoutOptions){
  runInNewContext(stripTypeScriptTypes(notificationSource),ctx);
  const eventsSource=readFileSync(new URL('../src/events.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');runInNewContext(stripTypeScriptTypes(eventsSource),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={events,updateOwnFarm,refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,friends,presentGift,closeGiftComposer,receive,dialog,health,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
+ source+='\nglobalThis.h={events,updateOwnFarm,refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,friends,presentGift,closeGiftComposer,receive,dialog,health,renderHealth,positionHealth,animalTooltip,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:{...ctx.h,runTimeouts(){for(const [id,callback]of [...timeouts]){timeouts.delete(id);callback();}}},elements,listeners,audioClips,observers,ctx,intervals};
 }
 function text(node){return(node.textContent??'')+(node.children??[]).map(child=>typeof child==='object'?text(child):child).join('');}
@@ -343,17 +343,17 @@ test('pest tool guidance explains growth, watering and blocked cooldown without 
  const bounds={left:0,top:0,width:1280,height:720};ctx.document.getElementById('game').getBoundingClientRect=()=>bounds;ctx.document.getElementById('farm').getBoundingClientRect=()=>bounds;
  const panel=ctx.document.getElementById('plant-health');panel.getBoundingClientRect=()=>({width:360,height:280});
  const tile={column:0,row:0,cropId:'nabo',state:'GROWING',watered:true,season:1,seasons:1,remainingSeconds:3600,nominalRemainingSeconds:3600};
- h.pickTool('SPREAD_INSECTS');assert.match(text(elements.get('notice')),/em crescimento e já regada/);assert.match(text(elements.get('notice')),/bloqueada.*consome.*6h/i);assert.doesNotMatch(text(elements.get('notice')),/prote[cç][aã]o/i);h.health(tile,{x:585,y:400},'tap');assert.match(text(panel),/Lançar inseto nesta planta/);
- clientNow+=60000;h.pickTool('SPREAD_WEEDS');assert.match(text(panel),/Lançar erva nesta planta/);assert.ok(!text(panel).includes('Lançar inseto nesta planta'));
+ h.pickTool('SPREAD_INSECTS');assert.match(text(elements.get('notice')),/em crescimento e já regada/);assert.match(text(elements.get('notice')),/bloqueada.*consome.*6h/i);assert.doesNotMatch(text(elements.get('notice')),/prote[cç][aã]o/i);h.health(tile,{x:585,y:400},'tap');assert.equal(panel.hidden,true);h.pickTool('CURSOR');h.health(tile,{x:585,y:400},'tap');assert.equal(panel.hidden,false);
+ clientNow+=60000;h.runTimeouts();assert.ok(!text(panel).includes('Lançar inseto nesta planta'));h.pickTool('SPREAD_WEEDS');assert.equal(panel.hidden,true);
  assert.equal(panel.querySelector('.crop-growth-value').textContent,'59min');
 });
-test('friend cleanup health actions do not promise XP',()=>{
+test('friend cleanup guidance stays in notices while plant inspection stays closed',()=>{
  const {h,ctx}=app();h.set({own:farm('alice'),visited:farm('bob'),catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:3600}],animals:[],fertilizers:[],vip:{greenPrice:20}}});h.receive({});
  const bounds={left:0,top:0,width:1280,height:720};ctx.document.getElementById('game').getBoundingClientRect=()=>bounds;ctx.document.getElementById('farm').getBoundingClientRect=()=>bounds;
  const panel=ctx.document.getElementById('plant-health');panel.getBoundingClientRect=()=>({width:360,height:280});
  for(const [tool,tile,label]of [['CLEAN_WEEDS',{state:'GROWING',weeds:true},'Tirar ervas do amigo'],['CLEAN_INSECTS',{state:'GROWING',insects:1},'Matar insetos do amigo']]){
   h.pickTool(tool);h.health({...tile,cropId:'nabo',watered:true,season:1,seasons:1,remainingSeconds:60,nominalRemainingSeconds:60},{x:585,y:400},'tap');
-  const hint=descendants(panel).find(node=>node.className==='crop-action-hint');assert.ok(hint);assert.equal(text(hint),label);assert.doesNotMatch(text(hint),/XP/);
+  assert.equal(panel.hidden,true);assert.match(text(ctx.document.getElementById('notice')),/20 XP de ajuda por dia/);
  }
 });
 
@@ -366,8 +366,8 @@ test('visits ignore protection data while the owner still sees the lock chip',()
  const lock=()=>descendants(panel).some(n=>n.src==='/assets/classic/icons/icone-cadeado.png');
  h.health(tile,{x:585,y:400},'tap');assert.ok(lock());
  h.set({own:{...farm('alice'),own:true},visited:{...farm('bob'),own:false,serverTime:'2026-11-03T12:00:00Z'},catalog});h.receive({});
- h.pickTool('SPREAD_INSECTS');h.health({...tile,remainingSeconds:3599},{x:585,y:400},'tap');
- assert.ok(!lock());assert.match(text(panel),/Lançar inseto nesta planta/);
+ h.pickTool('CURSOR');h.health({...tile,remainingSeconds:3599},{x:585,y:400},'tap');
+ assert.ok(!lock());assert.equal(panel.hidden,false);assert.ok(!text(panel).includes('Lançar inseto nesta planta'));
 });
 
 test('live shop explains nominal duration and the live popup qualifies its forecast',()=>{
@@ -929,6 +929,108 @@ test('reconnecting re-syncs the mobile camera without stacking camera listeners'
 });
 
 const sundayFixture={id:'sunday-harvest-2026-11-22',state:'ACTIVE',multiplier:2,startsAt:'2026-11-22T03:00:00Z',endsAt:'2026-11-23T03:00:00Z',nextStartsAt:'2026-11-29T03:00:00Z',nextEndsAt:'2026-11-30T03:00:00Z',cropIds:['nabo'],timezone:'America/Sao_Paulo'};
+test('plant inspection closes on tool selection and ignores hover, tap and refresh from other tools',()=>{
+ for(const visited of [undefined,farm('bob')]){
+  const {h,elements}=app();
+  h.set({own:farm('alice'),visited,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:3600}],animals:[],fertilizers:[]}});
+  h.health(null,null);const panel=elements.get('plant-health');panel.hidden=true;panel.getBoundingClientRect=()=>({width:360,height:280});
+  const tile={column:0,row:0,cropId:'nabo',state:'GROWING',watered:true,remainingSeconds:600,nominalRemainingSeconds:600,season:1,seasons:1};
+  const tools=visited?['STEAL','LOVE','SPREAD_WEEDS','SPREAD_INSECTS','CLEAN_WEEDS','CLEAN_INSECTS']:['WATER','PLOW','PLANT','FERTILIZE','HARVEST','WEED','PESTICIDE'];
+  for(const tool of tools){
+   h.pickTool('CURSOR');h.health(tile,{x:585,y:400},'tap');assert.equal(panel.hidden,false);
+   h.pickTool(tool);assert.equal(panel.hidden,true,`${tool} must close a pinned inspection`);
+   for(const pointer of ['mouse','touch','tap','refresh','resize']){h.health(tile,{x:585,y:400},pointer);h.runTimeouts();assert.equal(panel.hidden,true,`${tool}/${pointer} must not reopen inspection`);}
+  }
+ }
+});
+
+test('switching tools cancels a pending plant hover before it opens',()=>{
+ const {h,elements}=app();h.set({own:farm('alice'),catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:3600}],animals:[],fertilizers:[]}});
+ h.health(null,null);const panel=elements.get('plant-health');panel.hidden=true;panel.getBoundingClientRect=()=>({width:360,height:280});
+ h.health({column:0,row:0,cropId:'nabo',state:'GROWING',watered:true,remainingSeconds:600,nominalRemainingSeconds:600,season:1,seasons:1},{x:585,y:400});
+ assert.equal(panel.hidden,true);h.pickTool('WATER');h.runTimeouts();assert.equal(panel.hidden,true);
+});
+
+test('the scene inspection gate tracks toolbar changes and delayed renders cannot bypass it',async()=>{
+ const {h,ctx}=app();let canInspect;
+ ctx.Scene=class{constructor(...args){canInspect=args.at(-1);}update(){}close(){}};
+ ctx.ApiClient=class{pending=null;get(){return Promise.resolve(farm('alice'));}prepareRequestId(){return Promise.resolve();}};
+ await h.connect('alice',async()=> 'synthetic-token');h.set({own:h.get().own});assert.equal(canInspect(),true);
+ h.pickTool('WATER');assert.equal(canInspect(),false);
+ h.renderHealth({cropId:'nabo'},{x:585,y:400});assert.equal(ctx.document.getElementById('plant-health').hidden,true);
+ h.pickTool('CURSOR');assert.equal(canInspect(),true);
+});
+
+test('plant panels stay between real controls or switch to document flow when space is insufficient',()=>{
+ for(const [width,height,panelHeight,toolsTop,trayTop,headerHeight]of [[390,844,260,640,520,176],[844,390,160,330,300,90],[390,667,360,470,440,176]]){
+  const {h,ctx}=app();ctx.window.innerWidth=width;ctx.window.innerHeight=height;
+  ctx.window.matchMedia=query=>({matches:query.includes('orientation:landscape')?width>height&&height<=650:width<=1100});
+  const bounds={left:0,top:0,width,height};
+  for(const id of ['game','farm'])ctx.document.getElementById(id).getBoundingClientRect=()=>bounds;
+  ctx.document.getElementById('farm-header').getBoundingClientRect=()=>({top:0,height:headerHeight});
+  ctx.document.getElementById('tools-bar').getBoundingClientRect=()=>({left:0,top:toolsTop,width,height:height-toolsTop});
+  const tray=ctx.document.getElementById('tool-tray');tray.hidden=false;tray.getBoundingClientRect=()=>({left:0,top:trayTop,width,height:50});
+  const panel=ctx.document.getElementById('plant-health');panel.className='crop-tooltip';panel.getBoundingClientRect=()=>({width:Number.parseFloat(panel.style.width)||360,height:panelHeight});
+  h.positionHealth(panel,ctx.document.getElementById('game'),{x:585,y:400});
+  if(panelHeight>trayTop-headerHeight-24){
+   assert.equal(panel.dataset.layout,'flow');assert.equal(panel.style.position,'relative');assert.equal(panel.style.maxHeight,'none');continue;
+  }
+  assert.equal(panel.style.position,'fixed');assert.equal(panel.dataset.layout,'fixed');
+  const left=Number.parseFloat(panel.style.left),top=Number.parseFloat(panel.style.top),panelWidth=Number.parseFloat(panel.style.width);
+  assert.ok(left>=12&&left+panelWidth<=width-12);
+  assert.ok(top>=headerHeight+12&&top+panelHeight<=trayTop-12,`${width}×${height}: the entire panel must fit between header and tray`);
+  tray.hidden=true;h.positionHealth(panel,ctx.document.getElementById('game'),{x:585,y:400});
+  assert.equal(Number.parseFloat(panel.style.top)+panelHeight,toolsTop-12);
+ }
+});
+
+test('leaving inspection restores the scene after the flow fallback',()=>{
+ const {h,ctx,listeners}=app(),classes=new Set();h.set({own:farm('alice'),catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:3600}],animals:[],fertilizers:[]}});
+ const game=ctx.document.getElementById('game');game.classList={add:name=>classes.add(name),remove:name=>classes.delete(name)};
+ ctx.window.innerWidth=390;ctx.window.innerHeight=667;ctx.window.matchMedia=query=>({matches:!query.includes('orientation:landscape')});
+ game.getBoundingClientRect=()=>({left:0,top:0,width:390,height:667});ctx.document.getElementById('farm').getBoundingClientRect=game.getBoundingClientRect;
+ ctx.document.getElementById('farm-header').getBoundingClientRect=()=>({top:0,height:176});ctx.document.getElementById('tools-bar').getBoundingClientRect=()=>({top:470});ctx.document.getElementById('tool-tray').hidden=true;
+ ctx.document.getElementById('plant-health').getBoundingClientRect=()=>({height:360});
+ h.health({column:0,row:0,cropId:'nabo',state:'GROWING',watered:true,remainingSeconds:600,nominalRemainingSeconds:600,season:1,seasons:1},{x:585,y:400},'mouse');h.runTimeouts();
+ assert.equal(classes.has('inspection-flow'),true);
+ h.health(null,null,'mouse');assert.equal(ctx.document.getElementById('plant-health').hidden,false,'hiding the canvas must not dismiss inspection');
+ for(const id of ['tools-bar','tool-tray','farm-header']){listeners.get('pointerdown')({target:ctx.document.getElementById(id)});assert.equal(classes.has('inspection-flow'),true,'controls must not move before their click');}
+ h.pickTool('WATER');assert.equal(classes.has('inspection-flow'),false);assert.equal(ctx.document.getElementById('plant-health').hidden,true);
+});
+
+for(const pointer of ['mouse','tap'])test(`${pointer} inspection restores its pinning intent after flow and resize`,()=>{
+ for(const [width,height,layout]of [[390,844,'fixed'],[1366,900,'anchored']]){
+  const {h,ctx}=app();h.set({own:farm('alice'),catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:3600}],animals:[],fertilizers:[]}});
+  let size={left:0,top:0,width:390,height:667};
+  ctx.window.innerWidth=size.width;ctx.window.innerHeight=size.height;ctx.window.matchMedia=query=>({matches:query.includes('orientation:landscape')?size.width>size.height&&size.height<=650:size.width<=1100});
+  const game=ctx.document.getElementById('game'),panel=ctx.document.getElementById('plant-health');
+  game.getBoundingClientRect=()=>size;ctx.document.getElementById('farm').getBoundingClientRect=()=>size;
+  ctx.document.getElementById('farm-header').getBoundingClientRect=()=>({top:0,height:176});ctx.document.getElementById('tools-bar').getBoundingClientRect=()=>({top:size.height-184});ctx.document.getElementById('tool-tray').hidden=true;
+  panel.hidden=true;panel.getBoundingClientRect=()=>({height:360});
+  const tile={column:0,row:0,cropId:'nabo',state:'GROWING',watered:true,remainingSeconds:600,nominalRemainingSeconds:600,season:1,seasons:1},point={x:585,y:400};
+  h.health(tile,point,pointer);h.runTimeouts();assert.equal(panel.dataset.layout,'flow');
+  h.health(null,null,'mouse');assert.equal(panel.hidden,false,'flow temporarily retains both hover and tap inspections');
+  size={left:0,top:0,width,height};ctx.window.innerWidth=width;ctx.window.innerHeight=height;
+  h.health(tile,point,'resize');assert.equal(panel.dataset.layout,layout);
+  h.health(null,null,'mouse');assert.equal(panel.hidden,pointer==='mouse','only an explicit tap stays pinned after resize');
+  panel.listeners.pointerleave();assert.equal(panel.hidden,pointer==='mouse');
+ }
+});
+
+test('desktop plant popups respect visible bounds and tools while animal positioning stays anchored',()=>{
+ const {h,ctx}=app();ctx.window.innerWidth=1366;ctx.window.innerHeight=768;
+ const game=ctx.document.getElementById('game'),panel=ctx.document.getElementById('plant-health');
+ game.getBoundingClientRect=()=>({left:0,top:0,width:1366,height:768});ctx.document.getElementById('farm').getBoundingClientRect=game.getBoundingClientRect;
+ ctx.document.getElementById('tools-bar').getBoundingClientRect=()=>({top:670,height:80});ctx.document.getElementById('tool-tray').hidden=true;
+ panel.className='crop-tooltip';panel.getBoundingClientRect=()=>({width:360,height:280});
+ for(const point of [{x:20,y:20},{x:1580,y:880},{x:800,y:450}]){
+  h.positionHealth(panel,game,point);const top=Number.parseFloat(panel.style.top),left=Number.parseFloat(panel.style.left);
+  assert.equal(panel.style.position,'absolute');assert.ok(top>=12&&top+280<=658);assert.ok(left>=12&&left+360<=1354);
+ }
+ ctx.window.matchMedia=()=>({matches:true});panel.className='crop-tooltip animal-tooltip';h.positionHealth(panel,game,{x:800,y:450});
+ assert.equal(panel.style.position,'absolute');assert.equal(panel.dataset.layout,'anchored');
+});
+
 test('events dialog renders countdown and XP from server time, survives failures and stops on close',async()=>{
  const {h,elements,intervals}=app();
  h.set({own:{...farm('alice'),serverTime:sundayFixture.startsAt,sundayHarvestEvent:sundayFixture},catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:36000}],animals:[],fertilizers:[]},api:{get:async()=>{throw Error('offline');}}});

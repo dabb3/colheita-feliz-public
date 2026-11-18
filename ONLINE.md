@@ -270,9 +270,23 @@ daquele item. Não há venda unitária nem preço estimado no cliente. Lotes VIP
 bloqueados permanecem no estoque e não impedem a operação Vender tudo.
 
 O popup da planta informa temporada, estágio, condições e dois tempos com rótulos
-distintos: com rega contínua e sem nova rega. A posição acompanha a terra; em
-painéis estreitos, a informação aparece fora do canvas. A atualização recebida da
-API renova o popup mesmo com o cursor parado.
+distintos: com rega contínua e sem nova rega. Somente `CURSOR` abre a inspeção,
+por hover, clique ou toque; selecionar outra ferramenta fecha o painel e cancela
+a abertura pendente, preservando as ações na própria fazenda e nas visitas.
+Até 1100 CSS px, o painel compacto fica fixo entre o cabeçalho e as ferramentas
+quando há espaço para todo o conteúdo; no desktop,
+acompanha a terra dentro da área visível. Em paisagem até 650 CSS px de altura,
+usa duas colunas. O conteúdo não possui rolagem interna. A verificação visual
+cobriu tamanhos de 320 × 568 a 1366 × 768 CSS px, em retrato e paisagem, com zoom
+de página padrão. Quando a área entre o cabeçalho e as ferramentas ou uma bandeja
+aberta for insuficiente, a inspeção ocupa o lugar da cena no fluxo da página:
+cabeçalho, painel, bandeja e ferramentas ficam em sequência, sem sobreposição.
+Apenas a página inteira pode rolar; o painel mantém a fonte e todo o conteúdo.
+Fechar a inspeção ou escolher outra ferramenta restaura a cena. O mesmo fallback
+atende uma área visual reduzida pelo zoom de página. Ao sair do fallback após um
+redimensionamento, uma inspeção aberta por hover volta a fechar com a saída do
+ponteiro; somente a abertura explícita por clique ou toque mantém a fixação.
+A atualização recebida da API renova o painel mesmo com o cursor parado.
 
 Clique em animal abre o alvo escolhido. Ações de alimentação, coleta ou venda
 seguem espécie, estágio e estado projetados pelo servidor. Animais da fazenda
