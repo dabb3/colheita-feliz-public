@@ -209,7 +209,7 @@ A partir de 22/11/2026, toda colheita própria válida de cultura comum recebe 2
 
 Todas as culturas comuns da loja participam; culturas VIP e sementes especiais Bronze, Prata, Ouro e Diamante ficam excluídas. Não há rotação. Nas temporadas seguintes, dobra o XP fracionário daquela temporada, sem bônus adicional por VIP. Moedas, produção, venda, furto e XP de outras ações não mudam.
 
-A fazenda expõe sundayHarvestEvent com ID, estado, multiplicador, cropIds, timezone e datas startsAt/endsAt/nextStartsAt/nextEndsAt em ISO 8601. O menu Eventos mostra culturas, imagem, XP normal/dobrado e contagem baseada no serverTime mais tempo monotônico do cliente. Falha de atualização não bloqueia a fazenda; há atualização manual. Sem jobs ou migração de save.
+A fazenda expõe sundayHarvestEvent com ID, estado, multiplicador, cropIds, timezone e datas startsAt/endsAt/nextStartsAt/nextEndsAt em ISO 8601. O menu Eventos mostra culturas, imagem, XP normal/dobrado e contagem baseada no serverTime mais tempo monotônico do cliente. Falha de atualização não bloqueia a fazenda. Não há botão de atualizar: a aba recarrega a programação ao abrir sem dados e em cada início/fim de evento, além do refresh global da fazenda. O mesmo diálogo tem a aba **Calendário Diário**, que substitui o antigo botão próprio do menu (também no Mais do mobile) e mantém o fluxo de resgate, a contagem até a meia-noite de São Paulo, o **Atualizar calendário** e a recuperação de recibo descritos em "Calendário de recompensas de login". Trocar de aba ou fechar o diálogo para o temporizador da aba anterior. Sem jobs ou migração de save.
 
 ## Publicação gratuita proposta
 
