@@ -58,6 +58,9 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  events.get('pointermove')({clientX:585,clientY:400});assert.equal(hovered.at(-1).state,'DEAD');
  now=10000;tick(33);assert.equal(timers,2);
  assert.deepEqual(periods,['day']);period='night';scene.update(farm);assert.deepEqual(periods,['day','night']);scene.update(farm);assert.deepEqual(periods,['day','night']);period='day';scene.update(farm);assert.deepEqual(periods,['day','night','day']);
+ const backgrounds=images.map(image=>image.src).filter(src=>src.includes('/background/'));
+ assert.ok(['background.png','background-night.png'].every(name=>backgrounds.some(src=>src.endsWith('/'+name))),'open session switches between the original backgrounds');
+ assert.ok(!backgrounds.some(src=>src.includes('natal')),'Christmas backgrounds are never requested');
  scene.update({...farm,tiles:[{...tile,protected:true}]});while(pending.length)pending.shift().onload();
  drawn.length=0;scene.update({...farm,tiles:[{...tile,protected:true}]});
  assert.ok(drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('icone-cadeado.png')),'owner sees protected plots');
