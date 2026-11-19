@@ -49,7 +49,7 @@ public final class VisualReviewLauncher {
                 "26-loja-fertilizantes.png", "27-bandeja-fertilizantes.png", "28-pronta-pelo-fertilizante.png", "29-animais-bebes.png", "30-animais-jovens.png", "31-animais-adultos.png",
                 "32-animais-sono.png", "33-protetores-expirados.png", "34-animais-pagina2.png", "35-animais-pagina3.png", "36-animais-pagina4.png", "37-tarefas-no-tutorial.png", "38-terreno-verde-comprado.png", "39-saldos-milionarios.png", "40-planta-morta.png",
                 "41-background-dia.png", "42-background-por-do-sol.png", "43-background-noite.png", "44-notificacoes.png", "45-protegida-cadeado.png",
-                "46-natal-dia-mini-bis.png", "47-natal-por-do-sol.png", "48-natal-noite.png", "49-confirmar-terreno.png", "50-notificacoes-lidas.png"
+                "46-mini-bis-dia.png", "47-mini-bis-por-do-sol.png", "48-mini-bis-noite.png", "49-confirmar-terreno.png", "50-notificacoes-lidas.png"
         };
         private static final int[] FRAMES = {3, 3, 3, 3, 3, 3, 3, 3, 10, 14, 3, 3, 3, 3, 3, 3, 3, 3, 3, 12, 12, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
         static { FRAMES[30] = 150; } // Cinco segundos: inclui deslocamento e a cauda aberta do pavão.
