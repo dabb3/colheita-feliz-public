@@ -29,10 +29,6 @@ public final class GameAssets implements AutoCloseable {
     public final Texture background = load("classic/background/background.png");
     private final Texture sunsetBackground = load("classic/background/background-sunset.png");
     private final Texture nightBackground = load("classic/background/background-night.png");
-    private final Map<String,Texture> christmasBackgrounds=Map.of(
-            "day",load("classic/background/background-natal-dia.png"),
-            "sunset",load("classic/background/background-natal-por-do-sol.png"),
-            "night",load("classic/background/background-natal-noite.png"));
     public final Texture house = load("classic/buildings/main-house.png");
     public final Texture dogHouse = load("classic/buildings/dog-house.png");
     /** Mourão e tábua da cerca do cercado (gerados por tools/art/fence.py). */
@@ -123,8 +119,8 @@ public final class GameAssets implements AutoCloseable {
 
     public Texture crop(CropType type, int stage) { return crops.get(type.id())[stage - 1]; }
 
-    Texture background(DayPeriod period,java.time.Instant realNow) {
-        if(br.com.colheitafeliz.game.Christmas2026.active(realNow))return christmasBackgrounds.get(period.name().toLowerCase(java.util.Locale.ROOT));
+    /** The farm always uses the original backgrounds; the Christmas event keeps only its music and gifts. */
+    Texture background(DayPeriod period) {
         return switch (period) {
             case DAY -> background;
             case SUNSET -> sunsetBackground;

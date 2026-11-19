@@ -53,7 +53,8 @@ export class Scene {
   }[] = [];
   private catalog: Catalog;
   private hover: Tile | null = null;
-  private backgroundPeriod?: string;
+  /** Period plus Christmas state: the background follows only the period, but the music also changes at the event's edges. */
+  private mediaKey?: string;
   private onPeriodChange: (period: ReturnType<typeof periodAt>) => void;
   private onTile: (tile: Tile, pointerType?: string) => void;
   private onEmptyTap: () => void;
@@ -556,9 +557,9 @@ export class Scene {
   private draw() {
     if (document.hidden) return;
     const ctx = this.ctx, now=new Date(),
-      period = periodAt(now),periodKey=period+':'+christmasActive(now);
-    if (this.backgroundPeriod !== periodKey) {
-      this.backgroundPeriod = periodKey;
+      period = periodAt(now), mediaKey = period + ':' + christmasActive(now);
+    if (this.mediaKey !== mediaKey) {
+      this.mediaKey = mediaKey;
       this.onPeriodChange(period);
     }
     // Mobile camera may enlarge the backing store; drawing stays in 1600 × 900 world units.
@@ -568,7 +569,7 @@ export class Scene {
     ctx.fillStyle = period === "night" ? "#15464f" : "#84ba30";
     ctx.fillRect(0, 0, 1600, 900);
     const background = this.sprite(
-      backgroundArtPath(period,now),
+      backgroundArtPath(period),
     );
     if (background) {
       const bounds = backgroundBounds(

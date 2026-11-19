@@ -11,10 +11,6 @@ public final class Christmas2026 {
     private Christmas2026() {}
     public static boolean active(Instant now){return !now.isBefore(START)&&now.isBefore(END);}
     public static boolean giftDue(Instant now,Instant registeredAt){return !now.isBefore(GIFT_START)&&registeredAt.isBefore(REGISTRATION_CUTOFF);}
-    public static String backgroundPath(Instant now,String period){
-        if(active(now))return switch(period){case "day"->"classic/background/background-natal-dia.png";case "sunset"->"classic/background/background-natal-por-do-sol.png";case "night"->"classic/background/background-natal-noite.png";default->throw new IllegalArgumentException("Unknown period");};
-        return switch(period){case "day"->"classic/background/background.png";case "sunset"->"classic/background/background-sunset.png";case "night"->"classic/background/background-night.png";default->throw new IllegalArgumentException("Unknown period");};
-    }
     public static String musicPath(Instant now,boolean night){
         return active(now)?(night?"sounds/musica-evento-natal-noite.mp3":"sounds/musica-evento-natal-dia-e-por-do-sol.mp3"):(night?"sounds/noite.mp3":"sounds/farm_loop.mp3");
     }

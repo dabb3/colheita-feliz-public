@@ -31,14 +31,8 @@ class Christmas2026Test {
         clock.advanceSeconds(java.time.Duration.between(clock.instant(),Christmas2026.END.plusSeconds(86400)).getSeconds());
         assertTrue(game.buyVip().success());assertTrue(game.buySeed(type).success());
     }
-    @Test void mediaUsesChristmasTracksAndReturnsToDefaultsAtTheExactCutoff(){
+    @Test void musicUsesChristmasTracksAndReturnsToDefaultsAtTheExactCutoff(){
         var during=Instant.parse("2026-12-31T23:00:00Z");var after=Christmas2026.END;
-        assertEquals("classic/background/background-natal-dia.png",Christmas2026.backgroundPath(during,"day"));
-        assertEquals("classic/background/background-natal-por-do-sol.png",Christmas2026.backgroundPath(during,"sunset"));
-        assertEquals("classic/background/background-natal-noite.png",Christmas2026.backgroundPath(during,"night"));
-        assertEquals("classic/background/background.png",Christmas2026.backgroundPath(after,"day"));
-        assertEquals("classic/background/background-sunset.png",Christmas2026.backgroundPath(after,"sunset"));
-        assertEquals("classic/background/background-night.png",Christmas2026.backgroundPath(after,"night"));
         assertEquals("sounds/musica-evento-natal-dia-e-por-do-sol.mp3",Christmas2026.musicPath(during,false));
         assertEquals("sounds/musica-evento-natal-noite.mp3",Christmas2026.musicPath(during,true));
         assertEquals("sounds/farm_loop.mp3",Christmas2026.musicPath(after,false));assertEquals("sounds/noite.mp3",Christmas2026.musicPath(after,true));
