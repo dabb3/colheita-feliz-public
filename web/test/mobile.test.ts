@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {anchorCamera,cameraLayout,canvasResolution,coverScale,initialCamera,setupCamera,syncMobileCamera,worldAt,zoomAround} from '../src/mobile.ts';
+import {anchorCamera,cameraLayout,canvasResolution,coverScale,initialCamera,setupCamera,setupMobileLayout,setMoreMenuVisiting,syncMobileCamera,worldAt,zoomAround} from '../src/mobile.ts';
 
 test('the mobile camera always covers the viewport without empty bands',()=>{
  for(const [width,height]of [[360,420],[390,480],[430,560],[340,700]]){
@@ -81,4 +81,28 @@ test('the camera restores the sharp backing store after a new Scene resets the c
  canvas.width=1600;canvas.height=900;
  syncMobileCamera();
  assert.equal(canvas.width,sharp);
+});
+
+test('portrait visit keeps Amigos in the bar while Mais is hidden, and puts it back afterwards',()=>{
+ // Minimal DOM: nodes live in parent child lists so "before"/"after" keep the real order.
+ const node=(id,tag='button')=>({id,tag,hidden:false,parent:null,attributes:{},listeners:{},
+  setAttribute(key,value){this.attributes[key]=String(value);},addEventListener(name,handler){this.listeners[name]=handler;},focus(){},contains(target){return target===this||(this.children??[]).includes(target);},
+  remove(){if(this.parent){this.parent.children.splice(this.parent.children.indexOf(this),1);this.parent=null;}},
+  before(other){other.remove();other.parent=this.parent;this.parent.children.splice(this.parent.children.indexOf(this),0,other);},
+  after(other){other.remove();other.parent=this.parent;this.parent.children.splice(this.parent.children.indexOf(this)+1,0,other);},
+  append(...others){for(const other of others){other.remove();other.parent=this;(this.children??=[]).push(other);}},
+  querySelector(){return null;}});
+ const bar=node('farm-menu','nav'),menu=node('more-menu','div'),more=node('more'),ids=['notifications','shop','friends','home','settings','calendar','events'];
+ const byId=new Map([[bar.id,bar],[menu.id,menu],[more.id,more]]);bar.append(...ids.map(id=>{const button=node(id);byId.set(id,button);return button;}),more,menu);
+ const media={matches:true,addEventListener(){}};const saved={window:globalThis.window,document:globalThis.document,ResizeObserver:globalThis.ResizeObserver};
+ globalThis.window={matchMedia:()=>media};globalThis.document={getElementById:id=>byId.get(id)??null,createComment:id=>node('#'+id,'comment'),addEventListener(){}};
+ try{
+  setupMobileLayout();
+  assert.equal(byId.get('friends').parent,menu,'portrait moves Amigos into Mais');
+  menu.hidden=false;setMoreMenuVisiting(true);
+  assert.equal(byId.get('friends').parent,bar,'Amigos stays reachable in the bar during a visit');assert.equal(menu.hidden,true,'the open Mais menu closes');
+  assert.ok(['notifications','settings','calendar','events'].every(id=>byId.get(id).parent===menu));
+  setMoreMenuVisiting(false);assert.equal(byId.get('friends').parent,menu);
+  assert.deepEqual(menu.children.map(child=>child.id),['notifications','friends','settings','calendar','events'],'original order is kept');
+ }finally{setMoreMenuVisiting(false);Object.assign(globalThis,saved);}
 });

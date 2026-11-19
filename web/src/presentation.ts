@@ -536,6 +536,8 @@ export function gameShortcut(
     t: "plots",
   };
   const action = actions[key.toLowerCase()];
+  // A visit only shows Minha fazenda, Amigos and Presentear, so own-farm panels stay closed.
+  if (visiting && action !== "music" && action !== "effects") return undefined;
   return action ? { action } : undefined;
 }
 export function shortcutPanelState(
