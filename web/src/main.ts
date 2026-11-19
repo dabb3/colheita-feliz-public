@@ -401,10 +401,11 @@ async function refreshCalendarAtBoundary(context:NonNullable<typeof calendarCont
  const client=context.client,generation=context.session,resetAt=context.resetAt;
  try{
   const farm=await client.get<Farm>('/v1/me/farm');if(generation!==sessionGeneration||api!==client||farm.owner!==own?.owner)return;
-  if(!calendarCurrent(context)){own=acceptFarm(own,farm);return;}
-  updateOwnFarm(farm);calendarClock(context);context.message=preserveMessage;calendarPaint(context);
+  const target=calendarTarget(context);
+  if(!target){own=acceptFarm(own,farm);return;}
+  updateOwnFarm(farm);calendarClock(target);if(target===context)context.message=preserveMessage;calendarPaint(target);
  }catch(error){if(calendarCurrent(context)){const message=(error as {message?:unknown})?.message;context.message=preserveMessage?`${preserveMessage} Não foi possível atualizar o calendário: ${typeof message==='string'?message:'erro de conexão'}`:typeof message==='string'?`Não foi possível atualizar o calendário: ${message}`:'Não foi possível atualizar o calendário.';context.phase='error';calendarPaint(context);}}
- finally{if(calendarCurrent(context)){context.refreshing=false;if(context.resetAt===resetAt)context.checkedResetAt=resetAt;calendarPaint(context);}}
+ finally{if(calendarCurrent(context)){context.refreshing=false;if(context.resetAt===resetAt)context.checkedResetAt=resetAt;calendarPaint(context);}else{const target=calendarTarget(context);if(target)calendarPaint(target);}}
 }
 function tickLoginCalendar(context:NonNullable<typeof calendarContext>){
  if(!calendarCurrent(context))return;
@@ -412,8 +413,8 @@ function tickLoginCalendar(context:NonNullable<typeof calendarContext>){
  if(countdown)countdown.textContent=Number.isFinite(target)&&Number.isFinite(now)&&now>=target?'Aguardando confirmação do servidor…':`Próximo resgate em ${loginCountdown(context)}.`;
  if(Number.isFinite(target)&&Number.isFinite(now)&&now>=target&&context.checkedResetAt!==context.resetAt){context.checkedResetAt=context.resetAt;void refreshCalendarAtBoundary(context);}
 }
-/** A claim answers the calendar that started it or, after leaving and reopening the tab, the calendar now on screen. */
-function claimTarget(context:NonNullable<typeof calendarContext>){
+/** A claim or refresh answers the calendar that started it or, after leaving and reopening the tab, the calendar now on screen. */
+function calendarTarget(context:NonNullable<typeof calendarContext>){
  if(calendarCurrent(context))return context;
  const active=calendarContext;return active&&active.client===context.client&&active.session===context.session&&calendarCurrent(active)?active:undefined;
 }
@@ -426,17 +427,17 @@ async function submitLoginReward(context:NonNullable<typeof calendarContext>,ret
  try{
   const reply=retry?await client.retry():await client.mutate('/v1/me/actions',fields);
   if(generation!==sessionGeneration||api!==client)return;
-  const target=claimTarget(context);
+  const target=calendarTarget(context);
   if(reply.farm){if(target)updateOwnFarm(reply.farm);else own=acceptFarm(own,reply.farm);}
   if(!target)return;
   if(reply.result?.success){target.phase='ready';target.message=reply.result.message||'Recompensa resgatada.';if(own)calendarClock(target);render();}
   else{target.phase='error';target.message=reply.result?.message??'O servidor não confirmou a recompensa.';calendarPaint(target);}
  }catch(error){
   if(generation!==sessionGeneration||api!==client)return;
-  const target=claimTarget(context);
+  const target=calendarTarget(context);
   if(target){const message=(error as {message?:unknown})?.message;target.phase=loginRewardPending(client)?'unknown':'error';target.message=typeof message==='string'?message:'Não foi possível confirmar o resgate.';calendarPaint(target);if(error instanceof ApiError&&[409,410].includes(error.status)&&!client.pending)await refreshCalendarAtBoundary(target,target.message);}
  }finally{
-  if(generation===sessionGeneration&&api===client){busy=false;const target=claimTarget(context);if(target)calendarPaint(target);syncPending();}
+  if(generation===sessionGeneration&&api===client){busy=false;const target=calendarTarget(context);if(target)calendarPaint(target);syncPending();}
  }
 }
 /** The daily calendar is a permanent event, so it opens as a tab of Eventos. */

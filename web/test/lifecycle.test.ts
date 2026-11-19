@@ -1175,3 +1175,16 @@ test('events tab reloads once at the start and once at the end of the same event
  h.setNow(11_000+86_400_000);intervals.get(1000)();await new Promise(r=>setTimeout(r,0));assert.equal(reads,2,'end reloads even with the same event ID');
  intervals.get(1000)();intervals.get(1000)();await new Promise(r=>setTimeout(r,0));assert.equal(reads,2);assert.ok(text(elements.get('modal-content')).includes('Próximo domingo'));
 });
+
+test('a calendar refresh that finishes after leaving and reopening the tab updates the calendar on screen',async()=>{
+ const {h,elements}=app(),reply=deferred(),before={...loginFarm('alice',false,'1','2026-11-16T02:59:50Z','2026-11-16T03:00:00Z'),sundayHarvestEvent:sundayFixture},after={...loginFarm('alice',true,'2','2026-11-16T03:00:05Z','2026-11-17T03:00:00Z'),sundayHarvestEvent:sundayFixture};let reads=0;
+ h.set({own:before,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:36000}],animals:[],fertilizers:[],vip:{greenPrice:20}},api:{pending:null,busy:false,get:()=>{reads++;return reply.promise;}}});h.receive({farm:before});h.loginCalendar();
+ const tabs=()=>descendants(elements.get('modal-content')).filter(node=>node.getAttribute?.('role')==='tab'),find=label=>descendants(elements.get('modal-content')).find(node=>text(node)===label);
+ assert.equal(find('Resgatar recompensa').disabled,true);
+ find('Atualizar calendário').onclick();tabs()[0].onclick();tabs()[1].onclick();assert.equal(reads,1,'reopening reuses the GET in flight');
+ reply.resolve(after);await new Promise(resolve=>setTimeout(resolve,0));await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(h.get().own.revision,'2');assert.equal(h.calendarInfo().anchorServer,Date.parse(after.serverTime),'the clock of the tab on screen moves');assert.equal(h.calendarInfo().resetAt,after.loginRewards.nextResetAt);
+ assert.equal(find('Resgatar recompensa').disabled,false,'the new day is offered at once');assert.ok(text(elements.get('modal-content')).includes('Próximo resgate em'));
+ const late=deferred();h.set({own:after,api:{pending:null,busy:false,get:()=>late.promise}});h.receive({farm:after});h.loginCalendar();find('Atualizar calendário').onclick();tabs()[0].onclick();tabs()[1].onclick();const logout=h.logout();
+ late.resolve({...after,revision:'3'});await logout;await new Promise(resolve=>setTimeout(resolve,0));assert.equal(h.get().own,undefined,'a response after logout is still dropped');
+});
