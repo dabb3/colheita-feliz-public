@@ -115,6 +115,15 @@ export function soundForAction(action: string, animalReady = false) {
   if (action.startsWith("SELL_")) return "sell";
   return undefined;
 }
+/**
+ * Red halo that follows a hungry animal's silhouette. It pulses gently and stays still
+ * with reduced motion; any other status has no halo.
+ */
+export function hungerGlow(status: string, seconds: number, reducedMotion: boolean): { color: string; blur: number } | undefined {
+  if (status !== "HUNGRY") return undefined;
+  const pulse = reducedMotion ? 1 : 0.5 + 0.5 * Math.sin((seconds * 2 * Math.PI) / 1.6);
+  return { color: "rgba(255, 32, 32, 0.95)", blur: Math.round(14 + 8 * pulse) };
+}
 export function showAnimalProduct(status: string, kind: string, id: string) {
   return (
     status === "READY" &&

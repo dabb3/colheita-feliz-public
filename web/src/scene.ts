@@ -25,6 +25,7 @@ import {
   cropHeight,
   tileEffect,
   showAnimalProduct,
+  hungerGlow,
   animalProductPath,
   type TileEffect,
 } from "./presentation.ts";
@@ -39,6 +40,10 @@ type Sprite = {
   footCenterX: number;
   footWidth: number;
 };
+/** Read on every frame so turning the OS setting on stops the pulse without a reload. */
+function reducedMotion() {
+  return typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 export class Scene {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -309,6 +314,7 @@ export class Scene {
     bottom: number,
     width: number,
     flip = false,
+    glow?: { color: string; blur: number },
   ) {
     const rect = spriteDrawRect(
         x,
@@ -322,23 +328,33 @@ export class Scene {
         s.footCenterX,
       ),
       ctx = this.ctx;
+    if (flip || glow) ctx.save();
     if (flip) {
-      ctx.save();
       ctx.translate(x * 2, 0);
       ctx.scale(-1, 1);
     }
-    ctx.drawImage(
-      s.image,
-      s.x,
-      s.y,
-      s.w,
-      s.h,
-      rect.x,
-      rect.y,
-      rect.width,
-      rect.height,
-    );
-    if (flip) ctx.restore();
+    if (glow) {
+      // Canvas shadows follow the sprite's alpha, so the halo hugs the silhouette.
+      // shadowBlur ignores the transform, so it scales with the backing store.
+      ctx.shadowColor = glow.color;
+      ctx.shadowBlur = glow.blur * (this.canvas.width / 1600);
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+    }
+    // A second pass with the halo makes it read on bright grass; the sprite stays the same.
+    for (let pass = glow ? 2 : 1; pass > 0; pass--)
+      ctx.drawImage(
+        s.image,
+        s.x,
+        s.y,
+        s.w,
+        s.h,
+        rect.x,
+        rect.y,
+        rect.width,
+        rect.height,
+      );
+    if (flip || glow) ctx.restore();
   }
   private thing(
     path: string,
@@ -374,11 +390,12 @@ export class Scene {
     bottom: number,
     width: number,
     flip: boolean,
+    glow?: { color: string; blur: number },
   ) {
     const sprite = this.sprite(path, true);
     if (!sprite) return;
     this.shadow(sprite, x, bottom, width);
-    this.drawSprite(sprite, x, bottom, width, flip);
+    this.drawSprite(sprite, x, bottom, width, flip, glow);
   }
   private drawAnimal(
     animal: Farm["animals"][number],
@@ -392,14 +409,14 @@ export class Scene {
       walkingFrame = animalWalkingFrame(animal.id, motion.walking, seconds),
       xAt = x + motion.dx,
       bottom = 900 - y + motion.dy,
-      hungry = animal.status === "HUNGRY";
+      glow = hungerGlow(animal.status, seconds, reducedMotion());
     if (animal.id === "abelha") {
       const path = "classic/animals/abelha/colmeia-abelha-atlas.png",
         hive = this.sprite(path, true, 0),
         bees = this.sprite(path, true, 1);
       if (hive) {
         this.shadow(hive, x, bottom, width);
-        this.drawSprite(hive, x, bottom, width);
+        this.drawSprite(hive, x, bottom, width, false, glow);
       }
       if (!sleep && bees && hive)
         for (let i = 0; i < 4; i++) {
@@ -408,7 +425,6 @@ export class Scene {
             beeBottom = bottom - (width * hive.h) / hive.w + 8 - offset.y;
           this.drawSprite(bees, beeX, beeBottom, 16);
         }
-      if (hungry) this.feedMarker(x, bottom - width - 2);
       return;
     }
     const path = animalPath(
@@ -446,21 +462,16 @@ export class Scene {
       bottom,
       drawWidth,
       animalFlip(animal.id, motion.facingRight),
+      glow,
     );
     const type = this.catalog.animals.find((item) => item.id === animal.id);
     if (showAnimalProduct(animal.status, type?.kind ?? "", animal.id))
       this.product(animalProductPath(animal.id)!, x + 38, bottom + 12, 28);
-    if (hungry && sprite)
-      this.feedMarker(xAt, bottom - (drawWidth * sprite.h) / sprite.w - 2);
   }
   private product(path: string, x: number, bottom: number, width: number) {
     const sprite = this.sprite(path, true);
     if (!sprite) return;
     this.drawSprite(sprite, x, bottom, width);
-  }
-  private feedMarker(x: number, bottom: number) {
-    const icon = this.sprite("classic/icons/racao-generica.png");
-    if (icon) this.ctx.drawImage(icon.image, x - 9, bottom - 20, 18, 20);
   }
   private crop(
     path: string,

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {periodAt,tileCenter,pickTile,animalPath,animalWalkingFrame,animalSoundPath,tileArtRect,backgroundBounds,animalShadowRect,spriteDrawRect,measureSpriteFootprint,widthForMatchingHeight,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand,friendFeedOptions} from '../src/presentation.ts';
+import {hungerGlow,periodAt,tileCenter,pickTile,animalPath,animalWalkingFrame,animalSoundPath,tileArtRect,backgroundBounds,animalShadowRect,spriteDrawRect,measureSpriteFootprint,widthForMatchingHeight,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand,friendFeedOptions} from '../src/presentation.ts';
 
 test('the updated idle dog matches the walking sprite height after alpha trim',()=>{
  // Trimmed boxes (>12 alpha) of cachorro.png and cachorro-andando.png at 1536×1024.
@@ -233,4 +233,11 @@ test('action reward toast reports wallet, XP, and level changes',()=>{
  const before={coins:'100',greenCoins:'4',currentXp:'10',level:1};
  assert.deepEqual(actionRewardModel(before,{coins:'120',greenCoins:'6',currentXp:'15',level:1}),{coins:20,greens:2,xp:5,level:1,leveledUp:false});
  assert.deepEqual(actionRewardModel(before,{coins:'100',greenCoins:'4',currentXp:'0',level:2}),{coins:0,greens:0,xp:0,level:2,leveledUp:true});
+});
+
+test('hunger glow exists only for hungry animals, pulses gently and stays still with reduced motion',()=>{
+ for(const status of ['READY','PRODUCING','GROWING','SLEEPING'])assert.equal(hungerGlow(status,1,false),undefined);
+ const blurs=[0,0.4,0.8,1.2].map(seconds=>hungerGlow('HUNGRY',seconds,false).blur);
+ assert.ok(blurs.every(blur=>blur>=14&&blur<=22));assert.ok(new Set(blurs).size>1,'the halo pulses');
+ assert.deepEqual([0,0.4,0.8].map(seconds=>hungerGlow('HUNGRY',seconds,true)),Array(3).fill({color:'rgba(255, 32, 32, 0.95)',blur:22}));
 });
