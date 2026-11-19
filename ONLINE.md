@@ -331,6 +331,10 @@ nos Ajustes antes de usar os botões. Audição subjetiva,
 autoplay em Firefox/Safari e medição de fluidez em diferentes máquinas ainda
 precisam de ensaio; testes automatizados não comprovam esses resultados.
 
+## Relatório do período offline
+
+Depois de 3 horas ou mais fora, a abertura da própria fazenda mostra o painel "Sua fazenda rendeu!" com colheitas, produtos, visitas, proteção, cuidados automáticos e pendências do período, antes das notas de atualização. O servidor guarda o relatório até o cliente confirmar a exibição. A regra completa está em [Relatório do período offline](docs/game-rule.md#19-relatório-do-período-offline). O painel usa a fonte Fredoka (OFL), servida localmente em `web/public/fonts`.
+
 ## Tempos exibidos no cultivo
 
 A loja identifica o tempo nominal como duração com rega em dia e sem pragas. Solo seco cresce à metade da velocidade; ervas e minhocas pausam o crescimento. O popup separa o restante com rega em dia do restante sem nova rega. Cada cenário mostra sua própria previsão com data e hora locais, calculadas a partir do horário retornado pela API: uma mantendo a rega em dia e sem pragas; outra sem nova rega e sem novas pragas. O contador atualiza a previsão ideal conforme o crescimento real: ela permanece estável com solo úmido e acompanha o atraso enquanto a planta continuar seca. Pragas e plantas sem a primeira rega não exibem previsão de conclusão. Os textos usam os dados existentes da API; não alteram regras, preços, duração, relógio autoritativo ou saves.

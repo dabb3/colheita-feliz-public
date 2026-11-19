@@ -34,9 +34,24 @@ export interface Animal {
 }
 export interface AutomationService {id:string; name:string; description:string; greenPrice:number; durationDays:number;}
 export interface UpdateNotes {version:string; prNumber:number; date:string; items:string[];}
+export interface AwayReport {
+  /** One id per absence: the same report repeats until acknowledged; equal content in a later absence is a new report. */
+  id:string;
+  awaySeconds:number;
+  harvests:{cropId:string;name:string;stem:string;quantity:number}[];
+  /** Collected by automation into the deposit. */
+  products:{productId:string;name:string;animalId:string;quantity:number}[];
+  /** Ready in the barn, still waiting to be collected. */
+  readyProducts:{productId:string;name:string;animalId:string;quantity:number}[];
+  thefts:{at:string;actor:string;itemId:string;name:string;stem:string;quantity:number}[];
+  defenses:{at:string;actor:string}[];
+  care:{waterings:number;pestsRemoved:number;animalCares:number};
+  pending:({kind:'AUTOMATION';serviceId:string;name:string;expiredAt:string}|{kind:'VIP';expiredAt:string}|{kind:'FEED';animalId:string;name:string;stock:number})[];
+}
 export interface Farm {
   automations?: (AutomationService & {expiresAt:string|null;status:"ACTIVE"|"SUSPENDED"|"EXPIRED"|"NOT_PURCHASED"})[];
   updateNotes?: UpdateNotes;
+  awayReport?: AwayReport;
   avatar?: {id:string;photoUrl?:string|null};
   avatarSelected?: boolean;
   notifications?: GameNotification[];

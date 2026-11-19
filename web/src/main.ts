@@ -1,7 +1,7 @@
 import {renderEvents,eventBoosted,eventStatus,eventCountdown} from './events.ts';
 import {connectPush,suspendPush,reconcilePush,renderPushSettings} from './push.ts';
 import {createClient} from '@supabase/supabase-js';
-import type {Farm,Catalog,Tile,Animal,AnimalType,Reply,CommandFields,Friend,Gifts} from './types.ts';
+import type {Farm,Catalog,Tile,Animal,AnimalType,Reply,CommandFields,Friend,Gifts,AwayReport} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
 import {syncMobileCamera} from './mobile.ts';
@@ -10,6 +10,7 @@ import {renderWallet,control,text,image,renderDailyAllowance,friendAvatar,vipBad
 import {renderGiftComposer,renderLoginRewards,giftLimit,type GiftComposerState} from './ui-panels.ts';
 import {fertilizerDuration,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText} from './ui-presentation.ts';
 import {PROTECTED_ICON,notificationCount,renderNotifications} from './notifications.ts';
+import {renderAwayReport,startAwayLeaves} from './away-report.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,avatarImport,type AvatarChoice} from './avatar.ts';
 import {musicArtPath,seedArtPath,periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalSoundPath,animalStatusText,animalActionLabel,animalClickCommand,friendFeedOptions,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
 
@@ -127,7 +128,7 @@ async function fadeSoldDepositRows(fields:CommandFields,farm:Farm){
 }
 let missionsTimer:number|undefined;
 function stopCalendar(){window.clearInterval(calendarTimer);calendarTimer=undefined;calendarContext=undefined;}
-function dialog(title:string){stopEvents();stopCalendar();giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;modal.classList.remove('bite-dialog');modal.removeAttribute('aria-describedby');dialogGeneration++;refreshDialog=undefined;closeHealth();element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');modal.classList.toggle('missions-dialog',title==='Missões');modal.classList.toggle('gift-dialog',title==='Presentear');modal.classList.toggle('login-calendar-dialog',title==='Calendário de Recompensas');if(title!=='Missões'){window.clearInterval(missionsTimer);missionsTimer=undefined;}content.className='';content.replaceChildren();content.scrollTop=0;modalFooter.className='';modalFooter.replaceChildren();modalFooter.hidden=true;if(!modal.open)modal.showModal();}
+function dialog(title:string){stopEvents();stopCalendar();giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;modal.classList.remove('bite-dialog');modal.removeAttribute('aria-describedby');dialogGeneration++;refreshDialog=undefined;closeHealth();element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');modal.classList.toggle('missions-dialog',title==='Missões');modal.classList.toggle('away-dialog',title===AWAY_TITLE);modal.classList.toggle('gift-dialog',title==='Presentear');modal.classList.toggle('login-calendar-dialog',title==='Calendário de Recompensas');if(title!=='Missões'){window.clearInterval(missionsTimer);missionsTimer=undefined;}content.className='';content.replaceChildren();content.scrollTop=0;modalFooter.className='';modalFooter.replaceChildren();modalFooter.hidden=true;if(!modal.open)modal.showModal();}
 const shownBites=new Set<string>();
 function showBite(reply:Reply,actionName?:string){
  if(actionName!=='STEAL'||reply.theftOutcome?.kind!=='BITTEN'||!reply.farm||reply.farm.owner!==own?.owner)return false;
@@ -141,14 +142,56 @@ function showBite(reply:Reply,actionName?:string){
 }
 let pendingUpdateNotes: NonNullable<Farm['updateNotes']>[] = [], notesOwner = '';
 const shownUpdateNotes = new Set<string>();
+const AWAY_TITLE='Sua fazenda rendeu!';
+let pendingAway:AwayReport|undefined;const shownAway=new Set<string>(),ackingAway=new Set<string>();
 function collectUpdateNotes(farm:Farm){
- if(notesOwner!==farm.owner){notesOwner=farm.owner;shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();}
+ if(notesOwner!==farm.owner){notesOwner=farm.owner;shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();pendingAway=undefined;shownAway.clear();}
  const notes=farm.updateNotes;
  if(!notes?.version?.trim()||!Number.isInteger(notes.prNumber)||notes.prNumber<=0||!/^\d{4}-\d{2}-\d{2}$/.test(notes.date)||!notes.items?.length||!notes.items.every(item=>typeof item==='string'&&item.trim()))return;
  const key=JSON.stringify([notes.version,notes.date]);if(shownUpdateNotes.has(key))return;
  shownUpdateNotes.add(key);pendingUpdateNotes.push(notes);
 }
+/** Read from every own-farm reply, even one whose snapshot loses to a newer revision: the report is not farm state. */
+function collectAwayReport(farm:Farm){
+ const report=farm.awayReport;if(!report?.id||farm.owner!==own?.owner)return;
+ // Already shown: the server still has it, so the acknowledgement was lost; send it again.
+ if(shownAway.has(report.id))acknowledgeAway(report.id);else if(pendingAway?.id!==report.id)pendingAway=report;
+}
+function acknowledgeAway(id:string){
+ const client=api;if(!client||ackingAway.has(id))return;ackingAway.add(id);
+ void client.ackAwayReport(id).catch(()=>{}).finally(()=>ackingAway.delete(id));
+}
+const awayCareKey=()=>`colheita:away-care-open:${own?.owner??''}`;
+function awayCareOpen(){try{return window.localStorage.getItem(awayCareKey())==='1';}catch{return false;}}
+async function awayCommand(fields:CommandFields){
+ const reply=await runAction(fields);
+ if(!reply)return 'Aguarde a ação em andamento e tente de novo.';
+ return reply.result?.success?undefined:(reply.result?.message??'Não foi possível concluir.');
+}
+/** The away report goes first: it is about the player's own farm. */
+function showAwayReport(){
+ if(!own||modal.open||!pendingAway)return false;
+ const report=pendingAway;pendingAway=undefined;dialog(AWAY_TITLE);
+ const stopLeaves=document.body?startAwayLeaves(document.body):()=>{};modal.addEventListener('close',stopLeaves,{once:true});
+ modalFooter.hidden=false;
+ let close:HTMLButtonElement;
+ // Acknowledge only after the panel is built: a failed render keeps the report on the server for the next reply.
+ try{close=renderAwayReport(content,modalFooter,report,{
+  renew:serviceId=>awayCommand({action:'BUY_AUTOMATION',itemId:serviceId}),
+  feed:animalId=>awayCommand({action:'TEND_ANIMAL',itemId:animalId}),
+  renewVip:()=>{modal.close();shop('vip');},
+  buyFeed:()=>{modal.close();shop('animals');},
+  close:()=>{modal.close();showUpdateNotes();},
+  careOpen:awayCareOpen(),
+  vipActive:!!own.vipActive,
+  onCareToggle:open=>{try{window.localStorage.setItem(awayCareKey(),open?'1':'0');}catch{}},
+ });}catch{modal.close();return false;}
+ shownAway.add(report.id);acknowledgeAway(report.id);
+ close.focus({preventScroll:true});
+ return true;
+}
 function showUpdateNotes(){
+ if(showAwayReport())return;
  if(!own||modal.open||!pendingUpdateNotes.length)return;
  const notes=pendingUpdateNotes.shift()!;dialog('Notas da atualização');
  paragraph('PR #'+notes.prNumber+' · '+notes.date.split('-').reverse().join('/'));
@@ -395,6 +438,7 @@ function updateOwnFarm(farm:Farm){
  own=acceptFarm(own,farm);
  if(own===farm){const server=Date.parse(farm.serverTime??'');if(Number.isFinite(server))ownServerClock={owner:farm.owner,server,client:performance.now()};}
  if(own===farm)collectUpdateNotes(farm);
+ collectAwayReport(farm);
  if(previous&&own!==previous&&own.tiles.some(tile=>tile.state==='READY'&&previous.tiles.some(old=>
   old.column===tile.column&&old.row===tile.row&&old.cropId===tile.cropId&&old.season===tile.season&&old.state==='GROWING'
  )))playEffect('planta-pronta-para-colher');
@@ -407,11 +451,13 @@ function receive(reply:Reply,announce=true,actionName?:string){
  if(reply.result&&announce&&!bitten)notify(reply.result.message);
  return bitten;
 }
-async function action(fields:CommandFields,path='/v1/me/actions'){
+async function action(fields:CommandFields,path='/v1/me/actions'):Promise<void>{await runAction(fields,path);}
+/** Same as action(), but hands the reply to callers that show the result in place. */
+async function runAction(fields:CommandFields,path='/v1/me/actions'):Promise<Reply|undefined>{
  if(!api||!own||busy)return;
  if(!navigator.onLine){notify('Sem conexão. Reconecte antes de agir.');return;}
  busy=true;let stale=false;const client=api,generation=sessionGeneration,previousFarm=own,animalReady=fields.action==='TEND_ANIMAL'&&own.animals.some(animal=>animal.id===fields.itemId&&animal.status==='READY');
- try{const reply=await client.mutate(path,{...fields,expectedRevision:path==='/v1/me/actions'?own.revision:visited!.revision});if(generation===sessionGeneration){if(reply.result?.success&&reply.farm){await fadeSoldDepositRows(fields,reply.farm);if(generation!==sessionGeneration)return;}const bitten=receive(reply,false,String(fields.action));if(reply.result?.success&&own){const reward=actionRewardModel(previousFarm,own),selling=String(fields.action).startsWith('SELL_');if(selling){notifySale(reward.coins,reward.greens);if(reward.coins>0)animateGoldBalance(Number(previousFarm.coins??0),Number(own.coins??0));}else notifyAction(reply.result.message,String(fields.action),typeof fields.itemId==='string'?fields.itemId:undefined,reward);const cue=reward.leveledUp?'levelup':soundForAction(String(fields.action),animalReady);if(cue)playEffect(cue);}else if(reply.result){playEffect('acao-bloqueada');if(!bitten)notify(reply.result.message);}}}
+ try{const reply=await client.mutate(path,{...fields,expectedRevision:path==='/v1/me/actions'?own.revision:visited!.revision});if(generation===sessionGeneration){if(reply.result?.success&&reply.farm){await fadeSoldDepositRows(fields,reply.farm);if(generation!==sessionGeneration)return;}const bitten=receive(reply,false,String(fields.action));if(reply.result?.success&&own){const reward=actionRewardModel(previousFarm,own),selling=String(fields.action).startsWith('SELL_');if(selling){notifySale(reward.coins,reward.greens);if(reward.coins>0)animateGoldBalance(Number(previousFarm.coins??0),Number(own.coins??0));}else notifyAction(reply.result.message,String(fields.action),typeof fields.itemId==='string'?fields.itemId:undefined,reward);const cue=reward.leveledUp?'levelup':soundForAction(String(fields.action),animalReady);if(cue)playEffect(cue);}else if(reply.result){playEffect('acao-bloqueada');if(!bitten)notify(reply.result.message);}}return reply;}
  catch(error){stale=error instanceof ApiError&&[409,410].includes(error.status);if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();if(stale)void refresh();else void client.prepareRequestId().catch(()=>{});}}
 }
 let animalSound:HTMLAudioElement|undefined;
@@ -686,7 +732,7 @@ function animalPopup(id:string){
   const label=animalActionLabel(animal.status,type.kind,animal.stage);if(label)button(label,()=>{modal.close();void action({action:'TEND_ANIMAL',itemId:id});},detail);
   const feedId=type.kind==='PRODUCER'?'producer':'growth';
   button(`Comprar ração · ${catalog.feedPrices[feedId]} ouro`,()=>{modal.close();void action({action:'BUY_FEED',itemId:feedId});},detail);
-  if(type.kind==='GROWING')button('Vender adulto',()=>{modal.close();void action({action:'SELL_ANIMAL',itemId:id});},detail);
+  if(type.kind==='GROWING'&&animal.stage==='ADULT'&&label!=='Vender adulto')button('Vender adulto',()=>{modal.close();void action({action:'SELL_ANIMAL',itemId:id});},detail);
  }else if(visited&&animal.status==='HUNGRY'){
   const owner=visited.owner,options=friendFeedOptions(type.kind,animal.status,own?.feed);
   if(!options.length)paragraph('Você não tem ração compatível. Compre na Loja, aba Animais.',detail);

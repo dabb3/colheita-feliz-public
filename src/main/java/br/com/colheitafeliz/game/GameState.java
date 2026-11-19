@@ -67,6 +67,7 @@ public final class GameState {
     private VipStatus vip = new VipStatus(null);
     private Instant replayAt;
     private Instant automationCursor;
+    private AwayTally awayTally = new AwayTally();
     private final Map<String,Instant> automationTerms = new java.util.LinkedHashMap<>();
     private GameSnapshot.ChristmasState christmas2026;
     private PlayerAvatar avatar;
@@ -204,6 +205,8 @@ public final class GameState {
     }
 
     public void runAutomationsNow() { replayAutomations(realNow()); }
+    /** Returns the automation care counted since the previous drain and starts a new count. */
+    public AwayTally drainAwayTally() { var drained = awayTally; awayTally = new AwayTally(); return drained; }
 
     private void replayAutomations(Instant target) {
         if (target.isBefore(automationCursor)) return;
@@ -221,14 +224,14 @@ public final class GameState {
                     if (!land.isUnlocked(i % COLUMNS, i / COLUMNS) || tile.state() != TileState.GROWING
                             || tile.crop().plantedAt().isAfter(replayAt)) continue;
                     if (automationActive("water") && tile.crop().dryAt(replayAt)) {
-                        tool = Tool.WATER; act(i % COLUMNS, i / COLUMNS);
+                        tool = Tool.WATER; if (act(i % COLUMNS, i / COLUMNS).success()) awayTally.addWatering();
                     }
                     if (automationActive("pests")) {
                         if (tile.weedsSince() != null && !replayAt.isBefore(tile.weedsSince().plusSeconds(900))) {
-                            tool = Tool.WEEDER; act(i % COLUMNS, i / COLUMNS);
+                            tool = Tool.WEEDER; if (act(i % COLUMNS, i / COLUMNS).success()) awayTally.addPest();
                         }
                         if (tile.insectsSince() != null && !replayAt.isBefore(tile.insectsSince().plusSeconds(900))) {
-                            tool = Tool.PESTICIDE; act(i % COLUMNS, i / COLUMNS);
+                            tool = Tool.PESTICIDE; if (act(i % COLUMNS, i / COLUMNS).success()) awayTally.addPest();
                         }
                     }
                 }
@@ -236,7 +239,13 @@ public final class GameState {
                     Animal animal = barn.get(i);
                     if (animal.acquiredAt().isAfter(replayAt) || animal.growthAnchorAt().isAfter(replayAt)) continue;
                     if (animal.type().kind() == AnimalType.Kind.GROWING && animal.statusAt(replayAt) == Animal.Status.READY) continue;
-                    if (animal.hungryAt(replayAt) || animal.statusAt(replayAt) == Animal.Status.READY) tendAnimal(i);
+                    if (animal.hungryAt(replayAt) || animal.statusAt(replayAt) == Animal.Status.READY) {
+                        String productId = animal.type().productId();
+                        if (tendAnimal(i).success()) {
+                            awayTally.addAnimalCare();
+                            if (lastCollected == 1) awayTally.addCollected(productId, 1);
+                        }
+                    }
                 }
                 if (!replayAt.isBefore(target)) break;
                 replayAt = nextAutomationEvent(replayAt, target);

@@ -149,6 +149,7 @@ function app(preferences=new Map(),pushLogoutOptions){
  const notificationSource=readFileSync(new URL('../src/notifications.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(notificationSource),ctx);
  const eventsSource=readFileSync(new URL('../src/events.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');runInNewContext(stripTypeScriptTypes(eventsSource),ctx);
+ runInNewContext(stripTypeScriptTypes(readFileSync(new URL('../src/away-report.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'')),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
  source+='\nglobalThis.h={events,updateOwnFarm,refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,friends,presentGift,closeGiftComposer,receive,dialog,health,renderHealth,positionHealth,animalTooltip,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:{...ctx.h,runTimeouts(){for(const [id,callback]of [...timeouts]){timeouts.delete(id);callback();}}},elements,listeners,audioClips,observers,ctx,intervals};
@@ -830,6 +831,79 @@ test('VIP purchases require explicit confirmation and reject repeated confirmati
  const confirm=descendants(elements.get('modal-content')).find(n=>n.textContent==='Confirmar compra');confirm.onclick();confirm.onclick();assert.equal(sent.length,1);assert.equal(sent[0].action,'BUY_VIP');
  pending.resolve({});await new Promise(r=>setTimeout(r,0));
  h.shop('vip');descendants(elements.get('modal-content')).find(n=>n.attributes['aria-label']==='Comprar Rega automática por 100 verdes por 30 dias').onclick();assert.match(text(elements.get('modal-content')),/não estende/);descendants(elements.get('modal-content')).find(n=>n.textContent==='Cancelar').onclick();assert.equal(sent.length,1);
+});
+const awayReport={id:'11111111-1111-4111-8111-111111111111',awaySeconds:33600,harvests:[{cropId:'morango',name:'Morango',stem:'morango',quantity:12}],products:[],readyProducts:[],thefts:[],defenses:[],care:{waterings:0,pestsRemoved:0,animalCares:0},
+ pending:[{kind:'AUTOMATION',serviceId:'water',name:'Rega automática',expiredAt:'2026-11-13T06:12:00Z'},{kind:'FEED',animalId:'cachorro-robo',name:'Cachorro',stock:2},{kind:'VIP',expiredAt:'2026-11-13T06:00:00Z'}]};
+const notesFor=version=>({version,prNumber:42,date:'2026-11-08',items:['Novos cuidados VIP.']});
+test('away report opens before update notes and closing it shows the notes',()=>{
+ const {h,elements}=app();h.set({own:farm('alice')});
+ h.receive({farm:{...farm('alice'),revision:'2',awayReport,updateNotes:notesFor('v1')}});
+ assert.match(text(elements.get('modal-content')),/Sua fazenda rendeu!/);assert.match(text(elements.get('modal-content')),/12 morangos/);
+ descendants(elements.get('modal-footer')).find(n=>n.textContent==='Ir para a fazenda').onclick();
+ assert.equal(elements.get('modal-title').textContent,'Notas da atualização');
+});
+test('away report waits for an open dialog and is not duplicated by later refreshes',()=>{
+ const {h,elements}=app();h.set({own:farm('alice')});h.dialog('Ajustes');
+ h.receive({farm:{...farm('alice'),revision:'2',awayReport}});assert.equal(elements.get('modal-title').textContent,'Ajustes');
+ elements.get('close-modal').onclick();assert.match(text(elements.get('modal-content')),/Sua fazenda rendeu!/);
+ descendants(elements.get('modal-footer')).find(n=>n.textContent==='Ir para a fazenda').onclick();
+ h.receive({farm:{...farm('alice'),revision:'3',awayReport}});assert.equal(elements.get('modal').open,false);
+});
+test('away report from a previous account is dropped',()=>{
+ const {h,elements}=app();h.set({own:farm('alice')});h.dialog('Ajustes');
+ h.receive({farm:{...farm('alice'),revision:'2',awayReport}});
+ h.set({own:farm('bob')});h.receive({farm:{...farm('bob'),revision:'2'}});
+ elements.get('close-modal').onclick();assert.doesNotMatch(text(elements.get('modal-content')),/Sua fazenda rendeu!/);
+});
+test('renew and feed run the existing commands inside the panel',async()=>{
+ const {h,elements}=app(),sent=[];
+ h.set({own:{...farm('alice'),vipActive:true},api:{pending:null,ackAwayReport:async()=>{},mutate:async(_path,command)=>{sent.push(command);return {result:{success:true,message:'ok'},farm:{...farm('alice'),vipActive:true,revision:String(sent.length+2)}};},prepareRequestId:async()=>{}}});
+ h.receive({farm:{...farm('alice'),vipActive:true,revision:'2',awayReport}});
+ const find=label=>descendants(elements.get('modal-content')).find(n=>n.textContent===label);
+ find('Renovar').onclick();find('Confirmar').onclick();await new Promise(r=>setTimeout(r,0));
+ assert.deepEqual({action:sent[0].action,itemId:sent[0].itemId},{action:'BUY_AUTOMATION',itemId:'water'});
+ assert.match(text(elements.get('modal-content')),/Rega automática ativa ✓/);assert.match(text(elements.get('modal-content')),/Sua fazenda rendeu!/);
+ find('Alimentar').onclick();find('Confirmar').onclick();await new Promise(r=>setTimeout(r,0));
+ assert.deepEqual({action:sent[1].action,itemId:sent[1].itemId},{action:'TEND_ANIMAL',itemId:'cachorro-robo'});
+ assert.match(text(elements.get('modal-content')),/Cachorro alimentado ✓/);
+});
+test('away report is shown and acknowledged even when its snapshot loses to a newer revision',async()=>{
+ const {h,elements}=app(),acks=[];h.set({own:{...farm('alice'),revision:'5'},api:{pending:null,ackAwayReport:async id=>{acks.push(id);}}});
+ h.receive({farm:{...farm('alice'),revision:'4',awayReport}});
+ assert.match(text(elements.get('modal-content')),/Sua fazenda rendeu!/);assert.equal(h.get().own.revision,'5');
+ await new Promise(r=>setTimeout(r,0));assert.deepEqual(acks,[awayReport.id]);
+});
+test('reversed GET replies show the report once and resend a lost acknowledgement without reopening',async()=>{
+ const {h,elements}=app(),acks=[];h.set({own:farm('alice'),api:{pending:null,ackAwayReport:async id=>{acks.push(id);if(acks.length===1)throw new Error('offline');}}});
+ h.receive({farm:{...farm('alice'),revision:'3'}});h.receive({farm:{...farm('alice'),revision:'2',awayReport}});
+ assert.match(text(elements.get('modal-content')),/Sua fazenda rendeu!/);
+ descendants(elements.get('modal-footer')).find(n=>n.textContent==='Ir para a fazenda').onclick();await new Promise(r=>setTimeout(r,0));
+ h.receive({farm:{...farm('alice'),revision:'4',awayReport}});await new Promise(r=>setTimeout(r,0));
+ assert.equal(elements.get('modal').open,false);assert.deepEqual(acks,[awayReport.id,awayReport.id]);
+});
+test('a report that fails to render is not acknowledged and shows on the next reply',async()=>{
+ const {h,elements}=app(),acks=[];h.set({own:farm('alice'),api:{pending:null,ackAwayReport:async id=>{acks.push(id);}}});
+ h.receive({farm:{...farm('alice'),revision:'2',awayReport:{...awayReport,harvests:null}}});
+ await new Promise(r=>setTimeout(r,0));assert.deepEqual(acks,[]);assert.equal(elements.get('modal').open,false);
+ h.receive({farm:{...farm('alice'),revision:'3',awayReport}});
+ assert.match(text(elements.get('modal-content')),/Sua fazenda rendeu!/);await new Promise(r=>setTimeout(r,0));assert.deepEqual(acks,[awayReport.id]);
+});
+test('a reload before the acknowledgement shows the report again',()=>{
+ for(let run=0;run<2;run++){const {h,elements}=app();h.set({own:farm('alice')});
+  h.receive({farm:{...farm('alice'),revision:'2',awayReport}});assert.match(text(elements.get('modal-content')),/Sua fazenda rendeu!/);}
+});
+test('two absences with identical content are two reports',()=>{
+ const {h,elements}=app();h.set({own:farm('alice')});
+ h.receive({farm:{...farm('alice'),revision:'2',awayReport}});
+ descendants(elements.get('modal-footer')).find(n=>n.textContent==='Ir para a fazenda').onclick();
+ h.receive({farm:{...farm('alice'),revision:'3',awayReport:{...awayReport,id:'22222222-2222-4222-8222-222222222222'}}});
+ assert.match(text(elements.get('modal-content')),/Sua fazenda rendeu!/);
+});
+test('expired VIP in the report opens the shop on the VIP tab',()=>{
+ const {h,elements}=app();h.set({own:farm('alice')});
+ h.receive({farm:{...farm('alice'),revision:'2',awayReport:{...awayReport,pending:[{kind:'VIP',expiredAt:'2026-11-13T06:00:00Z'}]}}});
+ descendants(elements.get('modal-content')).find(n=>n.textContent==='Renovar').onclick();
+ assert.equal(elements.get('modal-title').textContent,'Loja');assert.equal(elements.get('modal').dataset.shopCategory,'vip');
 });
 test('claimed update notes wait for the open dialog and do not repeat, but new day and version do',()=>{
  const {h,elements}=app(),notes={version:'v1',prNumber:42,date:'2026-11-08',items:['Novos cuidados VIP.']};

@@ -1,10 +1,9 @@
 {
-  "version": "ui-mobile-v1",
-  "prNumber": 84,
+  "version": "relatorio-offline-v1",
+  "prNumber": 97,
   "items": [
-    "No celular em pé, a fazenda ocupa a tela toda: use pinça ou os botões + e − para dar zoom e arraste para mover. Só o toque usa a ferramenta.",
-    "As ferramentas ficam num painel logo abaixo da fazenda, com o nome da selecionada em destaque e os itens sem estoque em cinza.",
-    "Avisos, Amigos e Ajustes agora ficam no botão Mais, com a engrenagem. No computador, nada muda.",
-    "No iPhone, o Depósito volta a mostrar os itens em vez de abrir só com o título."
+    "Ao voltar ao jogo, o painel \"Sua fazenda rendeu!\" mostra o que aconteceu enquanto você estava fora: colheitas e cuidados automáticos, visitas, furtos e defesas.",
+    "O relatório também lista o que ficou pendente na fazenda, para você resolver logo ao entrar.",
+    "O botão Vender adulto aparece só quando o animal já é adulto, e uma vez só."
   ]
 }

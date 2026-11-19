@@ -108,6 +108,10 @@ export class ApiClient {
   async get<T>(path: string): Promise<T> {
     return this.request(path);
   }
+  /** Idempotent confirmation that the away report was shown; the server keeps it until then. */
+  async ackAwayReport(id: string): Promise<void> {
+    await this.request('/v1/me/away-report/ack', JSON.stringify({id}));
+  }
   async mutate(path: string, fields: CommandFields): Promise<Reply> {
     if (this.pending || this.busy)
       throw new Error("Resolva a ação pendente antes de continuar.");

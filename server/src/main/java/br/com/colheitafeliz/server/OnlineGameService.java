@@ -97,9 +97,38 @@ final class OnlineGameService implements AutoCloseable {
             var farm = load(tx, actor);
             farm.game().claimChristmasGift(participant.registeredAt());
             var view=withRequestLease(persist(tx, farm, false, true));
+            Instant now = clock.instant();
+            var ledger = tx.awayLedger(actor);
+            if (ledger != null && Duration.between(ledger.lastSeenAt(), now).compareTo(AwayReports.MIN_ABSENCE) >= 0) {
+                var report = AwayReports.build(farm.game(), ledger, now);
+                if (report != null) {
+                    // An unacknowledged report is folded into the new one, so no period is lost before the ACK.
+                    var previous = tx.pendingAwayReport(actor);
+                    if (previous != null) report = AwayReports.merge(previous, report, farm.game());
+                    report.addProperty("id", UUID.randomUUID().toString());
+                    tx.savePendingAwayReport(actor, report);
+                }
+            }
+            // Every own visit starts a new window; shorter absences are seen in the farm itself.
+            tx.saveAwayLedger(actor, AwayLedger.empty(now));
+            var pendingReport = tx.pendingAwayReport(actor);
+            if (pendingReport != null) {
+                pendingReport.remove("windows"); // only the server needs them, to merge the next report
+                view.add("awayReport", pendingReport);
+            }
             if(publishedNotes!=null&&tx.claimUpdateNotes(actor,publishedNotes.version(),publishedNotes.day(clock.instant())))
                 view.add("updateNotes",publishedNotes.view(clock.instant()));
             return view;
+    }
+
+    /** The client confirms it showed the report; repeating it, or naming an older report, changes nothing. */
+    JsonObject acknowledgeAwayReport(UUID actor, String reportId) {
+        try { UUID.fromString(reportId); } catch (RuntimeException e) { throw new ApiFailure(400, "Relatório inválido."); }
+        return store.transaction(actor, tx -> {
+            active(tx, actor);
+            tx.acknowledgeAwayReport(actor, reportId);
+            return object("ok", true);
+        });
     }
 
     JsonObject command(UUID actor, Command command) {
@@ -224,6 +253,7 @@ final class OnlineGameService implements AutoCloseable {
                 var visits = new VisitService();
                 ActionResult result;
                 br.com.colheitafeliz.game.TheftAttempt theft=null;
+                var ownerEvents = new java.util.ArrayList<AwayLedger.Event>();
                 if (command.action().equals("STEAL")) {
                     // The enclosing transaction holds the actor lock across cooldown, transfer and receipt.
                     Instant now = clock.instant();
@@ -233,8 +263,11 @@ final class OnlineGameService implements AutoCloseable {
                         theft = br.com.colheitafeliz.game.TheftAttempt.blocked("Você já usou sua tentativa de furto nas últimas 6 horas. Nova tentativa em "
                                 + remaining(now, availableAt) + ".");
                     } else {
+                        var target = destination.game().farm().tile(command.column(), command.row()).crop();
                         theft = stealAfterOwnerWindow(visits, destination, visitor, command, season, now);
                         if (theft.consumesCooldown()) tx.recordTheft(actor, now);
+                        var event = awayEvent(theft, visitor.name(), target, now);
+                        if (event != null) ownerEvents.add(event);
                     }
                     result=theft.result();
                 } else if (PEST_ACTIONS.contains(command.action())) {
@@ -289,7 +322,7 @@ final class OnlineGameService implements AutoCloseable {
                     store.pushStore().recordEvent(tx, command.requestId(), owner, actor, type, clock.instant());
                 }
                 var reply=object("result", result, "farm", persist(tx, visitor, false, true),
-                        "visitedFarm", persist(tx, destination, false, false));
+                        "visitedFarm", persist(tx, destination, false, false, ownerEvents));
                 if(theft!=null)reply.add("theftOutcome",object("kind",theft.kind(),"goldDebited",theft.goldDebited().toPlainString()));
                 return reply;
             });
@@ -376,14 +409,31 @@ final class OnlineGameService implements AutoCloseable {
     /** Normal online replay without owner-only gifts, notes, request leases or economic actions. */
     GameSnapshot advanceForCropPush(JdbcOnlineStore.Tx tx,UUID owner){
         var loaded=load(tx,owner);loaded.game().runAutomationsNow();
+        accumulate(tx,loaded,java.util.List.of());
         var snapshot=loaded.game().snapshot();
         // Avanço temporal em segundo plano não é uma ação do jogador: preservar a
         // revisão evita invalidar um clique feito com a projeção ainda aberta.
         tx.save(owner,snapshot,loaded.revision(),loaded.game().now());return snapshot;
     }
 
+    /** Owner-facing record of a theft attempt; blocked attempts (cooldown, window, invalid) are not reported. */
+    private static AwayLedger.Event awayEvent(br.com.colheitafeliz.game.TheftAttempt theft, String visitorName,
+                                              br.com.colheitafeliz.domain.crop.Crop target, Instant now) {
+        return switch (theft.kind()) {
+            case STOLEN -> new AwayLedger.Event("THEFT", now.toString(), visitorName, target.type().id(), 1, null);
+            // Plot protection is collective, so the defense is not credited to a specific animal.
+            case PROTECTED, BITTEN -> new AwayLedger.Event("DEFENDED", now.toString(), visitorName, null, 0, null);
+            case BLOCKED -> null;
+        };
+    }
+
     private JsonObject persist(JdbcOnlineStore.Tx tx, Loaded loaded, boolean force, boolean own) {
+        return persist(tx, loaded, force, own, java.util.List.of());
+    }
+
+    private JsonObject persist(JdbcOnlineStore.Tx tx, Loaded loaded, boolean force, boolean own, java.util.List<AwayLedger.Event> events) {
         loaded.game().runAutomationsNow();
+        accumulate(tx, loaded, events);
         var snapshot = loaded.game().snapshot();
         var compared=snapshot;
         if(loaded.before()!=null&&loaded.before().automations()!=null&&snapshot.automations()!=null)
@@ -418,6 +468,16 @@ final class OnlineGameService implements AutoCloseable {
         return object("completedDay", completedDay, "nextDay", next.day(),
                 "available", next.available(), "streakReset", next.streakReset(),
                 "nextResetAt", today.plusDays(1).atStartOfDay(LOGIN_REWARD_ZONE).toInstant().toString(), "rewards", rewards);
+    }
+
+    /** Adds automation care and visit events to the owner's away ledger in the farm's own transaction. */
+    private void accumulate(JdbcOnlineStore.Tx tx, Loaded loaded, java.util.List<AwayLedger.Event> events) {
+        var tally = loaded.game().drainAwayTally();
+        if (tally.isEmpty() && events.isEmpty()) return;
+        var ledger = tx.awayLedger(loaded.owner());
+        ledger = (ledger == null ? AwayLedger.empty(clock.instant()) : ledger).plus(tally);
+        for (var event : events) ledger = ledger.withEvent(event);
+        tx.saveAwayLedger(loaded.owner(), ledger);
     }
 
     private static JdbcOnlineStore.Player active(JdbcOnlineStore.Tx tx, UUID actor) {
