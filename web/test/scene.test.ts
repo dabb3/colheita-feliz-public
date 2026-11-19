@@ -7,12 +7,12 @@ import * as presentation from '../src/presentation.ts';
 
 test('scene draws stage-sized plants, real pests, ready props and trimmed hive without economic calls',()=>{
  const drawn=[],texts=[],pending=[],images=[],events=new Map(),selected=[],hovered=[];
- let tick,now=0,timers=0,ellipses=0,period='day',canInspect=true;const periods=[],tilesSelected=[];const cancelled=[];
+ let tick,now=0,timers=0,ellipses=0,period='day',christmas=false,canInspect=true;const periods=[],tilesSelected=[];const cancelled=[];
  const context={clearRect(){},fillRect(){},save(){},restore(){},translate(){},scale(){},rotate(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},stroke(){},fill(){},
   drawImage(image,...args){drawn.push({path:image.src,args});},fillText(text){texts.push(text);},ellipse(){ellipses++;},
   createRadialGradient(){return{addColorStop(){}};},getImageData(x,y,w,h){const data=new Uint8ClampedArray(w*h*4);for(let row=0;row<h;row++)for(let col=0;col<w;col++)if(row<h*.88||col<w*.25)data[(row*w+col)*4+3]=255;return{data};}};
  const canvas={width:1600,height:900,getContext:()=>context,getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(name,handler){events.set(name,handler);}};
- const environment={...presentation,periodAt:()=>period,performance:{now:()=>now},window:{requestAnimationFrame:fn=>{tick=fn;return ++timers;},cancelAnimationFrame:id=>cancelled.push(id)},AbortController,document:{hidden:false,createElement:()=>({getContext:()=>context})},
+ const environment={...presentation,periodAt:()=>period,christmasActive:()=>christmas,performance:{now:()=>now},window:{requestAnimationFrame:fn=>{tick=fn;return ++timers;},cancelAnimationFrame:id=>cancelled.push(id)},AbortController,document:{hidden:false,createElement:()=>({getContext:()=>context})},
   Image:class{width=100;height=200;onload;onerror;src;constructor(){pending.push(this);images.push(this);}}};
  const source=readFileSync(new URL('../src/scene.ts',import.meta.url),'utf8').replace(/^import\b[\s\S]*?;\s*/gm,'').replace('export class Scene','class Scene');
  runInNewContext(stripTypeScriptTypes(source)+'\nglobalThis.Scene=Scene;',environment);
@@ -61,6 +61,13 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  const backgrounds=images.map(image=>image.src).filter(src=>src.includes('/background/'));
  assert.ok(['background.png','background-night.png'].every(name=>backgrounds.some(src=>src.endsWith('/'+name))),'open session switches between the original backgrounds');
  assert.ok(!backgrounds.some(src=>src.includes('natal')),'Christmas backgrounds are never requested');
+ // Christmas starts and ends at midnight in São Paulo: the period stays night, yet the music must be synced again.
+ period='night';scene.update(farm);periods.length=0;
+ christmas=true;scene.update(farm);scene.update(farm);assert.deepEqual(periods,['night'],'event start resyncs the music once');
+ christmas=false;scene.update(farm);assert.deepEqual(periods,['night','night'],'event end resyncs the music');
+ christmas=true;scene.update(farm);while(pending.length)pending.shift().onload();drawn.length=0;scene.update(farm);
+ assert.ok(drawn.some(d=>d.path?.endsWith('/background-night.png'))&&!drawn.some(d=>d.path?.includes('natal')),'the night background stays original');
+ christmas=false;period='day';scene.update(farm);
  scene.update({...farm,tiles:[{...tile,protected:true}]});while(pending.length)pending.shift().onload();
  drawn.length=0;scene.update({...farm,tiles:[{...tile,protected:true}]});
  assert.ok(drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('icone-cadeado.png')),'owner sees protected plots');
