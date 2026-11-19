@@ -1,7 +1,7 @@
 import {renderEvents,eventBoosted,eventStatus,eventCountdown} from './events.ts';
 import {connectPush,suspendPush,reconcilePush,renderPushSettings} from './push.ts';
 import {createClient} from '@supabase/supabase-js';
-import type {Farm,Catalog,Tile,Animal,AnimalType,Reply,CommandFields,Friend,Gifts,AwayReport} from './types.ts';
+import type {Farm,Catalog,Tile,Animal,AnimalType,Reply,CommandFields,Friend,Gifts,AwayReport,SundayHarvestEvent} from './types.ts';
 import {ApiClient,ApiError,acceptFarm} from './api.ts';
 import {Scene} from './scene.ts';
 import {syncMobileCamera,setMoreMenuVisiting} from './mobile.ts';
@@ -412,6 +412,11 @@ function tickLoginCalendar(context:NonNullable<typeof calendarContext>){
  if(countdown)countdown.textContent=Number.isFinite(target)&&Number.isFinite(now)&&now>=target?'Aguardando confirmação do servidor…':`Próximo resgate em ${loginCountdown(context)}.`;
  if(Number.isFinite(target)&&Number.isFinite(now)&&now>=target&&context.checkedResetAt!==context.resetAt){context.checkedResetAt=context.resetAt;void refreshCalendarAtBoundary(context);}
 }
+/** A claim answers the calendar that started it or, after leaving and reopening the tab, the calendar now on screen. */
+function claimTarget(context:NonNullable<typeof calendarContext>){
+ if(calendarCurrent(context))return context;
+ const active=calendarContext;return active&&active.client===context.client&&active.session===context.session&&calendarCurrent(active)?active:undefined;
+}
 async function submitLoginReward(context:NonNullable<typeof calendarContext>,retry:boolean){
  if(!calendarCurrent(context)||!api||!own||busy||context.client.busy||context.refreshing||!navigator.onLine)return;
  const pending=!!context.client.pending;
@@ -421,15 +426,17 @@ async function submitLoginReward(context:NonNullable<typeof calendarContext>,ret
  try{
   const reply=retry?await client.retry():await client.mutate('/v1/me/actions',fields);
   if(generation!==sessionGeneration||api!==client)return;
-  if(reply.farm){if(calendarCurrent(context))updateOwnFarm(reply.farm);else own=acceptFarm(own,reply.farm);}
-  if(!calendarCurrent(context))return;
-  if(reply.result?.success){context.phase='ready';context.message=reply.result.message||'Recompensa resgatada.';if(own)calendarClock(context);render();}
-  else{context.phase='error';context.message=reply.result?.message??'O servidor não confirmou a recompensa.';calendarPaint(context);}
+  const target=claimTarget(context);
+  if(reply.farm){if(target)updateOwnFarm(reply.farm);else own=acceptFarm(own,reply.farm);}
+  if(!target)return;
+  if(reply.result?.success){target.phase='ready';target.message=reply.result.message||'Recompensa resgatada.';if(own)calendarClock(target);render();}
+  else{target.phase='error';target.message=reply.result?.message??'O servidor não confirmou a recompensa.';calendarPaint(target);}
  }catch(error){
   if(generation!==sessionGeneration||api!==client)return;
-  if(calendarCurrent(context)){const message=(error as {message?:unknown})?.message;context.phase=loginRewardPending(client)?'unknown':'error';context.message=typeof message==='string'?message:'Não foi possível confirmar o resgate.';calendarPaint(context);if(error instanceof ApiError&&[409,410].includes(error.status)&&!client.pending)await refreshCalendarAtBoundary(context,context.message);}
+  const target=claimTarget(context);
+  if(target){const message=(error as {message?:unknown})?.message;target.phase=loginRewardPending(client)?'unknown':'error';target.message=typeof message==='string'?message:'Não foi possível confirmar o resgate.';calendarPaint(target);if(error instanceof ApiError&&[409,410].includes(error.status)&&!client.pending)await refreshCalendarAtBoundary(target,target.message);}
  }finally{
-  if(generation===sessionGeneration&&api===client){busy=false;if(calendarCurrent(context))calendarPaint(context);syncPending();}
+  if(generation===sessionGeneration&&api===client){busy=false;const target=claimTarget(context);if(target)calendarPaint(target);syncPending();}
  }
 }
 /** The daily calendar is a permanent event, so it opens as a tab of Eventos. */
@@ -980,6 +987,8 @@ window.setInterval(()=>{if(!document.hidden)void refresh();},30_000);
 void start();
 
 function eventNow(){return ownServerClock?.owner===own?.owner?ownServerClock!.server+performance.now()-ownServerClock!.client:Number.NaN;}
+/** The start and the end of the same event share its ID, so each boundary reloads once by its own key. */
+function boundaryKey(event:SundayHarvestEvent){return `${event.id}:${event.state==='UPCOMING'?'start:'+event.startsAt:'end:'+event.endsAt}`;}
 function stopEvents(){window.clearInterval(eventsTimer);eventsTimer=undefined;eventsBoundary='';eventsRoot=undefined;}
 /** Eventos holds the temporary events and the permanent Calendário Diário; each tab owns its timer. */
 function events(tab:'events'|'calendar'='events'){
@@ -1000,7 +1009,7 @@ function eventsTab(root:HTMLElement){
  // No manual button: the schedule reloads when the tab opens without data and at each start/end boundary.
  const reload=async()=>{if(!client)return;try{const farm=await client.get<Farm>('/v1/me/farm');if(!current())return;updateOwnFarm(farm);render();paint();}catch{if(current()){paint();paragraph('Não foi possível atualizar os eventos. A programação tenta de novo sozinha.',root);}}};
  refreshDialog=paint;paint();
- eventsTimer=window.setInterval(()=>{if(!current()){stopEvents();return;}const countdown=root.querySelector<HTMLElement>('.event-countdown');if(countdown)countdown.textContent=eventCountdown(eventStatus(own?.sundayHarvestEvent,eventNow()));const event=own?.sundayHarvestEvent,now=eventNow();if(event&&((event.state==='UPCOMING'&&now>=Date.parse(event.startsAt))||(event.state==='ACTIVE'&&now>=Date.parse(event.endsAt)))&&eventsBoundary!==event.id){eventsBoundary=event.id;void reload();}},1000);
+ eventsTimer=window.setInterval(()=>{if(!current()){stopEvents();return;}const countdown=root.querySelector<HTMLElement>('.event-countdown');if(countdown)countdown.textContent=eventCountdown(eventStatus(own?.sundayHarvestEvent,eventNow()));const event=own?.sundayHarvestEvent,now=eventNow();if(event&&((event.state==='UPCOMING'&&now>=Date.parse(event.startsAt))||(event.state==='ACTIVE'&&now>=Date.parse(event.endsAt)))&&eventsBoundary!==boundaryKey(event)){eventsBoundary=boundaryKey(event);void reload();}},1000);
  if(!own?.sundayHarvestEvent)void reload();
 }
 

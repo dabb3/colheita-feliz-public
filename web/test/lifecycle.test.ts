@@ -1154,3 +1154,24 @@ test('Eventos holds the daily calendar as a tab and each tab stops the other tim
  h.loginCalendar();assert.equal(elements.get('modal-title').textContent,'Eventos');assert.deepEqual(tabs().map(tab=>tab.getAttribute('aria-selected')),['false','true']);
  h.dialog('Loja');assert.equal(intervals.has(1000),false);assert.equal(h.calendarInfo(),undefined);assert.equal(reads,0);
 });
+
+test('a claim that finishes after leaving and reopening the calendar tab updates the calendar on screen',async()=>{
+ const {h,elements}=app(),post=deferred(),before={...loginFarm(),sundayHarvestEvent:sundayFixture},after={...before,revision:'2',loginRewards:{...before.loginRewards,completedDay:1,nextDay:2,available:false}};let reads=0;
+ h.set({own:before,catalog:{crops:[],animals:[],fertilizers:[],vip:{greenPrice:20}},api:{pending:null,busy:false,get:async()=>{reads++;return before;},mutate:()=>post.promise}});h.receive({farm:before});h.loginCalendar();
+ const tabs=()=>descendants(elements.get('modal-content')).filter(node=>node.getAttribute?.('role')==='tab'),claim=()=>descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa');
+ claim().onclick();tabs()[0].onclick();tabs()[1].onclick();
+ post.resolve({farm:after,result:{success:true,message:'Dia 1 resgatado.'}});await new Promise(resolve=>setTimeout(resolve,0));await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(h.get().own.revision,'2');assert.equal(h.calendarInfo().phase,'ready');
+ assert.ok(text(elements.get('modal-content')).includes('Dia 1 resgatado.'),'the reopened tab shows the result');assert.equal(claim().disabled,true,'the claimed day is no longer offered');assert.equal(reads,0,'no extra GET is needed');
+});
+
+test('events tab reloads once at the start and once at the end of the same event ID',async()=>{
+ const {h,elements,intervals}=app(),upcoming={...sundayFixture,state:'UPCOMING'},active={...sundayFixture,state:'ACTIVE'},next={...sundayFixture,id:'sunday-harvest-2026-11-29',state:'UPCOMING',startsAt:sundayFixture.nextStartsAt,endsAt:sundayFixture.nextEndsAt};
+ const replies=[{...farm('alice'),revision:'2',serverTime:'2026-11-22T03:00:01Z',sundayHarvestEvent:active},{...farm('alice'),revision:'3',serverTime:'2026-11-23T03:00:01Z',sundayHarvestEvent:next}];let reads=0;
+ h.set({own:{...farm('alice'),serverTime:'2026-11-22T02:59:50Z',sundayHarvestEvent:upcoming},catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:36000}],animals:[],fertilizers:[]},api:{get:async()=>replies[Math.min(reads++,1)]}});
+ h.updateOwnFarm({...h.get().own});h.events();assert.equal(reads,0);
+ h.setNow(11_000);intervals.get(1000)();await new Promise(r=>setTimeout(r,0));assert.equal(reads,1,'start reloads');assert.equal(h.get().own.sundayHarvestEvent.state,'ACTIVE');
+ intervals.get(1000)();intervals.get(1000)();await new Promise(r=>setTimeout(r,0));assert.equal(reads,1,'no reload on every tick');
+ h.setNow(11_000+86_400_000);intervals.get(1000)();await new Promise(r=>setTimeout(r,0));assert.equal(reads,2,'end reloads even with the same event ID');
+ intervals.get(1000)();intervals.get(1000)();await new Promise(r=>setTimeout(r,0));assert.equal(reads,2);assert.ok(text(elements.get('modal-content')).includes('Próximo domingo'));
+});
