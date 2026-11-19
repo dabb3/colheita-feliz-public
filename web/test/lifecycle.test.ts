@@ -52,14 +52,14 @@ test('cancel and escape close the composer and keep the visit while POST locks X
 test('visit menu keeps only Minha fazenda, Amigos and Presentear and home restores the own menu',()=>{
  const {h,elements,ctx}=app(),own={...farm('alice'),loginRewards:{completedDay:0,nextDay:1,available:true,rewards:[]}},others=['notifications','shop','deposit','missions','events','settings','more'];
  h.set({own,api:{pending:null}});h.receive({farm:own});
- assert.ok(others.every(id=>!elements.get(id).hidden));assert.equal(elements.get('calendar').hidden,false);assert.equal(elements.get('home').hidden,true);assert.equal(elements.get('gift-visit').hidden,true);assert.equal(elements.get('friends').hidden,false);assert.equal(ctx.moreVisiting,false);
+ assert.ok(others.every(id=>!elements.get(id).hidden));assert.equal(elements.get('home').hidden,true);assert.equal(elements.get('gift-visit').hidden,true);assert.equal(elements.get('friends').hidden,false);assert.equal(ctx.moreVisiting,false);
  h.visit({...farm('bob'),name:'Bob'});
- assert.ok(others.every(id=>elements.get(id).hidden),'own-farm panels leave the top menu');assert.equal(elements.get('calendar').hidden,true);
+ assert.ok(others.every(id=>elements.get(id).hidden),'own-farm panels leave the top menu');
  assert.equal(elements.get('home').hidden,false);assert.equal(elements.get('friends').hidden,false);assert.equal(elements.get('gift-visit').hidden,false);assert.equal(elements.get('gift-visit').getAttribute('aria-label'),'Presentear Bob');assert.equal(ctx.moreVisiting,true);
  assert.ok(descendants(elements.get('tools')).some(node=>node.getAttribute?.('aria-label')==='Furtar colheita'||node.title==='Furtar colheita'||text(node).includes('Furtar')),'social toolbar stays available');
  h.visit({...farm('carol'),name:'Carol'});assert.equal(elements.get('gift-visit').getAttribute('aria-label'),'Presentear Carol');
  elements.get('home').onclick();
- assert.ok(others.every(id=>!elements.get(id).hidden));assert.equal(elements.get('calendar').hidden,false);assert.equal(elements.get('home').hidden,true);assert.equal(elements.get('gift-visit').hidden,true);assert.equal(ctx.moreVisiting,false);
+ assert.ok(others.every(id=>!elements.get(id).hidden));assert.equal(elements.get('home').hidden,true);assert.equal(elements.get('gift-visit').hidden,true);assert.equal(ctx.moreVisiting,false);
 });
 test('gift from a visit goes to the visited farm even after moving to another friend',async()=>{
  const {h,elements}=app(),own={...farm('alice'),seedCounts:{nabo:2}};let sent;
@@ -181,11 +181,11 @@ test('login reward claim locks double clicks and sends only action plus current 
  const {h,elements}=app(),post=deferred();let mutations=0,request;
  const own=loginFarm(),api={pending:null,busy:false,async get(path){assert.equal(path,'/v1/me/farm');return own;},mutate(path,fields){mutations++;assert.equal(path,'/v1/me/actions');request=fields;return post.promise;}};
  h.set({own,visited:farm('bob'),catalog:{crops:[],animals:[],fertilizers:[],vip:{greenPrice:20}},api});h.receive({farm:own});h.loginCalendar();
- assert.equal(elements.get('modal-title').textContent,'Calendário de Recompensas');const claim=descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa');claim.onclick();const locked=descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa');claim.onclick();
+ assert.equal(elements.get('modal-title').textContent,'Eventos');const claim=descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa');claim.onclick();const locked=descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa');claim.onclick();
  assert.equal(mutations,1);assert.equal(locked.disabled,true);assert.equal(JSON.stringify(request),JSON.stringify({action:'CLAIM_LOGIN_REWARD',expectedRevision:'1'}));
  const after={...own,revision:'2',serverTime:'2026-11-15T12:01:00Z',loginRewards:{...own.loginRewards,completedDay:1,nextDay:2,available:false}};
  post.resolve({farm:after,result:{success:true,message:'Dia 1 resgatado.'}});await new Promise(resolve=>setTimeout(resolve,0));
- assert.equal(h.get().own.revision,'2');assert.equal(elements.get('modal-title').textContent,'Calendário de Recompensas');assert.ok(text(elements.get('modal-content')).includes('Dia 1 resgatado.'));
+ assert.equal(h.get().own.revision,'2');assert.equal(elements.get('modal-title').textContent,'Eventos');assert.ok(text(elements.get('modal-content')).includes('Dia 1 resgatado.'));
 });
 
 test('calendar rollover rechecks the server once and clears its interval when the panel changes',async()=>{
@@ -227,10 +227,10 @@ test('calendar rollover GET failure recovers manually and only then allows an ex
 test('returning from a hidden tab rechecks server time when the monotonic clock did not advance',async()=>{
  const {h,elements,listeners,ctx,intervals}=app(),before=loginFarm('alice',false,'1','2026-11-16T02:59:50Z','2026-11-16T03:00:00Z'),after=loginFarm('alice',true,'2','2026-11-16T03:00:05Z','2026-11-17T03:00:00Z');let reads=0;
  h.set({own:before,api:{pending:null,busy:false,get:async path=>{assert.equal(path,'/v1/me/farm');reads++;return after;}}});h.receive({farm:before});h.loginCalendar();
- const panel=elements.get('modal-content').children,scrollTarget=elements.get('modal-content'),refresh=descendants(scrollTarget).find(node=>text(node)==='Atualizar calendário');scrollTarget.scrollTop=125;refresh.focus();ctx.document.hidden=true;listeners.get('visibilitychange')();
+ const tabPanel=descendants(elements.get('modal-content')).find(node=>node.id==='events-tab-panel'),panel=tabPanel.children,scrollTarget=elements.get('modal-content'),refresh=descendants(scrollTarget).find(node=>text(node)==='Atualizar calendário');scrollTarget.scrollTop=125;refresh.focus();ctx.document.hidden=true;listeners.get('visibilitychange')();
  ctx.document.hidden=false;listeners.get('visibilitychange')();await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(reads,1);assert.equal(h.get().own.revision,'2');assert.equal(h.calendarInfo().anchorServer,Date.parse(after.serverTime));assert.equal(h.calendarInfo().anchorClient,0);
- assert.equal(descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa').disabled,false);assert.ok(text(elements.get('modal-content')).includes('Próximo resgate em'));assert.equal(scrollTarget.scrollTop,125);assert.notEqual(elements.get('modal-content').children,panel);assert.equal(ctx.document.activeElement.getAttribute('data-focus-key'),'login-rewards-refresh');
+ assert.equal(descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa').disabled,false);assert.ok(text(elements.get('modal-content')).includes('Próximo resgate em'));assert.equal(scrollTarget.scrollTop,125);assert.notEqual(tabPanel.children,panel);assert.equal(ctx.document.activeElement.getAttribute('data-focus-key'),'login-rewards-refresh');
  intervals.get(1000)();assert.match(text(elements.get('modal-content')),/Próximo resgate em 23 h 59 min 55 s\./);assert.equal(reads,1);
 });
 
@@ -1128,12 +1128,29 @@ test('events dialog renders countdown and XP from server time, survives failures
  h.updateOwnFarm({...h.get().own});h.events();
  assert.ok(text(elements.get('modal-content')).includes('15 XP / 30 XP no evento'));
  assert.ok(text(elements.get('modal-content')).includes('Termina em 1d'));
- const content=elements.get('modal-content'),first=content.children[0];h.setNow(10000);intervals.get(1000)();assert.equal(content.children[0],first,'timer preserves cards and scroll');
- await elements.get('modal-footer').children[0].onclick();await new Promise(r=>setTimeout(r,0));
- assert.ok(text(content).includes('Não foi possível atualizar'));assert.ok(h.get().own);
+ assert.ok(!descendants(elements.get('modal-footer')).some(node=>text(node)==='Atualizar eventos'),'no manual refresh button');
+ const content=elements.get('modal-content'),panel=descendants(content).find(node=>node.id==='events-tab-panel'),first=panel.children[0];h.setNow(10000);intervals.get(1000)();assert.equal(panel.children[0],first,'timer preserves cards and scroll');
+ h.setNow(86_400_000+1000);intervals.get(1000)();await new Promise(r=>setTimeout(r,0));
+ assert.ok(text(content).includes('Não foi possível atualizar'),'the end of the event reloads the schedule by itself');assert.ok(h.get().own);
  h.dialog('Loja');assert.equal(intervals.has(1000),false);
 });
 test('missing event information leaves game accessible and shows retry',async()=>{
  const {h,elements}=app();h.set({own:farm('alice'),api:{get:async()=>{throw Error('offline');}}});h.events();await new Promise(r=>setTimeout(r,0));
- assert.ok(text(elements.get('modal-content')).includes('indisponíveis'));assert.ok(h.get().own);assert.equal(elements.get('modal-footer').children[0].textContent,'Atualizar eventos');
+ assert.ok(text(elements.get('modal-content')).includes('indisponíveis'));assert.ok(h.get().own);assert.ok(text(elements.get('modal-content')).includes('tenta de novo sozinha'));assert.ok(!descendants(elements.get('modal-footer')).some(node=>text(node)==='Atualizar eventos'));
+});
+
+test('Eventos holds the daily calendar as a tab and each tab stops the other timer',async()=>{
+ const {h,elements,intervals}=app(),own={...loginFarm(),sundayHarvestEvent:sundayFixture,serverTime:sundayFixture.startsAt};let reads=0;
+ h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:36000}],animals:[],fertilizers:[],vip:{greenPrice:20}},api:{pending:null,busy:false,get:async()=>{reads++;return own;}}});h.receive({farm:own});
+ h.events();
+ const tabs=()=>descendants(elements.get('modal-content')).filter(node=>node.getAttribute?.('role')==='tab');
+ assert.equal(elements.get('modal-title').textContent,'Eventos');assert.deepEqual(tabs().map(text),['Eventos ativos','Calendário Diário']);
+ assert.deepEqual(tabs().map(tab=>tab.getAttribute('aria-selected')),['true','false']);assert.ok(text(elements.get('modal-content')).includes('15 XP / 30 XP no evento'));assert.equal(h.calendarInfo(),undefined);
+ const dialogs=h.dialogGeneration();tabs()[1].onclick();
+ assert.equal(h.dialogGeneration(),dialogs,'switching tabs keeps the same dialog');assert.deepEqual(tabs().map(tab=>tab.getAttribute('aria-selected')),['false','true']);
+ assert.ok(descendants(elements.get('modal-content')).some(node=>text(node)==='Resgatar recompensa'));assert.ok(descendants(elements.get('modal-content')).some(node=>text(node)==='Atualizar calendário'),'calendar keeps its own recovery refresh');
+ assert.ok(!text(elements.get('modal-content')).includes('15 XP / 30 XP no evento'));assert.equal(h.calendarInfo().phase,'ready');assert.equal(intervals.has(1000),true);
+ tabs()[0].onclick();assert.equal(h.calendarInfo(),undefined,'leaving the calendar tab stops its context');assert.ok(text(elements.get('modal-content')).includes('15 XP / 30 XP no evento'));
+ h.loginCalendar();assert.equal(elements.get('modal-title').textContent,'Eventos');assert.deepEqual(tabs().map(tab=>tab.getAttribute('aria-selected')),['false','true']);
+ h.dialog('Loja');assert.equal(intervals.has(1000),false);assert.equal(h.calendarInfo(),undefined);assert.equal(reads,0);
 });

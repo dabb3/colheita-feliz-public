@@ -683,7 +683,6 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 #modal.gift-dialog #modal-footer{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;border-top:1px solid #bec7ab;background:#ecf2df}
 .gift-recipient{display:flex;align-items:center;gap:.8rem;margin:1rem 0 1.5rem}.gift-recipient .friend-avatar{width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid #d0d8b9}
 .gift-composer-scroll>p{margin:.8rem 0}.gift-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.5rem}.gift-options button{display:flex;align-items:center;gap:.6rem;text-align:left}.gift-options [aria-pressed=true]{outline:3px solid #426b36;outline-offset:1px}.gift-seed-icon{width:34px;height:34px;object-fit:contain;flex:none}.gift-quantity{display:flex;align-items:center;justify-content:center;gap:1rem;margin:1.25rem auto}.gift-quantity strong{min-width:115px;text-align:center}.gift-message{border-left:3px solid #b28a27;padding:.5rem .75rem;background:#fff8df}
-#calendar{flex:none}
 .calendar-menu-icon{display:grid;width:56px;height:56px;place-items:center;color:#fff8d7;font-size:42px;line-height:1;filter:drop-shadow(1px 3px 2px #0005)}
 .events-panel{display:grid;gap:12px}.event-countdown{font-weight:700;color:#426b36}.event-crops{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px}.event-crop{display:grid;justify-items:center;gap:6px;padding:10px;border:1px solid #d8ddc9;border-radius:10px;background:#fffceea6;text-align:center;min-width:0}.event-crop img{width:56px;height:56px;object-fit:contain}.event-crop span{font-size:12px}.event-badge{display:inline-block;border-radius:12px;background:#e8f0c7;color:#345627;padding:3px 8px;font-size:11px;font-weight:700}.events-panel p{margin:0}
 
@@ -800,3 +799,6 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 @keyframes awayLeafFall{to{transform:translate(var(--dx),110vh) rotate(540deg)}}
 @media (prefers-reduced-motion:reduce){.away-leaves{display:none}.away-care.is-entering div{animation:none}#modal.away-dialog .away-close{transition:none}}
 @media (max-width:560px){#modal.away-dialog{width:calc(100vw - 16px)}#modal.away-dialog[open]{max-height:calc(100dvh - 16px)}.away-title-row h2{font-size:27px}.away-sprig{width:26px}.away-event time{display:none}.away-event{grid-template-columns:40px minmax(0,1fr)}}
+#modal .tabs.events-tabs{display:flex;gap:4px;margin:0 0 14px;padding:0;border-bottom:1px solid #b8bdad}
+#modal .tabs.events-tabs>.shop-tab{flex:1 1 0;min-height:44px;margin:0 0 -1px;padding:8px 12px;border:1px solid #b8bdad;border-radius:6px 6px 0 0;background:linear-gradient(#f9fcff,#d9e0e5);color:#3e331a;box-shadow:none;transform:none;font-size:14px}
+#modal .tabs.events-tabs>.shop-tab[aria-selected=true]{z-index:1;border-bottom-color:#fffdf1;background:#fffdf1;box-shadow:inset 0 3px #e6b843}

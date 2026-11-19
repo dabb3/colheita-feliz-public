@@ -14,7 +14,7 @@ import {renderAwayReport,startAwayLeaves} from './away-report.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,avatarImport,type AvatarChoice} from './avatar.ts';
 import {musicArtPath,seedArtPath,periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalSoundPath,animalStatusText,animalActionLabel,animalClickCommand,friendFeedOptions,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
 
-let eventsTimer:number|undefined,eventsBoundary='';
+let eventsTimer:number|undefined,eventsBoundary='',eventsRoot:HTMLElement|undefined;
 const config=window.COLHEITA_CONFIG;
 const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const modal=element<HTMLDialogElement>('modal'),content=element('modal-content'),modalFooter=element('modal-footer');
@@ -28,7 +28,7 @@ let toastTimer:number,loginTransitionTimer:number,sessionGeneration=0,navigation
 let goldAnimationFrame=0;
 let giftContext:{client:ApiClient;session:number;dialog:number;recipientId:string;friend:Friend;state:GiftComposerState;reload?:()=>void;paint?:()=>void}|undefined;
 let giftReturn:{friendId:string;scroll:number}|undefined;
-let calendarContext:{client:ApiClient;session:number;dialog:number;phase:'ready'|'sending'|'unknown'|'error';message?:string;anchorServer:number;anchorClient:number;resetAt:string;checkedResetAt?:string;refreshing?:boolean}|undefined,calendarTimer:number|undefined,ownServerClock:{owner:string;server:number;client:number}|undefined;
+let calendarContext:{root:HTMLElement;client:ApiClient;session:number;dialog:number;phase:'ready'|'sending'|'unknown'|'error';message?:string;anchorServer:number;anchorClient:number;resetAt:string;checkedResetAt?:string;refreshing?:boolean}|undefined,calendarTimer:number|undefined,ownServerClock:{owner:string;server:number;client:number}|undefined;
 const depositNumber=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1});
 const depositPriceNumber=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2});
 const login=element('login');
@@ -128,7 +128,7 @@ async function fadeSoldDepositRows(fields:CommandFields,farm:Farm){
 }
 let missionsTimer:number|undefined;
 function stopCalendar(){window.clearInterval(calendarTimer);calendarTimer=undefined;calendarContext=undefined;}
-function dialog(title:string){stopEvents();stopCalendar();giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;modal.classList.remove('bite-dialog');modal.removeAttribute('aria-describedby');dialogGeneration++;refreshDialog=undefined;closeHealth();element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');modal.classList.toggle('missions-dialog',title==='Missões');modal.classList.toggle('away-dialog',title===AWAY_TITLE);modal.classList.toggle('gift-dialog',title==='Presentear');modal.classList.toggle('login-calendar-dialog',title==='Calendário de Recompensas');if(title!=='Missões'){window.clearInterval(missionsTimer);missionsTimer=undefined;}content.className='';content.replaceChildren();content.scrollTop=0;modalFooter.className='';modalFooter.replaceChildren();modalFooter.hidden=true;if(!modal.open)modal.showModal();}
+function dialog(title:string){stopEvents();stopCalendar();giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;modal.classList.remove('bite-dialog');modal.removeAttribute('aria-describedby');dialogGeneration++;refreshDialog=undefined;closeHealth();element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');modal.classList.toggle('missions-dialog',title==='Missões');modal.classList.toggle('away-dialog',title===AWAY_TITLE);modal.classList.toggle('gift-dialog',title==='Presentear');modal.classList.toggle('login-calendar-dialog',title==='Eventos');if(title!=='Missões'){window.clearInterval(missionsTimer);missionsTimer=undefined;}content.className='';content.replaceChildren();content.scrollTop=0;modalFooter.className='';modalFooter.replaceChildren();modalFooter.hidden=true;if(!modal.open)modal.showModal();}
 const shownBites=new Set<string>();
 function showBite(reply:Reply,actionName?:string){
  if(actionName!=='STEAL'||reply.theftOutcome?.kind!=='BITTEN'||!reply.farm||reply.farm.owner!==own?.owner)return false;
@@ -289,7 +289,7 @@ function giftVisited(){if(!visited||!own||visited.owner===own.owner)return;prese
 function syncFarmMenu(){
  const visiting=!!visited;
  for(const id of ['notifications','shop','deposit','missions','events','settings','more'])element(id).hidden=visiting;
- element('calendar').hidden=visiting||!own?.loginRewards;element('home').hidden=!visiting;
+ element('home').hidden=!visiting;
  const gift=element('gift-visit');gift.hidden=!visiting||visited!.owner===own?.owner;gift.setAttribute('aria-label',visiting?`Presentear ${visited!.name}`:'Presentear amigo');
  setMoreMenuVisiting(visiting);
 }
@@ -379,7 +379,7 @@ async function refresh(){
  }catch(error){if(generation===sessionGeneration)handleError(error);}
 }
 function loginRewardPending(client:ApiClient){try{return client.pending?.path==='/v1/me/actions'&&JSON.parse(client.pending.body).action==='CLAIM_LOGIN_REWARD';}catch{return false;}}
-function calendarCurrent(context:NonNullable<typeof calendarContext>){return calendarContext===context&&api===context.client&&sessionGeneration===context.session&&dialogGeneration===context.dialog&&modal.open&&element('modal-title').textContent==='Calendário de Recompensas';}
+function calendarCurrent(context:NonNullable<typeof calendarContext>){return calendarContext===context&&api===context.client&&sessionGeneration===context.session&&dialogGeneration===context.dialog&&modal.open&&element('modal-title').textContent==='Eventos';}
 function calendarClock(context:NonNullable<typeof calendarContext>){const clock=ownServerClock?.owner===own?.owner?ownServerClock:undefined;context.anchorServer=clock?.server??Number.NaN;context.anchorClient=clock?.client??performance.now();context.resetAt=own?.loginRewards?.nextResetAt??'';context.checkedResetAt=undefined;}
 function loginCountdown(context:NonNullable<typeof calendarContext>){
  const target=Date.parse(context.resetAt),now=context.anchorServer+(performance.now()-context.anchorClient);
@@ -393,7 +393,7 @@ function calendarPaint(context:NonNullable<typeof calendarContext>){
  if(latestClock&&latestClock.client>=context.anchorClient){context.anchorServer=latestClock.server;context.anchorClient=latestClock.client;}
  if(context.resetAt!==resetAt){context.resetAt=resetAt;context.checkedResetAt=undefined;}
  const rewardPending=loginRewardPending(context.client);
- renderLoginRewards(content,own.loginRewards,catalog,{phase:context.phase,pending:!!context.client.pending,recoverable:rewardPending,busy:busy||context.client.busy,refreshing:!!context.refreshing,online:navigator.onLine,countdown:loginCountdown(context),message:context.message},{claim:()=>void submitLoginReward(context,false),retry:()=>void submitLoginReward(context,true),refresh:()=>void refreshCalendarAtBoundary(context)});
+ renderLoginRewards(context.root,own.loginRewards,catalog,{phase:context.phase,pending:!!context.client.pending,recoverable:rewardPending,busy:busy||context.client.busy,refreshing:!!context.refreshing,online:navigator.onLine,countdown:loginCountdown(context),message:context.message},{claim:()=>void submitLoginReward(context,false),retry:()=>void submitLoginReward(context,true),refresh:()=>void refreshCalendarAtBoundary(context)});
 }
 async function refreshCalendarAtBoundary(context:NonNullable<typeof calendarContext>,preserveMessage?:string){
  if(!calendarCurrent(context)||context.refreshing||!navigator.onLine)return;
@@ -408,7 +408,7 @@ async function refreshCalendarAtBoundary(context:NonNullable<typeof calendarCont
 }
 function tickLoginCalendar(context:NonNullable<typeof calendarContext>){
  if(!calendarCurrent(context))return;
- const countdown=content.querySelector<HTMLElement>('.login-rewards-countdown'),target=Date.parse(context.resetAt),now=context.anchorServer+(performance.now()-context.anchorClient);
+ const countdown=context.root.querySelector<HTMLElement>('.login-rewards-countdown'),target=Date.parse(context.resetAt),now=context.anchorServer+(performance.now()-context.anchorClient);
  if(countdown)countdown.textContent=Number.isFinite(target)&&Number.isFinite(now)&&now>=target?'Aguardando confirmação do servidor…':`Próximo resgate em ${loginCountdown(context)}.`;
  if(Number.isFinite(target)&&Number.isFinite(now)&&now>=target&&context.checkedResetAt!==context.resetAt){context.checkedResetAt=context.resetAt;void refreshCalendarAtBoundary(context);}
 }
@@ -432,10 +432,12 @@ async function submitLoginReward(context:NonNullable<typeof calendarContext>,ret
   if(generation===sessionGeneration&&api===client){busy=false;if(calendarCurrent(context))calendarPaint(context);syncPending();}
  }
 }
-function loginCalendar(){
- if(!own||!own.loginRewards)return;
- dialog('Calendário de Recompensas');const client=api;if(!client)return;
- const context:NonNullable<typeof calendarContext>={client,session:sessionGeneration,dialog:dialogGeneration,phase:loginRewardPending(client)?'unknown':'ready',anchorServer:Number.NaN,anchorClient:performance.now(),resetAt:own.loginRewards.nextResetAt};calendarContext=context;calendarClock(context);
+/** The daily calendar is a permanent event, so it opens as a tab of Eventos. */
+function loginCalendar(){events('calendar');}
+function calendarTab(root:HTMLElement){
+ const client=api;if(!own||!client)return;
+ if(!own.loginRewards){root.className='events-panel';paragraph('Calendário Diário indisponível no momento.',root);return;}
+ const context:NonNullable<typeof calendarContext>={root,client,session:sessionGeneration,dialog:dialogGeneration,phase:loginRewardPending(client)?'unknown':'ready',anchorServer:Number.NaN,anchorClient:performance.now(),resetAt:own.loginRewards.nextResetAt};calendarContext=context;calendarClock(context);
  refreshDialog=()=>calendarPaint(context);calendarPaint(context);calendarTimer=window.setInterval(()=>tickLoginCalendar(context),1000);if(!Number.isFinite(context.anchorServer))void refreshCalendarAtBoundary(context);
 }
 function handleError(error:unknown){
@@ -961,7 +963,7 @@ async function start(){
   }
  }catch(error){showConnection();notify(error instanceof Error?error.message:'Servidor indisponível.');button('Tentar conectar novamente',start,login);}
 }
-element('notifications').onclick=notifications;element('calendar').onclick=loginCalendar;element('events').onclick=events;
+element('notifications').onclick=notifications;element('events').onclick=()=>events();
 element('shop').onclick=()=>shop();element('deposit').onclick=deposit;element('missions').onclick=missions;element('friends').onclick=()=>void friends();
 element('home').onclick=()=>{navigationGeneration++;visited=undefined;tool='PLOW';render();};element('gift-visit').onclick=giftVisited;element('settings').onclick=()=>shortcutPanel('Ajustes',settings);element('close-modal').onclick=()=>{if(element('modal-title').textContent==='Presentear'){closeGiftComposer();return;}modal.close();showUpdateNotes();};
 modal.addEventListener('cancel',event=>{if(element('modal-title').textContent!=='Presentear')return;event.preventDefault();closeGiftComposer();});
@@ -971,20 +973,34 @@ element('retry').onclick=()=>retryPending();
 window.addEventListener('offline',()=>showConnection('Sem conexão. Reconecte antes de agir.'));
 window.addEventListener('online',()=>{void refresh();if(api)void reconcilePush(avatarUser,api).catch(()=>{});});
 document.addEventListener('pointerdown',event=>{if(healthPinned&&!['farm','plant-health','tools-bar','tool-tray','farm-header'].some(id=>element(id).contains(event.target as Node)))closeHealth();});
-modal.addEventListener('close',()=>{stopEvents();if(element('modal-title').textContent==='Calendário de Recompensas')stopCalendar();health(healthTile,healthPoint);window.clearInterval(missionsTimer);missionsTimer=undefined;});
+modal.addEventListener('close',()=>{stopEvents();if(element('modal-title').textContent==='Eventos')stopCalendar();health(healthTile,healthPoint);window.clearInterval(missionsTimer);missionsTimer=undefined;});
 document.addEventListener('keydown',event=>{if(!own||event.repeat||event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement||(event.target as HTMLElement)?.tagName==='TEXTAREA')return;const shortcut=gameShortcut(event.key,!!visited);if(!shortcut)return;if(shortcut.action==='tool'){if(!modal.open)pickTool(shortcut.tool);return;}if(shortcut.action==='shop')shortcutPanel('Loja',()=>shop());else if(shortcut.action==='deposit')shortcutPanel('Depósito',deposit);else if(shortcut.action==='missions')shortcutPanel('Missões',missions);else if(shortcut.action==='plots')shortcutPanel('Terras da fazenda',tileList);else if(shortcut.action==='music')toggleMusic();else if(shortcut.action==='effects')toggleEffects();});
 document.addEventListener('visibilitychange',()=>{syncMusic();if(!document.hidden)void refresh();});
 window.setInterval(()=>{if(!document.hidden)void refresh();},30_000);
 void start();
 
 function eventNow(){return ownServerClock?.owner===own?.owner?ownServerClock!.server+performance.now()-ownServerClock!.client:Number.NaN;}
-function stopEvents(){window.clearInterval(eventsTimer);eventsTimer=undefined;eventsBoundary='';}
-function events(){
- dialog('Eventos');const session=sessionGeneration,panel=dialogGeneration,client=api;
- const paint=()=>renderEvents(content,own?.sundayHarvestEvent,catalog,eventNow());
- const reload=async()=>{if(!client)return;try{const farm=await client.get<Farm>('/v1/me/farm');if(session!==sessionGeneration||panel!==dialogGeneration||!modal.open)return;updateOwnFarm(farm);render();paint();}catch{if(session===sessionGeneration&&panel===dialogGeneration&&modal.open){paint();paragraph('Não foi possível atualizar os eventos. Tente novamente.');}}};
- refreshDialog=paint;paint();button('Atualizar eventos',()=>void reload(),modalFooter);modalFooter.hidden=false;
- eventsTimer=window.setInterval(()=>{if(session!==sessionGeneration||panel!==dialogGeneration||!modal.open){stopEvents();return;}const countdown=content.querySelector<HTMLElement>('.event-countdown');if(countdown)countdown.textContent=eventCountdown(eventStatus(own?.sundayHarvestEvent,eventNow()));const event=own?.sundayHarvestEvent,now=eventNow();if(event&&((event.state==='UPCOMING'&&now>=Date.parse(event.startsAt))||(event.state==='ACTIVE'&&now>=Date.parse(event.endsAt)))&&eventsBoundary!==event.id){eventsBoundary=event.id;void reload();}},1000);
+function stopEvents(){window.clearInterval(eventsTimer);eventsTimer=undefined;eventsBoundary='';eventsRoot=undefined;}
+/** Eventos holds the temporary events and the permanent Calendário Diário; each tab owns its timer. */
+function events(tab:'events'|'calendar'='events'){
+ dialog('Eventos');const tabs=document.createElement('div'),body=document.createElement('div'),panel=dialogGeneration;
+ tabs.className='tabs events-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Eventos');body.id='events-tab-panel';body.setAttribute('role','tabpanel');
+ const items=[['events','Eventos ativos'],['calendar','Calendário Diário']] as const;
+ const show=(next:'events'|'calendar',focus=false)=>{
+  if(panel!==dialogGeneration||!modal.open)return;stopEvents();stopCalendar();refreshDialog=undefined;
+  for(const tabButton of Array.from(tabs.children) as HTMLButtonElement[]){const selected=tabButton.dataset.tab===next;tabButton.setAttribute('aria-selected',String(selected));tabButton.tabIndex=selected?0:-1;if(selected&&focus)tabButton.focus();}
+  body.replaceChildren();body.setAttribute('aria-labelledby',`events-tab-${next}`);if(next==='calendar')calendarTab(body);else eventsTab(body);
+ };
+ for(const [id,label]of items){const tabButton=button(label,()=>show(id,true),tabs,`events-tab:${id}`);tabButton.className='shop-tab';tabButton.id=`events-tab-${id}`;tabButton.dataset.tab=id;tabButton.setAttribute('role','tab');tabButton.setAttribute('aria-controls','events-tab-panel');}
+ enableTabNavigation(tabs);content.append(tabs,body);show(tab);
+}
+function eventsTab(root:HTMLElement){
+ const session=sessionGeneration,panel=dialogGeneration,client=api,current=()=>session===sessionGeneration&&panel===dialogGeneration&&modal.open&&eventsRoot===root;eventsRoot=root;
+ const paint=()=>{if(current())renderEvents(root,own?.sundayHarvestEvent,catalog,eventNow());};
+ // No manual button: the schedule reloads when the tab opens without data and at each start/end boundary.
+ const reload=async()=>{if(!client)return;try{const farm=await client.get<Farm>('/v1/me/farm');if(!current())return;updateOwnFarm(farm);render();paint();}catch{if(current()){paint();paragraph('Não foi possível atualizar os eventos. A programação tenta de novo sozinha.',root);}}};
+ refreshDialog=paint;paint();
+ eventsTimer=window.setInterval(()=>{if(!current()){stopEvents();return;}const countdown=root.querySelector<HTMLElement>('.event-countdown');if(countdown)countdown.textContent=eventCountdown(eventStatus(own?.sundayHarvestEvent,eventNow()));const event=own?.sundayHarvestEvent,now=eventNow();if(event&&((event.state==='UPCOMING'&&now>=Date.parse(event.startsAt))||(event.state==='ACTIVE'&&now>=Date.parse(event.endsAt)))&&eventsBoundary!==event.id){eventsBoundary=event.id;void reload();}},1000);
  if(!own?.sundayHarvestEvent)void reload();
 }
 

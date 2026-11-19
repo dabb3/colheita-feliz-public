@@ -92,7 +92,7 @@ test('portrait visit keeps Amigos in the bar while Mais is hidden, and puts it b
   after(other){other.remove();other.parent=this.parent;this.parent.children.splice(this.parent.children.indexOf(this)+1,0,other);},
   append(...others){for(const other of others){other.remove();other.parent=this;(this.children??=[]).push(other);}},
   querySelector(){return null;}});
- const bar=node('farm-menu','nav'),menu=node('more-menu','div'),more=node('more'),ids=['notifications','shop','friends','home','settings','calendar','events'];
+ const bar=node('farm-menu','nav'),menu=node('more-menu','div'),more=node('more'),ids=['notifications','shop','friends','home','settings','events'];
  const byId=new Map([[bar.id,bar],[menu.id,menu],[more.id,more]]);bar.append(...ids.map(id=>{const button=node(id);byId.set(id,button);return button;}),more,menu);
  const media={matches:true,addEventListener(){}};const saved={window:globalThis.window,document:globalThis.document,ResizeObserver:globalThis.ResizeObserver};
  globalThis.window={matchMedia:()=>media};globalThis.document={getElementById:id=>byId.get(id)??null,createComment:id=>node('#'+id,'comment'),addEventListener(){}};
@@ -101,8 +101,8 @@ test('portrait visit keeps Amigos in the bar while Mais is hidden, and puts it b
   assert.equal(byId.get('friends').parent,menu,'portrait moves Amigos into Mais');
   menu.hidden=false;setMoreMenuVisiting(true);
   assert.equal(byId.get('friends').parent,bar,'Amigos stays reachable in the bar during a visit');assert.equal(menu.hidden,true,'the open Mais menu closes');
-  assert.ok(['notifications','settings','calendar','events'].every(id=>byId.get(id).parent===menu));
+  assert.ok(['notifications','settings','events'].every(id=>byId.get(id).parent===menu));
   setMoreMenuVisiting(false);assert.equal(byId.get('friends').parent,menu);
-  assert.deepEqual(menu.children.map(child=>child.id),['notifications','friends','settings','calendar','events'],'original order is kept');
+  assert.deepEqual(menu.children.map(child=>child.id),['notifications','friends','settings','events'],'original order is kept');
  }finally{setMoreMenuVisiting(false);Object.assign(globalThis,saved);}
 });
