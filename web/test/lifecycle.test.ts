@@ -12,82 +12,97 @@ import * as events from '../src/events.ts';
 
 const farm=owner=>({owner,name:owner,revision:'1',tiles:[],animals:[],seedCounts:{}});
 function deferred(){let resolve,reject;const promise=new Promise((accept,fail)=>{resolve=accept;reject=fail;});return{promise,resolve,reject};}
-test('friend list orders Presentear before visit, removes old gift block and keeps IDs despite homonyms',async()=>{
+test('friend list offers only Visitar fazenda and keeps IDs despite homonyms',async()=>{
  const {h,elements}=app();let target='';
  h.set({own:farm('alice'),api:{get:path=>{if(path==='/v1/friends')return Promise.resolve([{id:'bob',name:'Sam',avatar:{id:'female-2'}},{id:'carol',name:'Sam',avatar:{id:'google',photoUrl:'https://lh3.googleusercontent.com/a/carol'}},{id:'dan',name:'Dan'}]);target=path;return Promise.resolve(farm('bob'));}}});
  await h.friends();const images=descendants(elements.get('modal-content')).filter(node=>node.tag==='img'&&node.className==='friend-avatar');
  assert.equal(images.length,3);assert.equal(images[0].src,'/assets/classic/icons/avatar_feminino2.png');assert.equal(images[1].src,'https://lh3.googleusercontent.com/a/carol');assert.equal(images[1].referrerPolicy,'no-referrer');
  assert.equal(images[2].src,avatar.CLASSIC_AVATAR);images[1].onerror();assert.equal(images[1].src,avatar.CLASSIC_AVATAR);assert.equal(images[1].onerror,null);
- const rows=descendants(elements.get('modal-content')).filter(node=>node.className==='friend-card');assert.equal(rows[0].children[2].textContent,'Presentear');assert.equal(rows[0].children[3].textContent,'Visitar fazenda');assert.ok(!descendants(elements.get('modal-content')).some(node=>node.className==='gift-panel'));
- const presents=descendants(elements.get('modal-content')).filter(node=>node.textContent==='Presentear');assert.equal(presents[0].dataset.friendGift,'bob');assert.equal(presents[1].dataset.friendGift,'carol');
- await rows[0].children[3].onclick();assert.equal(target,'/v1/farms/bob/visit');
+ const rows=descendants(elements.get('modal-content')).filter(node=>node.className==='friend-card');assert.equal(rows[0].children.length,3);assert.equal(rows[0].children[2].textContent,'Visitar fazenda');assert.ok(!descendants(elements.get('modal-content')).some(node=>node.className==='gift-panel'));
+ assert.ok(!descendants(elements.get('modal-content')).some(node=>node.textContent==='Presentear'||node.dataset?.friendGift!==undefined));
+ await rows[1].children[2].onclick();assert.equal(target,'/v1/farms/carol/visit');
 });
 test('gift GET failure retains fixed recipient and retries inside composer',async()=>{
  const {h,elements}=app();let giftReads=0;const bob={...farm('bob'),level:10};
  h.set({own:{...farm('alice'),seedCounts:{nabo:2}},catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[],vip:{greenPrice:20}},api:{get:async path=>{if(path==='/v1/friends')return[{id:'bob',name:'Bob'}];if(path==='/v1/gifts'){if(giftReads++===0)throw new ApiError(500,'server failure');return{received:[],sent:[]};}if(path==='/v1/me/farm')return h.get().own;return bob;}}});
- await h.friends();descendants(elements.get('modal-content')).find(n=>n.textContent==='Presentear').onclick();await new Promise(r=>setTimeout(r,0));
+ openGift(h,elements);await new Promise(r=>setTimeout(r,0));
  const content=elements.get('modal-content');assert.equal(elements.get('modal-title').textContent,'Presentear');assert.ok(text(content).includes('Bob'));assert.match(text(content),/Não foi possível/);
  descendants(content).find(node=>node.textContent==='Tentar novamente').onclick();await new Promise(r=>setTimeout(r,0));
  assert.equal(giftReads,2);assert.equal(elements.get('modal-title').textContent,'Presentear');assert.ok(descendants(content).some(n=>text(n)==='Bob'));assert.ok(descendants(content).some(n=>text(n).includes('Nabo')),text(content));
 });
 test('gift network failure remains scoped to composer',async()=>{
  const {h,elements}=app();h.set({own:{...farm('alice'),seedCounts:{nabo:1}},catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api:{get:async path=>{if(path==='/v1/friends')return[{id:'bob',name:'Bob'}];throw new TypeError('network unavailable');}}});
- await h.friends();descendants(elements.get('modal-content')).find(n=>n.textContent==='Presentear').onclick();await new Promise(r=>setTimeout(r,0));
+ openGift(h,elements);await new Promise(r=>setTimeout(r,0));
  assert.equal(elements.get('modal-title').textContent,'Presentear');assert.match(text(elements.get('modal-content')),/Não foi possível carregar/);assert.ok(!elements.has('connection'));
 });
-test('cancel and escape return once to the same friend while POST locks X, Cancel and Escape',async()=>{
+test('cancel and escape close the composer and keep the visit while POST locks X, Cancel and Escape',async()=>{
  const {h,elements,ctx}=app(),post=deferred();let mutations=0;const own={...farm('alice'),seedCounts:{nabo:4}},target={...farm('bob'),level:5};
- const api={pending:null,busy:false,get:async path=>path==='/v1/friends'?[{id:'bob',name:'Bob'}]:path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:target,mutate(_path,fields){mutations++;assert.equal(fields.recipientId,'bob');return post.promise;}};
- h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api});await h.friends();
- const list=descendants(elements.get('modal-content')).find(n=>n.className==='friend-list');list.scrollTop=210;
- descendants(elements.get('modal-content')).find(n=>n.textContent==='Presentear').onclick();await new Promise(r=>setTimeout(r,0));
+ const api={pending:null,busy:false,get:async path=>path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:target,mutate(_path,fields){mutations++;assert.equal(fields.recipientId,'bob');return post.promise;}};
+ h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api});
+ openGift(h,elements);await new Promise(r=>setTimeout(r,0));
  let footer=elements.get('modal-footer');footer.children.find(n=>n.textContent==='Cancelar').onclick();await new Promise(r=>setTimeout(r,0));
- assert.equal(elements.get('modal-title').textContent,'Amigos');assert.equal(elements.get('modal').scrollTop,210);assert.equal(ctx.document.activeElement?.dataset?.friendGift,'bob');
- descendants(elements.get('modal-content')).find(n=>n.textContent==='Presentear').onclick();await new Promise(r=>setTimeout(r,0));footer=elements.get('modal-footer');const send=footer.children.find(n=>n.textContent==='Enviar');send.onclick();send.onclick();
+ assert.equal(elements.get('modal').open,false);assert.equal(h.get().visited.owner,'bob');assert.equal(ctx.document.activeElement,elements.get('gift-visit'));
+ elements.get('gift-visit').onclick();await new Promise(r=>setTimeout(r,0));let prevented=false;elements.get('modal').listeners.cancel({preventDefault(){prevented=true;}});assert.equal(prevented,true);assert.equal(elements.get('modal').open,false,'Escape closes the composer like Cancel');
+ elements.get('gift-visit').onclick();await new Promise(r=>setTimeout(r,0));footer=elements.get('modal-footer');const send=footer.children.find(n=>n.textContent==='Enviar');send.onclick();send.onclick();
  assert.equal(mutations,1);assert.equal(elements.get('modal-footer').children.find(n=>n.textContent==='Enviando…').disabled,true);assert.equal(elements.get('modal-footer').children[0].disabled,true);assert.equal(elements.get('close-modal').disabled,true);
- let prevented=false;elements.get('modal').listeners.cancel({preventDefault(){prevented=true;}});assert.equal(prevented,true);elements.get('close-modal').onclick();assert.equal(elements.get('modal-title').textContent,'Presentear');
+ prevented=false;elements.get('modal').listeners.cancel({preventDefault(){prevented=true;}});assert.equal(prevented,true);elements.get('close-modal').onclick();assert.equal(elements.get('modal-title').textContent,'Presentear');assert.equal(elements.get('modal').open,true);
  post.resolve({result:{success:true,message:'Sementes enviadas.'},farm:own});await new Promise(r=>setTimeout(r,0));await new Promise(r=>setTimeout(r,0));
- assert.equal(elements.get('modal-title').textContent,'Amigos');assert.equal(mutations,1);assert.equal(elements.get('modal').listenerCounts.cancel,1);
+ assert.equal(elements.get('modal').open,false);assert.equal(h.get().visited.owner,'bob');assert.equal(text(elements.get('notice')),'Sementes enviadas.');assert.equal(mutations,1);assert.equal(elements.get('modal').listenerCounts.cancel,1);
 });
-test('removed friend falls back to a focusable list instead of a homonym',async()=>{
- const {h,elements,ctx}=app(),own={...farm('alice'),seedCounts:{nabo:1}};let friendReads=0;
- h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api:{get:async path=>path==='/v1/friends'?(friendReads++===0?[{id:'bob',name:'Sam'},{id:'other',name:'Sam'}]:[{id:'other',name:'Sam'}]):path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm('bob')}});
- await h.friends();descendants(elements.get('modal-content')).find(n=>n.dataset.friendGift==='bob').onclick();await new Promise(r=>setTimeout(r,0));elements.get('modal-footer').children[0].onclick();await new Promise(r=>setTimeout(r,0));
- const list=descendants(elements.get('modal-content')).find(n=>n.className==='friend-list');assert.equal(list.tabIndex,-1);assert.equal(ctx.document.activeElement,list);assert.equal(list.children[0].dataset.friendId,'other');
+test('visit menu keeps only Minha fazenda, Amigos and Presentear and home restores the own menu',()=>{
+ const {h,elements,ctx}=app(),own={...farm('alice'),loginRewards:{completedDay:0,nextDay:1,available:true,rewards:[]}},others=['notifications','shop','deposit','missions','events','settings','more'];
+ h.set({own,api:{pending:null}});h.receive({farm:own});
+ assert.ok(others.every(id=>!elements.get(id).hidden));assert.equal(elements.get('calendar').hidden,false);assert.equal(elements.get('home').hidden,true);assert.equal(elements.get('gift-visit').hidden,true);assert.equal(elements.get('friends').hidden,false);assert.equal(ctx.moreVisiting,false);
+ h.visit({...farm('bob'),name:'Bob'});
+ assert.ok(others.every(id=>elements.get(id).hidden),'own-farm panels leave the top menu');assert.equal(elements.get('calendar').hidden,true);
+ assert.equal(elements.get('home').hidden,false);assert.equal(elements.get('friends').hidden,false);assert.equal(elements.get('gift-visit').hidden,false);assert.equal(elements.get('gift-visit').getAttribute('aria-label'),'Presentear Bob');assert.equal(ctx.moreVisiting,true);
+ assert.ok(descendants(elements.get('tools')).some(node=>node.getAttribute?.('aria-label')==='Furtar colheita'||node.title==='Furtar colheita'||text(node).includes('Furtar')),'social toolbar stays available');
+ h.visit({...farm('carol'),name:'Carol'});assert.equal(elements.get('gift-visit').getAttribute('aria-label'),'Presentear Carol');
+ elements.get('home').onclick();
+ assert.ok(others.every(id=>!elements.get(id).hidden));assert.equal(elements.get('calendar').hidden,false);assert.equal(elements.get('home').hidden,true);assert.equal(elements.get('gift-visit').hidden,true);assert.equal(ctx.moreVisiting,false);
 });
-test('sending to one of two friends with the same name uses the clicked UUID',async()=>{
+test('gift from a visit goes to the visited farm even after moving to another friend',async()=>{
  const {h,elements}=app(),own={...farm('alice'),seedCounts:{nabo:2}};let sent;
- h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api:{pending:null,get:async path=>path==='/v1/friends'?[{id:'bob',name:'Sam'},{id:'carol',name:'Sam'}]:path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm(path.includes('/carol/')?'carol':'bob'),mutate:async(_path,fields)=>{sent=fields;return{result:{success:true,message:'Enviado'},farm:own};}}});
- await h.friends();descendants(elements.get('modal-content')).find(n=>n.dataset.friendGift==='carol').onclick();await new Promise(r=>setTimeout(r,0));elements.get('modal-footer').children[1].onclick();await new Promise(r=>setTimeout(r,0));await new Promise(r=>setTimeout(r,0));
- assert.equal(sent.recipientId,'carol');assert.equal(elements.get('modal-title').textContent,'Amigos');
+ h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api:{pending:null,get:async path=>path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm(path.split('/')[3]),mutate:async(_path,fields)=>{sent=fields;return{result:{success:true,message:'Enviado'},farm:own};}}});
+ openGift(h,elements,'bob','Bob');await new Promise(r=>setTimeout(r,0));elements.get('modal-footer').children[0].onclick();
+ openGift(h,elements,'carol','Carol');await new Promise(r=>setTimeout(r,0));assert.ok(text(elements.get('modal-content')).includes('Carol'));
+ elements.get('modal-footer').children[1].onclick();await new Promise(r=>setTimeout(r,0));await new Promise(r=>setTimeout(r,0));
+ assert.equal(sent.recipientId,'carol');assert.equal(h.get().visited.owner,'carol');
+});
+test('sending to one of two friends with the same name uses the visited UUID',async()=>{
+ const {h,elements}=app(),own={...farm('alice'),seedCounts:{nabo:2}};let sent;
+ h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api:{pending:null,get:async path=>path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm(path.includes('/carol/')?'carol':'bob'),mutate:async(_path,fields)=>{sent=fields;return{result:{success:true,message:'Enviado'},farm:own};}}});
+ openGift(h,elements,'carol','Sam');await new Promise(r=>setTimeout(r,0));elements.get('modal-footer').children[1].onclick();await new Promise(r=>setTimeout(r,0));await new Promise(r=>setTimeout(r,0));
+ assert.equal(sent.recipientId,'carol');assert.equal(elements.get('modal').open,false);assert.equal(h.get().visited.owner,'carol');
 });
 test('definitive gift refusal reloads stock and cooldown and leaves Enviar disabled',async()=>{
  const {h,elements}=app();let own={...farm('alice'),seedCounts:{nabo:3}},gifts={received:[],sent:[]};
  h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api:{pending:null,get:async path=>path==='/v1/friends'?[{id:'bob',name:'Bob'}]:path==='/v1/gifts'?gifts:path==='/v1/me/farm'?own:farm('bob'),mutate:async()=>{own={...own,revision:'2',seedCounts:{nabo:0}};gifts={received:[],sent:[{recipientId:'bob',cropId:'nabo',quantity:1,createdAt:new Date().toISOString()}]};return{result:{success:false,message:'Semente indisponível.'},farm:own};}}});
- await h.friends();descendants(elements.get('modal-content')).find(n=>n.textContent==='Presentear').onclick();await new Promise(r=>setTimeout(r,0));assert.equal(elements.get('modal-footer').children[1].disabled,false);
+ openGift(h,elements);await new Promise(r=>setTimeout(r,0));assert.equal(elements.get('modal-footer').children[1].disabled,false);
  elements.get('modal-footer').children[1].onclick();for(let i=0;i<4;i++)await new Promise(r=>setTimeout(r,0));
  assert.equal(elements.get('modal-title').textContent,'Presentear');assert.match(text(elements.get('modal-content')),/últimas 24 horas/);assert.equal(elements.get('modal-footer').children.find(n=>n.textContent==='Enviar').disabled,true);
 });
-test('logout during gift POST keeps response from reopening Friends',async()=>{
+test('logout during gift POST keeps response from reopening a panel',async()=>{
  const {h,elements}=app(),post=deferred(),own={...farm('alice'),seedCounts:{nabo:1}};let mutations=0;
  h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api:{pending:null,busy:false,get:async path=>path==='/v1/friends'?[{id:'bob',name:'Bob'}]:path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm('bob'),mutate(){mutations++;return post.promise;}}});
- await h.friends();descendants(elements.get('modal-content')).find(n=>n.textContent==='Presentear').onclick();await new Promise(r=>setTimeout(r,0));elements.get('modal-footer').children.find(n=>n.textContent==='Enviar').onclick();
+ openGift(h,elements);await new Promise(r=>setTimeout(r,0));elements.get('modal-footer').children.find(n=>n.textContent==='Enviar').onclick();
  await h.logout();post.resolve({result:{success:true,message:'ok'},farm:own});await new Promise(r=>setTimeout(r,0));assert.equal(mutations,1);assert.equal(elements.get('modal').open,false);assert.equal(elements.get('modal-title').textContent,'Presentear');
 });
 test('pending gift reload offers shared receipt retry for its original recipient only',async()=>{
  const {h,elements}=app(),own={...farm('alice'),seedCounts:{nabo:0}},pending={path:'/v1/gifts',body:'{"requestId":"same-id","recipientId":"bob","cropId":"nabo","quantity":2}'};let retries=0,mutations=0;
- const api={pending,get:async path=>path==='/v1/friends'?[{id:'bob',name:'Sam'},{id:'other',name:'Sam'}]:path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm(path.includes('/bob/')?'bob':'other'),retry:async()=>{retries++;api.pending=null;return{result:{success:true,message:'Recuperado'},farm:own};},mutate(){mutations++;}};
- h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api});await h.friends();
- const presents=descendants(elements.get('modal-content')).filter(n=>n.textContent==='Presentear');presents[0].onclick();await new Promise(r=>setTimeout(r,0));
+ const api={pending,get:async path=>path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm(path.includes('/bob/')?'bob':'other'),retry:async()=>{retries++;api.pending=null;return{result:{success:true,message:'Recuperado'},farm:own};},mutate(){mutations++;}};
+ h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api});
+ openGift(h,elements,'other','Sam');await new Promise(r=>setTimeout(r,0));assert.notEqual(elements.get('modal-title')?.textContent,'Presentear','another recipient cannot start while the pending gift is unresolved');assert.match(text(elements.get('notice')),/presente pendente para outro amigo/);
+ openGift(h,elements,'bob','Sam');await new Promise(r=>setTimeout(r,0));
  assert.equal(elements.get('modal-title').textContent,'Presentear');assert.ok(text(elements.get('modal-content')).includes('envio anterior'));assert.ok(text(elements.get('modal-content')).includes('Tentativa pendente: Nabo · 2 semente(s)'));
  descendants(elements.get('modal-content')).find(n=>n.textContent==='Recuperar resultado').onclick();await new Promise(r=>setTimeout(r,0));await new Promise(r=>setTimeout(r,0));
- assert.equal(retries,1);assert.equal(mutations,0);assert.equal(elements.get('modal-title').textContent,'Amigos');
+ assert.equal(retries,1);assert.equal(mutations,0);assert.equal(elements.get('modal').open,false);assert.equal(text(elements.get('notice')),'Recuperado');assert.equal(h.get().visited.owner,'bob');
 });
 test('late pending gift retry stays out of a different dialog but updates the current farm',async()=>{
  for(const outcome of ['success','reject']){
   const {h,elements,ctx}=app(),reply=deferred(),own={...farm('alice'),revision:'1',seedCounts:{nabo:1}},pending={path:'/v1/gifts',body:'{"requestId":"same-id","recipientId":"bob","cropId":"nabo","quantity":1}'};
   const api={pending,get:async path=>path==='/v1/friends'?[{id:'bob',name:'Bob'}]:path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm('bob'),retry:()=>reply.promise};
-  h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api});await h.friends();descendants(elements.get('modal-content')).find(n=>n.dataset.friendGift==='bob').onclick();await new Promise(r=>setTimeout(r,0));
+  h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api});openGift(h,elements,'bob');await new Promise(r=>setTimeout(r,0));
   descendants(elements.get('modal-content')).find(n=>n.textContent==='Recuperar resultado').onclick();h.dialog('Outro painel');const content=elements.get('modal-content').children,notice=text(elements.get('notice')??{textContent:''}),focusTarget=ctx.document.createElement('button');focusTarget.focus();elements.get('modal').setAttribute('closedby','none');elements.get('close-modal').disabled=true;
   if(outcome==='success')reply.resolve({farm:{...own,revision:'2',seedCounts:{}},result:{success:true,message:'Presente confirmado'}});else reply.reject(new TypeError('offline'));
   await new Promise(r=>setTimeout(r,0));await new Promise(r=>setTimeout(r,0));
@@ -100,19 +115,20 @@ test('late generic retry cannot replace the current panel with a returned invita
 });
 test('pending gift retry cannot restore farm after logout',async()=>{
  const {h,elements}=app(),reply=deferred(),own=farm('alice'),api={pending:{path:'/v1/gifts',body:'{"requestId":"same-id","recipientId":"bob","cropId":"nabo","quantity":1}'},get:async path=>path==='/v1/friends'?[{id:'bob',name:'Bob'}]:path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm('bob'),retry:()=>reply.promise};
- h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api});await h.friends();descendants(elements.get('modal-content')).find(n=>n.dataset.friendGift==='bob').onclick();await new Promise(r=>setTimeout(r,0));descendants(elements.get('modal-content')).find(n=>n.textContent==='Recuperar resultado').onclick();await h.logout();reply.resolve({farm:{...own,revision:'2'},result:{success:true,message:'late'}});await new Promise(r=>setTimeout(r,0));
+ h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api});openGift(h,elements,'bob');await new Promise(r=>setTimeout(r,0));descendants(elements.get('modal-content')).find(n=>n.textContent==='Recuperar resultado').onclick();await h.logout();reply.resolve({farm:{...own,revision:'2'},result:{success:true,message:'late'}});await new Promise(r=>setTimeout(r,0));
  assert.equal(h.get().own,undefined);assert.equal(elements.get('modal').open,false);
 });
-test('pending gift retry does not notify a newer Amigos dialog after its list loads',async()=>{
- const {h,elements}=app(),reply=deferred(),friendsReply=deferred(),own=farm('alice');let friendReads=0;
- const api={pending:{path:'/v1/gifts',body:'{"requestId":"same-id","recipientId":"bob","cropId":"nabo","quantity":1}'},get:async path=>path==='/v1/friends'?(++friendReads===1?[{id:'bob',name:'Bob'}]:friendsReply.promise):path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm('bob'),retry:()=>reply.promise};
- h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api});await h.friends();descendants(elements.get('modal-content')).find(n=>n.dataset.friendGift==='bob').onclick();await new Promise(r=>setTimeout(r,0));descendants(elements.get('modal-content')).find(n=>n.textContent==='Recuperar resultado').onclick();reply.resolve({result:{success:true,message:'Presente confirmado'},farm:own});await new Promise(r=>setTimeout(r,0));
- assert.equal(elements.get('modal-title').textContent,'Amigos');h.dialog('Amigos');friendsReply.resolve([{id:'bob',name:'Bob'}]);await new Promise(r=>setTimeout(r,0));await new Promise(r=>setTimeout(r,0));assert.equal(text(elements.get('notice')??{textContent:''}),'');
+test('pending gift retry that succeeds after the panel changed does not close or notify the newer panel',async()=>{
+ const {h,elements}=app(),reply=deferred(),own=farm('alice');
+ const api={pending:{path:'/v1/gifts',body:'{"requestId":"same-id","recipientId":"bob","cropId":"nabo","quantity":1}'},get:async path=>path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm('bob'),retry:()=>reply.promise};
+ h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api});openGift(h,elements);await new Promise(r=>setTimeout(r,0));descendants(elements.get('modal-content')).find(n=>n.textContent==='Recuperar resultado').onclick();
+ h.dialog('Amigos');reply.resolve({result:{success:true,message:'Presente confirmado'},farm:own});await new Promise(r=>setTimeout(r,0));await new Promise(r=>setTimeout(r,0));
+ assert.equal(elements.get('modal-title').textContent,'Amigos');assert.equal(elements.get('modal').open,true);assert.equal(text(elements.get('notice')??{textContent:''}),'');
 });
 test('secondary GET failure keeps receipt recovery separate from data retry',async()=>{
  const {h,elements}=app(),own={...farm('alice'),seedCounts:{nabo:1}},pending={path:'/v1/gifts',body:'{"requestId":"same-id","recipientId":"bob","cropId":"nabo","quantity":1}'};let reads=0,retries=0,mutations=0;
  const api={pending,get:async path=>{if(path==='/v1/friends')return[{id:'bob',name:'Bob'}];if(path==='/v1/gifts'){reads++;throw new Error('offline');}if(path==='/v1/me/farm')return own;return farm('bob');},retry:async()=>{retries++;throw new Error('still offline');},mutate(){mutations++;}};
- h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api});await h.friends();descendants(elements.get('modal-content')).find(n=>n.textContent==='Presentear').onclick();await new Promise(r=>setTimeout(r,0));
+ h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api});openGift(h,elements);await new Promise(r=>setTimeout(r,0));
  let content=elements.get('modal-content');assert.ok(text(content).includes('Não foi possível carregar'));assert.ok(text(content).includes('Há um envio pendente'));
  h.receive({farm:{...own,revision:'2',seedCounts:{}}});assert.ok(text(content).includes('Tentativa pendente: Nabo · 1 semente(s)'));
  descendants(content).find(n=>n.textContent==='Tentar novamente').onclick();await new Promise(r=>setTimeout(r,0));assert.equal(retries,0);assert.equal(reads,2);
@@ -122,10 +138,10 @@ test('secondary GET failure keeps receipt recovery separate from data retry',asy
 test('late gift failure after navigating away does not affect the next panel',async()=>{
  const {h,elements}=app(),reply=deferred(),own={...farm('alice'),seedCounts:{nabo:1}};
  h.set({own,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api:{get:path=>path==='/v1/friends'?[{id:'bob',name:'Bob'}]:path==='/v1/gifts'?reply.promise:path==='/v1/me/farm'?own:farm('bob')}});
- await h.friends();descendants(elements.get('modal-content')).find(n=>n.textContent==='Presentear').onclick();h.dialog('Outro painel');reply.resolve(Promise.reject(new TypeError('network unavailable')));await new Promise(r=>setTimeout(r,0));
+ openGift(h,elements);h.dialog('Outro painel');reply.resolve(Promise.reject(new TypeError('network unavailable')));await new Promise(r=>setTimeout(r,0));
  assert.equal(elements.get('modal-title').textContent,'Outro painel');assert.ok(!text(elements.get('modal-content')).includes('Não foi possível'));
  const next=app(),late=deferred(),nextOwn={...farm('alice'),seedCounts:{nabo:1}};next.h.set({own:nextOwn,catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo'}],animals:[],fertilizers:[]},api:{get:path=>path==='/v1/friends'?[{id:'bob',name:'Bob'}]:path==='/v1/gifts'?late.promise:path==='/v1/me/farm'?nextOwn:farm('bob')}});
- await next.h.friends();descendants(next.elements.get('modal-content')).find(n=>n.textContent==='Presentear').onclick();await next.h.logout();late.resolve(Promise.reject(new TypeError('network unavailable')));await new Promise(r=>setTimeout(r,0));
+ openGift(next.h,next.elements);await next.h.logout();late.resolve(Promise.reject(new TypeError('network unavailable')));await new Promise(r=>setTimeout(r,0));
  assert.equal(next.elements.get('modal').open,false);assert.ok(!text(next.elements.get('modal-content')).includes('Não foi possível'));
 });
 function app(preferences=new Map(),pushLogoutOptions){
@@ -136,11 +152,11 @@ function app(preferences=new Map(),pushLogoutOptions){
   removeAttribute(key){delete this.attributes[key];},setAttribute(key,value){this.attributes[key]=String(value);},getAttribute(key){return this.attributes[key]??null;},
   contains(target){return !!target&&(target===this||this.children.some(child=>child?.contains?.(target)));},
   get firstElementChild(){return this.children[0]??null;},get lastElementChild(){return this.children.at(-1)??null;},
-  querySelectorAll(selector){return descendants(this).slice(1).filter(node=>selector==='[data-focus-key]'?node.getAttribute('data-focus-key')!==null:selector==='[data-friend-gift]'?node.dataset.friendGift!==undefined:selector.startsWith('.')?(node.className??'').split(/\s+/).includes(selector.slice(1)):false);},
+  querySelectorAll(selector){return descendants(this).slice(1).filter(node=>selector==='[data-focus-key]'?node.getAttribute('data-focus-key')!==null:selector.startsWith('.')?(node.className??'').split(/\s+/).includes(selector.slice(1)):false);},
   querySelector(selector){return this.querySelectorAll(selector)[0]??null;},focus(){if(this.tag==='div'&&this.tabIndex===undefined)return;ctx.document.activeElement=this;},
   getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(name,handler){(this.listenerCounts??={})[name]=(this.listenerCounts[name]??0)+1;(this.listeners??={})[name]=handler;},close(){this.open=false;},showModal(){this.open=true;}});
  const storage={getItem:()=>null,setItem(){},removeItem(){}};
- const ctx={syncMobileCamera(){ctx.cameraSyncs=(ctx.cameraSyncs??0)+1;},reconcilePush:async()=>{},connectPush:async()=>{},suspendPush:pushLogoutOptions?.suspendPush??(async()=>{}),createClient:()=>({auth:{signOut:pushLogoutOptions?.signOut}}),renderPushSettings:()=>{},setMonotonic(value){monotonic=value;},performance:{now:()=>monotonic},...presentation,...uiPresentation,...avatar,...inviteUrl,history:{state:null,replaceState(){}},window:{localStorage:{getItem:key=>preferences.get(key)??null,setItem:(key,value)=>preferences.set(key,value)},COLHEITA_CONFIG:{development:!pushLogoutOptions},setInterval(callback,delay){intervals.set(delay,callback);return delay;},clearInterval(id){intervals.delete(id);},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make(id==='close-modal'||id==='retry'?'button':'div'));return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}addEventListener(){}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
+ const ctx={syncMobileCamera(){ctx.cameraSyncs=(ctx.cameraSyncs??0)+1;},setMoreMenuVisiting(value){ctx.moreVisiting=value;},reconcilePush:async()=>{},connectPush:async()=>{},suspendPush:pushLogoutOptions?.suspendPush??(async()=>{}),createClient:()=>({auth:{signOut:pushLogoutOptions?.signOut}}),renderPushSettings:()=>{},setMonotonic(value){monotonic=value;},performance:{now:()=>monotonic},...presentation,...uiPresentation,...avatar,...inviteUrl,history:{state:null,replaceState(){}},window:{localStorage:{getItem:key=>preferences.get(key)??null,setItem:(key,value)=>preferences.set(key,value)},COLHEITA_CONFIG:{development:!pushLogoutOptions},setInterval(callback,delay){intervals.set(delay,callback);return delay;},clearInterval(id){intervals.delete(id);},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make(id==='close-modal'||id==='retry'||id==='gift-visit'?'button':'div'));return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}addEventListener(){}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
  ctx.document.getElementById('farm-header').getBoundingClientRect=()=>({left:0,top:0,width:0,height:0,bottom:0});
  const uiSource=readFileSync(new URL('../src/ui.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(uiSource),ctx);
@@ -151,9 +167,10 @@ function app(preferences=new Map(),pushLogoutOptions){
  const eventsSource=readFileSync(new URL('../src/events.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');runInNewContext(stripTypeScriptTypes(eventsSource),ctx);
  runInNewContext(stripTypeScriptTypes(readFileSync(new URL('../src/away-report.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'')),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={events,updateOwnFarm,refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,friends,presentGift,closeGiftComposer,receive,dialog,health,renderHealth,positionHealth,animalTooltip,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
+ source+='\nglobalThis.h={events,updateOwnFarm,refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,friends,presentGift,closeGiftComposer,receive,dialog,health,renderHealth,positionHealth,animalTooltip,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),visit:value=>{visited=value;render();},calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:{...ctx.h,runTimeouts(){for(const [id,callback]of [...timeouts]){timeouts.delete(id);callback();}}},elements,listeners,audioClips,observers,ctx,intervals};
 }
+function openGift(h,elements,owner='bob',name='Bob'){h.visit({...farm(owner),name});elements.get('gift-visit').onclick();}
 function text(node){return(node.textContent??'')+(node.children??[]).map(child=>typeof child==='object'?text(child):child).join('');}
 function descendants(node){return[node,...(node.children??[]).flatMap(child=>typeof child==='object'?descendants(child):[])];}
 function loginFarm(owner='alice',available=true,revision='1',serverTime='2026-11-15T12:00:00Z',nextResetAt='2026-11-16T03:00:00Z'){
@@ -220,7 +237,7 @@ test('returning from a hidden tab rechecks server time when the monotonic clock 
 test('gift default selection and send remain blocked when stock contains only calendar seeds',async()=>{
  const {h,elements}=app(),own={...farm('alice'),seedCounts:{'semente-bronze':1}},crop={id:'semente-bronze',name:'Semente de Bronze',spriteStem:'semente-bronze',acquisitionSource:'LOGIN_REWARD'};let mutations=0;
  h.set({own,catalog:{crops:[crop],animals:[],fertilizers:[],vip:{greenPrice:20}},api:{pending:null,get:async path=>path==='/v1/friends'?[{id:'bob',name:'Bob'}]:path==='/v1/gifts'?{received:[],sent:[]}:path==='/v1/me/farm'?own:farm('bob'),mutate(){mutations++;}}});
- await h.friends();descendants(elements.get('modal-content')).find(node=>text(node)==='Presentear').onclick();await new Promise(resolve=>setTimeout(resolve,0));
+ openGift(h,elements);await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(elements.get('modal-title').textContent,'Presentear');assert.ok(!text(elements.get('modal-content')).includes('Semente de Bronze'));assert.equal(mutations,0);assert.equal(elements.get('modal-footer').children.find(node=>text(node)==='Enviar').disabled,true);
 });
 

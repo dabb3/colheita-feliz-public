@@ -186,6 +186,12 @@ export function setupCamera(media: MediaQueryList, {scene, canvas, controls, zoo
   sync();
 }
 
+let syncMoreMenu = (_visiting: boolean) => {};
+/** During a visit "Mais" is hidden, so Amigos goes back to the bar and the open menu closes. */
+export function setMoreMenuVisiting(visiting: boolean) {
+  syncMoreMenu(visiting);
+}
+
 function setupMoreMenu(media: MediaQueryList) {
   const more = document.getElementById('more') as HTMLButtonElement | null, menu = document.getElementById('more-menu');
   if (!more || !menu) return;
@@ -197,9 +203,16 @@ function setupMoreMenu(media: MediaQueryList) {
     more.setAttribute('aria-expanded', 'false');
     if (focus) more.focus();
   };
+  let visiting = false;
   const sync = () => {
-    if (media.matches) menu.append(...moved);
+    if (media.matches) moved.forEach((node, index) => {if (visiting && node.id === 'friends') anchors[index].after(node); else menu.append(node);});
     else {moved.forEach((node, index) => anchors[index].after(node)); close();}
+  };
+  syncMoreMenu = next => {
+    if (next === visiting) return;
+    visiting = next;
+    close();
+    sync();
   };
   more.addEventListener('click', () => {
     const open = menu.hidden;

@@ -133,6 +133,8 @@ test('keyboard shortcuts cover desktop panels and settings',()=>{
  assert.deepEqual(gameShortcut('b'),{action:'shop'});
  assert.deepEqual(gameShortcut('v'),{action:'deposit'});
  assert.equal(gameShortcut('1',true),undefined);
+ for(const key of ['b','v','q','t'])assert.equal(gameShortcut(key,true),undefined,'own-farm panels stay closed during a visit');
+ assert.deepEqual(gameShortcut('m',true),{action:'music'});assert.deepEqual(gameShortcut('n',true),{action:'effects'});
 });
 test('panel shortcuts open another panel and close the same panel on repeat',()=>{
  assert.equal(shortcutPanelState(false,'','Loja'),'open');
