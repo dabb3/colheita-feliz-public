@@ -294,6 +294,12 @@ visitada são somente leitura; Loja → Meus animais continua mostrando os próp
 inclusive durante visitas. O painel aberto acompanha as atualizações periódicas,
 preservando o foco quando a ação ainda existe. Percentual de fome não é exibido,
 pois esse dado não integra a projeção atual.
+Na cena, animal com fome (`HUNGRY`), inclusive jovens, protetores, a colmeia e
+animais da fazenda visitada, ganha um halo vermelho que acompanha a silhueta do
+sprite (sombra do canvas, isolada por `save`/`restore`). Ele substitui o ícone de
+ração sobre o animal, pulsa de leve e fica parado com
+`prefers-reduced-motion: reduce`. O popup continua mostrando "Com fome" e Alimentar.
+Para revisar, `npm run review --prefix web` aceita `?hungry=1`.
 
 Tarefas usam cartões de estado e amigos usam nomes e botões de visita. Listagem,
 criação e aceite de convite não preenchem nem fecham uma janela diferente após

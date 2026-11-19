@@ -128,7 +128,7 @@ const farm = {
   animals: Object.keys(animalLayout).map((id) => ({
     id,
     stage,
-    status:
+    status: params.get("hungry") === "1" ? "HUNGRY" :
       id === "abelha" ||
       catalog.animals.find((a) => a.id === id)?.kind === "PROTECTOR" ||
       stage !== "ADULT"

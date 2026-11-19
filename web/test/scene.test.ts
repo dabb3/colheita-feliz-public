@@ -77,3 +77,31 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  scene.close();
  assert.deepEqual(cancelled,[2]);
 });
+
+test('hungry animals get a red silhouette halo instead of the tiny feed icon, without leaking canvas state',()=>{
+ const drawn=[],images=[],pending=[],stack=[];let reduced=false;
+ const context={shadowColor:'rgba(0, 0, 0, 0)',shadowBlur:0,shadowOffsetX:0,shadowOffsetY:0,setTransform(){},clearRect(){},fillRect(){},translate(){},scale(){},rotate(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},stroke(){},fill(){},ellipse(){},fillText(){},
+  save(){stack.push({shadowColor:this.shadowColor,shadowBlur:this.shadowBlur});},restore(){Object.assign(this,stack.pop());},
+  drawImage(image,...args){drawn.push({path:image.src??'',shadow:this.shadowColor,blur:this.shadowBlur,args});},
+  createRadialGradient(){return{addColorStop(){}};},getImageData(x,y,w,h){const data=new Uint8ClampedArray(w*h*4);for(let row=0;row<h;row++)for(let col=0;col<w;col++)if(row<h*.88||col<w*.25)data[(row*w+col)*4+3]=255;return{data};}};
+ const canvas={width:3200,height:1800,getContext:()=>context,getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(){}};
+ const environment={...presentation,periodAt:()=>'day',performance:{now:()=>0},window:{requestAnimationFrame:()=>1,cancelAnimationFrame(){},matchMedia:query=>({matches:reduced&&query.includes('reduce')})},AbortController,document:{hidden:false,createElement:()=>({getContext:()=>context})},
+  Image:class{width=100;height=200;onload;onerror;src;constructor(){pending.push(this);images.push(this);}}};
+ const source=readFileSync(new URL('../src/scene.ts',import.meta.url),'utf8').replace(/^import\b[\s\S]*?;\s*/gm,'').replace('export class Scene','class Scene');
+ runInNewContext(stripTypeScriptTypes(source)+'\nglobalThis.Scene=Scene;',environment);
+ const scene=new environment.Scene(canvas,{crops:[],animals:[{id:'vaca',kind:'PRODUCER'},{id:'abelha',kind:'PROTECTOR'}]},()=>{},()=>{},()=>{},()=>{},()=>{},()=>{},()=>true);
+ canvas.width=3200; // the mobile camera doubles the backing store
+ const farm={owner:'alice',own:true,tiles:[],animals:[{id:'vaca',stage:'ADULT',status:'HUNGRY'},{id:'abelha',stage:'ADULT',status:'HUNGRY'},{id:'porco',stage:'ADULT',status:'READY'}]};
+ scene.update(farm);while(pending.length){const image=pending.shift();if(image.src.includes('atlas')){image.width=400;image.height=100;}image.onload();}
+ drawn.length=0;scene.update(farm);
+ const red=draw=>draw.shadow.startsWith('rgba(255, 32, 32');
+ const cow=drawn.filter(d=>/vaca\/vaca[^/]*\.png$/.test(d.path)),hive=drawn.filter(d=>d.path===''),pig=drawn.filter(d=>/porco\/porco[^/]*\.png$/.test(d.path));
+ assert.ok(cow.length>0&&cow.every(red),'hungry cow is drawn with the red halo');assert.ok(hive.some(red),'hungry hive (atlas frame) gets the halo too');assert.ok(drawn.filter(red).every(d=>d.path===''||/vaca\//.test(d.path)),'only the hungry animals glow');
+ assert.ok(pig.length>0&&pig.every(d=>!red(d)),'a fed animal has no halo');
+ assert.ok(cow.every(d=>d.blur>=28),'blur follows the doubled backing store');
+ assert.ok(!images.some(image=>image.src.endsWith('racao-generica.png')),'the tiny feed icon is gone');
+ assert.equal(stack.length,0);assert.equal(context.shadowColor,'rgba(0, 0, 0, 0)','canvas state is restored for the next objects');assert.equal(context.shadowBlur,0);
+ const others=drawn.filter(d=>d.path!==''&&!/vaca\//.test(d.path));assert.ok(others.length>0&&others.every(d=>!red(d)),'no other sprite inherits the halo');
+ reduced=true;drawn.length=0;scene.update(farm);const still=drawn.filter(d=>/vaca\/vaca[^/]*\.png$/.test(d.path)).map(d=>d.blur);
+ drawn.length=0;scene.update(farm);assert.deepEqual(drawn.filter(d=>/vaca\/vaca[^/]*\.png$/.test(d.path)).map(d=>d.blur),still,'reduced motion keeps the halo still');
+});
