@@ -162,27 +162,80 @@ class AwayReportsTest {
         assertTrue(report.getAsJsonArray("pending").asList().stream().anyMatch(p -> p.getAsJsonObject().get("kind").getAsString().equals("FEED")));
     }
 
-    @Test void mergeAddsCountsKeepsEventsAndTakesCurrentPendings() {
+    @Test void mergeAddsHistoryAndRereadsTheFarm() {
         var older = com.google.gson.JsonParser.parseString("""
                 {"awaySeconds":10800,"harvests":[{"cropId":"cenoura","name":"Cenoura","stem":"cenoura","quantity":2}],
                  "products":[{"productId":"ovo","name":"Ovo","animalId":"galinha","quantity":1}],"readyProducts":[],
                  "thefts":[{"at":"2026-11-13T01:00:00Z","actor":"Bob","itemId":"cenoura","name":"Cenoura","stem":"cenoura","quantity":1}],
                  "defenses":[],"care":{"waterings":3,"pestsRemoved":1,"animalCares":0},
-                 "pending":[{"kind":"VIP","expiredAt":"2026-11-13T00:00:00Z"}],"id":"old"}""").getAsJsonObject();
+                 "pending":[{"kind":"VIP","expiredAt":"2026-11-13T00:00:00Z"}],"windows":[],"id":"old"}""").getAsJsonObject();
         var newer = com.google.gson.JsonParser.parseString("""
-                {"awaySeconds":14400,"harvests":[{"cropId":"cenoura","name":"Cenoura","stem":"cenoura","quantity":1},{"cropId":"milho","name":"Milho","stem":"milho","quantity":4}],
-                 "products":[],"readyProducts":[{"productId":"ovo","name":"Ovo","animalId":"galinha","quantity":1}],
-                 "thefts":[],"defenses":[{"at":"2026-11-13T09:00:00Z","actor":"Carol"}],
-                 "care":{"waterings":2,"pestsRemoved":0,"animalCares":5},"pending":[]}""").getAsJsonObject();
-        var merged = AwayReports.merge(older, newer);
+                {"awaySeconds":14400,"harvests":[],"products":[{"productId":"ovo","name":"Ovo","animalId":"galinha","quantity":2}],
+                 "readyProducts":[],"thefts":[],"defenses":[{"at":"2026-11-13T09:00:00Z","actor":"Carol"}],
+                 "care":{"waterings":2,"pestsRemoved":0,"animalCares":5},"pending":[],"windows":[]}""").getAsJsonObject();
+        var merged = AwayReports.merge(older, newer, game);
         assertEquals(25200, merged.get("awaySeconds").getAsLong());
-        assertEquals(7, quantity(merged, "harvests")); assertEquals(2, merged.getAsJsonArray("harvests").size());
-        assertEquals(3, merged.getAsJsonArray("harvests").get(0).getAsJsonObject().get("quantity").getAsInt());
-        assertEquals(1, quantity(merged, "products")); assertEquals(1, quantity(merged, "readyProducts"));
+        assertEquals(3, quantity(merged, "products"));
+        assertEquals(0, quantity(merged, "harvests"), "ready crops are read from the farm, not added up");
         assertEquals(1, merged.getAsJsonArray("thefts").size()); assertEquals(1, merged.getAsJsonArray("defenses").size());
         assertEquals(5, merged.getAsJsonObject("care").get("waterings").getAsInt());
         assertEquals(5, merged.getAsJsonObject("care").get("animalCares").getAsInt());
         assertEquals(0, merged.getAsJsonArray("pending").size(), "pendings reflect the farm now");
         assertFalse(merged.has("id"));
+    }
+
+    @Test void productReadyInAnOlderReportDisappearsOnceCollected() {
+        readyProducer(); // ready an hour ago, inside the older report's window
+        var older = AwayReports.build(game, AwayLedger.empty(ago(3 * 3600)), clock.instant());
+        assertEquals(1, quantity(older, "readyProducts"));
+        game.barn().collect(0, clock.instant());
+        clock.advance(4 * 3600);
+        var newer = AwayReports.build(game, AwayLedger.empty(ago(3 * 3600)).plus(1, 0, 0, java.util.Map.of()), clock.instant());
+        var merged = AwayReports.merge(older, newer, game);
+        assertEquals(0, quantity(merged, "readyProducts"));
+    }
+
+    @Test void productReadyInAnOlderReportStaysWhileStillInTheBarn() {
+        readyProducer();
+        var older = AwayReports.build(game, AwayLedger.empty(ago(3 * 3600)), clock.instant());
+        clock.advance(4 * 3600);
+        var newer = AwayReports.build(game, AwayLedger.empty(ago(3 * 3600)).plus(1, 0, 0, java.util.Map.of()), clock.instant());
+        var merged = AwayReports.merge(older, newer, game);
+        assertEquals(1, quantity(merged, "readyProducts"));
+    }
+
+    @Test void cropReadyBetweenTheTwoAbsencesIsNotCredited() {
+        var older = AwayReports.build(game, AwayLedger.empty(ago(10 * 3600)).plus(1, 0, 0, java.util.Map.of()), ago(7 * 3600));
+        matured(0, ago(5 * 3600)); // the owner was around then
+        matured(1, ago(3600));
+        var newer = AwayReports.build(game, AwayLedger.empty(ago(3 * 3600)), clock.instant());
+        var merged = AwayReports.merge(older, newer, game);
+        assertEquals(1, quantity(merged, "harvests"));
+    }
+
+    @Test void mergeKeepsTheNewestTwentyVisitEventsOverall() {
+        var base = clock.instant();
+        var older = new com.google.gson.JsonObject[1]; var newer = new com.google.gson.JsonObject[1];
+        for (int part = 0; part < 2; part++) {
+            var ledger = AwayLedger.empty(base.minusSeconds(100_000));
+            for (int i = 0; i < 8; i++) {
+                // 16 events per report, thefts and defenses alternating: 32 in all, so only the merge cap applies.
+                long minute = part * 100 + i * 2;
+                ledger = ledger.withEvent(new AwayLedger.Event("THEFT", base.minusSeconds(90_000 - minute * 60).toString(), "Bob", "cenoura", 1, null))
+                        .withEvent(new AwayLedger.Event("DEFENDED", base.minusSeconds(90_000 - (minute + 1) * 60).toString(), "Carol", null, 0, null));
+            }
+            var report = AwayReports.build(game, ledger, base);
+            if (part == 0) older[0] = report; else newer[0] = report;
+        }
+        var merged = AwayReports.merge(older[0], newer[0], game);
+        var all = new java.util.ArrayList<Instant>();
+        for (String kind : List.of("thefts", "defenses"))
+            merged.getAsJsonArray(kind).forEach(e -> all.add(Instant.parse(e.getAsJsonObject().get("at").getAsString())));
+        assertEquals(AwayLedger.MAX_EVENTS, all.size());
+        var everything = new java.util.ArrayList<Instant>();
+        for (var report : List.of(older[0], newer[0])) for (String kind : List.of("thefts", "defenses"))
+            report.getAsJsonArray(kind).forEach(e -> everything.add(Instant.parse(e.getAsJsonObject().get("at").getAsString())));
+        everything.sort(null); all.sort(null);
+        assertEquals(everything.subList(everything.size() - AwayLedger.MAX_EVENTS, everything.size()), all);
     }
 }

@@ -104,7 +104,7 @@ final class OnlineGameService implements AutoCloseable {
                 if (report != null) {
                     // An unacknowledged report is folded into the new one, so no period is lost before the ACK.
                     var previous = tx.pendingAwayReport(actor);
-                    if (previous != null) report = AwayReports.merge(previous, report);
+                    if (previous != null) report = AwayReports.merge(previous, report, farm.game());
                     report.addProperty("id", UUID.randomUUID().toString());
                     tx.savePendingAwayReport(actor, report);
                 }
@@ -112,7 +112,10 @@ final class OnlineGameService implements AutoCloseable {
             // Every own visit starts a new window; shorter absences are seen in the farm itself.
             tx.saveAwayLedger(actor, AwayLedger.empty(now));
             var pendingReport = tx.pendingAwayReport(actor);
-            if (pendingReport != null) view.add("awayReport", pendingReport);
+            if (pendingReport != null) {
+                pendingReport.remove("windows"); // only the server needs them, to merge the next report
+                view.add("awayReport", pendingReport);
+            }
             if(publishedNotes!=null&&tx.claimUpdateNotes(actor,publishedNotes.version(),publishedNotes.day(clock.instant())))
                 view.add("updateNotes",publishedNotes.view(clock.instant()));
             return view;

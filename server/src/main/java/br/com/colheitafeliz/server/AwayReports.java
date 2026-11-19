@@ -7,7 +7,10 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /** Builds the owner's "while you were away" summary from the ledger and the farm as it is now. */
@@ -16,12 +19,18 @@ final class AwayReports {
     private static final Map<String,String> SERVICE_NAMES = Map.of("water", "Rega automática", "pests", "Controle de pragas", "animals", "Cuidador de animais");
     private AwayReports() {}
 
+    /** One absence the report covers; ready crops and producers are only credited when they became ready inside one. */
+    private record Window(Instant since, Instant until) {
+        boolean contains(Instant at) { return at != null && at.isAfter(since) && !at.isAfter(until); }
+    }
+
     /** Null when nothing happened in the window. */
     static JsonObject build(GameState game, AwayLedger ledger, Instant now) {
         Instant since = ledger.lastSeenAt();
-        var harvests = harvests(game, since, now);
+        var windows = List.of(new Window(since, now));
+        var harvests = harvests(game, windows);
         var products = products(game, ledger.collected());
-        var readyProducts = products(game, readyProducers(game, since, now));
+        var readyProducts = products(game, readyProducers(game, windows));
         var thefts = new JsonArray(); var defenses = new JsonArray();
         for (var event : ledger.events()) {
             var item = new JsonObject();
@@ -49,27 +58,49 @@ final class AwayReports {
         careJson.addProperty("animalCares", ledger.animalCares());
         report.add("care", careJson);
         report.add("pending", pending.items());
+        report.add("windows", windowsJson(windows));
         return report;
     }
 
     /**
-     * Joins an unacknowledged report with the next one: counts add up, visit events keep the newest
-     * {@link AwayLedger#MAX_EVENTS}, and pendings come from the newer report because they reflect the farm now.
+     * Joins an unacknowledged report with the next one. What already happened adds up (time away, collected
+     * products, care) and visit events keep the newest {@link AwayLedger#MAX_EVENTS} overall. What describes the
+     * farm now (ready crops and products, pendings) is read again from {@code game}, limited to the reports' windows.
      */
-    static JsonObject merge(JsonObject older, JsonObject newer) {
+    static JsonObject merge(JsonObject older, JsonObject newer, GameState game) {
+        var windows = new ArrayList<>(windows(older)); windows.addAll(windows(newer));
         var merged = new JsonObject();
         merged.addProperty("awaySeconds", older.get("awaySeconds").getAsLong() + newer.get("awaySeconds").getAsLong());
-        merged.add("harvests", sumBy(older, newer, "harvests", "cropId"));
+        merged.add("harvests", harvests(game, windows));
         merged.add("products", sumBy(older, newer, "products", "productId"));
-        merged.add("readyProducts", sumBy(older, newer, "readyProducts", "productId"));
-        merged.add("thefts", latest(older, newer, "thefts"));
-        merged.add("defenses", latest(older, newer, "defenses"));
+        merged.add("readyProducts", products(game, readyProducers(game, windows)));
+        latestEvents(older, newer, merged);
         var care = new JsonObject();
         for (String field : java.util.List.of("waterings", "pestsRemoved", "animalCares"))
             care.addProperty(field, older.getAsJsonObject("care").get(field).getAsInt() + newer.getAsJsonObject("care").get(field).getAsInt());
         merged.add("care", care);
         merged.add("pending", newer.getAsJsonArray("pending").deepCopy());
+        merged.add("windows", windowsJson(windows));
         return merged;
+    }
+
+    private static List<Window> windows(JsonObject report) {
+        var result = new ArrayList<Window>();
+        for (var element : list(report, "windows")) {
+            var window = element.getAsJsonObject();
+            result.add(new Window(Instant.parse(window.get("since").getAsString()), Instant.parse(window.get("until").getAsString())));
+        }
+        return result;
+    }
+
+    private static JsonArray windowsJson(List<Window> windows) {
+        var result = new JsonArray();
+        for (var window : windows) {
+            var item = new JsonObject();
+            item.addProperty("since", window.since().toString()); item.addProperty("until", window.until().toString());
+            result.add(item);
+        }
+        return result;
     }
 
     private static JsonArray list(JsonObject report, String name) {
@@ -89,21 +120,29 @@ final class AwayReports {
         return result;
     }
 
-    private static JsonArray latest(JsonObject older, JsonObject newer, String name) {
-        var all = new java.util.ArrayList<com.google.gson.JsonElement>();
-        list(older, name).forEach(item -> all.add(item.deepCopy())); list(newer, name).forEach(item -> all.add(item.deepCopy()));
-        var result = new JsonArray();
-        all.subList(Math.max(0, all.size() - AwayLedger.MAX_EVENTS), all.size()).forEach(result::add);
-        return result;
+    /** Thefts and defenses share one cap, like the ledger: the newest events overall, split back by kind. */
+    private static void latestEvents(JsonObject older, JsonObject newer, JsonObject merged) {
+        record Tagged(String kind, JsonObject event) {}
+        var all = new ArrayList<Tagged>();
+        for (var report : List.of(older, newer))
+            for (String kind : List.of("thefts", "defenses"))
+                list(report, kind).forEach(item -> all.add(new Tagged(kind, item.getAsJsonObject().deepCopy())));
+        all.sort(Comparator.comparing((Tagged t) -> Instant.parse(t.event().get("at").getAsString())));
+        var thefts = new JsonArray(); var defenses = new JsonArray();
+        for (var tagged : all.subList(Math.max(0, all.size() - AwayLedger.MAX_EVENTS), all.size()))
+            (tagged.kind().equals("thefts") ? thefts : defenses).add(tagged.event());
+        merged.add("thefts", thefts); merged.add("defenses", defenses);
     }
 
-    private static boolean inWindow(Instant at, Instant since, Instant now) { return at != null && at.isAfter(since) && !at.isAfter(now); }
+    private static boolean inWindow(Instant at, Instant since, Instant now) { return new Window(since, now).contains(at); }
 
-    private static JsonArray harvests(GameState game, Instant since, Instant now) {
+    private static boolean inAny(List<Window> windows, Instant at) { return windows.stream().anyMatch(window -> window.contains(at)); }
+
+    private static JsonArray harvests(GameState game, List<Window> windows) {
         var byCrop = new LinkedHashMap<String,Integer>();
         for (int row = 0; row < GameState.ROWS; row++) for (int col = 0; col < GameState.COLUMNS; col++) {
             var crop = game.farm().tile(col, row).crop();
-            if (crop != null && crop.matureAt(game.now()) && inWindow(crop.maturedAt(game.now()), since, now))
+            if (crop != null && crop.matureAt(game.now()) && inAny(windows, crop.maturedAt(game.now())))
                 byCrop.merge(crop.type().id(), crop.origin().quantity(), Integer::sum);
         }
         var list = new JsonArray();
@@ -116,14 +155,14 @@ final class AwayReports {
         return list;
     }
 
-    /** Producers that became ready in the window and still wait in the barn; collected output is counted apart. */
-    private static Map<String,Integer> readyProducers(GameState game, Instant since, Instant now) {
+    /** Producers that became ready in a window and still wait in the barn; collected output is counted apart. */
+    private static Map<String,Integer> readyProducers(GameState game, List<Window> windows) {
         var byProduct = new LinkedHashMap<String,Integer>();
         for (Animal animal : game.barn().animals()) {
             var type = animal.type();
             if (type.kind() != AnimalType.Kind.PRODUCER || animal.statusAt(game.now()) != Animal.Status.READY) continue;
             // Readiness assumes uninterrupted feeding from the cycle anchor; a hungry pause can only move it later.
-            if (inWindow(animal.growthAnchorAt().plusMillis(type.requiredMillis() - animal.grownAtAnchorMillis()), since, now))
+            if (inAny(windows, animal.growthAnchorAt().plusMillis(type.requiredMillis() - animal.grownAtAnchorMillis())))
                 byProduct.merge(type.productId(), 1, Integer::sum);
         }
         return byProduct;

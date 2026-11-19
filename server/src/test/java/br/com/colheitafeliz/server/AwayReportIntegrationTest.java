@@ -173,6 +173,7 @@ class AwayReportIntegrationTest {
         assertEquals(1, report.getAsJsonArray("thefts").size(), "the theft from the first absence survives");
         assertEquals(1, report.getAsJsonArray("defenses").size());
         assertEquals(27 * 3600 + 1, report.get("awaySeconds").getAsLong());
+        assertFalse(report.has("windows"), "the windows only serve the server's merge");
     }
 
     @Test void identicalAbsencesGetDistinctIds() {
