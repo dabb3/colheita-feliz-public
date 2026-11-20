@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {hungerGlow,periodAt,tileCenter,pickTile,animalPath,animalWalkingFrame,animalSoundPath,tileArtRect,backgroundBounds,animalShadowRect,spriteDrawRect,measureSpriteFootprint,widthForMatchingHeight,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand,friendFeedOptions} from '../src/presentation.ts';
+import {ownedSeeds,seedSelection,hungerGlow,periodAt,tileCenter,pickTile,animalPath,animalWalkingFrame,animalSoundPath,tileArtRect,backgroundBounds,animalShadowRect,spriteDrawRect,measureSpriteFootprint,widthForMatchingHeight,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand,friendFeedOptions} from '../src/presentation.ts';
 
 test('the updated idle dog matches the walking sprite height after alpha trim',()=>{
  // Trimmed boxes (>12 alpha) of cachorro.png and cachorro-andando.png at 1536×1024.
@@ -240,4 +240,14 @@ test('hunger glow exists only for hungry animals, pulses gently and stays still 
  const blurs=[0,0.4,0.8,1.2].map(seconds=>hungerGlow('HUNGRY',seconds,false).blur);
  assert.ok(blurs.every(blur=>blur>=14&&blur<=22));assert.ok(new Set(blurs).size>1,'the halo pulses');
  assert.deepEqual([0,0.4,0.8].map(seconds=>hungerGlow('HUNGRY',seconds,true)),Array(3).fill({color:'rgba(255, 32, 32, 0.95)',blur:22}));
+});
+
+test('seed bag lists only whole positive stock and keeps a held selection',()=>{
+ const crops=[{id:'nabo'},{id:'milho'},{id:'mini-bis'},{id:'cenoura'}];
+ const counts={nabo:3,milho:0,'mini-bis':1,cenoura:-2};
+ assert.deepEqual(ownedSeeds(crops,counts).map(crop=>crop.id),['nabo','mini-bis']);
+ assert.deepEqual(ownedSeeds(crops,{nabo:1.5}),[]);assert.deepEqual(ownedSeeds(crops,undefined),[]);
+ assert.equal(seedSelection(crops,counts,'mini-bis'),'mini-bis');
+ assert.equal(seedSelection(crops,counts,'milho'),'nabo','selected seed ran out');
+ assert.equal(seedSelection(crops,{},'milho'),'milho','nothing held keeps the old id');
 });

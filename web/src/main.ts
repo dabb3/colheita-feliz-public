@@ -12,7 +12,7 @@ import {fertilizerDuration,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText,purch
 import {PROTECTED_ICON,notificationCount,renderNotifications} from './notifications.ts';
 import {renderAwayReport,startAwayLeaves} from './away-report.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,avatarImport,type AvatarChoice} from './avatar.ts';
-import {musicArtPath,seedArtPath,periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalSoundPath,animalStatusText,animalActionLabel,animalClickCommand,friendFeedOptions,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
+import {musicArtPath,seedArtPath,ownedSeeds,seedSelection,periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalSoundPath,animalStatusText,animalActionLabel,animalClickCommand,friendFeedOptions,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
 
 let eventsTimer:number|undefined,eventsBoundary='',eventsRoot:HTMLElement|undefined;
 const config=window.COLHEITA_CONFIG;
@@ -319,6 +319,7 @@ function render(){
  scene?.update(display()!);syncPending();renderTools();refreshOpenDialog();const currentHealthTile=healthTile&&display()?.tiles.find(tile=>tile.column===healthTile!.column&&tile.row===healthTile!.row);health(currentHealthTile??null,healthPoint,'refresh');layoutHud();showUpdateNotes();
 }
 function renderTools(){
+ if(own&&!visited)selectedSeed=seedSelection(catalog.crops,own.seedCounts,selectedSeed);
  const toolbar=element('tools');toolbar.replaceChildren();
  const definitions=visited?[['CURSOR','Inspecionar plantas','cursor-ui'],['STEAL','Furtar colheita','mao-restaurada'],['LOVE','Fertilizante do amor','adubo-amor'],['SPREAD_INSECTS','Lançar inseto · 1/6h','verme_1'],['SPREAD_WEEDS','Lançar erva · 1/6h','erva_daninha_1'],['CLEAN_WEEDS','Tirar ervas do amigo','herbicida-ui'],['CLEAN_INSECTS','Matar insetos do amigo','pesticida-ui']]:toolDefinitions;
  if(!definitions.some(d=>d[0]===tool)){tool=definitions[0][0];trayOpen=false;}
@@ -348,7 +349,9 @@ function renderToolTray(){
  const title=document.createElement('strong');title.className='tray-title';title.textContent=seeds?'Sementes':tool==='LOVE'?'Fertilizante do amor':'Fertilizantes';tray.append(title);
  const grid=document.createElement('div');grid.className='tray-items';tray.append(grid);
  if(seeds){
-  for(const crop of catalog.crops){const unlocked=(own?.level??0)>=crop.requiredLevel,count=own?.seedCounts?.[crop.id]??0,item=button('',()=>{
+  const owned=ownedSeeds(catalog.crops,own?.seedCounts);
+  if(!owned.length){grid.append(text('p',EMPTY_SEED_BAG,'tray-empty'));const open=button('Abrir Loja',()=>{trayOpen=false;renderTools();shop('crops');},grid,'tray-open-shop');open.className='tray-empty-shop';}
+  for(const crop of owned){const unlocked=(own?.level??0)>=crop.requiredLevel,count=own?.seedCounts?.[crop.id]??0,item=button('',()=>{
    if(!unlocked){notify(`${crop.name} libera no nível ${crop.requiredLevel}.`);return;}
    selectedSeed=crop.id;trayOpen=false;renderTools();notify(`Semente selecionada: ${crop.name}.`);
   },grid);item.className='tray-item';item.setAttribute('aria-pressed',String(selectedSeed===crop.id));item.setAttribute('aria-label',`${crop.name}, ${unlocked?`${count} sementes`:`libera no nível ${crop.requiredLevel}`}`);if(!unlocked)item.classList.add('locked');
@@ -522,6 +525,7 @@ async function tileAction(tile:Tile){
  if(visited){await action(tileCommand(tool,tile,selectedSeed,toolFertilizer(),true),`/v1/farms/${visited.owner}/visit-actions`);return;}
  if(!tile.unlocked){confirmPlot(tile);return;}
  if(tool==='CURSOR')return;
+ if(tool==='PLANT'&&tile.state==='PLOWED'&&!ownedSeeds(catalog.crops,own?.seedCounts).length){notify(EMPTY_SEED_BAG);return;}
  await action(tileCommand(tool,tile,selectedSeed,selectedFertilizer));
 }
 let healthKey='',healthDataKey='',healthOpenTimer:number|undefined,healthClockTimer:number|undefined,healthPinned=false,healthTapPinned=false,healthAnchorAt=0,healthBaseRemaining=0,healthBaseNominal=0;
@@ -679,6 +683,7 @@ async function buyFeed(id:FeedId,quantity:number){
  const purchased=(own?.feed?.[id]??before)-before;if(purchased<=0)return;
  const meta=feedDetails.find(item=>item.id===id)!;notify(`+${purchased} ${meta.name}`);content.querySelector(`[data-feed-stock="${id}"]`)?.classList.add('feed-stock-pulse');
 }
+const EMPTY_SEED_BAG='Você não tem sementes. Compre na Loja ou resgate recompensas.';
 type ShopCategory='crops'|'animals'|'vip';
 function shop(category:ShopCategory='crops',focusKey?:string){
  dialog('Loja');modal.dataset.shopCategory=category;const tabs=document.createElement('div');tabs.className='tabs shop-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Seções da Loja');tabs.setAttribute('aria-orientation','horizontal');content.append(tabs);

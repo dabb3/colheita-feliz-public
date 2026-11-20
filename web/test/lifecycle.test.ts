@@ -247,6 +247,29 @@ test('plant picker keeps reward seeds from the full catalog',()=>{
  assert.ok(descendants(elements.get('tool-tray')).some(node=>node.getAttribute('aria-label')==='Semente de Bronze, 1 sementes'));
 });
 
+test('seed bag shows only held seeds and moves the selection when the last one is planted',()=>{
+ const {h,elements}=app(),crops=[{id:'nabo',name:'Nabo',spriteStem:'nabo',requiredLevel:1},{id:'milho',name:'Milho',spriteStem:'milho',requiredLevel:1},{id:'mini-bis',name:'Mini-Bis',spriteStem:'mini-bis',acquisitionSource:'LOGIN_REWARD',requiredLevel:1}];
+ const own={...farm('alice'),level:5,seedCounts:{nabo:1,milho:0,'mini-bis':1}};
+ h.set({own,catalog:{crops,animals:[],fertilizers:[],vip:{greenPrice:20}},api:{pending:null}});h.pickTool('PLANT');
+ const labels=()=>descendants(elements.get('tool-tray')).map(node=>node.getAttribute?.('aria-label')).filter(Boolean);
+ assert.deepEqual(labels(),['Nabo, 1 sementes','Mini-Bis, 1 sementes']);
+ h.receive({farm:{...own,revision:'2',seedCounts:{nabo:0,milho:0,'mini-bis':1}}});
+ assert.deepEqual(labels(),['Mini-Bis, 1 sementes']);
+ assert.equal(descendants(elements.get('tool-tray')).find(node=>node.getAttribute?.('aria-label')==='Mini-Bis, 1 sementes').getAttribute('aria-pressed'),'true');
+});
+
+test('empty seed bag explains where to get seeds and planting does not send a command',async()=>{
+ const {h,elements}=app(),sent=[];
+ h.set({own:{...farm('alice'),seedCounts:{nabo:0}},catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',requiredLevel:1,seedPrices:{GOLD:300}}],animals:[],fertilizers:[],vip:{greenPrice:20}},api:{pending:null,mutate:async(_path,fields)=>{sent.push(fields);return{};}}});
+ h.pickTool('PLANT');
+ assert.match(text(elements.get('tool-tray')),/Você não tem sementes\. Compre na Loja ou resgate recompensas\./);
+ assert.ok(!descendants(elements.get('tool-tray')).some(node=>node.className==='tray-item'));
+ descendants(elements.get('tool-tray')).find(node=>node.textContent==='Abrir Loja').onclick();
+ assert.equal(elements.get('modal-title').textContent,'Loja');assert.equal(elements.get('tool-tray').hidden,true);
+ await h.tileAction({column:0,row:0,unlocked:true,state:'PLOWED'});
+ assert.equal(sent.length,0);assert.match(text(elements.get('notice')),/Você não tem sementes/);
+});
+
 test('stale calendar claim updates own farm silently after navigation and ignores logout response',async()=>{
  const {h,elements}=app(),first=deferred(),initial=loginFarm(),updated={...initial,revision:'2'};let api={pending:null,busy:false,mutate:()=>first.promise};
  h.set({own:initial,api});h.receive({farm:initial});h.loginCalendar();descendants(elements.get('modal-content')).find(node=>text(node)==='Resgatar recompensa').onclick();h.dialog('Outro painel');first.resolve({farm:updated,result:{success:true,message:'late reward'}});await new Promise(resolve=>setTimeout(resolve,0));

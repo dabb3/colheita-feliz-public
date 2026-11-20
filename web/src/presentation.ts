@@ -3,6 +3,20 @@ import type { Animal, AnimalType, Crop, Farm, Tile } from "./types.ts";
 export function seedArtPath(stem:string):string {
   return `classic/crops/seeds/${stem==='mini-bis'?'semente-mini-bis':`semente_${stem}`}.png`;
 }
+/** Seeds the player actually holds, in catalog order; the bag is an inventory, not the shop. */
+export function ownedSeeds<T extends { id: string }>(crops: T[], counts: Record<string, number> | undefined): T[] {
+  return crops.filter((crop) => {
+    const count = counts?.[crop.id];
+    return Number.isInteger(count) && (count as number) > 0;
+  });
+}
+
+/** Keeps the chosen seed while it is in stock; otherwise falls back to the first one held. */
+export function seedSelection(crops: { id: string }[], counts: Record<string, number> | undefined, selected: string): string {
+  const owned = ownedSeeds(crops, counts);
+  return owned.some((crop) => crop.id === selected) ? selected : owned[0]?.id ?? selected;
+}
+
 export function christmasActive(now:Date):boolean {
   const time=now.getTime();return time>=Date.parse('2026-11-06T03:00:00Z')&&time<Date.parse('2027-01-01T03:00:00Z');
 }
