@@ -921,7 +921,7 @@ function decorations(open=false,focusKey?:string){
  const placeholder=document.createElement('div');placeholder.className='decoration-preview-placeholder';placeholder.setAttribute('role','img');placeholder.setAttribute('aria-label','Prévia carregando');
  let shown:HTMLElement=previous??placeholder;
  stage.append(shown);
- const status=document.createElement('div');status.className='decoration-preview-status';status.setAttribute('role','status');status.textContent='Carregando prévia…';stage.append(status);
+ const previewStatus=document.createElement('div');previewStatus.className='decoration-preview-status';previewStatus.setAttribute('role','status');previewStatus.textContent='Carregando prévia…';stage.append(previewStatus);
  const panelGeneration=dialogGeneration;
  const current=()=>dialogGeneration===panelGeneration&&modal.open&&content.contains(stage)&&own?.owner===currentOwner;
  const warmNeighbors=()=>{
@@ -934,21 +934,21 @@ function decorations(open=false,focusKey?:string){
   ]);
  };
  const load=()=>{
-  status.className='decoration-preview-status';status.replaceChildren(document.createTextNode('Carregando prévia…'));status.hidden=false;
+  previewStatus.className='decoration-preview-status';previewStatus.replaceChildren(document.createTextNode('Carregando prévia…'));previewStatus.hidden=false;
   void decorationPreviewRequest.show(previewPath,image=>{
    if(!current())return;
    image.className='decoration-preview';image.alt=previewAlt;
    shown.replaceWith(image);shown=image;
    decorationVisibleImage=image;decorationVisibleOwner=currentOwner;decorationVisiblePath=previewPath;
-   status.hidden=true;warmNeighbors();
+   previewStatus.hidden=true;warmNeighbors();
   },()=>{
    if(!current())return;
-   status.className='decoration-preview-status is-error';status.replaceChildren(document.createTextNode('Não foi possível carregar a imagem. '));
-   button('Tentar novamente',load,status);
+   previewStatus.className='decoration-preview-status is-error';previewStatus.replaceChildren(document.createTextNode('Não foi possível carregar a imagem. '));
+   button('Tentar novamente',load,previewStatus);
   });
  };
  if(previous&&decorationVisiblePath===previewPath){
-  decorationPreviewRequest.cancel();previous.alt=previewAlt;status.hidden=true;warmNeighbors();
+  decorationPreviewRequest.cancel();previous.alt=previewAlt;previewStatus.hidden=true;warmNeighbors();
  }else load();
  const next=button('›',()=>move(1),stage,'decoration-next');next.className='decoration-arrow';next.setAttribute('aria-label','Próximo fundo');
  carousel.append(stage);
