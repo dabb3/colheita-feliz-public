@@ -1246,6 +1246,57 @@ class OnlineGameIntegrationTest {
     }
     private static boolean unlocked(JsonObject farm, String id) { return achievement(farm, id).get("unlocked").getAsBoolean(); }
 
+    @Test void backgroundPackCostsExactlyOneMillionGoldOnceAndShowsToVisitors() {
+        connectFriends();
+        grantGold(alice, new BigDecimal("999499"));
+        var farm = service.farm(alice);
+        assertEquals("999999", farm.get("coins").getAsString());
+        assertEquals("default", farm.get("activeBackgroundId").getAsString());
+        assertEquals(java.util.List.of("default"), ids(farm.getAsJsonArray("ownedBackgroundIds")));
+        var poor = service.command(alice, new Command(requestId(), farm.get("revision").getAsString(), "BUY_BACKGROUND", "savana", "GOLD", null, null, null));
+        assertFalse(poor.getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals("999999", poor.getAsJsonObject("farm").get("coins").getAsString());
+
+        grantGold(alice, BigDecimal.ONE);
+        farm = service.farm(alice);
+        var revision = farm.get("revision").getAsString();
+        for (String bad : new String[] {"natal", "default-x", "../background"})
+            assertEquals(400, assertThrows(ApiFailure.class, () -> service.command(alice, new Command(requestId(), revision, "BUY_BACKGROUND", bad, "GOLD", null, null, null))).status());
+        assertEquals(400, assertThrows(ApiFailure.class, () -> service.command(alice, new Command(requestId(), revision, "BUY_BACKGROUND", "savana", "GREEN", null, null, null))).status());
+        var buy = new Command(requestId(), revision, "BUY_BACKGROUND", "savana", "GOLD", null, null, null);
+        var bought = service.command(alice, buy);
+        assertTrue(bought.getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals("0", bought.getAsJsonObject("farm").get("coins").getAsString());
+        assertEquals("savana", bought.getAsJsonObject("farm").get("activeBackgroundId").getAsString());
+        assertEquals(bought, service.command(alice, buy), "retry não cobra de novo");
+        grantGold(alice, new BigDecimal("2000000"));
+        farm = service.farm(alice);
+        var again = service.command(alice, new Command(requestId(), farm.get("revision").getAsString(), "BUY_BACKGROUND", "savana", "GOLD", null, null, null));
+        assertFalse(again.getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals("2000000", again.getAsJsonObject("farm").get("coins").getAsString());
+
+        var visit = service.visit(bob, alice);
+        assertEquals("savana", visit.get("activeBackgroundId").getAsString());
+        assertNull(visit.get("ownedBackgroundIds"), "visitante não vê a coleção");
+
+        farm = again.getAsJsonObject("farm");
+        var locked = service.command(alice, new Command(requestId(), farm.get("revision").getAsString(), "EQUIP_BACKGROUND", "tropical", null, null, null, null));
+        assertFalse(locked.getAsJsonObject("result").get("success").getAsBoolean());
+        var standard = service.command(alice, new Command(requestId(), locked.getAsJsonObject("farm").get("revision").getAsString(), "EQUIP_BACKGROUND", "default", null, null, null, null)).getAsJsonObject("farm");
+        assertEquals("default", standard.get("activeBackgroundId").getAsString());
+        assertEquals("2000000", standard.get("coins").getAsString());
+        var back = service.command(alice, new Command(requestId(), standard.get("revision").getAsString(), "EQUIP_BACKGROUND", "savana", null, null, null, null)).getAsJsonObject("farm");
+        assertEquals("savana", back.get("activeBackgroundId").getAsString());
+        assertEquals(java.util.List.of("default", "savana"), ids(back.getAsJsonArray("ownedBackgroundIds")));
+        assertEquals("default", service.farm(bob).get("activeBackgroundId").getAsString(), "a compra é só da conta da Alice");
+    }
+
+    private static java.util.List<String> ids(com.google.gson.JsonArray array) {
+        var result = new java.util.ArrayList<String>();
+        for (var item : array) result.add(item.getAsString());
+        return result;
+    }
+
     private void connectFriends() {
         service.farm(alice);
         var invite = service.createInvitation(alice, requestId());

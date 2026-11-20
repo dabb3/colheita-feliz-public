@@ -579,9 +579,10 @@ export class Scene {
     ctx.clearRect(0, 0, 1600, 900);
     ctx.fillStyle = period === "night" ? "#15464f" : "#84ba30";
     ctx.fillRect(0, 0, 1600, 900);
-    const background = this.sprite(
-      backgroundArtPath(period),
-    );
+    // The classic pack covers a paid pack while it loads or if its file is missing.
+    const background =
+      this.sprite(backgroundArtPath(period, this.farm?.activeBackgroundId)) ??
+      this.sprite(backgroundArtPath(period));
     if (background) {
       const bounds = backgroundBounds(
         1600,

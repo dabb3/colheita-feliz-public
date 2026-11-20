@@ -8,6 +8,7 @@ import * as presentation from '../src/presentation.ts';
 import * as uiPresentation from '../src/ui-presentation.ts';
 import * as avatar from '../src/avatar.ts';
 import * as inviteUrl from '../src/invite-url.ts';
+import * as backgroundCatalog from '../src/background-catalog.ts';
 import * as events from '../src/events.ts';
 
 const farm=owner=>({owner,name:owner,revision:'1',tiles:[],animals:[],seedCounts:{}});
@@ -50,7 +51,7 @@ test('cancel and escape close the composer and keep the visit while POST locks X
  assert.equal(elements.get('modal').open,false);assert.equal(h.get().visited.owner,'bob');assert.equal(text(elements.get('notice')),'Sementes enviadas.');assert.equal(mutations,1);assert.equal(elements.get('modal').listenerCounts.cancel,1);
 });
 test('visit menu keeps only Minha fazenda, Amigos and Presentear and home restores the own menu',()=>{
- const {h,elements,ctx}=app(),own={...farm('alice'),loginRewards:{completedDay:0,nextDay:1,available:true,rewards:[]}},others=['notifications','shop','deposit','missions','achievements','events','settings','more'];
+ const {h,elements,ctx}=app(),own={...farm('alice'),loginRewards:{completedDay:0,nextDay:1,available:true,rewards:[]}},others=['notifications','shop','deposit','missions','achievements','decorations','events','settings','more'];
  h.set({own,api:{pending:null}});h.receive({farm:own});
  assert.ok(others.every(id=>!elements.get(id).hidden));assert.equal(elements.get('home').hidden,true);assert.equal(elements.get('gift-visit').hidden,true);assert.equal(elements.get('friends').hidden,false);assert.equal(ctx.moreVisiting,false);
  h.visit({...farm('bob'),name:'Bob'});
@@ -156,7 +157,7 @@ function app(preferences=new Map(),pushLogoutOptions){
   querySelector(selector){return this.querySelectorAll(selector)[0]??null;},focus(){if(this.tag==='div'&&this.tabIndex===undefined)return;ctx.document.activeElement=this;},
   getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(name,handler){(this.listenerCounts??={})[name]=(this.listenerCounts[name]??0)+1;(this.listeners??={})[name]=handler;},close(){this.open=false;},showModal(){this.open=true;}});
  const storage={getItem:()=>null,setItem(){},removeItem(){}};
- const ctx={syncMobileCamera(){ctx.cameraSyncs=(ctx.cameraSyncs??0)+1;},setMoreMenuVisiting(value){ctx.moreVisiting=value;},reconcilePush:async()=>{},connectPush:async()=>{},suspendPush:pushLogoutOptions?.suspendPush??(async()=>{}),createClient:()=>({auth:{signOut:pushLogoutOptions?.signOut}}),renderPushSettings:()=>{},setMonotonic(value){monotonic=value;},performance:{now:()=>monotonic},...presentation,...uiPresentation,...avatar,...inviteUrl,history:{state:null,replaceState(){}},window:{localStorage:{getItem:key=>preferences.get(key)??null,setItem:(key,value)=>preferences.set(key,value)},COLHEITA_CONFIG:{development:!pushLogoutOptions},setInterval(callback,delay){intervals.set(delay,callback);return delay;},clearInterval(id){intervals.delete(id);},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make(id==='close-modal'||id==='retry'||id==='gift-visit'?'button':'div'));return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}addEventListener(){}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
+ const ctx={syncMobileCamera(){ctx.cameraSyncs=(ctx.cameraSyncs??0)+1;},setMoreMenuVisiting(value){ctx.moreVisiting=value;},reconcilePush:async()=>{},connectPush:async()=>{},suspendPush:pushLogoutOptions?.suspendPush??(async()=>{}),createClient:()=>({auth:{signOut:pushLogoutOptions?.signOut}}),renderPushSettings:()=>{},setMonotonic(value){monotonic=value;},performance:{now:()=>monotonic},...presentation,...uiPresentation,...backgroundCatalog,...avatar,...inviteUrl,history:{state:null,replaceState(){}},window:{localStorage:{getItem:key=>preferences.get(key)??null,setItem:(key,value)=>preferences.set(key,value)},COLHEITA_CONFIG:{development:!pushLogoutOptions},setInterval(callback,delay){intervals.set(delay,callback);return delay;},clearInterval(id){intervals.delete(id);},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make(id==='close-modal'||id==='retry'||id==='gift-visit'?'button':'div'));return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}addEventListener(){}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
  ctx.document.getElementById('farm-header').getBoundingClientRect=()=>({left:0,top:0,width:0,height:0,bottom:0});
  const uiSource=readFileSync(new URL('../src/ui.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(uiSource),ctx);
@@ -167,7 +168,7 @@ function app(preferences=new Map(),pushLogoutOptions){
  const eventsSource=readFileSync(new URL('../src/events.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');runInNewContext(stripTypeScriptTypes(eventsSource),ctx);
  runInNewContext(stripTypeScriptTypes(readFileSync(new URL('../src/away-report.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'')),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={events,updateOwnFarm,refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,achievements,friends,presentGift,closeGiftComposer,receive,dialog,health,renderHealth,positionHealth,animalTooltip,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),visit:value=>{visited=value;render();},calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
+ source+='\nglobalThis.h={events,updateOwnFarm,refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,achievements,decorations,friends,presentGift,closeGiftComposer,receive,dialog,health,renderHealth,positionHealth,animalTooltip,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),visit:value=>{visited=value;render();},calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:{...ctx.h,runTimeouts(){for(const [id,callback]of [...timeouts]){timeouts.delete(id);callback();}}},elements,listeners,audioClips,observers,ctx,intervals};
 }
 function openGift(h,elements,owner='bob',name='Bob'){h.visit({...farm(owner),name});elements.get('gift-visit').onclick();}
@@ -264,6 +265,7 @@ test('empty seed bag explains where to get seeds and planting does not send a co
  h.pickTool('PLANT');
  assert.match(text(elements.get('tool-tray')),/Você não tem sementes\. Compre na Loja ou resgate recompensas\./);
  assert.ok(!descendants(elements.get('tool-tray')).some(node=>node.className==='tray-item'));
+ assert.doesNotMatch(text(elements.get('tool-tray')),/0 sementes/,'sem legenda de semente fantasma');
  descendants(elements.get('tool-tray')).find(node=>node.textContent==='Abrir Loja').onclick();
  assert.equal(elements.get('modal-title').textContent,'Loja');assert.equal(elements.get('tool-tray').hidden,true);
  await h.tileAction({column:0,row:0,unlocked:true,state:'PLOWED'});
@@ -772,6 +774,31 @@ test('visited wallet shows the public title next to the VIP badge',()=>{
  const wallet=elements.get('wallet');
  assert.ok(descendants(wallet).some(node=>node.className==='player-title'&&node.textContent==='♛ Rei do Gado ♛'));
  assert.ok(descendants(wallet).some(node=>node.className==='vip-badge'||String(node.className).includes('vip')),'VIP continua visível');
+});
+
+test('Decorações shows one pack at a time, confirms the purchase and applies owned packs for free',async()=>{
+ const {h,elements}=app(),sent=[];
+ const own={...farm('alice'),coins:'1000000',activeBackgroundId:'default',ownedBackgroundIds:['default','outono'],backgroundPrice:'1000000'};
+ h.set({own,api:{pending:null,prepareRequestId:async()=>{},mutate:async(_path,fields)=>{sent.push(fields);return{result:{success:true,message:'ok'},farm:{...own,revision:'2',coins:'0',activeBackgroundId:'inverno',ownedBackgroundIds:['default','inverno','outono']}};}}});
+ h.decorations(true);
+ const content=()=>elements.get('modal-content'),find=label=>descendants(content()).find(node=>node.getAttribute?.('aria-label')===label||node.textContent===label);
+ assert.equal(elements.get('modal-title').textContent,'Decorações');
+ assert.match(text(content()),/Clássico1 \/ 11Padrão · Equipado/);
+ find('Fundo anterior').onclick();assert.match(text(content()),/Jardim oriental11 \/ 11Não comprado/);
+ find('Próximo fundo').onclick();find('Próximo fundo').onclick();
+ assert.match(text(content()),/Inverno2 \/ 11Não comprado/);
+ find('Noite').onclick();
+ assert.ok(descendants(content()).some(node=>node.className==='decoration-preview'&&node.src==='/assets/classic/background/background-inverno-noite.png'));
+ find('Comprar e aplicar · 1.000.000 ouro').onclick();
+ assert.equal(sent.length,0,'a compra pede confirmação');assert.match(text(content()),/Gastar 1\.000\.000 ouro em Inverno\?/);
+ find('Confirmar compra').onclick();await new Promise(r=>setTimeout(r,0));
+ assert.deepEqual({...sent[0],expectedRevision:undefined},{action:'BUY_BACKGROUND',itemId:'inverno',currency:'GOLD',expectedRevision:undefined});
+ assert.match(text(content()),/Inverno2 \/ 11Equipado/,'o refresh mantém o slide e mostra o fundo ativo');
+ find('Próximo fundo').onclick();assert.match(text(content()),/Outono3 \/ 11Comprado/);
+ find('Aplicar').onclick();await new Promise(r=>setTimeout(r,0));
+ assert.deepEqual({...sent[1],expectedRevision:undefined},{action:'EQUIP_BACKGROUND',itemId:'outono',expectedRevision:undefined});
+ find('Próximo fundo').onclick();
+ const short=find('Ouro insuficiente');assert.ok(short);assert.equal(short.disabled,true);
 });
 
 test('open missions screen refreshes progress after a farm update',()=>{

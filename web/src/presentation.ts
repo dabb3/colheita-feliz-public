@@ -1,4 +1,5 @@
 import type { Animal, AnimalType, Crop, Farm, Tile } from "./types.ts";
+import { backgroundPath } from "./background-catalog.ts";
 
 export function seedArtPath(stem:string):string {
   return `classic/crops/seeds/${stem==='mini-bis'?'semente-mini-bis':`semente_${stem}`}.png`;
@@ -20,9 +21,9 @@ export function seedSelection(crops: { id: string }[], counts: Record<string, nu
 export function christmasActive(now:Date):boolean {
   const time=now.getTime();return time>=Date.parse('2026-11-06T03:00:00Z')&&time<Date.parse('2027-01-01T03:00:00Z');
 }
-/** The farm always uses the original backgrounds; the Christmas event keeps only its music and gifts. */
-export function backgroundArtPath(period:'day'|'sunset'|'night'):string {
-  return `classic/background/background${period==='day'?'':'-'+period}.png`;
+/** Background of the farm on screen: its pack (classic when unknown) for the viewer's local period. No Christmas art. */
+export function backgroundArtPath(period:'day'|'sunset'|'night',packId?:string|null):string {
+  return backgroundPath(packId,period);
 }
 export function musicArtPath(period:'day'|'sunset'|'night',now:Date):string {
   return christmasActive(now)?`musica-evento-natal-${period==='night'?'noite':'dia-e-por-do-sol'}.mp3`:period==='night'?'noite.mp3':'farm_loop.mp3';

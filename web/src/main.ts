@@ -8,6 +8,7 @@ import {syncMobileCamera,setMoreMenuVisiting} from './mobile.ts';
 import {takeInvite} from './invite-url.ts';
 import {renderWallet,control,text,image,renderDailyAllowance,friendAvatar,vipBadge} from './ui.ts';
 import {renderGiftComposer,renderLoginRewards,giftLimit,type GiftComposerState} from './ui-panels.ts';
+import {BACKGROUND_PACKS,backgroundPath,DEFAULT_BACKGROUND,type Period} from './background-catalog.ts';
 import {fertilizerDuration,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText,purchaseQuantity} from './ui-presentation.ts';
 import {PROTECTED_ICON,notificationCount,renderNotifications} from './notifications.ts';
 import {renderAwayReport,startAwayLeaves} from './away-report.ts';
@@ -30,6 +31,8 @@ let giftContext:{client:ApiClient;session:number;dialog:number;recipientId:strin
 let giftReturn:{friendId:string;scroll:number}|undefined;
 let calendarContext:{root:HTMLElement;client:ApiClient;session:number;dialog:number;phase:'ready'|'sending'|'unknown'|'error';message?:string;anchorServer:number;anchorClient:number;resetAt:string;checkedResetAt?:string;refreshing?:boolean}|undefined,calendarTimer:number|undefined,ownServerClock:{owner:string;server:number;client:number}|undefined;
 const depositNumber=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1});
+// Carousel position and preview period survive the panel refresh that follows each server reply.
+let decorationIndex=0,decorationPeriod:Period='day',decorationConfirm='';
 const depositPriceNumber=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2});
 const login=element('login');
 const {invite:inviteFromUrl,cleaned:cleanedUrl}=takeInvite(location.href);
@@ -288,7 +291,7 @@ function giftVisited(){if(!visited||!own||visited.owner===own.owner)return;prese
 /** During a visit the top menu keeps only Minha fazenda, Amigos and Presentear; the social toolbar is separate. */
 function syncFarmMenu(){
  const visiting=!!visited;
- for(const id of ['notifications','shop','deposit','missions','achievements','events','settings','more'])element(id).hidden=visiting;
+ for(const id of ['notifications','shop','deposit','missions','achievements','decorations','events','settings','more'])element(id).hidden=visiting;
  element('home').hidden=!visiting;
  const gift=element('gift-visit');gift.hidden=!visiting||visited!.owner===own?.owner;gift.setAttribute('aria-label',visiting?`Presentear ${visited!.name}`:'Presentear amigo');
  setMoreMenuVisiting(visiting);
@@ -368,7 +371,7 @@ function renderToolTray(){
    item.onmouseleave=()=>{const caption=document.getElementById('tool-tray-caption');if(caption)caption.textContent=selected?`${selected} · ${detail}`:'';};
   }
  }
- const selected=seeds?catalog.crops.find(item=>item.id===selectedSeed)?.name:catalog.fertilizers.find(item=>item.id===toolFertilizer())?.name;
+ const selected=seeds?ownedSeeds(catalog.crops,own?.seedCounts).find(item=>item.id===selectedSeed)?.name:catalog.fertilizers.find(item=>item.id===toolFertilizer())?.name;
  const count=seeds?own?.seedCounts?.[selectedSeed]??0:own?.fertilizers?.[toolFertilizer()]??0,selectedFertilizerType=catalog.fertilizers.find(item=>item.id===toolFertilizer());
  const detail=seeds?`${count} sementes`:selectedFertilizerType?.friendsOnly?'plantação de amigos':`reduz ${formatToolDuration(selectedFertilizerType?.reductionSeconds??0)} · ${count} no estoque`;
  const caption=document.createElement('span');caption.id='tool-tray-caption';caption.className='tray-caption';caption.textContent=selected?`${selected} · ${detail}`:'';tray.append(caption);
@@ -897,6 +900,40 @@ const WEEKLY_RESET_TEXT='Reinicia domingo às 00:00 (horário de Brasília)';
 function weeklyDescription(id:string){return id==='harvest'?'Colha plantas maduras na sua fazenda.':id==='buy-animals'?'Compre animais na Loja.':id==='love-friends'?'Use o fertilizante do amor nas plantações de amigos.':'Avance esta tarefa para receber a recompensa.';}
 // Server time is authoritative for the reset; this is only the remaining-time hint.
 function weeklyCountdownText(nextResetAt:string){const left=Math.max(0,Date.parse(nextResetAt)-Date.now());if(!Number.isFinite(left))return '';const minutes=Math.ceil(left/60_000),days=Math.floor(minutes/1440),hours=Math.floor(minutes%1440/60);return `faltam ${days?`${days}d `:''}${hours}h ${minutes%60}min`;}
+function decorations(open=false,focusKey?:string){
+ if(open){decorationIndex=Math.max(0,BACKGROUND_PACKS.findIndex(pack=>pack.id===(own?.activeBackgroundId??DEFAULT_BACKGROUND)));decorationPeriod=periodAt(new Date());decorationConfirm='';}
+ dialog('Decorações');refreshDialog=()=>decorations();
+ const pack=BACKGROUND_PACKS[decorationIndex],owned=new Set(own?.ownedBackgroundIds??[DEFAULT_BACKGROUND]),active=(own?.activeBackgroundId??DEFAULT_BACKGROUND)===pack.id,price=Number(own?.backgroundPrice??1_000_000),isDefault=pack.id===DEFAULT_BACKGROUND;
+ const carousel=document.createElement('section');carousel.className='decoration-carousel';carousel.setAttribute('aria-roledescription','carrossel');carousel.setAttribute('aria-label','Fundos da fazenda');carousel.tabIndex=0;
+ const move=(step:number)=>{decorationIndex=(decorationIndex+step+BACKGROUND_PACKS.length)%BACKGROUND_PACKS.length;decorationConfirm='';decorations(false,step<0?'decoration-prev':'decoration-next');};
+ carousel.onkeydown=(event:KeyboardEvent)=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();move(event.key==='ArrowLeft'?-1:1);}};
+ const stage=document.createElement('div');stage.className='decoration-stage';
+ const prev=button('‹',()=>move(-1),stage,'decoration-prev');prev.className='decoration-arrow';prev.setAttribute('aria-label','Fundo anterior');
+ const preview=document.createElement('img');preview.className='decoration-preview';preview.src=`/assets/${backgroundPath(pack.id,decorationPeriod)}`;preview.alt=`${pack.name}, ${decorationPeriod==='day'?'dia':decorationPeriod==='sunset'?'tarde':'noite'}`;stage.append(preview);
+ const next=button('›',()=>move(1),stage,'decoration-next');next.className='decoration-arrow';next.setAttribute('aria-label','Próximo fundo');
+ carousel.append(stage);
+ const heading=document.createElement('div');heading.className='decoration-heading';heading.append(text('h3',pack.name),text('span',`${decorationIndex+1} / ${BACKGROUND_PACKS.length}`,'decoration-count'));
+ const status=isDefault?(active?'Padrão · Equipado':'Padrão'):active?'Equipado':owned.has(pack.id)?'Comprado':'Não comprado';
+ heading.append(text('span',status,`decoration-status${active?' active':''}`));carousel.append(heading);
+ const periods=document.createElement('div');periods.className='decoration-periods';periods.setAttribute('role','group');periods.setAttribute('aria-label','Prévia do período');
+ for(const [id,label]of [['day','Dia'],['sunset','Tarde'],['night','Noite']] as const){const choice=button(label,()=>{decorationPeriod=id;decorations(false,`decoration-period:${id}`);},periods,`decoration-period:${id}`);choice.setAttribute('aria-pressed',String(decorationPeriod===id));}
+ carousel.append(periods);
+ const actions=document.createElement('div');actions.className='decoration-actions';
+ if(active)actions.append(text('span','Este é o fundo da sua fazenda.','muted'));
+ else if(isDefault||owned.has(pack.id)){const apply=button(isDefault?'Aplicar padrão':'Aplicar',()=>void action({action:'EQUIP_BACKGROUND',itemId:pack.id}),actions,`decoration-apply:${pack.id}`);apply.className='decoration-buy';}
+ else{
+  actions.append(text('span',`${depositNumber.format(price)} ouro · dia, tarde e noite`,'decoration-price'));
+  if(Number(own?.coins??0)<price){const short=button('Ouro insuficiente',()=>{},actions,`decoration-buy:${pack.id}`);short.className='decoration-buy';short.disabled=true;}
+  else if(decorationConfirm!==pack.id){const buy=button(`Comprar e aplicar · ${depositNumber.format(price)} ouro`,()=>{decorationConfirm=pack.id;decorations(false,`decoration-confirm:${pack.id}`);},actions,`decoration-buy:${pack.id}`);buy.className='decoration-buy';}
+  else{
+   actions.append(text('strong',`Gastar ${depositNumber.format(price)} ouro em ${pack.name}? O fundo é aplicado na hora e fica seu.`,'decoration-confirm'));
+   const confirm=button('Confirmar compra',()=>{decorationConfirm='';void action({action:'BUY_BACKGROUND',itemId:pack.id,currency:'GOLD'});},actions,`decoration-confirm:${pack.id}`);confirm.className='decoration-buy';
+   button('Cancelar',()=>{decorationConfirm='';decorations(false,`decoration-buy:${pack.id}`);},actions,`decoration-cancel:${pack.id}`);
+  }
+ }
+ carousel.append(actions);content.append(carousel);
+ if(focusKey)[...content.querySelectorAll<HTMLElement>('[data-focus-key]')].find(node=>node.dataset.focusKey===focusKey)?.focus({preventScroll:true});
+}
 // Titles are shown with textContent only: their Unicode art is data, never markup.
 function achievements(){
  dialog('Conquistas');refreshDialog=achievements;
@@ -1042,7 +1079,7 @@ async function start(){
  }catch(error){showConnection();notify(error instanceof Error?error.message:'Servidor indisponível.');button('Tentar conectar novamente',start,login);}
 }
 element('notifications').onclick=notifications;element('events').onclick=()=>events();
-element('shop').onclick=()=>shop();element('deposit').onclick=deposit;element('missions').onclick=missions;element('achievements').onclick=achievements;element('friends').onclick=()=>void friends();
+element('shop').onclick=()=>shop();element('deposit').onclick=deposit;element('missions').onclick=missions;element('achievements').onclick=achievements;element('decorations').onclick=()=>decorations(true);element('friends').onclick=()=>void friends();
 element('home').onclick=()=>{navigationGeneration++;visited=undefined;tool='PLOW';render();};element('gift-visit').onclick=giftVisited;element('settings').onclick=()=>shortcutPanel('Ajustes',settings);element('close-modal').onclick=()=>{if(element('modal-title').textContent==='Presentear'){closeGiftComposer();return;}modal.close();showUpdateNotes();};
 modal.addEventListener('cancel',event=>{if(element('modal-title').textContent!=='Presentear')return;event.preventDefault();closeGiftComposer();});
 modal.addEventListener('close',showUpdateNotes);

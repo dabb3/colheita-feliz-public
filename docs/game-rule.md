@@ -453,6 +453,10 @@ A tela Tarefas tem uma seção Semanais, separada das diárias. São três taref
 
 A semana vira **domingo às 00:00 em America/Sao_Paulo**, diferente das diárias em UTC. O progresso para na meta, então ações depois da conclusão não pagam de novo antes da virada. O XP passa pelas recompensas normais de nível. Ações recusadas, repetições do mesmo pedido, furtos e automações não contam. O dono da plantação adubada não ganha progresso nem XP. As recompensas em verdes das diárias e o bônus cooperativo não mudam.
 
+### 12.4. Fundos de fazenda
+
+O fundo clássico é gratuito e padrão. Cada um dos dez fundos pagos custa **1.000.000 de ouro**, uma única vez, e inclui dia, tarde e noite. A compra aplica o fundo na hora; depois, trocar entre os fundos já comprados e o clássico não custa nada. Não há compra em verdes, aluguel nem revenda. O fundo ativo aparece para quem visita a fazenda.
+
 ## 13. Furto de temporadas
 
 Regra vigente (decisão de 2026-11-13): cinco minutos de exclusividade por temporada e uma tentativa consumida por jogador a cada 6 horas. Histórico: a decisão de 2026-11-09 fixava essa espera em 24 horas. O limite é consumido por furto bem-sucedido ou tentativa válida contra terra protegida, com ou sem mordida. Não há imunidade para iniciantes.

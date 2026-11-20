@@ -383,6 +383,14 @@ Esses contadores começam na implantação, sem retroatividade inventada. Nível
 
 `EQUIP_TITLE` com `itemId` igual ao id da conquista equipa um título liberado da própria conta; id desconhecido retorna 400 e título bloqueado retorna `result.success=false`. `CLEAR_TITLE`, sem outros campos, remove o título. A fazenda própria traz `achievements` (`id`, `category`, `categoryLabel`, `title`, `target`, `progress`, `unlocked`), `equippedTitleId` e `equippedTitle`. A visita e `/v1/friends` trazem só `equippedTitle`, que o cliente mostra como texto ao lado do nome, sem tirar o selo VIP.
 
+## Decorações: fundos da fazenda
+
+O botão Decorações (ícone `decoracoes.png`) abre um carrossel com um fundo por vez, setas, prévia de dia, tarde e noite e o estado Padrão, Não comprado, Comprado ou Equipado. O fundo clássico é grátis e padrão. Os outros dez (`inverno`, `outono`, `savana`, `cerejeiras`, `floresta_encantada`, `tropical`, `mundo_dos_doces`, `planeta_alienigena`, `terra_vulcanica`, `jardim_oriental`) custam 1.000.000 de ouro cada e trazem os três períodos. Os arquivos ficam numa lista fechada em `web/src/background-catalog.ts`, com os nomes reais, inclusive `backgound-inverno.png`; os fundos de Natal não entram.
+
+`BUY_BACKGROUND` com `itemId` do pack (e `currency` ausente ou `GOLD`) debita 1.000.000 de ouro de uma vez, guarda o pack e já o aplica. Pack já comprado, `default` ou saldo menor retornam `result.success=false` sem cobrar; id desconhecido ou verdes retornam 400. `EQUIP_BACKGROUND` aplica de graça o padrão ou um pack da própria conta. A tabela privada `colheita.farm_backgrounds` guarda `owned` e `active` por dono, com RLS e privilégios revogados; conta sem registro usa o padrão. Compra, débito, recibo e fazenda vão na mesma transação, então retry e duas abas não cobram duas vezes.
+
+A fazenda própria traz `activeBackgroundId`, `ownedBackgroundIds` e `backgroundPrice`; a visita traz só `activeBackgroundId`. A cena desenha o pack da fazenda que está na tela, no período do relógio local de quem olha, e usa o clássico enquanto o pack carrega ou se o id for desconhecido.
+
 ## Ajuda diária de 100 ouro
 
 Tarefas oferece resgate manual de 100 ouro por dia UTC, sem acumular valores de dias ausentes e sem depender de saldo, nível ou VIP. O botão só aparece quando a API informa dailyAllowance; após o resgate fica bloqueado e mostra a próxima virada em data/hora local. Não há pagamento por GET, login ou tutorial, nem XP, verdes, itens ou progresso de tarefas. A regra fonte é a seção 12.1 de docs/game-rule.md.

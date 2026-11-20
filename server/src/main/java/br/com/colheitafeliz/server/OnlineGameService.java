@@ -172,6 +172,8 @@ final class OnlineGameService implements AutoCloseable {
                             tx.recordLoginRewardProgress(actor, today, next.day(), cycle, total, clock.instant());
                         }
                     }
+                } else if (command.action().equals("BUY_BACKGROUND") || command.action().equals("EQUIP_BACKGROUND")) {
+                    result = background(tx, actor, farm.game(), command);
                 } else if (command.action().equals("EQUIP_TITLE") || command.action().equals("CLEAR_TITLE")) {
                     result = equipTitle(tx, actor, farm.game(), command);
                 } else {
@@ -354,6 +356,26 @@ final class OnlineGameService implements AutoCloseable {
             });
     }
 
+    /** Compra (1.000.000 de ouro, uma vez, já aplicando) ou aplica de graça um fundo que a conta possui. */
+    private ActionResult background(JdbcOnlineStore.Tx tx, UUID actor, GameState game, Command command) {
+        String id = command.requireItem();
+        if (!Backgrounds.known(id)) throw new ApiFailure(400, "Fundo inválido.");
+        var state = tx.backgrounds(actor);
+        if (command.action().equals("EQUIP_BACKGROUND")) {
+            if (command.currency() != null) throw new ApiFailure(400, "Aplicar um fundo não tem custo.");
+            if (!id.equals(Backgrounds.DEFAULT) && !state.owned().contains(id)) return ActionResult.fail("Compre esse fundo antes de aplicar.");
+            if (!id.equals(state.active())) tx.saveBackgrounds(actor, state.equip(id), clock.instant());
+            return ActionResult.ok(id.equals(Backgrounds.DEFAULT) ? "Fundo padrão aplicado." : "Fundo aplicado.");
+        }
+        if (command.currency() != null && !command.currency().equals("GOLD")) throw new ApiFailure(400, "Fundos só são vendidos por ouro.");
+        if (id.equals(Backgrounds.DEFAULT)) return ActionResult.fail("O fundo padrão é gratuito.");
+        if (state.owned().contains(id)) return ActionResult.fail("Você já tem esse fundo. Use Aplicar.");
+        if (game.wallet().balance(Currency.GOLD).compareTo(Backgrounds.PRICE) < 0) return ActionResult.fail("Moedas insuficientes.");
+        game.wallet().debit(Currency.GOLD, Backgrounds.PRICE);
+        tx.saveBackgrounds(actor, state.buy(id), clock.instant());
+        return ActionResult.ok("Fundo comprado e aplicado. -1.000.000 ouro.");
+    }
+
     /** Equipa um título liberado da própria conta, ou remove o atual; nunca aceita título de outra pessoa ou bloqueado. */
     private ActionResult equipTitle(JdbcOnlineStore.Tx tx, UUID actor, GameState game, Command command) {
         var progress = tx.achievements(actor);
@@ -514,6 +536,14 @@ final class OnlineGameService implements AutoCloseable {
             for (var entry : titles.entrySet()) view.add(entry.getKey(), entry.getValue());
         }
         else view.addProperty("equippedTitle", Achievements.equippedTitle(tx.achievements(loaded.owner()).equipped()));
+        var backgrounds = tx.backgrounds(loaded.owner());
+        view.addProperty("activeBackgroundId", backgrounds.active());
+        if (own) {
+            var owned = new JsonArray();
+            for (String id : backgrounds.ownedIds()) owned.add(id);
+            view.add("ownedBackgroundIds", owned);
+            view.addProperty("backgroundPrice", Backgrounds.PRICE.toPlainString());
+        }
         return view;
     }
 

@@ -108,6 +108,9 @@ export interface Farm {
   cooperativeBonus?: { green: number; done: boolean };
   achievements?: { id: string; category: string; categoryLabel: string; title: string; target: number; progress: number; unlocked: boolean }[];
   equippedTitleId?: string | null;
+  activeBackgroundId?: string;
+  ownedBackgroundIds?: string[];
+  backgroundPrice?: string;
   equippedTitle?: string | null;
   weeklyTasks?: {
     weekStartsAt: string;

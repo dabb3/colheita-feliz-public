@@ -803,3 +803,21 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 .achievement-state.equipped{color:#426b36;font-weight:700}
 .achievement-equip{grid-column:3;grid-row:1;padding:.3rem .7rem;font-size:13px}
 @media(max-width:600px){.achievement-card{grid-template-columns:minmax(0,1fr) auto}.achievement-card progress{grid-column:1/-1}.achievement-state,.achievement-equip{grid-column:2}}
+.decoration-carousel{display:grid;gap:10px}
+.decoration-carousel:focus-visible{outline:3px solid #1668cd;outline-offset:3px}
+.decoration-stage{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px}
+.decoration-preview{width:100%;aspect-ratio:16/9;border:1px solid #c1cdae;border-radius:10px;object-fit:cover;background:#84ba30}
+.decoration-arrow{width:44px;height:44px;padding:0;font-size:26px;line-height:1}
+.decoration-heading{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px}
+.decoration-heading h3{margin:0;color:#57471f;font:700 20px Georgia,serif}
+.decoration-count{color:#66735d;font-size:13px;font-variant-numeric:tabular-nums}
+.decoration-status{margin-left:auto;padding:2px 10px;border:1px solid #d8c279;border-radius:999px;background:#fff8df;color:#705719;font-size:12px;font-weight:700}
+.decoration-status.active{border-color:#98b26c;background:#edf3e4;color:#426b36}
+.decoration-periods{display:flex;justify-content:center;gap:6px}
+.decoration-periods button{min-width:72px;padding:.3rem .7rem;background:linear-gradient(#f9fcff,#d9e0e5);font-size:13px}
+.decoration-periods button[aria-pressed=true]{background:#fffdf1;box-shadow:inset 0 3px #e6b843}
+.decoration-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 12px;text-align:center}
+.decoration-price{color:#57471f;font-weight:700}
+.decoration-confirm{flex-basis:100%;color:#57471f}
+.decoration-buy{min-height:44px}
+@media(max-width:600px){.decoration-stage{grid-template-columns:36px minmax(0,1fr) 36px;gap:4px}.decoration-arrow{width:36px;height:44px}.decoration-status{margin-left:0}}
