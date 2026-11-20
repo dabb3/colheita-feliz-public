@@ -362,9 +362,15 @@ A inicialização cria aditivamente e de forma idempotente `colheita.login_rewar
 
 Incluir `login_reward_progress`, `farms` e demais tabelas existentes nos backups/restaurações. Publicar primeiro o backend com o catálogo das quatro culturas disponível e só então habilitar os claims no cliente. Jogadores existentes começam disponíveis para o dia 1, sem prêmios retroativos. Em rollback, desativar o calendário no código/cliente e preservar a tabela, os lotes e a leitura dos snapshots com sementes premiadas; não reverter para binário que não reconheça esses itens. O bônus UTC não faz parte do rollback do calendário.
 
+## Tarefas semanais
+
+O botão Missões passou a se chamar Tarefas; identificadores, rotas e o asset `missoes.png` continuam iguais. A fazenda própria traz `weeklyTasks` com `weekStartsAt`, `nextResetAt` e `tasks` (`id`, `title`, `progress`, `target`, `rewardXp`, `done`). A visita não recebe esse campo.
+
+A tabela privada `colheita.weekly_task_progress` guarda por dono `week_start` (sempre domingo) e os contadores `harvests` (até 12), `animals` (até 5) e `love` (até 30), com RLS e privilégios revogados como as demais, criada de forma aditiva na inicialização. O servidor conta `HARVEST` e `BUY_ANIMAL` bem-sucedidos em `POST /v1/me/actions` e `LOVE` bem-sucedido na rota de visita, para o visitante. Contador, XP, fazenda e recibo são gravados na mesma transação; o replay devolve o recibo sem contar de novo. A semana vira domingo 00:00 em `America/Sao_Paulo`; uma semana guardada mais nova que o relógio do servidor é mantida, sem voltar para a anterior. Rollback de código deixa a tabela sem uso.
+
 ## Ajuda diária de 100 ouro
 
-Missões oferece resgate manual de 100 ouro por dia UTC, sem acumular valores de dias ausentes e sem depender de saldo, nível ou VIP. O botão só aparece quando a API informa dailyAllowance; após o resgate fica bloqueado e mostra a próxima virada em data/hora local. Não há pagamento por GET, login ou tutorial, nem XP, verdes, itens ou progresso de tarefas. A regra fonte é a seção 12.1 de docs/game-rule.md.
+Tarefas oferece resgate manual de 100 ouro por dia UTC, sem acumular valores de dias ausentes e sem depender de saldo, nível ou VIP. O botão só aparece quando a API informa dailyAllowance; após o resgate fica bloqueado e mostra a próxima virada em data/hora local. Não há pagamento por GET, login ou tutorial, nem XP, verdes, itens ou progresso de tarefas. A regra fonte é a seção 12.1 de docs/game-rule.md.
 
 CLAIM_DAILY_ALLOWANCE usa POST /v1/me/actions e os identificadores/revisões existentes. O backend define o valor; campos extras como amount são recusados. A tabela privada colheita.daily_allowances guarda somente actor e last_claimed_day, com RLS/revogação como as demais tabelas, criada aditivamente na inicialização. Crédito, último dia e recibo são confirmados na mesma transação, sob lock por ator e fazenda; replay não paga novamente e rollback desfaz tudo. A data usa UTC explícito e retrocessos não reabrem dias já pagos.
 

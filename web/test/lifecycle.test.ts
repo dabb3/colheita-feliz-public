@@ -734,6 +734,22 @@ test('animal popup shows protector feeding time left',()=>{
  const bar=descendants(content).find(node=>node.getAttribute('role')==='progressbar');
  assert.ok(bar);assert.equal(bar.getAttribute('aria-valuenow'),'50');assert.equal(bar.children[0].style.width,'50%');
 });
+test('Tarefas shows weekly XP tasks apart from the daily green ones and keeps finished ones until reset',()=>{
+ const {h,elements}=app(),nextResetAt=new Date(Date.now()+(2*24*60+3*60+5)*60_000).toISOString();
+ const weeklyTasks={weekStartsAt:'2026-11-22T03:00:00Z',nextResetAt,tasks:[{id:'harvest',title:'Colha 12 plantas',progress:0,target:12,rewardXp:100,done:false},{id:'buy-animals',title:'Compre 5 animais',progress:5,target:5,rewardXp:100,done:true},{id:'love-friends',title:'Adube 30 plantas de amigos com fertilizante do amor',progress:29,target:30,rewardXp:100,done:false}]};
+ h.set({own:{...farm('alice'),missions:[{id:'care',title:'Cuidar da fazenda',green:1,progress:0,target:1,done:false}],weeklyTasks}});h.missions();
+ const content=elements.get('modal-content'),caption=text(content);
+ assert.equal(elements.get('modal-title').textContent,'Tarefas');
+ assert.match(caption,/Diárias · Em andamento/);assert.match(caption,/Semanais/);
+ assert.match(caption,/Reinicia domingo às 00:00 \(horário de Brasília\) · faltam 2d 3h \d+min/);
+ const weekly=descendants(content).find(node=>node.className==='mission-section weekly-section');
+ assert.match(text(weekly),/0 \/ 12/);assert.match(text(weekly),/29 \/ 30/);assert.match(text(weekly),/Compre 5 animais\+100  recebido/);
+ const images=descendants(weekly).filter(node=>node.tag==='img').map(node=>node.src);
+ assert.ok(images.length>=3);assert.ok(images.every(src=>src==='/assets/classic/icons/xp.png'),'XP nunca usa moeda verde');
+ const daily=descendants(content).find(node=>node.className==='mission-section');
+ assert.ok(descendants(daily).some(node=>node.src==='/assets/classic/icons/moeda-verde.png'));
+});
+
 test('open missions screen refreshes progress after a farm update',()=>{
  const {h,elements}=app(),farmState={...farm('alice'),missions:[{id:'m',title:'Colher',green:1,progress:1,target:2,done:false}]};
  h.set({own:farmState});h.missions();assert.match(text(elements.get('modal-content')),/1 \/ 2/);

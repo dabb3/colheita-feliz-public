@@ -1132,6 +1132,71 @@ class OnlineGameIntegrationTest {
 
     private UUID requestId() { return UUID.fromString(service.requestId().get("requestId").getAsString()); }
 
+    @Test void weeklyTasksPayOneHundredXpOnceToTheActorAndSurviveReplay() {
+        connectFriends();
+        prepare(alice, "morango", true, true);
+        prepare(bob, null, false, false);
+        var week = WeeklyTasks.weekStart(clock.instant());
+        store.transaction(alice, tx -> { tx.recordWeeklyTasks(alice, new WeeklyTasks.Progress(week, 11, 4, 0), clock.instant()); return null; });
+        store.transaction(bob, tx -> { tx.recordWeeklyTasks(bob, new WeeklyTasks.Progress(week, 0, 0, 29), clock.instant()); return null; });
+
+        var before = service.farm(alice);
+        var buy = new Command(requestId(), before.get("revision").getAsString(), "BUY_ANIMAL", "galinha", "GOLD", null, null, null);
+        var bought = service.command(alice, buy);
+        assertTrue(bought.getAsJsonObject("result").get("message").getAsString().contains("Tarefa semanal concluída: +100 XP."));
+        var after = bought.getAsJsonObject("farm");
+        assertEquals(before.get("level"), after.get("level"));
+        assertEquals(0, new BigDecimal(after.get("currentXp").getAsString()).subtract(new BigDecimal(before.get("currentXp").getAsString())).compareTo(new BigDecimal("100")));
+        assertEquals(bought, service.command(alice, buy), "replay não conta de novo");
+        var pato = service.command(alice, new Command(requestId(), after.get("revision").getAsString(), "BUY_ANIMAL", "pato", "GOLD", null, null, null));
+        assertTrue(pato.getAsJsonObject("result").get("success").getAsBoolean());
+        assertFalse(pato.getAsJsonObject("result").get("message").getAsString().contains("Tarefa semanal"));
+        assertEquals(after.get("currentXp"), pato.getAsJsonObject("farm").get("currentXp"));
+        assertEquals(java.util.List.of("11/12", "5/5", "0/30"), weekly(pato.getAsJsonObject("farm")));
+
+        var refused = service.command(alice, new Command(requestId(), service.farm(alice).get("revision").getAsString(), "HARVEST", null, null, 1, 1, null));
+        assertFalse(refused.getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(java.util.List.of("11/12", "5/5", "0/30"), weekly(service.farm(alice)), "falha não conta");
+        var harvest = service.command(alice, new Command(requestId(), service.farm(alice).get("revision").getAsString(), "HARVEST", null, null, 0, 0, null));
+        assertTrue(harvest.getAsJsonObject("result").get("message").getAsString().contains("Tarefa semanal concluída: +100 XP."));
+        assertEquals(java.util.List.of("12/12", "5/5", "0/30"), weekly(harvest.getAsJsonObject("farm")));
+        // Morango tem várias temporadas: regada de novo, a planta volta a aceitar o adubo do amor.
+        assertTrue(service.command(alice, new Command(requestId(), service.farm(alice).get("revision").getAsString(), "WATER", null, null, 0, 0, null))
+                .getAsJsonObject("result").get("success").getAsBoolean());
+        var love = service.visitAction(bob, alice, loveCommand(bob, alice));
+        assertTrue(love.getAsJsonObject("result").get("message").getAsString().contains("Tarefa semanal concluída: +100 XP."), love.getAsJsonObject("result").toString());
+        assertNull(love.getAsJsonObject("visitedFarm").get("weeklyTasks"), "progresso é privado");
+        assertEquals(java.util.List.of("0/12", "0/5", "30/30"), weekly(love.getAsJsonObject("farm")));
+        assertEquals(java.util.List.of("12/12", "5/5", "0/30"), weekly(service.farm(alice)), "o dono da planta não ganha a tarefa do visitante");
+
+    }
+
+    @Test void weeklyTasksResetAtSundayMidnightInSaoPaulo() {
+        var saturday = Instant.parse("2026-11-29T02:59:59Z");
+        clock.advanceSeconds(java.time.Duration.between(clock.instant(), saturday).toSeconds());
+        var farm = service.farm(alice);
+        var week = WeeklyTasks.weekStart(clock.instant());
+        assertEquals(java.time.LocalDate.parse("2026-11-22"), week);
+        assertEquals("2026-11-29T03:00:00Z", farm.getAsJsonObject("weeklyTasks").get("nextResetAt").getAsString());
+        store.transaction(alice, tx -> { tx.recordWeeklyTasks(alice, new WeeklyTasks.Progress(week, 12, 5, 30), clock.instant()); return null; });
+        assertEquals(java.util.List.of("12/12", "5/5", "30/30"), weekly(service.farm(alice)));
+        clock.advanceSeconds(1);
+        var next = service.farm(alice);
+        assertEquals(java.util.List.of("0/12", "0/5", "0/30"), weekly(next));
+        assertEquals("2026-11-29T03:00:00Z", next.getAsJsonObject("weeklyTasks").get("weekStartsAt").getAsString());
+    }
+
+    private static java.util.List<String> weekly(JsonObject farm) {
+        var result = new java.util.ArrayList<String>();
+        for (var task : farm.getAsJsonObject("weeklyTasks").getAsJsonArray("tasks")) {
+            var item = task.getAsJsonObject();
+            result.add(item.get("progress").getAsInt() + "/" + item.get("target").getAsInt());
+            assertEquals(100, item.get("rewardXp").getAsInt());
+            assertEquals(item.get("progress").getAsInt() >= item.get("target").getAsInt(), item.get("done").getAsBoolean());
+        }
+        return result;
+    }
+
     private void connectFriends() {
         service.farm(alice);
         var invite = service.createInvitation(alice, requestId());

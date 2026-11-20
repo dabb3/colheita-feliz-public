@@ -172,7 +172,11 @@ final class OnlineGameService implements AutoCloseable {
                             tx.recordLoginRewardProgress(actor, today, next.day(), cycle, total, clock.instant());
                         }
                     }
-                } else result = act(farm.game(), command);
+                } else {
+                    result = act(farm.game(), command);
+                    if (command.action().equals("HARVEST")) result = advanceWeekly(tx, actor, farm.game(), WeeklyTasks.Task.HARVEST, result);
+                    else if (command.action().equals("BUY_ANIMAL")) result = advanceWeekly(tx, actor, farm.game(), WeeklyTasks.Task.BUY_ANIMAL, result);
+                }
                 return object("result", result, "farm", persist(tx, farm, true, true));
             });
     }
@@ -316,6 +320,8 @@ final class OnlineGameService implements AutoCloseable {
                     }
                 } else {
                     result = visits.fertilizeVisit(destination.game(), visitor.game(), command.column(), command.row(), "amor", season);
+                    // O XP da tarefa vai para quem adubou, nunca para o dono da plantação.
+                    result = advanceWeekly(tx, actor, visitor.game(), WeeklyTasks.Task.LOVE, result);
                 }
                 if (result.success() && (command.action().equals("STEAL") || PEST_ACTIONS.contains(command.action()))) {
                     String type = command.action().equals("STEAL") ? "THEFT" : "PEST";
@@ -326,6 +332,19 @@ final class OnlineGameService implements AutoCloseable {
                 if(theft!=null)reply.add("theftOutcome",object("kind",theft.kind(),"goldDebited",theft.goldDebited().toPlainString()));
                 return reply;
             });
+    }
+
+    /** Conta uma ação já confirmada e paga 100 XP na única vez em que a tarefa chega à meta na semana. */
+    private ActionResult advanceWeekly(JdbcOnlineStore.Tx tx, UUID actor, GameState game, WeeklyTasks.Task task, ActionResult result) {
+        if (!result.success()) return result;
+        Instant now = clock.instant();
+        var before = WeeklyTasks.current(tx.weeklyTasks(actor), now);
+        var after = before.plusOne(task);
+        if (after == before) return result;
+        tx.recordWeeklyTasks(actor, after, now);
+        if (after.value(task) < task.target) return result;
+        String levelUp = game.awardTaskXp(WeeklyTasks.REWARD_XP);
+        return ActionResult.ok((result.message() + " Tarefa semanal concluída: +" + WeeklyTasks.REWARD_XP + " XP. " + levelUp).strip());
     }
 
     private static int cooperativeHelpXp(JdbcOnlineStore.Tx tx, UUID actor, LocalDate today) {
@@ -448,6 +467,7 @@ final class OnlineGameService implements AutoCloseable {
             view.add("dailyAllowance", object("amount", DAILY_ALLOWANCE.toPlainString(), "available", available,
                     "nextResetAt", resetDay.atStartOfDay(ZoneOffset.UTC).toInstant().toString()));
             view.add("loginRewards", loginRewardView(tx, loaded.owner()));
+            view.add("weeklyTasks", WeeklyTasks.view(WeeklyTasks.current(tx.weeklyTasks(loaded.owner()), clock.instant())));
         }
         return view;
     }

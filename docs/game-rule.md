@@ -431,7 +431,7 @@ As tarefas já contam durante o tutorial, não exigem gastar mais que o saldo in
 
 ### 12.1. Ajuda diária em ouro
 
-No online, cada jogador pode resgatar manualmente **100 moedas de ouro por dia UTC**, na tela de Missões. A disponibilidade renova à meia-noite UTC, no mesmo calendário das tarefas; não é um prazo móvel de 24 horas. A interface mostra a próxima virada no horário local. O valor não depende de saldo, nível ou VIP.
+No online, cada jogador pode resgatar manualmente **100 moedas de ouro por dia UTC**, na tela de Tarefas. A disponibilidade renova à meia-noite UTC, no mesmo calendário das tarefas; não é um prazo móvel de 24 horas. A interface mostra a próxima virada no horário local. O valor não depende de saldo, nível ou VIP.
 
 Abrir o jogo, visitar, concluir tutorial ou consultar a fazenda não paga a ajuda. Dias não resgatados não acumulam: após qualquer ausência, somente 100 ouro ficam disponíveis para o dia atual. O resgate não concede moedas verdes, XP, itens, progresso de tutorial ou tarefas e não consome os limites de furto ou pragas. É uma fonte adicional explícita de ouro; não altera o saldo inicial de 500 ouro e 5 verdes.
 
@@ -442,6 +442,16 @@ O servidor persiste o último dia pago junto com o crédito, sem confiar no rel�
 Somente o online mostra missões cooperativas; o desktop não tem amigos e continua com as duas tarefas acima. São duas: **Amigo da Natureza**, remover 2 pragas (ervas ou insetos) em fazendas de amigos, com progresso parcial persistido (seção 13.2), e **Amigo dos Animais**, alimentar 1 animal faminto de um amigo (seção 13.3). Nenhuma paga verdes próprios.
 
 As missões cooperativas não pagam verdes individualmente. Um **bônus cooperativo de 1 verde** é pago uma única vez por dia UTC, quando todas as missões cooperativas da lista estiverem concluídas. A lista é definida por dados em `DailyMissionBoard.COOPERATIVE` e contém as duas missões, então o bônus exige ambas. Um save do mesmo dia em que o bônus já foi pago só com Amigo da Natureza (antes de Amigo dos Animais existir) continua válido e não paga outro bônus. Decisão do dono do produto: com o bônus, o total online de verdes de tarefas e missões chega a 3 por dia UTC; o limite de 2 verdes acima vale para as tarefas solo.
+
+### 12.3. Tarefas semanais
+
+A tela Tarefas tem uma seção Semanais, separada das diárias. São três tarefas, cada uma paga **100 XP** uma única vez por semana:
+
+- **Colha 12 plantas:** cada colheita bem-sucedida na própria fazenda conta 1.
+- **Compre 5 animais:** cada animal comprado conta 1; ração não conta.
+- **Adube 30 plantas de amigos com fertilizante do amor:** cada aplicação aceita numa plantação de amigo conta 1, para quem adubou.
+
+A semana vira **domingo às 00:00 em America/Sao_Paulo**, diferente das diárias em UTC. O progresso para na meta, então ações depois da conclusão não pagam de novo antes da virada. O XP passa pelas recompensas normais de nível. Ações recusadas, repetições do mesmo pedido, furtos e automações não contam. O dono da plantação adubada não ganha progresso nem XP. As recompensas em verdes das diárias e o bônus cooperativo não mudam.
 
 ## 13. Furto de temporadas
 

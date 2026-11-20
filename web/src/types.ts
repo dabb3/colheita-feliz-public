@@ -106,6 +106,11 @@ export interface Farm {
     done: boolean;
   }[];
   cooperativeBonus?: { green: number; done: boolean };
+  weeklyTasks?: {
+    weekStartsAt: string;
+    nextResetAt: string;
+    tasks: { id: string; title: string; progress: number; target: number; rewardXp: number; done: boolean }[];
+  };
   nextPlot?: { column: number; row: number; requiredLevel?:number; price?:string|number; currency?:string; purchasable?:boolean };
 }
 export interface Friend { vipActive?:boolean; id:string; name:string; avatar?:Farm['avatar']; }
