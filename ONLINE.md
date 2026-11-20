@@ -368,6 +368,21 @@ O botão Missões passou a se chamar Tarefas; identificadores, rotas e o asset `
 
 A tabela privada `colheita.weekly_task_progress` guarda por dono `week_start` (sempre domingo) e os contadores `harvests` (até 12), `animals` (até 5) e `love` (até 30), com RLS e privilégios revogados como as demais, criada de forma aditiva na inicialização. O servidor conta `HARVEST` e `BUY_ANIMAL` bem-sucedidos em `POST /v1/me/actions` e `LOVE` bem-sucedido na rota de visita, para o visitante. Contador, XP, fazenda e recibo são gravados na mesma transação; o replay devolve o recibo sem contar de novo. A semana vira domingo 00:00 em `America/Sao_Paulo`; uma semana guardada mais nova que o relógio do servidor é mantida, sem voltar para a anterior. Rollback de código deixa a tabela sem uso.
 
+## Conquistas e títulos
+
+O botão Conquistas (ícone `conquistas.png`) abre as 40 conquistas de `conquistas.md`, em 9 categorias. A recompensa é só o título; liberado, nunca é revogado. No celular o botão fica em Mais, e na visita ele some como os outros painéis da própria fazenda.
+
+A tabela privada `colheita.achievement_progress` guarda por dono os contadores `clean`, `plant`, `harvest`, `spread`, `steal` e `green_spent`, os ids liberados e `equipped_title`, com RLS e privilégios revogados, criada de forma aditiva. Os contadores só sobem depois de uma ação bem-sucedida, na mesma transação da fazenda e do recibo, então o replay não conta de novo:
+
+- limpeza: `WEED` e `PESTICIDE` na própria fazenda e `CLEAN_WEEDS`/`CLEAN_INSECTS` em amigos, uma por ação; a limpeza automática do serviço VIP não conta;
+- plantio: `PLANT`; colheitas: `HARVEST`; pragas em amigos: `SPREAD_INSECTS` e `SPREAD_WEEDS`;
+- furtos: só `STEAL` com resultado `STOLEN`; bloqueio, proteção e mordida não contam;
+- verdes gastos: soma dos débitos reais em verdes do comando (carteira), inclusive compras em lote, VIP, serviços e terrenos; nunca a diferença de saldo.
+
+Esses contadores começam na implantação, sem retroatividade inventada. Nível, terrenos liberados e tipos de animal possuídos ao mesmo tempo são lidos do estado atual e liberam o título já na primeira leitura da fazenda.
+
+`EQUIP_TITLE` com `itemId` igual ao id da conquista equipa um título liberado da própria conta; id desconhecido retorna 400 e título bloqueado retorna `result.success=false`. `CLEAR_TITLE`, sem outros campos, remove o título. A fazenda própria traz `achievements` (`id`, `category`, `categoryLabel`, `title`, `target`, `progress`, `unlocked`), `equippedTitleId` e `equippedTitle`. A visita e `/v1/friends` trazem só `equippedTitle`, que o cliente mostra como texto ao lado do nome, sem tirar o selo VIP.
+
 ## Ajuda diária de 100 ouro
 
 Tarefas oferece resgate manual de 100 ouro por dia UTC, sem acumular valores de dias ausentes e sem depender de saldo, nível ou VIP. O botão só aparece quando a API informa dailyAllowance; após o resgate fica bloqueado e mostra a próxima virada em data/hora local. Não há pagamento por GET, login ou tutorial, nem XP, verdes, itens ou progresso de tarefas. A regra fonte é a seção 12.1 de docs/game-rule.md.

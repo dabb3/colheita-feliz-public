@@ -1197,6 +1197,55 @@ class OnlineGameIntegrationTest {
         return result;
     }
 
+    @Test void achievementsCountConfirmedActionsAndShowOnlyTheEquippedTitleInPublic() {
+        connectFriends();
+        prepare(alice, "nabo", true, false);
+        prepare(bob, null, false, false);
+        var farm = service.farm(alice);
+        assertTrue(unlocked(farm, "level-60"), "nível atual libera sem recontagem");
+        assertFalse(unlocked(farm, "plots-10"));
+        store.transaction(alice, tx -> { tx.addAchievementCounters(alice, new Achievements.Delta(0, 0, 499, 0, 0, new BigDecimal("999")), clock.instant()); return null; });
+
+        var harvest = new Command(requestId(), farm.get("revision").getAsString(), "HARVEST", null, null, 0, 0, null);
+        farm = service.command(alice, harvest).getAsJsonObject("farm");
+        assertTrue(unlocked(farm, "harvest-500"));
+        service.command(alice, harvest);
+        assertEquals(500, achievement(service.farm(alice), "harvest-1000").get("progress").getAsLong(), "replay não conta de novo");
+
+        farm = service.farm(alice);
+        var green = service.command(alice, new Command(requestId(), farm.get("revision").getAsString(), "BUY_FERTILIZER", "rapido", "GREEN", null, null, null, null, null, 2));
+        assertTrue(green.getAsJsonObject("result").get("success").getAsBoolean());
+        assertTrue(unlocked(green.getAsJsonObject("farm"), "green-1000"), "lote de 2 conta 2 verdes gastos");
+        assertEquals(1001, achievement(green.getAsJsonObject("farm"), "green-2000").get("progress").getAsLong());
+
+        farm = green.getAsJsonObject("farm");
+        var locked = service.command(alice, new Command(requestId(), farm.get("revision").getAsString(), "EQUIP_TITLE", "harvest-1000", null, null, null, null));
+        assertFalse(locked.getAsJsonObject("result").get("success").getAsBoolean());
+        var revision = locked.getAsJsonObject("farm").get("revision").getAsString();
+        assertEquals(400, assertThrows(ApiFailure.class, () -> service.command(alice, new Command(requestId(), revision, "EQUIP_TITLE", "nope", null, null, null, null))).status());
+        var equipped = service.command(alice, new Command(requestId(), revision, "EQUIP_TITLE", "harvest-500", null, null, null, null)).getAsJsonObject("farm");
+        assertEquals("harvest-500", equipped.get("equippedTitleId").getAsString());
+        assertEquals("★ Mão na Enxada ★", equipped.get("equippedTitle").getAsString());
+
+        var visit = service.visit(bob, alice);
+        assertEquals("★ Mão na Enxada ★", visit.get("equippedTitle").getAsString());
+        assertNull(visit.get("achievements"), "contadores são privados");
+        assertEquals("★ Mão na Enxada ★", service.friends(bob).get(0).getAsJsonObject().get("equippedTitle").getAsString());
+
+        assertFalse(service.visitAction(bob, alice, theftCommand(bob, alice)).getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(0, achievement(service.farm(bob), "steal-100").get("progress").getAsLong(), "furto recusado não conta");
+
+        var cleared = service.command(alice, new Command(requestId(), equipped.get("revision").getAsString(), "CLEAR_TITLE", null, null, null, null, null)).getAsJsonObject("farm");
+        assertTrue(cleared.get("equippedTitle") == null || cleared.get("equippedTitle").isJsonNull());
+        var publicTitle = service.visit(bob, alice).get("equippedTitle"); assertTrue(publicTitle == null || publicTitle.isJsonNull());
+    }
+
+    private static JsonObject achievement(JsonObject farm, String id) {
+        for (var item : farm.getAsJsonArray("achievements")) if (item.getAsJsonObject().get("id").getAsString().equals(id)) return item.getAsJsonObject();
+        throw new AssertionError(id);
+    }
+    private static boolean unlocked(JsonObject farm, String id) { return achievement(farm, id).get("unlocked").getAsBoolean(); }
+
     private void connectFriends() {
         service.farm(alice);
         var invite = service.createInvitation(alice, requestId());

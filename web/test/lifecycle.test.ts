@@ -50,7 +50,7 @@ test('cancel and escape close the composer and keep the visit while POST locks X
  assert.equal(elements.get('modal').open,false);assert.equal(h.get().visited.owner,'bob');assert.equal(text(elements.get('notice')),'Sementes enviadas.');assert.equal(mutations,1);assert.equal(elements.get('modal').listenerCounts.cancel,1);
 });
 test('visit menu keeps only Minha fazenda, Amigos and Presentear and home restores the own menu',()=>{
- const {h,elements,ctx}=app(),own={...farm('alice'),loginRewards:{completedDay:0,nextDay:1,available:true,rewards:[]}},others=['notifications','shop','deposit','missions','events','settings','more'];
+ const {h,elements,ctx}=app(),own={...farm('alice'),loginRewards:{completedDay:0,nextDay:1,available:true,rewards:[]}},others=['notifications','shop','deposit','missions','achievements','events','settings','more'];
  h.set({own,api:{pending:null}});h.receive({farm:own});
  assert.ok(others.every(id=>!elements.get(id).hidden));assert.equal(elements.get('home').hidden,true);assert.equal(elements.get('gift-visit').hidden,true);assert.equal(elements.get('friends').hidden,false);assert.equal(ctx.moreVisiting,false);
  h.visit({...farm('bob'),name:'Bob'});
@@ -167,7 +167,7 @@ function app(preferences=new Map(),pushLogoutOptions){
  const eventsSource=readFileSync(new URL('../src/events.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');runInNewContext(stripTypeScriptTypes(eventsSource),ctx);
  runInNewContext(stripTypeScriptTypes(readFileSync(new URL('../src/away-report.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'')),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={events,updateOwnFarm,refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,friends,presentGift,closeGiftComposer,receive,dialog,health,renderHealth,positionHealth,animalTooltip,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),visit:value=>{visited=value;render();},calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
+ source+='\nglobalThis.h={events,updateOwnFarm,refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,achievements,friends,presentGift,closeGiftComposer,receive,dialog,health,renderHealth,positionHealth,animalTooltip,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),visit:value=>{visited=value;render();},calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:{...ctx.h,runTimeouts(){for(const [id,callback]of [...timeouts]){timeouts.delete(id);callback();}}},elements,listeners,audioClips,observers,ctx,intervals};
 }
 function openGift(h,elements,owner='bob',name='Bob'){h.visit({...farm(owner),name});elements.get('gift-visit').onclick();}
@@ -748,6 +748,30 @@ test('Tarefas shows weekly XP tasks apart from the daily green ones and keeps fi
  assert.ok(images.length>=3);assert.ok(images.every(src=>src==='/assets/classic/icons/xp.png'),'XP nunca usa moeda verde');
  const daily=descendants(content).find(node=>node.className==='mission-section');
  assert.ok(descendants(daily).some(node=>node.src==='/assets/classic/icons/moeda-verde.png'));
+});
+
+test('Conquistas groups titles, equips only unlocked ones and removes the active title',async()=>{
+ const {h,elements}=app(),sent=[];
+ const achievements=[{id:'plant-100',category:'plant',categoryLabel:'🌱 Plantio de sementes',title:'•° Camponês •°',target:100,progress:100,unlocked:true},{id:'plant-250',category:'plant',categoryLabel:'🌱 Plantio de sementes',title:'★ Playboy Rural ★',target:250,progress:100,unlocked:false},{id:'level-30',category:'level',categoryLabel:'⭐ Níveis',title:'<b>★ Veterano VIP ★</b>',target:30,progress:30,unlocked:true}];
+ const own={...farm('alice'),achievements,equippedTitleId:'level-30',equippedTitle:'<b>★ Veterano VIP ★</b>'};
+ h.set({own,api:{pending:null,prepareRequestId:async()=>{},mutate:async(_path,fields)=>{sent.push(fields);return{result:{success:true,message:'ok'},farm:{...own,revision:'2'}};}}});h.achievements();
+ const content=elements.get('modal-content'),caption=text(content);
+ assert.equal(elements.get('modal-title').textContent,'Conquistas');
+ assert.match(caption,/2 de 3 títulos liberados/);assert.match(caption,/🌱 Plantio de sementes/);assert.match(caption,/⭐ Níveis/);
+ assert.match(caption,/100 \/ 250/);assert.match(caption,/Bloqueado/);assert.match(caption,/Equipado/);
+ assert.ok(descendants(content).some(node=>node.textContent==='<b>★ Veterano VIP ★</b>'),'título é texto, não HTML');
+ assert.ok(!descendants(content).some(node=>node.getAttribute?.('aria-label')==='Equipar título ★ Playboy Rural ★'));
+ descendants(content).find(node=>node.getAttribute?.('aria-label')==='Equipar título •° Camponês •°').onclick();await new Promise(r=>setTimeout(r,0));
+ assert.equal(sent[0].action,'EQUIP_TITLE');assert.equal(sent[0].itemId,'plant-100');
+ descendants(elements.get('modal-content')).find(node=>node.textContent==='Remover título').onclick();await new Promise(r=>setTimeout(r,0));
+ assert.equal(sent[1].action,'CLEAR_TITLE');assert.equal(sent[1].itemId,undefined);
+});
+
+test('visited wallet shows the public title next to the VIP badge',()=>{
+ const {h,elements}=app();h.set({own:farm('alice')});h.visit({...farm('bob'),name:'Bob',vipActive:true,equippedTitle:'♛ Rei do Gado ♛'});
+ const wallet=elements.get('wallet');
+ assert.ok(descendants(wallet).some(node=>node.className==='player-title'&&node.textContent==='♛ Rei do Gado ♛'));
+ assert.ok(descendants(wallet).some(node=>node.className==='vip-badge'||String(node.className).includes('vip')),'VIP continua visível');
 });
 
 test('open missions screen refreshes progress after a farm update',()=>{

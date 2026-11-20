@@ -26,7 +26,7 @@ npm.cmd run build:local --prefix web
 
 O build local configura a API em `http://127.0.0.1:8080`. Para iniciar uma API local com contas de desenvolvimento e PostgreSQL descartável, consulte [ONLINE.md](ONLINE.md).
 
-O cliente inclui um modo de revisão visual com dados sintéticos. Os menus de Loja, Depósito, Tarefas, Eventos (com a aba Calendário Diário), Amigos e Ajustes são acessíveis por botões; regras e contrato online do calendário estão em [ONLINE.md](ONLINE.md). A seleção de avatar é uma preferência local por conta e dispositivo, não uma atualização do perfil no banco.
+O cliente inclui um modo de revisão visual com dados sintéticos. Os menus de Loja, Depósito, Tarefas, Conquistas, Eventos (com a aba Calendário Diário), Amigos e Ajustes são acessíveis por botões; regras e contrato online do calendário estão em [ONLINE.md](ONLINE.md). A seleção de avatar é uma preferência local por conta e dispositivo, não uma atualização do perfil no banco.
 
 | Tecla | Atalho no Web |
 | --- | --- |

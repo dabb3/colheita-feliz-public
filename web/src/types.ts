@@ -106,6 +106,9 @@ export interface Farm {
     done: boolean;
   }[];
   cooperativeBonus?: { green: number; done: boolean };
+  achievements?: { id: string; category: string; categoryLabel: string; title: string; target: number; progress: number; unlocked: boolean }[];
+  equippedTitleId?: string | null;
+  equippedTitle?: string | null;
   weeklyTasks?: {
     weekStartsAt: string;
     nextResetAt: string;
@@ -113,7 +116,7 @@ export interface Farm {
   };
   nextPlot?: { column: number; row: number; requiredLevel?:number; price?:string|number; currency?:string; purchasable?:boolean };
 }
-export interface Friend { vipActive?:boolean; id:string; name:string; avatar?:Farm['avatar']; }
+export interface Friend { vipActive?:boolean; id:string; name:string; avatar?:Farm['avatar']; equippedTitle?:string|null; }
 export interface Gift { id:string; senderId?:string; senderName?:string; recipientId?:string; recipientName?:string; cropId:string; quantity:number; createdAt:string; state:'DELIVERED'; }
 export interface Gifts { received:Gift[]; sent:Gift[]; }
 export interface GameNotification {

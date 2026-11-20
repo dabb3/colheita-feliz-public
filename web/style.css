@@ -786,3 +786,20 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 #modal .tabs.events-tabs>.shop-tab[aria-selected=true]{z-index:1;border-bottom-color:#fffdf1;background:#fffdf1;box-shadow:inset 0 3px #e6b843}
 .tray-empty{grid-column:1/-1;margin:0;font-size:13px;text-align:center}
 .tray-empty-shop{grid-column:1/-1;justify-self:center;font-size:12px;padding:.3rem .8rem}
+.player-title{display:block;overflow:hidden;color:#7a4f12;font-size:12px;font-weight:700;line-height:1.3;text-overflow:ellipsis;white-space:nowrap}
+.friend-identity{display:grid;flex:1;min-width:0}
+.friend-identity strong{flex:none}
+.achievements-summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-bottom:8px}
+.achievements-active{color:#7a4f12;font-weight:700}
+.achievement-clear{margin-left:auto;padding:.3rem .7rem;font-size:13px}
+.achievements-note{margin:0 0 8px}
+.achievement-category{margin-bottom:12px}
+.achievement-card{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:6px 12px;margin:6px 0;padding:8px 12px;border:1px solid #d2d4b8;border-radius:10px;background:#fff}
+.achievement-card.unlocked{border-color:#d5a92f;background:#fffbe6}
+.achievement-title{min-width:0;overflow-wrap:anywhere}
+.achievement-card progress{grid-column:1/2;width:100%}
+.achievement-progress{color:#526353;font-size:12px;font-variant-numeric:tabular-nums}
+.achievement-state{grid-column:3;grid-row:1;color:#66735d;font-size:12px}
+.achievement-state.equipped{color:#426b36;font-weight:700}
+.achievement-equip{grid-column:3;grid-row:1;padding:.3rem .7rem;font-size:13px}
+@media(max-width:600px){.achievement-card{grid-template-columns:minmax(0,1fr) auto}.achievement-card progress{grid-column:1/-1}.achievement-state,.achievement-equip{grid-column:2}}

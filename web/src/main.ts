@@ -288,7 +288,7 @@ function giftVisited(){if(!visited||!own||visited.owner===own.owner)return;prese
 /** During a visit the top menu keeps only Minha fazenda, Amigos and Presentear; the social toolbar is separate. */
 function syncFarmMenu(){
  const visiting=!!visited;
- for(const id of ['notifications','shop','deposit','missions','events','settings','more'])element(id).hidden=visiting;
+ for(const id of ['notifications','shop','deposit','missions','achievements','events','settings','more'])element(id).hidden=visiting;
  element('home').hidden=!visiting;
  const gift=element('gift-visit');gift.hidden=!visiting||visited!.owner===own?.owner;gift.setAttribute('aria-label',visiting?`Presentear ${visited!.name}`:'Presentear amigo');
  setMoreMenuVisiting(visiting);
@@ -897,6 +897,34 @@ const WEEKLY_RESET_TEXT='Reinicia domingo às 00:00 (horário de Brasília)';
 function weeklyDescription(id:string){return id==='harvest'?'Colha plantas maduras na sua fazenda.':id==='buy-animals'?'Compre animais na Loja.':id==='love-friends'?'Use o fertilizante do amor nas plantações de amigos.':'Avance esta tarefa para receber a recompensa.';}
 // Server time is authoritative for the reset; this is only the remaining-time hint.
 function weeklyCountdownText(nextResetAt:string){const left=Math.max(0,Date.parse(nextResetAt)-Date.now());if(!Number.isFinite(left))return '';const minutes=Math.ceil(left/60_000),days=Math.floor(minutes/1440),hours=Math.floor(minutes%1440/60);return `faltam ${days?`${days}d `:''}${hours}h ${minutes%60}min`;}
+// Titles are shown with textContent only: their Unicode art is data, never markup.
+function achievements(){
+ dialog('Conquistas');refreshDialog=achievements;
+ const list=own?.achievements??[],unlockedCount=list.filter(item=>item.unlocked).length;
+ const summary=document.createElement('div');summary.className='achievements-summary';
+ summary.append(text('strong',`${unlockedCount} de ${list.length} títulos liberados`));
+ summary.append(text('span',own?.equippedTitle?`Título ativo: ${own.equippedTitle}`:'Nenhum título ativo','achievements-active'));
+ if(own?.equippedTitle){const clear=button('Remover título',()=>void action({action:'CLEAR_TITLE'}),summary,'title-clear');clear.className='achievement-clear';}
+ content.append(summary);
+ content.append(text('p','Plantio, colheitas, pragas, furtos e verdes gastos contam a partir desta atualização; nível, terrenos e animais usam o estado atual.','muted achievements-note'));
+ const categories=new Map<string,{label:string;items:typeof list}>();
+ for(const item of list){const group=categories.get(item.category)??{label:item.categoryLabel,items:[]};group.items.push(item);categories.set(item.category,group);}
+ for(const [id,group]of categories){
+  const section=document.createElement('section');section.className='achievement-category';section.setAttribute('aria-labelledby',`achievement-${id}`);
+  const heading=text('h3',group.label,'mission-section-title');heading.id=`achievement-${id}`;section.append(heading);
+  for(const item of group.items){
+   const card=document.createElement('article');card.className=`achievement-card${item.unlocked?' unlocked':''}`;
+   const title=text('strong',item.title,'achievement-title');card.append(title);
+   const progress=document.createElement('progress');progress.max=item.target;progress.value=Math.min(item.progress,item.target);progress.setAttribute('aria-label',`${item.title}: ${depositNumber.format(progress.value)} de ${depositNumber.format(item.target)}`);
+   card.append(progress,text('span',`${depositNumber.format(progress.value)} / ${depositNumber.format(item.target)}`,'achievement-progress'));
+   if(!item.unlocked)card.append(text('span','Bloqueado','achievement-state'));
+   else if(own?.equippedTitleId===item.id)card.append(text('span','Equipado','achievement-state equipped'));
+   else{const equip=button('Equipar',()=>void action({action:'EQUIP_TITLE',itemId:item.id}),card,`title-equip:${item.id}`);equip.className='achievement-equip';equip.setAttribute('aria-label',`Equipar título ${item.title}`);}
+   section.append(card);
+  }
+  content.append(section);
+ }
+}
 function sectionHeading(label:string){const heading=document.createElement('h3');heading.className='mission-section-title';heading.textContent=label;return heading;}
 function missionDescription(id:string){return id==='care'?'Plante, regue, colha ou cuide dos animais.':id==='trade'?'Compre ou venda itens na fazenda.':id==='nature'?'Remova ervas ou insetos nas fazendas de amigos.':id==='animals'?'Alimente com sua ração um animal com fome na fazenda de um amigo.':'Avance esta tarefa para receber a recompensa.';}
 function countdownText(showLocalTime=true){const now=new Date(),midnight=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+1)),minutes=Math.max(0,Math.ceil((midnight.getTime()-now.getTime())/60_000)),hours=Math.floor(minutes/60),parts=new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',hourCycle:'h23'}).formatToParts(midnight),hour=parts.find(part=>part.type==='hour')?.value??'00';return `Novas tarefas diárias em ${hours?`${hours}h `:''}${minutes%60}min${showLocalTime?` (às ${hour}h)`:''}`;}
@@ -946,7 +974,7 @@ async function friends(){
  const heading=document.createElement('h3');heading.className='friends-title';heading.textContent='Seus amigos';content.append(heading);const listPanel=document.createElement('div');listPanel.className='friend-list';listPanel.tabIndex=-1;content.append(listPanel);
  let friendRefresh=0;
  refreshDialog=()=>{const request=++friendRefresh;void client.get<Friend[]>('/v1/friends').then(list=>{if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open||request!==friendRefresh)return;for(const row of Array.from(listPanel.children)){const name=row.children[1],friend=list.find(item=>item.id===(row as HTMLElement).dataset.friendId);if(name&&friend){name.replaceChildren(document.createTextNode(friend.name));if(friend.vipActive)name.append(vipBadge());}}}).catch(()=>{});};
- try{const list=await client.get<Friend[]>('/v1/friends');if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open)return;for(const friend of list){const row=document.createElement('article');row.className='friend-card';row.dataset.friendId=friend.id;const badge=friendAvatar(friend);const name=document.createElement('strong');name.textContent=friend.name;if(friend.vipActive)name.append(vipBadge());row.append(badge,name);button('Visitar fazenda',async()=>{const navigation=++navigationGeneration;try{const farm=await client.get<Farm>(`/v1/farms/${friend.id}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||dialogGeneration!==panelGeneration||!modal.open)return;visited=farm;tool='CURSOR';render();modal.close();}catch(error){handleError(error);}},row);listPanel.append(row);}if(!list.length)paragraph('Nenhum amigo adicionado ainda.',listPanel);
+ try{const list=await client.get<Friend[]>('/v1/friends');if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open)return;for(const friend of list){const row=document.createElement('article');row.className='friend-card';row.dataset.friendId=friend.id;const badge=friendAvatar(friend);const name=document.createElement('strong');name.textContent=friend.name;if(friend.vipActive)name.append(vipBadge());const identity=document.createElement('div');identity.className='friend-identity';identity.append(name);if(friend.equippedTitle)identity.append(text('small',friend.equippedTitle,'player-title'));row.append(badge,identity);button('Visitar fazenda',async()=>{const navigation=++navigationGeneration;try{const farm=await client.get<Farm>(`/v1/farms/${friend.id}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||dialogGeneration!==panelGeneration||!modal.open)return;visited=farm;tool='CURSOR';render();modal.close();}catch(error){handleError(error);}},row);listPanel.append(row);}if(!list.length)paragraph('Nenhum amigo adicionado ainda.',listPanel);
  }
  catch(error){handleError(error);}
 }
@@ -1014,7 +1042,7 @@ async function start(){
  }catch(error){showConnection();notify(error instanceof Error?error.message:'Servidor indisponível.');button('Tentar conectar novamente',start,login);}
 }
 element('notifications').onclick=notifications;element('events').onclick=()=>events();
-element('shop').onclick=()=>shop();element('deposit').onclick=deposit;element('missions').onclick=missions;element('friends').onclick=()=>void friends();
+element('shop').onclick=()=>shop();element('deposit').onclick=deposit;element('missions').onclick=missions;element('achievements').onclick=achievements;element('friends').onclick=()=>void friends();
 element('home').onclick=()=>{navigationGeneration++;visited=undefined;tool='PLOW';render();};element('gift-visit').onclick=giftVisited;element('settings').onclick=()=>shortcutPanel('Ajustes',settings);element('close-modal').onclick=()=>{if(element('modal-title').textContent==='Presentear'){closeGiftComposer();return;}modal.close();showUpdateNotes();};
 modal.addEventListener('cancel',event=>{if(element('modal-title').textContent!=='Presentear')return;event.preventDefault();closeGiftComposer();});
 modal.addEventListener('close',showUpdateNotes);

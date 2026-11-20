@@ -52,4 +52,10 @@
 <Class name="br.com.colheitafeliz.game.AnimalTest"/>
 <Bug pattern="RV_RETURN_VALUE_IGNORED,RV_RETURN_VALUE_IGNORED_INFERRED"/>
 </Match>
+<!-- O SQL de saveTitles só concatena o schema validado no construtor ([a-z][a-z0-9_]{0,50}); os valores vão como parâmetros. -->
+<Match>
+<Class name="br.com.colheitafeliz.server.JdbcOnlineStore$Tx"/>
+<Method name="saveTitles"/>
+<Bug pattern="SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING"/>
+</Match>
 </FindBugsFilter>

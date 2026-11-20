@@ -172,10 +172,23 @@ final class OnlineGameService implements AutoCloseable {
                             tx.recordLoginRewardProgress(actor, today, next.day(), cycle, total, clock.instant());
                         }
                     }
+                } else if (command.action().equals("EQUIP_TITLE") || command.action().equals("CLEAR_TITLE")) {
+                    result = equipTitle(tx, actor, farm.game(), command);
                 } else {
                     result = act(farm.game(), command);
                     if (command.action().equals("HARVEST")) result = advanceWeekly(tx, actor, farm.game(), WeeklyTasks.Task.HARVEST, result);
                     else if (command.action().equals("BUY_ANIMAL")) result = advanceWeekly(tx, actor, farm.game(), WeeklyTasks.Task.BUY_ANIMAL, result);
+                    if (result.success()) {
+                        var category = switch (command.action()) {
+                            case "PLANT" -> Achievements.Category.PLANT;
+                            case "HARVEST" -> Achievements.Category.HARVEST;
+                            case "WEED", "PESTICIDE" -> Achievements.Category.CLEAN;
+                            default -> null;
+                        };
+                        var delta = (category == null ? Achievements.Delta.NONE : Achievements.Delta.of(category))
+                                .withGreen(farm.game().wallet().spent(Currency.GREEN));
+                        if (!delta.empty()) tx.addAchievementCounters(actor, delta, clock.instant());
+                    }
                 }
                 return object("result", result, "farm", persist(tx, farm, true, true));
             });
@@ -219,7 +232,8 @@ final class OnlineGameService implements AutoCloseable {
 
     JsonArray friends(JdbcOnlineStore.Tx tx, UUID actor) {
         active(tx, actor);var result=new JsonArray();
-        for(var player:tx.friends(actor,clock.instant()))result.add(object("id",player.id(),"name",player.name(),"active",player.active(),"avatar",player.avatar(),"vipActive",player.vipActive()));
+        for(var player:tx.friends(actor,clock.instant()))result.add(object("id",player.id(),"name",player.name(),"active",player.active(),"avatar",player.avatar(),"vipActive",player.vipActive(),
+                "equippedTitle",Achievements.equippedTitle(tx.achievements(player.id()).equipped())));
         return result;
     }
 
@@ -323,6 +337,12 @@ final class OnlineGameService implements AutoCloseable {
                     // O XP da tarefa vai para quem adubou, nunca para o dono da plantação.
                     result = advanceWeekly(tx, actor, visitor.game(), WeeklyTasks.Task.LOVE, result);
                 }
+                // Só ações que surtiram efeito contam; furto bloqueado, protegido ou mordido não é colheita roubada.
+                var visitAchievement = !result.success() ? null
+                        : command.action().equals("STEAL") ? (theft != null && theft.kind() == br.com.colheitafeliz.game.TheftAttempt.Kind.STOLEN ? Achievements.Category.STEAL : null)
+                        : PEST_ACTIONS.contains(command.action()) ? Achievements.Category.SPREAD
+                        : CLEAN_ACTIONS.contains(command.action()) ? Achievements.Category.CLEAN : null;
+                if (visitAchievement != null) tx.addAchievementCounters(actor, Achievements.Delta.of(visitAchievement), clock.instant());
                 if (result.success() && (command.action().equals("STEAL") || PEST_ACTIONS.contains(command.action()))) {
                     String type = command.action().equals("STEAL") ? "THEFT" : "PEST";
                     store.pushStore().recordEvent(tx, command.requestId(), owner, actor, type, clock.instant());
@@ -332,6 +352,21 @@ final class OnlineGameService implements AutoCloseable {
                 if(theft!=null)reply.add("theftOutcome",object("kind",theft.kind(),"goldDebited",theft.goldDebited().toPlainString()));
                 return reply;
             });
+    }
+
+    /** Equipa um título liberado da própria conta, ou remove o atual; nunca aceita título de outra pessoa ou bloqueado. */
+    private ActionResult equipTitle(JdbcOnlineStore.Tx tx, UUID actor, GameState game, Command command) {
+        var progress = tx.achievements(actor);
+        var unlocked = Achievements.unlocked(progress, game);
+        if (command.action().equals("CLEAR_TITLE")) {
+            tx.saveTitles(actor, unlocked, null, clock.instant());
+            return ActionResult.ok("Título removido.");
+        }
+        var achievement = Achievements.find(command.requireItem());
+        if (achievement == null) throw new ApiFailure(400, "Título inválido.");
+        if (!unlocked.contains(achievement.id())) return ActionResult.fail("Esse título ainda está bloqueado.");
+        tx.saveTitles(actor, unlocked, achievement, clock.instant());
+        return ActionResult.ok("Título equipado: " + achievement.title());
     }
 
     /** Conta uma ação já confirmada e paga 100 XP na única vez em que a tarefa chega à meta na semana. */
@@ -468,7 +503,17 @@ final class OnlineGameService implements AutoCloseable {
                     "nextResetAt", resetDay.atStartOfDay(ZoneOffset.UTC).toInstant().toString()));
             view.add("loginRewards", loginRewardView(tx, loaded.owner()));
             view.add("weeklyTasks", WeeklyTasks.view(WeeklyTasks.current(tx.weeklyTasks(loaded.owner()), clock.instant())));
+            var achievements = tx.achievements(loaded.owner());
+            var unlocked = Achievements.unlocked(achievements, loaded.game());
+            if (!unlocked.equals(achievements.unlocked())) {
+                tx.saveTitles(loaded.owner(), unlocked, Achievements.find(achievements.equipped()), clock.instant());
+                achievements = new Achievements.Progress(achievements.clean(), achievements.plant(), achievements.harvest(),
+                        achievements.spread(), achievements.steal(), achievements.green(), unlocked, achievements.equipped());
+            }
+            var titles = Achievements.view(achievements, loaded.game());
+            for (var entry : titles.entrySet()) view.add(entry.getKey(), entry.getValue());
         }
+        else view.addProperty("equippedTitle", Achievements.equippedTitle(tx.achievements(loaded.owner()).equipped()));
         return view;
     }
 
