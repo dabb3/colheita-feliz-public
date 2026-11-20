@@ -20,6 +20,7 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  const tile={column:0,row:0,unlocked:true,state:'READY',cropId:'nabo',stage:3,weeds:true,insects:2};
  const farm={owner:'alice',own:true,nextPlot:{column:1,row:0},tiles:[tile,{column:0,row:1,unlocked:true,state:'GRASS'}],animals:[{id:'vaca',stage:'ADULT',status:'READY'},{id:'abelha',stage:'ADULT',status:'PRODUCING'},{id:'cachorro-robo',stage:'ADULT',status:'PRODUCING'}]};
  scene.update(farm);
+ for(const file of ['background.png','background-sunset.png','background-night.png'])assert.ok(images.some(image=>image.src==='/assets/classic/background/'+file),`pré-carrega ${file}`);
  while(pending.length){const image=pending.shift();if(image.src.includes('atlas')){image.width=400;image.height=100;}if(image.src.endsWith('cachorro-andando.png'))image.onerror();else image.onload();}
  drawn.length=0;scene.update(farm);
  assert.ok(drawn.some(d=>d.path?.endsWith('cachorro.png')&&d.args.at(-2)===110),'idle dog remains visible at normal width when the walking reference fails');

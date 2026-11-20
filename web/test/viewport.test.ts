@@ -64,7 +64,7 @@ test('canvas clicks and hover share the uniform transform and ignore letterbox s
  let timerId=0;
  let bounds={left:10,top:312.3125,width:390,height:219.375};
  const canvas={width:0,height:0,getContext:()=>({}),getBoundingClientRect:()=>bounds,addEventListener:(name,handler)=>handlers.set(name,handler)};
- const context={...presentation,window:{requestAnimationFrame:()=>1,cancelAnimationFrame(){},setTimeout(callback,delay){assert.equal(delay,500);timers.set(++timerId,callback);return timerId;},clearTimeout(id){timers.delete(id);}},document:{hidden:true},AbortController,performance:{now:()=>0}};
+ const context={...presentation,window:{requestAnimationFrame:()=>1,cancelAnimationFrame(){},setTimeout(callback,delay){assert.equal(delay,500);timers.set(++timerId,callback);return timerId;},clearTimeout(id){timers.delete(id);}},document:{hidden:true},Image:class{},AbortController,performance:{now:()=>0}};
  const source=readFileSync(new URL('../src/scene.ts',import.meta.url),'utf8').replace(/^import\b[\s\S]*?;\s*/gm,'').replace('export class Scene','class Scene');
  runInNewContext(stripTypeScriptTypes(source)+'\nglobalThis.Scene=Scene;',context);
  const scene=new context.Scene(canvas,{},tile=>selected.push([tile.column,tile.row]),()=>{},tile=>hovered.push(tile),undefined,undefined,id=>sounds.push(id));

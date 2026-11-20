@@ -910,7 +910,7 @@ function decorations(open=false,focusKey?:string){
  carousel.onkeydown=(event:KeyboardEvent)=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();move(event.key==='ArrowLeft'?-1:1);}};
  const stage=document.createElement('div');stage.className='decoration-stage';
  const prev=button('‹',()=>move(-1),stage,'decoration-prev');prev.className='decoration-arrow';prev.setAttribute('aria-label','Fundo anterior');
- const preview=document.createElement('img');preview.className='decoration-preview';preview.src=`/assets/${backgroundPath(pack.id,decorationPeriod)}`;preview.alt=`${pack.name}, ${decorationPeriod==='day'?'dia':decorationPeriod==='sunset'?'tarde':'noite'}`;stage.append(preview);
+ const preview=document.createElement('img');preview.className='decoration-preview';preview.onload=preview.onerror=()=>preview.classList.remove('loading');preview.src=`/assets/${backgroundPath(pack.id,decorationPeriod)}`;if(!preview.complete)preview.classList.add('loading');preview.alt=`${pack.name}, ${decorationPeriod==='day'?'dia':decorationPeriod==='sunset'?'tarde':'noite'}`;stage.append(preview);
  const next=button('›',()=>move(1),stage,'decoration-next');next.className='decoration-arrow';next.setAttribute('aria-label','Próximo fundo');
  carousel.append(stage);
  const heading=document.createElement('div');heading.className='decoration-heading';heading.append(text('h3',pack.name),text('span',`${decorationIndex+1} / ${BACKGROUND_PACKS.length}`,'decoration-count'));
@@ -933,6 +933,8 @@ function decorations(open=false,focusKey?:string){
   }
  }
  carousel.append(actions);content.append(carousel);
+ // The arrows and period buttons swap to neighbour images, so fetch them now; the browser cache keeps them.
+ for(const id of [pack.id,BACKGROUND_PACKS[(decorationIndex+1)%BACKGROUND_PACKS.length].id,BACKGROUND_PACKS[(decorationIndex-1+BACKGROUND_PACKS.length)%BACKGROUND_PACKS.length].id])for(const period of id===pack.id?(['day','sunset','night'] as const):[decorationPeriod]){const warm=new Image();warm.src=`/assets/${backgroundPath(id,period)}`;}
  if(focusKey)[...content.querySelectorAll<HTMLElement>('[data-focus-key]')].find(node=>node.dataset.focusKey===focusKey)?.focus({preventScroll:true});
 }
 // Titles are shown with textContent only: their Unicode art is data, never markup.

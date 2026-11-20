@@ -218,6 +218,9 @@ export class Scene {
       this.tileEffects = this.tileEffects.slice(-24);
     }
     this.farm = farm;
+    // Warm the other periods of the active pack so the day/sunset/night switch never shows an empty field.
+    for (const period of ["day", "sunset", "night"] as const)
+      this.sprite(backgroundArtPath(period, farm.activeBackgroundId));
     this.draw();
   }
   private point(e: PointerEvent | MouseEvent) {

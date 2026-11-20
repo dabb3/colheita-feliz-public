@@ -61,7 +61,7 @@ await writeFile(
 );
 await writeFile(
   resolve(dist, "_headers"),
-  `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://lh3.googleusercontent.com; connect-src 'self' ${config.api} ${config.supabaseUrl}; base-uri 'none'; frame-ancestors 'none'; form-action 'self'\n/config.js\n  Cache-Control: no-store\n/index.html\n  Cache-Control: no-cache\n/push-worker.js\n  Cache-Control: no-cache\n`,
+  `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://lh3.googleusercontent.com; connect-src 'self' ${config.api} ${config.supabaseUrl}; base-uri 'none'; frame-ancestors 'none'; form-action 'self'\n/config.js\n  Cache-Control: no-store\n/index.html\n  Cache-Control: no-cache\n/push-worker.js\n  Cache-Control: no-cache\n/assets/classic/background/*\n  Cache-Control: public, max-age=31536000, immutable\n`,
 );
 await checkAssetSizes(dist);
 console.log(
