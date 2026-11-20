@@ -684,12 +684,12 @@ test('music continues while hidden and pauses on logout',async()=>{
  ctx.document.hidden=false;listeners.get('visibilitychange')();assert.equal(music.playCount,1);
  await h.logout();assert.equal(music.paused,true);
 });
-test('open owned-animal screen refreshes after a successful state update',()=>{
- const {h,elements}=app(),farmState={...farm('alice'),level:1,feed:{producer:1},animals:[{id:'vaca',stage:'ADULT',status:'READY',remainingSeconds:0}]};
+test('open animal popup refreshes after a successful state update',()=>{
+ const {h,elements}=app(),farmState={...farm('alice'),own:true,level:1,feed:{producer:1},animals:[{id:'vaca',stage:'ADULT',status:'READY',remainingSeconds:0}]};
  h.set({own:farmState,catalog:{crops:[],fertilizers:[],feedPrices:{producer:10,growth:10},animals:[{id:'vaca',name:'Vaca',kind:'PRODUCER',productName:'Leite'}],vip:{greenPrice:20}}});
- h.shop('owned');assert.match(text(elements.get('modal-content')),/Coletar/);
+ h.animalPopup('vaca');assert.match(text(elements.get('modal-content')),/Recolher produto/);
  h.receive({farm:{...farmState,revision:'2',animals:[{id:'vaca',stage:'ADULT',status:'PRODUCING',remainingSeconds:3600}]}});
- assert.doesNotMatch(text(elements.get('modal-content')),/Coletar/);assert.match(text(elements.get('modal-content')),/Produzindo/);
+ assert.doesNotMatch(text(elements.get('modal-content')),/Recolher produto/);assert.match(text(elements.get('modal-content')),/PRODUCING/);
 });
 test('protector popup shows remaining feeding progress at 6h, 3h and hunger',()=>{
  const {h,elements}=app(),catalog={crops:[],fertilizers:[],animals:[{id:'cachorro-robo',name:'Cachorro',kind:'PROTECTOR'}],vip:{greenPrice:20}};
@@ -702,13 +702,13 @@ test('protector popup shows remaining feeding progress at 6h, 3h and hunger',()=
   assert.equal(bar.children[0].style.width,`${expected}%`);
  }
 });
-test('owned animals show protector feeding progress',()=>{
+test('animal popup shows protector feeding time left',()=>{
  const {h,elements}=app();
  h.set({own:{...farm('alice'),feed:{producer:0,growth:0},animals:[{id:'cachorro-robo',stage:'ADULT',status:'PRODUCING',remainingSeconds:10800}]},catalog:{crops:[],fertilizers:[],feedPrices:{producer:10,growth:10},animals:[{id:'cachorro-robo',name:'Cachorro',kind:'PROTECTOR'}],vip:{greenPrice:20}}});
- h.shop('owned');
- const card=descendants(elements.get('modal-content')).find(node=>node.className==='owned-animal-card');
- assert.ok(card);assert.ok(text(card).includes('ALIMENTAÇÃO'));assert.ok(text(card).includes('3h 0min restantes'));
- const bar=descendants(card).find(node=>node.getAttribute('role')==='progressbar');
+ h.animalPopup('cachorro-robo');
+ const content=elements.get('modal-content');
+ assert.ok(text(content).includes('ALIMENTAÇÃO'));assert.ok(text(content).includes('3h 0min restantes'));
+ const bar=descendants(content).find(node=>node.getAttribute('role')==='progressbar');
  assert.ok(bar);assert.equal(bar.getAttribute('aria-valuenow'),'50');assert.equal(bar.children[0].style.width,'50%');
 });
 test('open missions screen refreshes progress after a farm update',()=>{
@@ -820,9 +820,39 @@ test('login imports existing browser choice only when server has no selection',a
   h.set({own:undefined});await h.connect('alice',async()=> 'token');assert.equal(sent.length,selected===false?1:0);if(sent.length){assert.equal(sent[0].action,'IMPORT_AVATAR');assert.equal(sent[0].itemId,'female-1');}
  }
 });
-test('fertilizer shop renders every actual catalog duration in hours and minutes',()=>{
+test('fertilizers live in the Sementes tab under both seed filters with every catalog duration',()=>{
  const {h,elements}=app(),fertilizers=JSON.parse(readFileSync(new URL('../../assets/data/fertilizers.json',import.meta.url),'utf8'));
- h.set({own:{...farm('alice'),level:50},catalog:{crops:[],animals:[],fertilizers,vip:{greenPrice:10}}});h.shop('fertilizers');const caption=text(elements.get('modal-content'));for(const fertilizer of fertilizers)assert.ok(caption.includes('Reduz '+uiPresentation.fertilizerDuration(fertilizer.reductionSeconds)));
+ h.set({own:{...farm('alice'),level:50},catalog:{crops:[],animals:[],fertilizers,vip:{greenPrice:10}}});h.shop();
+ const content=elements.get('modal-content');
+ assert.deepEqual(descendants(content).find(node=>node.className==='tabs shop-tabs').children.map(node=>node.textContent),['Sementes','Animais','VIP']);
+ for(const filter of ['VIP','Comuns']){
+  const caption=text(content);assert.match(caption,/Fertilizantes/);
+  for(const fertilizer of fertilizers){assert.ok(caption.includes(fertilizer.name));assert.ok(caption.includes('Reduz '+uiPresentation.fertilizerDuration(fertilizer.reductionSeconds)));}
+  descendants(content).find(node=>node.className==='tabs seed-tabs').children.find(node=>node.textContent===filter).onclick();
+ }
+});
+
+test('seed and fertilizer cards buy 1 to 99 units in one command with the total price',async()=>{
+ const {h,elements}=app(),sent=[];
+ const own={...farm('alice'),level:10,coins:'1000',greenCoins:'0',seedCounts:{nabo:4},fertilizers:{comum:1}};
+ const catalog={crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:3600,seasons:1,requiredLevel:1,seedPrices:{GOLD:30},vipOnly:false}],animals:[],fertilizers:[{id:'comum',name:'Fertilizante comum',prices:{GOLD:1000},requiredLevel:10,reductionSeconds:3600,friendsOnly:false}],vip:{greenPrice:10}};
+ h.set({own,catalog,api:{pending:null,prepareRequestId:async()=>{},mutate:async(_path,fields)=>{sent.push(fields);return{result:{success:true,message:'ok'},farm:{...own,revision:'2',seedCounts:{nabo:7}}};}}});h.shop();
+ const content=elements.get('modal-content'),find=label=>descendants(content).find(node=>node.getAttribute('aria-label')===label);
+ assert.match(text(content),/Você tem 4/);assert.match(text(content),/Você tem 1/);
+ find('Comprar Nabo por 30 ouro').onclick();await new Promise(r=>setTimeout(r,0));
+ assert.deepEqual({...sent[0],expectedRevision:undefined},{action:'BUY_SEED',itemId:'nabo',currency:'GOLD',expectedRevision:undefined},'uma unidade mantém o comando antigo');
+ find('Aumentar quantidade de Nabo').onclick();find('Aumentar quantidade de Nabo').onclick();
+ const buy=find('Comprar 3 Nabo por 90 ouro');assert.ok(buy);assert.equal(buy.disabled,false);
+ buy.onclick();await new Promise(r=>setTimeout(r,0));
+ assert.deepEqual({...sent[1],expectedRevision:undefined},{action:'BUY_SEED',itemId:'nabo',currency:'GOLD',quantity:3,expectedRevision:undefined});
+ assert.match(text(elements.get('modal-content')),/Você tem 7/,'o estoque vem da resposta do servidor');
+ assert.ok(find('Comprar 3 Nabo por 90 ouro'),'a quantidade escolhida sobrevive ao refresh');
+ const field=find('Quantidade de Nabo, de 1 a 99');field.value='150';field.onchange();assert.equal(field.value,'99');
+ assert.equal(find('Diminuir quantidade de Nabo').disabled,false);assert.equal(find('Aumentar quantidade de Nabo').disabled,true);
+ const expensive=find('Comprar 99 Nabo por 2.970 ouro');assert.equal(expensive.disabled,true);assert.equal(expensive.title,'Saldo de ouro insuficiente');
+ field.value='abc';field.onchange();assert.equal(field.value,'1');
+ find('Aumentar quantidade de Fertilizante comum').onclick();
+ assert.equal(find('Comprar 2 Fertilizante comum por 2.000 ouro').disabled,true);
 });
 
 test('late avatar response preserves a closed or replaced dialog',async()=>{

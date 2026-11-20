@@ -290,8 +290,7 @@ A atualização recebida da API renova o painel mesmo com o cursor parado.
 
 Clique em animal abre o alvo escolhido. Ações de alimentação, coleta ou venda
 seguem espécie, estágio e estado projetados pelo servidor. Animais da fazenda
-visitada são somente leitura; Loja → Meus animais continua mostrando os próprios,
-inclusive durante visitas. O painel aberto acompanha as atualizações periódicas,
+visitada são somente leitura. O painel aberto acompanha as atualizações periódicas,
 preservando o foco quando a ação ainda existe. Percentual de fome não é exibido,
 pois esse dado não integra a projeção atual.
 Na cena, animal com fome (`HUNGRY`), inclusive jovens, protetores, a colmeia e
@@ -401,5 +400,9 @@ Antes de publicar, usar API e frontend compatíveis e atualizar todos os produto
 ## Fertilizantes e painéis móveis
 
 O catálogo compartilhado define os seis fertilizantes da seção 5 de game-rule.md. Rápido, Super, Ultra e Mega são exclusivos de verdes; Amor custa ouro. Compras anteriores mantêm seu estoque, sem migração. Ultra reduz 9 horas e Mega reduz 14 horas da temporada atual; o excedente não passa à próxima.
+
+A Loja tem as abas Sementes, Animais e VIP. A aba Sementes mostra os filtros Comuns e VIP e, abaixo deles, a seção Fertilizantes, visível em qualquer filtro. A antiga aba Meus animais saiu: cada animal continua abrindo seu painel ao ser clicado na fazenda.
+
+`BUY_SEED` e `BUY_FERTILIZER` em `POST /v1/me/actions` aceitam o campo opcional `quantity`, inteiro de 1 a 99. Sem o campo, a compra é de uma unidade, como nos clientes antigos. Valor fracionário, fora da faixa, texto ou `quantity` em outra ação retorna 400. O servidor confere catálogo, origem de loja, nível, VIP, moeda, saldo e espaço no estoque antes de mexer na fazenda: debita preço × quantidade uma vez e credita o lote inteiro, ou recusa sem gastar nada. A quantidade faz parte do recibo: repetir o mesmo `requestId` devolve a mesma resposta e reutilizá-lo com outra quantidade retorna 409. A ração continua com compra unitária.
 
 Amigos permite quebra dos nomes e botões em telas estreitas. O popup de planta respeita a viewport visível e o topo das ferramentas, acompanha zoom e permite rolagem quando necessário.

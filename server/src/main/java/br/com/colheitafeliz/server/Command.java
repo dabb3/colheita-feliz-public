@@ -5,12 +5,16 @@ import java.util.Set;
 import java.util.UUID;
 
 record Command(UUID requestId, String expectedRevision, String action, String itemId, String currency,
-               Integer column, Integer row, String harvestRevision, String photoUrl, String feedId) {
+               Integer column, Integer row, String harvestRevision, String photoUrl, String feedId, Integer quantity) {
+    static final int MAX_PURCHASE_QUANTITY = 99;
     Command(UUID requestId,String expectedRevision,String action,String itemId,String currency,Integer column,Integer row,String harvestRevision){
         this(requestId,expectedRevision,action,itemId,currency,column,row,harvestRevision,null,null);
     }
     Command(UUID requestId,String expectedRevision,String action,String itemId,String currency,Integer column,Integer row,String harvestRevision,String photoUrl){
         this(requestId,expectedRevision,action,itemId,currency,column,row,harvestRevision,photoUrl,null);
+    }
+    Command(UUID requestId,String expectedRevision,String action,String itemId,String currency,Integer column,Integer row,String harvestRevision,String photoUrl,String feedId){
+        this(requestId,expectedRevision,action,itemId,currency,column,row,harvestRevision,photoUrl,feedId,null);
     }
     private static final Set<String> ACTIONS = Set.of("BUY_SEED", "BUY_ANIMAL", "BUY_FEED", "BUY_FERTILIZER",
             "BUY_VIP", "BUY_PLOT", "SELL_ALL", "SELL_ITEM", "SELL_ITEM_ALL", "SELL_ANIMAL", "TEND_ANIMAL",
@@ -25,6 +29,10 @@ record Command(UUID requestId, String expectedRevision, String action, String it
             throw new ApiFailure(400,"O calendário determina a recompensa no servidor.");
         if (feedId != null && (!action.equals("FEED_ANIMAL") || !Set.of("growth", "producer").contains(feedId)))
             throw new ApiFailure(400, "Ração inválida.");
+        if (quantity != null && !Set.of("BUY_SEED", "BUY_FERTILIZER").contains(action))
+            throw new ApiFailure(400, "Quantidade não permitida nesta ação.");
+        if (quantity != null && (quantity < 1 || quantity > MAX_PURCHASE_QUANTITY))
+            throw new ApiFailure(400, "Escolha de 1 a " + MAX_PURCHASE_QUANTITY + " unidades.");
         revision(expectedRevision);
         if (harvestRevision != null) revision(harvestRevision);
         if (itemId != null && !itemId.matches("[a-z0-9_-]{1,60}")) throw new ApiFailure(400, "Item inválido.");
@@ -43,6 +51,8 @@ record Command(UUID requestId, String expectedRevision, String action, String it
     void requireTile() {
         if (column == null || row == null) throw new ApiFailure(400, "Escolha um terreno.");
     }
+    /** Compras antigas não mandam quantidade e continuam comprando uma unidade. */
+    int purchaseQuantity() { return quantity == null ? 1 : quantity; }
     String requireItem() {
         if (itemId == null) throw new ApiFailure(400, "Escolha um item.");
         return itemId;

@@ -72,14 +72,18 @@ public final class Market {
     }
 
     /** Compra uma semente na moeda pedida; o lote guarda moeda, preço e exclusividade VIP para a venda. */
-    public void buySeed(CropType type, Currency currency) {
+    public void buySeed(CropType type, Currency currency) { buySeed(type, currency, 1); }
+
+    /** Compra o lote inteiro ou nada: estoque e saldo são conferidos antes de debitar uma única vez. */
+    public void buySeed(CropType type, Currency currency, int quantity) {
         if (type.acquisitionSource() != br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP)
             throw new IllegalArgumentException(type.id() + " is not sold");
+        if (quantity < 1) throw new IllegalArgumentException("quantity must be positive");
         BigDecimal price = type.seedPrices().get(currency);
         if (price == null) throw new IllegalArgumentException(type.id() + " is not sold for " + currency);
-        Math.addExact(inventory.seeds(type), 1);
-        wallet.debit(currency, price);
-        inventory.addSeedLot(new ItemLot(type.id(), currency, price, 1, type.vipOnly()));
+        Math.addExact(inventory.seeds(type), quantity);
+        wallet.debit(currency, price.multiply(BigDecimal.valueOf(quantity)));
+        inventory.addSeedLot(new ItemLot(type.id(), currency, price, quantity, type.vipOnly()));
     }
 
 }

@@ -534,10 +534,10 @@ final class OnlineGameService implements AutoCloseable {
             case "DISMISS_READ_NOTIFICATIONS" -> game.dismissReadNotifications();
             case "READ_NOTIFICATION" -> game.markNotificationRead(c.requireItem());
             case "READ_ALL_NOTIFICATIONS" -> game.markAllNotificationsRead();
-            case "BUY_SEED" -> game.buySeed(catalog.get(c.requireItem()), currency);
+            case "BUY_SEED" -> game.buySeed(catalog.get(c.requireItem()), currency, c.purchaseQuantity());
             case "BUY_ANIMAL" -> game.buyAnimal(game.animalType(c.requireItem()), currency);
             case "BUY_FEED" -> game.buyFeed(c.requireItem());
-            case "BUY_FERTILIZER" -> game.buyFertilizer(c.requireItem(), currency);
+            case "BUY_FERTILIZER" -> game.buyFertilizer(c.requireItem(), currency, c.purchaseQuantity());
             case "BUY_VIP" -> game.buyVip();
             case "SELL_ALL" -> game.sellEverything();
             case "SELL_ITEM" -> catalog.all().stream().anyMatch(type -> type.id().equals(c.requireItem()))

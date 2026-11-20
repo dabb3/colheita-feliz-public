@@ -13,7 +13,7 @@ Esta é a fonte normativa dos valores e das regras desejadas. `docs/regras-de-ne
 
 ## 2. Sementes e plantas: tabela consolidada
 
-O preço de compra é por semente. A receita v1 é o retorno do ciclo completo, repartido entre as temporadas na moeda da aquisição. Cada produto preserva o custo da semente e sua própria temporada. Todas as culturas rendem uma unidade por terreno em cada temporada. As sementes VIP exigem cartão VIP ativo para compra, plantio e venda dos produtos, conforme as seções 7 e 9.2.
+O preço de compra é por semente. A Loja vende sementes e fertilizantes de 1 a 99 unidades por compra: o total é o preço unitário vezes a quantidade, debitado de uma vez na moeda escolhida, e a compra inteira é recusada quando falta saldo, nível, VIP ou espaço no estoque. A receita v1 é o retorno do ciclo completo, repartido entre as temporadas na moeda da aquisição. Cada produto preserva o custo da semente e sua própria temporada. Todas as culturas rendem uma unidade por terreno em cada temporada. As sementes VIP exigem cartão VIP ativo para compra, plantio e venda dos produtos, conforme as seções 7 e 9.2.
 
 Desde o balanceamento v1 de 2026-11-05, a coluna de venda mostra os valores exatos por temporada, na ordem das colheitas. Para culturas comuns, VIP ativo na venda acrescenta somente a parcela proporcional de 10% do custo da semente, dividida entre todas as temporadas. Culturas exclusivas VIP exigem VIP ativo na venda e recebem apenas o valor da tabela, sem bônus adicional. As plantas e os produtos anteriores conservam a regra v0, conforme a seção 6.3.
 
