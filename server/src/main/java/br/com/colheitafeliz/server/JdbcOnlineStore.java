@@ -26,7 +26,7 @@ import java.util.function.Function;
 final class JdbcOnlineStore implements AutoCloseable {
     static final int RECEIPTS_PER_ACTOR = 1000;
     record Player(UUID id, String name, boolean active, Instant registeredAt) {}
-    record Friend(UUID id,String name,boolean active,br.com.colheitafeliz.game.PlayerAvatar avatar,boolean vipActive) {}
+    record Friend(UUID id,String name,boolean active,br.com.colheitafeliz.game.PlayerAvatar avatar,boolean vipActive,String equippedTitle) {}
     record Farm(GameSnapshot snapshot, long revision, Instant time, LocalDate allowanceDay) {}
     record LoginRewardProgress(LocalDate lastClaimDate, int completedDay, long cycle, long totalClaims) {}
     record Receipt(String hash, JsonObject response) {}
@@ -460,11 +460,12 @@ final class JdbcOnlineStore implements AutoCloseable {
                     r->r.getObject(1,UUID.class),actor,version,day).isEmpty();
         }
         List<Friend> friends(UUID actor,Instant now) {
-            return query("SELECT p.id,p.name,p.active,g.snapshot->'avatar',g.snapshot->>'vipExpiresAt' FROM " + schema + ".players p JOIN " + schema
+            // The equipped title comes in the same query, so the list never runs one lookup per friend.
+            return query("SELECT p.id,p.name,p.active,g.snapshot->'avatar',g.snapshot->>'vipExpiresAt',a.equipped_title FROM " + schema + ".players p JOIN " + schema
                     + ".friendships f ON p.id=CASE WHEN f.a=? THEN f.b ELSE f.a END LEFT JOIN " + schema
-                    + ".farms g ON g.owner=p.id WHERE (f.a=? OR f.b=?) AND p.active",
+                    + ".farms g ON g.owner=p.id LEFT JOIN " + schema + ".achievement_progress a ON a.owner=p.id WHERE (f.a=? OR f.b=?) AND p.active",
                     r -> new Friend(r.getObject(1, UUID.class), r.getString(2), r.getBoolean(3),publicAvatar(r.getString(4)),
-                            r.getString(5)!=null&&now.isBefore(Instant.parse(r.getString(5)))), actor, actor, actor);
+                            r.getString(5)!=null&&now.isBefore(Instant.parse(r.getString(5))),r.getString(6)), actor, actor, actor);
         }
         private br.com.colheitafeliz.game.PlayerAvatar publicAvatar(String json){
             var avatar=json==null?com.google.gson.JsonNull.INSTANCE:JsonParser.parseString(json);

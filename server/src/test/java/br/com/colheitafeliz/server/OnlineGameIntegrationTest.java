@@ -1240,6 +1240,63 @@ class OnlineGameIntegrationTest {
         var publicTitle = service.visit(bob, alice).get("equippedTitle"); assertTrue(publicTitle == null || publicTitle.isJsonNull());
     }
 
+    @Test void visitAchievementsCountOnlyEffectivePestsAndCleanupsOnce() {
+        UUID carol = preparePestFriends(false);
+        var insects = pestCommand(bob, alice, "SPREAD_INSECTS");
+        assertTrue(confirmed(() -> service.visitAction(bob, alice, insects)));
+        service.visitAction(bob, alice, insects);
+        assertEquals(1, progress(bob, "spread-100"), "replay da praga não conta de novo");
+        assertFalse(confirmed(() -> service.visitAction(bob, carol, pestCommand(bob, carol, "SPREAD_INSECTS"))), "recarga de 6 horas");
+        assertEquals(1, progress(bob, "spread-100"), "praga recusada não conta");
+
+        var cure = new Command(requestId(), service.farm(alice).get("revision").getAsString(), "PESTICIDE", null, null, 0, 0, null);
+        assertTrue(confirmed(() -> service.command(alice, cure)));
+        service.command(alice, cure);
+        assertEquals(1, progress(alice, "clean-100"), "replay da limpeza não conta de novo");
+        var nothing = new Command(requestId(), service.farm(alice).get("revision").getAsString(), "PESTICIDE", null, null, 0, 0, null);
+        assertFalse(confirmed(() -> service.command(alice, nothing)));
+        assertEquals(1, progress(alice, "clean-100"), "limpar terra sem praga não conta");
+    }
+
+    @Test void onlyAStolenHarvestCountsAndItsReplayDoesNotCountAgain() {
+        connectFriends();
+        UUID carol = UUID.randomUUID();
+        service.acceptInvitation(carol, "Carol", service.createInvitation(bob, requestId()).get("code").getAsString(), requestId());
+        service.farm(carol);
+        prepare(carol, "morango", true, false);
+        prepare(bob, null, false, false);
+        // Alice por último: preparar outra fazenda adianta o relógio e deixaria os protetores com fome.
+        prepare(alice, "morango", true, true);
+        assertFalse(confirmed(() -> service.visitAction(bob, alice, theftCommand(bob, alice))));
+        assertEquals(0, progress(bob, "steal-100"), "furto protegido ou mordido não conta");
+        clock.advanceSeconds(21600);
+        var theft = theftCommand(bob, carol);
+        var stolen = service.visitAction(bob, carol, theft);
+        assertTrue(stolen.getAsJsonObject("result").get("success").getAsBoolean(), stolen.toString());
+        assertEquals(stolen, service.visitAction(bob, carol, theft));
+        assertEquals(1, progress(bob, "steal-100"), "replay do furto não conta de novo");
+    }
+
+    @Test void concurrentPurchasesOfTheSameBackgroundChargeOnlyOnce() throws Exception {
+        grantGold(alice, new BigDecimal("1999500"));
+        var farm = service.farm(alice);
+        assertEquals("2000000", farm.get("coins").getAsString());
+        var revision = farm.get("revision").getAsString();
+        var one = new Command(requestId(), revision, "BUY_BACKGROUND", "savana", "GOLD", null, null, null);
+        var two = new Command(requestId(), revision, "BUY_BACKGROUND", "savana", "GOLD", null, null, null);
+        var start = new java.util.concurrent.CyclicBarrier(2);
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> { start.await(5, java.util.concurrent.TimeUnit.SECONDS); return confirmed(() -> service.command(alice, one)); });
+            var second = executor.submit(() -> { start.await(5, java.util.concurrent.TimeUnit.SECONDS); return confirmed(() -> service.command(alice, two)); });
+            assertEquals(1, (first.get() ? 1 : 0) + (second.get() ? 1 : 0));
+        }
+        farm = service.farm(alice);
+        assertEquals("1000000", farm.get("coins").getAsString());
+        assertEquals(java.util.List.of("default", "savana"), ids(farm.getAsJsonArray("ownedBackgroundIds")));
+    }
+
+    private long progress(UUID player, String id) { return achievement(service.farm(player), id).get("progress").getAsLong(); }
+
     private static JsonObject achievement(JsonObject farm, String id) {
         for (var item : farm.getAsJsonArray("achievements")) if (item.getAsJsonObject().get("id").getAsString().equals(id)) return item.getAsJsonObject();
         throw new AssertionError(id);

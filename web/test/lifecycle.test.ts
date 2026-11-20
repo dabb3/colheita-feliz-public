@@ -974,6 +974,24 @@ test('shop quantities do not leak to the next account',async()=>{
  assert.ok(find('Comprar Nabo por 30 ouro'),'Bob começa em uma unidade');
 });
 
+test('weekly countdown follows the server clock, not a wrong device clock',()=>{
+ const {h,elements}=app(),own={...farm('alice'),serverTime:'2026-11-20T12:00:00Z',missions:[],weeklyTasks:{weekStartsAt:'2026-11-15T03:00:00Z',nextResetAt:'2026-11-22T03:00:00Z',tasks:[]}};
+ h.set({own});h.receive({farm:own});h.missions();
+ assert.match(text(elements.get('modal-content')),/faltam 1d 15h 0min/,'o relógio do aparelho (hoje real) não muda a contagem');
+});
+test('friend list refresh keeps, changes and removes the public title next to the VIP badge',async()=>{
+ const {h,elements}=app();let list=[{id:'bob',name:'Bob',vipActive:true,equippedTitle:'♛ Rei do Gado ♛'}];
+ const own=farm('alice');h.set({own,api:{get:async path=>path==='/v1/friends'?list:own}});await h.friends();
+ const identity=()=>descendants(elements.get('modal-content')).find(node=>node.className==='friend-identity');
+ const title=()=>descendants(identity()).find(node=>node.className==='player-title')?.textContent;
+ const vip=()=>descendants(identity()).some(node=>node.className?.includes?.('vip'));
+ assert.equal(title(),'♛ Rei do Gado ♛');assert.ok(vip());
+ const refresh=async()=>{h.receive({farm:{...h.get().own,revision:String(Number(h.get().own.revision)+1)}});for(let i=0;i<3;i++)await new Promise(r=>setTimeout(r,0));};
+ await refresh();assert.equal(title(),'♛ Rei do Gado ♛','o refresh não apaga o título');assert.ok(vip(),'nem o selo VIP');
+ list=[{...list[0],equippedTitle:'★ Mão na Enxada ★'}];await refresh();assert.equal(title(),'★ Mão na Enxada ★');
+ list=[{...list[0],equippedTitle:null,vipActive:false}];await refresh();assert.equal(title(),undefined);assert.equal(vip(),false);
+});
+
 test('late avatar response preserves a closed or replaced dialog',async()=>{
  for(const close of [true,false]){
   const {h,elements}=app(),own=farm('alice'),reply=deferred();h.set({own,api:{pending:null,mutate:()=>reply.promise,prepareRequestId:async()=>{}}});h.avatarSettings();descendants(elements.get('modal-content')).find(n=>n.textContent==='Feminino 3').onclick();

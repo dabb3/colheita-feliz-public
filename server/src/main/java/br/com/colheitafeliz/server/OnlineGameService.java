@@ -235,7 +235,7 @@ final class OnlineGameService implements AutoCloseable {
     JsonArray friends(JdbcOnlineStore.Tx tx, UUID actor) {
         active(tx, actor);var result=new JsonArray();
         for(var player:tx.friends(actor,clock.instant()))result.add(object("id",player.id(),"name",player.name(),"active",player.active(),"avatar",player.avatar(),"vipActive",player.vipActive(),
-                "equippedTitle",Achievements.equippedTitle(tx.achievements(player.id()).equipped())));
+                "equippedTitle",Achievements.equippedTitle(player.equippedTitle())));
         return result;
     }
 
