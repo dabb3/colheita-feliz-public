@@ -805,8 +805,13 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 @media(max-width:600px){.achievement-card{grid-template-columns:minmax(0,1fr) auto}.achievement-card progress{grid-column:1/-1}.achievement-state,.achievement-equip{grid-column:2}}
 .decoration-carousel{display:grid;gap:10px}
 .decoration-carousel:focus-visible{outline:3px solid #1668cd;outline-offset:3px}
-.decoration-stage{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px}
-.decoration-preview{width:100%;aspect-ratio:16/9;border:1px solid #c1cdae;border-radius:10px;object-fit:fill;background:#84ba30}
+.decoration-stage{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px}
+.decoration-preview{width:100%;aspect-ratio:16/9;border:1px solid #c1cdae;border-radius:10px;object-fit:fill;background:#244a50}
+.decoration-preview-placeholder{width:100%;aspect-ratio:16/9;border:1px solid #9cb4b1;border-radius:10px;background:linear-gradient(135deg,#1b454b,#53716e 52%,#244257)}
+.decoration-preview-status{position:absolute;z-index:1;top:50%;left:50%;display:flex;max-width:calc(100% - 110px);align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;padding:8px 12px;transform:translate(-50%,-50%);border-radius:8px;background:rgba(18,44,45,.88);color:#fff;text-align:center;font-size:13px;pointer-events:none}
+.decoration-preview-status[hidden]{display:none}
+.decoration-preview-status.is-error{pointer-events:auto}
+.decoration-preview-status button{padding:.25rem .6rem;font-size:12px}
 .decoration-arrow{width:44px;height:44px;padding:0;font-size:26px;line-height:1}
 .decoration-heading{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px}
 .decoration-heading h3{margin:0;color:#57471f;font:700 20px Georgia,serif}
