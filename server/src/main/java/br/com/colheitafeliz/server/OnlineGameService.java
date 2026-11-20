@@ -172,7 +172,26 @@ final class OnlineGameService implements AutoCloseable {
                             tx.recordLoginRewardProgress(actor, today, next.day(), cycle, total, clock.instant());
                         }
                     }
-                } else result = act(farm.game(), command);
+                } else if (command.action().equals("BUY_BACKGROUND") || command.action().equals("EQUIP_BACKGROUND")) {
+                    result = background(tx, actor, farm.game(), command);
+                } else if (command.action().equals("EQUIP_TITLE") || command.action().equals("CLEAR_TITLE")) {
+                    result = equipTitle(tx, actor, farm.game(), command);
+                } else {
+                    result = act(farm.game(), command);
+                    if (command.action().equals("HARVEST")) result = advanceWeekly(tx, actor, farm.game(), WeeklyTasks.Task.HARVEST, result);
+                    else if (command.action().equals("BUY_ANIMAL")) result = advanceWeekly(tx, actor, farm.game(), WeeklyTasks.Task.BUY_ANIMAL, result);
+                    if (result.success()) {
+                        var category = switch (command.action()) {
+                            case "PLANT" -> Achievements.Category.PLANT;
+                            case "HARVEST" -> Achievements.Category.HARVEST;
+                            case "WEED", "PESTICIDE" -> Achievements.Category.CLEAN;
+                            default -> null;
+                        };
+                        var delta = (category == null ? Achievements.Delta.NONE : Achievements.Delta.of(category))
+                                .withGreen(farm.game().wallet().spent(Currency.GREEN));
+                        if (!delta.empty()) tx.addAchievementCounters(actor, delta, clock.instant());
+                    }
+                }
                 return object("result", result, "farm", persist(tx, farm, true, true));
             });
     }
@@ -215,7 +234,8 @@ final class OnlineGameService implements AutoCloseable {
 
     JsonArray friends(JdbcOnlineStore.Tx tx, UUID actor) {
         active(tx, actor);var result=new JsonArray();
-        for(var player:tx.friends(actor,clock.instant()))result.add(object("id",player.id(),"name",player.name(),"active",player.active(),"avatar",player.avatar(),"vipActive",player.vipActive()));
+        for(var player:tx.friends(actor,clock.instant()))result.add(object("id",player.id(),"name",player.name(),"active",player.active(),"avatar",player.avatar(),"vipActive",player.vipActive(),
+                "equippedTitle",Achievements.equippedTitle(player.equippedTitle())));
         return result;
     }
 
@@ -316,7 +336,15 @@ final class OnlineGameService implements AutoCloseable {
                     }
                 } else {
                     result = visits.fertilizeVisit(destination.game(), visitor.game(), command.column(), command.row(), "amor", season);
+                    // O XP da tarefa vai para quem adubou, nunca para o dono da plantação.
+                    result = advanceWeekly(tx, actor, visitor.game(), WeeklyTasks.Task.LOVE, result);
                 }
+                // Só ações que surtiram efeito contam; furto bloqueado, protegido ou mordido não é colheita roubada.
+                var visitAchievement = !result.success() ? null
+                        : command.action().equals("STEAL") ? (theft != null && theft.kind() == br.com.colheitafeliz.game.TheftAttempt.Kind.STOLEN ? Achievements.Category.STEAL : null)
+                        : PEST_ACTIONS.contains(command.action()) ? Achievements.Category.SPREAD
+                        : CLEAN_ACTIONS.contains(command.action()) ? Achievements.Category.CLEAN : null;
+                if (visitAchievement != null) tx.addAchievementCounters(actor, Achievements.Delta.of(visitAchievement), clock.instant());
                 if (result.success() && (command.action().equals("STEAL") || PEST_ACTIONS.contains(command.action()))) {
                     String type = command.action().equals("STEAL") ? "THEFT" : "PEST";
                     store.pushStore().recordEvent(tx, command.requestId(), owner, actor, type, clock.instant());
@@ -326,6 +354,54 @@ final class OnlineGameService implements AutoCloseable {
                 if(theft!=null)reply.add("theftOutcome",object("kind",theft.kind(),"goldDebited",theft.goldDebited().toPlainString()));
                 return reply;
             });
+    }
+
+    /** Compra (1.000.000 de ouro, uma vez, já aplicando) ou aplica de graça um fundo que a conta possui. */
+    private ActionResult background(JdbcOnlineStore.Tx tx, UUID actor, GameState game, Command command) {
+        String id = command.requireItem();
+        if (!Backgrounds.known(id)) throw new ApiFailure(400, "Fundo inválido.");
+        var state = tx.backgrounds(actor);
+        if (command.action().equals("EQUIP_BACKGROUND")) {
+            if (command.currency() != null) throw new ApiFailure(400, "Aplicar um fundo não tem custo.");
+            if (!id.equals(Backgrounds.DEFAULT) && !state.owned().contains(id)) return ActionResult.fail("Compre esse fundo antes de aplicar.");
+            if (!id.equals(state.active())) tx.saveBackgrounds(actor, state.equip(id), clock.instant());
+            return ActionResult.ok(id.equals(Backgrounds.DEFAULT) ? "Fundo padrão aplicado." : "Fundo aplicado.");
+        }
+        if (command.currency() != null && !command.currency().equals("GOLD")) throw new ApiFailure(400, "Fundos só são vendidos por ouro.");
+        if (id.equals(Backgrounds.DEFAULT)) return ActionResult.fail("O fundo padrão é gratuito.");
+        if (state.owned().contains(id)) return ActionResult.fail("Você já tem esse fundo. Use Aplicar.");
+        if (game.wallet().balance(Currency.GOLD).compareTo(Backgrounds.PRICE) < 0) return ActionResult.fail("Moedas insuficientes.");
+        game.wallet().debit(Currency.GOLD, Backgrounds.PRICE);
+        tx.saveBackgrounds(actor, state.buy(id), clock.instant());
+        return ActionResult.ok("Fundo comprado e aplicado. -1.000.000 ouro.");
+    }
+
+    /** Equipa um título liberado da própria conta, ou remove o atual; nunca aceita título de outra pessoa ou bloqueado. */
+    private ActionResult equipTitle(JdbcOnlineStore.Tx tx, UUID actor, GameState game, Command command) {
+        var progress = tx.achievements(actor);
+        var unlocked = Achievements.unlocked(progress, game);
+        if (command.action().equals("CLEAR_TITLE")) {
+            tx.saveTitles(actor, unlocked, null, clock.instant());
+            return ActionResult.ok("Título removido.");
+        }
+        var achievement = Achievements.find(command.requireItem());
+        if (achievement == null) throw new ApiFailure(400, "Título inválido.");
+        if (!unlocked.contains(achievement.id())) return ActionResult.fail("Esse título ainda está bloqueado.");
+        tx.saveTitles(actor, unlocked, achievement, clock.instant());
+        return ActionResult.ok("Título equipado: " + achievement.title());
+    }
+
+    /** Conta uma ação já confirmada e paga 100 XP na única vez em que a tarefa chega à meta na semana. */
+    private ActionResult advanceWeekly(JdbcOnlineStore.Tx tx, UUID actor, GameState game, WeeklyTasks.Task task, ActionResult result) {
+        if (!result.success()) return result;
+        Instant now = clock.instant();
+        var before = WeeklyTasks.current(tx.weeklyTasks(actor), now);
+        var after = before.plusOne(task);
+        if (after == before) return result;
+        tx.recordWeeklyTasks(actor, after, now);
+        if (after.value(task) < task.target) return result;
+        String levelUp = game.awardTaskXp(WeeklyTasks.REWARD_XP);
+        return ActionResult.ok((result.message() + " Tarefa semanal concluída: +" + WeeklyTasks.REWARD_XP + " XP. " + levelUp).strip());
     }
 
     private static int cooperativeHelpXp(JdbcOnlineStore.Tx tx, UUID actor, LocalDate today) {
@@ -448,6 +524,25 @@ final class OnlineGameService implements AutoCloseable {
             view.add("dailyAllowance", object("amount", DAILY_ALLOWANCE.toPlainString(), "available", available,
                     "nextResetAt", resetDay.atStartOfDay(ZoneOffset.UTC).toInstant().toString()));
             view.add("loginRewards", loginRewardView(tx, loaded.owner()));
+            view.add("weeklyTasks", WeeklyTasks.view(WeeklyTasks.current(tx.weeklyTasks(loaded.owner()), clock.instant())));
+            var achievements = tx.achievements(loaded.owner());
+            var unlocked = Achievements.unlocked(achievements, loaded.game());
+            if (!unlocked.equals(achievements.unlocked())) {
+                tx.saveTitles(loaded.owner(), unlocked, Achievements.find(achievements.equipped()), clock.instant());
+                achievements = new Achievements.Progress(achievements.clean(), achievements.plant(), achievements.harvest(),
+                        achievements.spread(), achievements.steal(), achievements.green(), unlocked, achievements.equipped());
+            }
+            var titles = Achievements.view(achievements, loaded.game());
+            for (var entry : titles.entrySet()) view.add(entry.getKey(), entry.getValue());
+        }
+        else view.addProperty("equippedTitle", Achievements.equippedTitle(tx.achievements(loaded.owner()).equipped()));
+        var backgrounds = tx.backgrounds(loaded.owner());
+        view.addProperty("activeBackgroundId", backgrounds.active());
+        if (own) {
+            var owned = new JsonArray();
+            for (String id : backgrounds.ownedIds()) owned.add(id);
+            view.add("ownedBackgroundIds", owned);
+            view.addProperty("backgroundPrice", Backgrounds.PRICE.toPlainString());
         }
         return view;
     }

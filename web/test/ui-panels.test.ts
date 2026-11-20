@@ -109,7 +109,7 @@ test('login calendar preserves panel scroll, retains controls focus, and moves d
 
 test('calendar lives inside Eventos on desktop and in the mobile more menu, and the modal scrolls on short screens',()=>{
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8'),mobile=readFileSync(new URL('../src/mobile.ts',import.meta.url),'utf8'),css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
- assert.doesNotMatch(html,/id="calendar"/);assert.match(html,/id="events"/);assert.match(mobile,/\['notifications', 'friends', 'settings', 'events'\]/);assert.match(css,/\.login-calendar-dialog #modal-content\{[^}]*overflow:auto/);assert.match(css,/@media\(max-width:380px\)\{\.login-rewards-grid\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+ assert.doesNotMatch(html,/id="calendar"/);assert.match(html,/id="events"/);assert.match(mobile,/\['notifications', 'achievements', 'decorations', 'friends', 'settings', 'events'\]/);assert.match(css,/\.login-calendar-dialog #modal-content\{[^}]*overflow:auto/);assert.match(css,/@media\(max-width:380px\)\{\.login-rewards-grid\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
 });
 
 test('shop excludes login reward crops while catalog crops remain available for planting and deposit',()=>{

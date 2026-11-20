@@ -810,6 +810,12 @@ public final class GameState {
                 : "Primeiros passos concluídos!";
     }
 
+    /** XP de tarefa semanal, decidido pelo servidor; aplica as recompensas de nível como qualquer outro XP. */
+    public String awardTaskXp(int xp) {
+        if (xp <= 0) throw new IllegalArgumentException("Task XP must be positive");
+        return awardXp(BigDecimal.valueOf(xp));
+    }
+
     /** Dá XP e, para cada nível tabelado alcançado, as duas moedas; não concede sementes. */
     private String awardXp(BigDecimal xp) {
         int before = progress.level();

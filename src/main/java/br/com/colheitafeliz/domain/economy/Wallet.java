@@ -7,6 +7,8 @@ import java.util.Objects;
 
 public final class Wallet {
     private final Map<Currency, BigDecimal> balances = new EnumMap<>(Currency.class);
+    /** Débitos reais desde que esta carteira foi carregada; não entra no snapshot. */
+    private final Map<Currency, BigDecimal> spent = new EnumMap<>(Currency.class);
     public Wallet(int coins) {
         this(BigDecimal.valueOf(coins), BigDecimal.ZERO);
     }
@@ -25,7 +27,9 @@ public final class Wallet {
         if (valid.signum() == 0 || valid.compareTo(balance(currency)) > 0)
             throw new IllegalStateException("Insufficient coins");
         balances.put(currency, balance(currency).subtract(valid));
+        spent.merge(currency, valid, BigDecimal::add);
     }
+    public BigDecimal spent(Currency currency) { return spent.getOrDefault(Objects.requireNonNull(currency), BigDecimal.ZERO); }
     private static BigDecimal validate(BigDecimal amount) {
         if (amount == null || amount.signum() < 0 || amount.stripTrailingZeros().scale() > 1)
             throw new IllegalArgumentException("Invalid balance or precision");

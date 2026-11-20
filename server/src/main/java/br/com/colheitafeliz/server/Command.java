@@ -20,7 +20,7 @@ record Command(UUID requestId, String expectedRevision, String action, String it
             "BUY_VIP", "BUY_PLOT", "SELL_ALL", "SELL_ITEM", "SELL_ITEM_ALL", "SELL_ANIMAL", "TEND_ANIMAL",
             "PLOW", "PLANT", "WATER", "HARVEST", "WEED", "PESTICIDE", "FERTILIZE", "STEAL", "LOVE",
             "SPREAD_INSECTS", "SPREAD_WEEDS", "CLEAN_WEEDS", "CLEAN_INSECTS", "FEED_ANIMAL", "CLAIM_DAILY_ALLOWANCE", "CLAIM_LOGIN_REWARD", "READ_NOTIFICATION", "READ_ALL_NOTIFICATIONS",
-            "SET_AVATAR", "IMPORT_AVATAR", "DISMISS_NOTIFICATION", "DISMISS_READ_NOTIFICATIONS", "BUY_AUTOMATION");
+            "SET_AVATAR", "IMPORT_AVATAR", "DISMISS_NOTIFICATION", "DISMISS_READ_NOTIFICATIONS", "BUY_AUTOMATION", "EQUIP_TITLE", "CLEAR_TITLE", "BUY_BACKGROUND", "EQUIP_BACKGROUND");
     Command {
         Objects.requireNonNull(requestId);
         if (!ACTIONS.contains(action)) throw new ApiFailure(400, "Ação desconhecida.");
@@ -29,6 +29,8 @@ record Command(UUID requestId, String expectedRevision, String action, String it
             throw new ApiFailure(400,"O calendário determina a recompensa no servidor.");
         if (feedId != null && (!action.equals("FEED_ANIMAL") || !Set.of("growth", "producer").contains(feedId)))
             throw new ApiFailure(400, "Ração inválida.");
+        if (action.equals("CLEAR_TITLE") && (itemId != null || currency != null || column != null || row != null || harvestRevision != null || feedId != null))
+            throw new ApiFailure(400, "Remover o título não aceita outros campos.");
         if (quantity != null && !Set.of("BUY_SEED", "BUY_FERTILIZER").contains(action))
             throw new ApiFailure(400, "Quantidade não permitida nesta ação.");
         if (quantity != null && (quantity < 1 || quantity > MAX_PURCHASE_QUANTITY))

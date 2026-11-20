@@ -1,14 +1,29 @@
 import type { Animal, AnimalType, Crop, Farm, Tile } from "./types.ts";
+import { backgroundPath } from "./background-catalog.ts";
 
 export function seedArtPath(stem:string):string {
   return `classic/crops/seeds/${stem==='mini-bis'?'semente-mini-bis':`semente_${stem}`}.png`;
 }
+/** Seeds the player actually holds, in catalog order; the bag is an inventory, not the shop. */
+export function ownedSeeds<T extends { id: string }>(crops: T[], counts: Record<string, number> | undefined): T[] {
+  return crops.filter((crop) => {
+    const count = counts?.[crop.id];
+    return Number.isInteger(count) && (count as number) > 0;
+  });
+}
+
+/** Keeps the chosen seed while it is in stock; otherwise falls back to the first one held. */
+export function seedSelection(crops: { id: string }[], counts: Record<string, number> | undefined, selected: string): string {
+  const owned = ownedSeeds(crops, counts);
+  return owned.some((crop) => crop.id === selected) ? selected : owned[0]?.id ?? selected;
+}
+
 export function christmasActive(now:Date):boolean {
   const time=now.getTime();return time>=Date.parse('2026-11-06T03:00:00Z')&&time<Date.parse('2027-01-01T03:00:00Z');
 }
-/** The farm always uses the original backgrounds; the Christmas event keeps only its music and gifts. */
-export function backgroundArtPath(period:'day'|'sunset'|'night'):string {
-  return `classic/background/background${period==='day'?'':'-'+period}.png`;
+/** Background of the farm on screen: its pack (classic when unknown) for the viewer's local period. No Christmas art. */
+export function backgroundArtPath(period:'day'|'sunset'|'night',packId?:string|null):string {
+  return backgroundPath(packId,period);
 }
 export function musicArtPath(period:'day'|'sunset'|'night',now:Date):string {
   return christmasActive(now)?`musica-evento-natal-${period==='night'?'noite':'dia-e-por-do-sol'}.mp3`:period==='night'?'noite.mp3':'farm_loop.mp3';
@@ -222,20 +237,6 @@ export function periodAt(date: Date): "day" | "sunset" | "night" {
     : minute >= 1020 && minute <= 1110
       ? "sunset"
       : "night";
-}
-export function backgroundBounds(
-  viewportWidth: number,
-  viewportHeight: number,
-  imageWidth: number,
-  imageHeight: number,
-) {
-  const scale = Math.max(
-    viewportWidth / imageWidth,
-    viewportHeight / imageHeight,
-  );
-  const width = imageWidth * scale,
-    height = imageHeight * scale;
-  return { x: (viewportWidth - width) / 2, y: 0, width, height };
 }
 export function tileCenter(column: number, row: number) {
   return { x: 585 + (column - row) * 85, y: 400 + (column + row) * 36 };

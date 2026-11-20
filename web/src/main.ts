@@ -8,11 +8,12 @@ import {syncMobileCamera,setMoreMenuVisiting} from './mobile.ts';
 import {takeInvite} from './invite-url.ts';
 import {renderWallet,control,text,image,renderDailyAllowance,friendAvatar,vipBadge} from './ui.ts';
 import {renderGiftComposer,renderLoginRewards,giftLimit,type GiftComposerState} from './ui-panels.ts';
+import {BACKGROUND_PACKS,backgroundPath,DEFAULT_BACKGROUND,type Period} from './background-catalog.ts';
 import {fertilizerDuration,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText,purchaseQuantity} from './ui-presentation.ts';
 import {PROTECTED_ICON,notificationCount,renderNotifications} from './notifications.ts';
 import {renderAwayReport,startAwayLeaves} from './away-report.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,avatarImport,type AvatarChoice} from './avatar.ts';
-import {musicArtPath,seedArtPath,periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalSoundPath,animalStatusText,animalActionLabel,animalClickCommand,friendFeedOptions,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
+import {musicArtPath,seedArtPath,ownedSeeds,seedSelection,periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalSoundPath,animalStatusText,animalActionLabel,animalClickCommand,friendFeedOptions,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
 
 let eventsTimer:number|undefined,eventsBoundary='',eventsRoot:HTMLElement|undefined;
 const config=window.COLHEITA_CONFIG;
@@ -30,6 +31,8 @@ let giftContext:{client:ApiClient;session:number;dialog:number;recipientId:strin
 let giftReturn:{friendId:string;scroll:number}|undefined;
 let calendarContext:{root:HTMLElement;client:ApiClient;session:number;dialog:number;phase:'ready'|'sending'|'unknown'|'error';message?:string;anchorServer:number;anchorClient:number;resetAt:string;checkedResetAt?:string;refreshing?:boolean}|undefined,calendarTimer:number|undefined,ownServerClock:{owner:string;server:number;client:number}|undefined;
 const depositNumber=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1});
+// Carousel position and preview period survive the panel refresh that follows each server reply.
+let decorationIndex=0,decorationPeriod:Period='day',decorationConfirm='';
 const depositPriceNumber=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2});
 const login=element('login');
 const {invite:inviteFromUrl,cleaned:cleanedUrl}=takeInvite(location.href);
@@ -128,7 +131,7 @@ async function fadeSoldDepositRows(fields:CommandFields,farm:Farm){
 }
 let missionsTimer:number|undefined;
 function stopCalendar(){window.clearInterval(calendarTimer);calendarTimer=undefined;calendarContext=undefined;}
-function dialog(title:string){stopEvents();stopCalendar();giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;modal.classList.remove('bite-dialog');modal.removeAttribute('aria-describedby');dialogGeneration++;refreshDialog=undefined;closeHealth();element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');modal.classList.toggle('missions-dialog',title==='Missões');modal.classList.toggle('away-dialog',title===AWAY_TITLE);modal.classList.toggle('gift-dialog',title==='Presentear');modal.classList.toggle('login-calendar-dialog',title==='Eventos');if(title!=='Missões'){window.clearInterval(missionsTimer);missionsTimer=undefined;}content.className='';content.replaceChildren();content.scrollTop=0;modalFooter.className='';modalFooter.replaceChildren();modalFooter.hidden=true;if(!modal.open)modal.showModal();}
+function dialog(title:string){stopEvents();stopCalendar();giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;modal.classList.remove('bite-dialog');modal.removeAttribute('aria-describedby');dialogGeneration++;refreshDialog=undefined;closeHealth();element('modal-title').textContent=title;modal.classList.toggle('shop-dialog',title==='Loja');modal.classList.toggle('deposit-dialog',title==='Depósito');modal.classList.toggle('settings-dialog',title==='Ajustes');modal.classList.toggle('missions-dialog',title==='Tarefas');modal.classList.toggle('away-dialog',title===AWAY_TITLE);modal.classList.toggle('gift-dialog',title==='Presentear');modal.classList.toggle('login-calendar-dialog',title==='Eventos');if(title!=='Tarefas'){window.clearInterval(missionsTimer);missionsTimer=undefined;}content.className='';content.replaceChildren();content.scrollTop=0;modalFooter.className='';modalFooter.replaceChildren();modalFooter.hidden=true;if(!modal.open)modal.showModal();}
 const shownBites=new Set<string>();
 function showBite(reply:Reply,actionName?:string){
  if(actionName!=='STEAL'||reply.theftOutcome?.kind!=='BITTEN'||!reply.farm||reply.farm.owner!==own?.owner)return false;
@@ -288,7 +291,7 @@ function giftVisited(){if(!visited||!own||visited.owner===own.owner)return;prese
 /** During a visit the top menu keeps only Minha fazenda, Amigos and Presentear; the social toolbar is separate. */
 function syncFarmMenu(){
  const visiting=!!visited;
- for(const id of ['notifications','shop','deposit','missions','events','settings','more'])element(id).hidden=visiting;
+ for(const id of ['notifications','shop','deposit','missions','achievements','decorations','events','settings','more'])element(id).hidden=visiting;
  element('home').hidden=!visiting;
  const gift=element('gift-visit');gift.hidden=!visiting||visited!.owner===own?.owner;gift.setAttribute('aria-label',visiting?`Presentear ${visited!.name}`:'Presentear amigo');
  setMoreMenuVisiting(visiting);
@@ -319,6 +322,7 @@ function render(){
  scene?.update(display()!);syncPending();renderTools();refreshOpenDialog();const currentHealthTile=healthTile&&display()?.tiles.find(tile=>tile.column===healthTile!.column&&tile.row===healthTile!.row);health(currentHealthTile??null,healthPoint,'refresh');layoutHud();showUpdateNotes();
 }
 function renderTools(){
+ if(own&&!visited)selectedSeed=seedSelection(catalog.crops,own.seedCounts,selectedSeed);
  const toolbar=element('tools');toolbar.replaceChildren();
  const definitions=visited?[['CURSOR','Inspecionar plantas','cursor-ui'],['STEAL','Furtar colheita','mao-restaurada'],['LOVE','Fertilizante do amor','adubo-amor'],['SPREAD_INSECTS','Lançar inseto · 1/6h','verme_1'],['SPREAD_WEEDS','Lançar erva · 1/6h','erva_daninha_1'],['CLEAN_WEEDS','Tirar ervas do amigo','herbicida-ui'],['CLEAN_INSECTS','Matar insetos do amigo','pesticida-ui']]:toolDefinitions;
  if(!definitions.some(d=>d[0]===tool)){tool=definitions[0][0];trayOpen=false;}
@@ -348,7 +352,9 @@ function renderToolTray(){
  const title=document.createElement('strong');title.className='tray-title';title.textContent=seeds?'Sementes':tool==='LOVE'?'Fertilizante do amor':'Fertilizantes';tray.append(title);
  const grid=document.createElement('div');grid.className='tray-items';tray.append(grid);
  if(seeds){
-  for(const crop of catalog.crops){const unlocked=(own?.level??0)>=crop.requiredLevel,count=own?.seedCounts?.[crop.id]??0,item=button('',()=>{
+  const owned=ownedSeeds(catalog.crops,own?.seedCounts);
+  if(!owned.length){grid.append(text('p',EMPTY_SEED_BAG,'tray-empty'));const open=button('Abrir Loja',()=>{trayOpen=false;renderTools();shop('crops');},grid,'tray-open-shop');open.className='tray-empty-shop';}
+  for(const crop of owned){const unlocked=(own?.level??0)>=crop.requiredLevel,count=own?.seedCounts?.[crop.id]??0,item=button('',()=>{
    if(!unlocked){notify(`${crop.name} libera no nível ${crop.requiredLevel}.`);return;}
    selectedSeed=crop.id;trayOpen=false;renderTools();notify(`Semente selecionada: ${crop.name}.`);
   },grid);item.className='tray-item';item.setAttribute('aria-pressed',String(selectedSeed===crop.id));item.setAttribute('aria-label',`${crop.name}, ${unlocked?`${count} sementes`:`libera no nível ${crop.requiredLevel}`}`);if(!unlocked)item.classList.add('locked');
@@ -365,7 +371,7 @@ function renderToolTray(){
    item.onmouseleave=()=>{const caption=document.getElementById('tool-tray-caption');if(caption)caption.textContent=selected?`${selected} · ${detail}`:'';};
   }
  }
- const selected=seeds?catalog.crops.find(item=>item.id===selectedSeed)?.name:catalog.fertilizers.find(item=>item.id===toolFertilizer())?.name;
+ const selected=seeds?ownedSeeds(catalog.crops,own?.seedCounts).find(item=>item.id===selectedSeed)?.name:catalog.fertilizers.find(item=>item.id===toolFertilizer())?.name;
  const count=seeds?own?.seedCounts?.[selectedSeed]??0:own?.fertilizers?.[toolFertilizer()]??0,selectedFertilizerType=catalog.fertilizers.find(item=>item.id===toolFertilizer());
  const detail=seeds?`${count} sementes`:selectedFertilizerType?.friendsOnly?'plantação de amigos':`reduz ${formatToolDuration(selectedFertilizerType?.reductionSeconds??0)} · ${count} no estoque`;
  const caption=document.createElement('span');caption.id='tool-tray-caption';caption.className='tray-caption';caption.textContent=selected?`${selected} · ${detail}`:'';tray.append(caption);
@@ -522,6 +528,7 @@ async function tileAction(tile:Tile){
  if(visited){await action(tileCommand(tool,tile,selectedSeed,toolFertilizer(),true),`/v1/farms/${visited.owner}/visit-actions`);return;}
  if(!tile.unlocked){confirmPlot(tile);return;}
  if(tool==='CURSOR')return;
+ if(tool==='PLANT'&&tile.state==='PLOWED'&&!ownedSeeds(catalog.crops,own?.seedCounts).length){notify(EMPTY_SEED_BAG);return;}
  await action(tileCommand(tool,tile,selectedSeed,selectedFertilizer));
 }
 let healthKey='',healthDataKey='',healthOpenTimer:number|undefined,healthClockTimer:number|undefined,healthPinned=false,healthTapPinned=false,healthAnchorAt=0,healthBaseRemaining=0,healthBaseNominal=0;
@@ -679,6 +686,7 @@ async function buyFeed(id:FeedId,quantity:number){
  const purchased=(own?.feed?.[id]??before)-before;if(purchased<=0)return;
  const meta=feedDetails.find(item=>item.id===id)!;notify(`+${purchased} ${meta.name}`);content.querySelector(`[data-feed-stock="${id}"]`)?.classList.add('feed-stock-pulse');
 }
+const EMPTY_SEED_BAG='Você não tem sementes. Compre na Loja ou resgate recompensas.';
 type ShopCategory='crops'|'animals'|'vip';
 function shop(category:ShopCategory='crops',focusKey?:string){
  dialog('Loja');modal.dataset.shopCategory=category;const tabs=document.createElement('div');tabs.className='tabs shop-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Seções da Loja');tabs.setAttribute('aria-orientation','horizontal');content.append(tabs);
@@ -863,32 +871,110 @@ function deposit(){
  content.append(feedSection);
 }
 function missions(){
- dialog('Missões');
+ dialog('Tarefas');
  refreshDialog=missions;
  renderDailyAllowance(content,own?.dailyAllowance,()=>void action({action:'CLAIM_DAILY_ALLOWANCE'}));
  const daily=own?.missions??[],active=daily.filter(mission=>!mission.done),completed=daily.filter(mission=>mission.done),hasTutorial=!!own?.tutorial,activeCount=active.length+(hasTutorial?1:0);
- const activeSection=document.createElement('section');activeSection.className='mission-section';activeSection.append(sectionHeading('Em andamento'));
+ const activeSection=document.createElement('section');activeSection.className='mission-section';activeSection.append(sectionHeading('Diárias · Em andamento'));
  if(own?.tutorial){const total=Math.max(1,own.tutorialTotal??6),progress=Math.min(own.tutorialStep??0,total);activeSection.append(missionCard('Tutorial',own.tutorial.title??'',own.tutorial.hint??'',progress,total));}
  for(const mission of active)activeSection.append(missionCard('Diária',mission.title,missionDescription(mission.id),mission.progress,mission.target,mission.green));
- const bonus=own?.cooperativeBonus;if(bonus&&!bonus.done)activeSection.append(missionCard('Bônus','Bônus cooperativo','Conclua todas as missões de ajuda a amigos do dia.',0,1,bonus.green));
+ const bonus=own?.cooperativeBonus;if(bonus&&!bonus.done)activeSection.append(missionCard('Bônus','Bônus cooperativo','Conclua todas as tarefas de ajuda a amigos do dia.',0,1,bonus.green));
  if(activeCount||(bonus&&!bonus.done))content.append(activeSection);
  else{const empty=document.createElement('div');empty.className='missions-empty';empty.append(text('strong','Tudo feito por hoje! 🌾'),countdownNode(true));content.append(empty);}
- const completedSection=document.createElement('section');completedSection.className='mission-section';completedSection.append(sectionHeading(`Concluídas hoje (${completed.length})`));
+ const completedSection=document.createElement('section');completedSection.className='mission-section';completedSection.append(sectionHeading(`Diárias · Concluídas hoje (${completed.length})`));
  for(const mission of completed)completedSection.append(completedMission(mission.title,mission.green));if(bonus?.done)completedSection.append(completedMission('Bônus cooperativo',bonus.green));content.append(completedSection);
+ const weekly=own?.weeklyTasks;
+ if(weekly){
+  const weeklySection=document.createElement('section');weeklySection.className='mission-section weekly-section';weeklySection.append(sectionHeading('Semanais'));
+  weeklySection.append(text('p',`${WEEKLY_RESET_TEXT} · ${weeklyCountdownText(weekly.nextResetAt)}`,'muted weekly-reset'));
+  for(const task of weekly.tasks.filter(item=>!item.done))weeklySection.append(missionCard('Semanal',task.title,weeklyDescription(task.id),task.progress,task.target,task.rewardXp,'xp'));
+  for(const task of weekly.tasks.filter(item=>item.done))weeklySection.append(completedMission(task.title,task.rewardXp,'xp'));
+  content.append(weeklySection);
+ }
  const footerTimer=countdownNode();
  const timerWrap=document.createElement('div');timerWrap.className='missions-footer-timer';timerWrap.append(footerTimer);
  const vip=document.createElement('div');vip.className='missions-footer-vip';const vipIcon=document.createElement('img');vipIcon.className='missions-vip-icon';vipIcon.src='/assets/classic/icons/cartao-vip.png';vipIcon.alt='';vip.append(vipIcon);if(own?.vipActive){vip.append(text('strong','VIP ativo'));const remaining=remainingVip(own.vipExpiresAt);if(remaining)vip.append(text('span',` · ${remaining}`));}else{vip.append(text('span','Desbloqueie culturas VIP e preços especiais de venda.'));const activate=button('Ativar VIP',()=>shop('vip'),vip);activate.className='missions-vip-button';}
  modalFooter.append(timerWrap,vip);modalFooter.hidden=false;updateMissionCountdown();if(missionsTimer===undefined)missionsTimer=window.setInterval(updateMissionCountdown,60_000);
 }
+const WEEKLY_RESET_TEXT='Reinicia domingo às 00:00 (horário de Brasília)';
+function weeklyDescription(id:string){return id==='harvest'?'Colha plantas maduras na sua fazenda.':id==='buy-animals'?'Compre animais na Loja.':id==='love-friends'?'Use o fertilizante do amor nas plantações de amigos.':'Avance esta tarefa para receber a recompensa.';}
+// Server time is authoritative for the reset; this is only the remaining-time hint.
+// Server time keeps the countdown right on a device with a wrong clock; the local clock is only a fallback.
+function weeklyCountdownText(nextResetAt:string){const server=eventNow(),left=Math.max(0,Date.parse(nextResetAt)-(Number.isFinite(server)?server:Date.now()));if(!Number.isFinite(left))return '';const minutes=Math.ceil(left/60_000),days=Math.floor(minutes/1440),hours=Math.floor(minutes%1440/60);return `faltam ${days?`${days}d `:''}${hours}h ${minutes%60}min`;}
+function decorations(open=false,focusKey?:string){
+ if(open){decorationIndex=Math.max(0,BACKGROUND_PACKS.findIndex(pack=>pack.id===(own?.activeBackgroundId??DEFAULT_BACKGROUND)));decorationPeriod=periodAt(new Date());decorationConfirm='';}
+ dialog('Decorações');refreshDialog=()=>decorations();
+ const pack=BACKGROUND_PACKS[decorationIndex],owned=new Set(own?.ownedBackgroundIds??[DEFAULT_BACKGROUND]),active=(own?.activeBackgroundId??DEFAULT_BACKGROUND)===pack.id,price=Number(own?.backgroundPrice??1_000_000),isDefault=pack.id===DEFAULT_BACKGROUND;
+ const carousel=document.createElement('section');carousel.className='decoration-carousel';carousel.setAttribute('aria-roledescription','carrossel');carousel.setAttribute('aria-label','Fundos da fazenda');carousel.tabIndex=0;
+ const move=(step:number)=>{decorationIndex=(decorationIndex+step+BACKGROUND_PACKS.length)%BACKGROUND_PACKS.length;decorationConfirm='';decorations(false,step<0?'decoration-prev':'decoration-next');};
+ carousel.onkeydown=(event:KeyboardEvent)=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();move(event.key==='ArrowLeft'?-1:1);}};
+ const stage=document.createElement('div');stage.className='decoration-stage';
+ const prev=button('‹',()=>move(-1),stage,'decoration-prev');prev.className='decoration-arrow';prev.setAttribute('aria-label','Fundo anterior');
+ const preview=document.createElement('img');preview.className='decoration-preview';preview.src=`/assets/${backgroundPath(pack.id,decorationPeriod)}`;preview.alt=`${pack.name}, ${decorationPeriod==='day'?'dia':decorationPeriod==='sunset'?'tarde':'noite'}`;stage.append(preview);
+ const next=button('›',()=>move(1),stage,'decoration-next');next.className='decoration-arrow';next.setAttribute('aria-label','Próximo fundo');
+ carousel.append(stage);
+ const heading=document.createElement('div');heading.className='decoration-heading';heading.append(text('h3',pack.name),text('span',`${decorationIndex+1} / ${BACKGROUND_PACKS.length}`,'decoration-count'));
+ const status=isDefault?(active?'Padrão · Equipado':'Padrão'):active?'Equipado':owned.has(pack.id)?'Comprado':'Não comprado';
+ heading.append(text('span',status,`decoration-status${active?' active':''}`));carousel.append(heading);
+ const periods=document.createElement('div');periods.className='decoration-periods';periods.setAttribute('role','group');periods.setAttribute('aria-label','Prévia do período');
+ for(const [id,label]of [['day','Dia'],['sunset','Tarde'],['night','Noite']] as const){const choice=button(label,()=>{decorationPeriod=id;decorations(false,`decoration-period:${id}`);},periods,`decoration-period:${id}`);choice.setAttribute('aria-pressed',String(decorationPeriod===id));}
+ carousel.append(periods);
+ const actions=document.createElement('div');actions.className='decoration-actions';
+ if(active)actions.append(text('span','Este é o fundo da sua fazenda.','muted'));
+ else if(isDefault||owned.has(pack.id)){const apply=button(isDefault?'Aplicar padrão':'Aplicar',()=>void action({action:'EQUIP_BACKGROUND',itemId:pack.id}),actions,`decoration-apply:${pack.id}`);apply.className='decoration-buy';}
+ else{
+  actions.append(text('span',`${depositNumber.format(price)} ouro · dia, tarde e noite`,'decoration-price'));
+  if(Number(own?.coins??0)<price){const short=button('Ouro insuficiente',()=>{},actions,`decoration-buy:${pack.id}`);short.className='decoration-buy';short.disabled=true;}
+  else if(decorationConfirm!==pack.id){const buy=button(`Comprar e aplicar · ${depositNumber.format(price)} ouro`,()=>{decorationConfirm=pack.id;decorations(false,`decoration-confirm:${pack.id}`);},actions,`decoration-buy:${pack.id}`);buy.className='decoration-buy';}
+  else{
+   actions.append(text('strong',`Gastar ${depositNumber.format(price)} ouro em ${pack.name}? O fundo é aplicado na hora e fica seu.`,'decoration-confirm'));
+   const confirm=button('Confirmar compra',()=>{decorationConfirm='';void action({action:'BUY_BACKGROUND',itemId:pack.id,currency:'GOLD'});},actions,`decoration-confirm:${pack.id}`);confirm.className='decoration-buy';
+   button('Cancelar',()=>{decorationConfirm='';decorations(false,`decoration-buy:${pack.id}`);},actions,`decoration-cancel:${pack.id}`);
+  }
+ }
+ carousel.append(actions);content.append(carousel);
+ if(focusKey)[...content.querySelectorAll<HTMLElement>('[data-focus-key]')].find(node=>node.dataset.focusKey===focusKey)?.focus({preventScroll:true});
+}
+// Titles are shown with textContent only: their Unicode art is data, never markup.
+function achievements(){
+ dialog('Conquistas');refreshDialog=achievements;
+ const list=own?.achievements??[],unlockedCount=list.filter(item=>item.unlocked).length;
+ const summary=document.createElement('div');summary.className='achievements-summary';
+ summary.append(text('strong',`${unlockedCount} de ${list.length} títulos liberados`));
+ summary.append(text('span',own?.equippedTitle?`Título ativo: ${own.equippedTitle}`:'Nenhum título ativo','achievements-active'));
+ if(own?.equippedTitle){const clear=button('Remover título',()=>void action({action:'CLEAR_TITLE'}),summary,'title-clear');clear.className='achievement-clear';}
+ content.append(summary);
+ content.append(text('p','Plantio, colheitas, pragas, furtos e verdes gastos contam a partir desta atualização; nível, terrenos e animais usam o estado atual.','muted achievements-note'));
+ const categories=new Map<string,{label:string;items:typeof list}>();
+ for(const item of list){const group=categories.get(item.category)??{label:item.categoryLabel,items:[]};group.items.push(item);categories.set(item.category,group);}
+ for(const [id,group]of categories){
+  const section=document.createElement('section');section.className='achievement-category';section.setAttribute('aria-labelledby',`achievement-${id}`);
+  const heading=text('h3',group.label,'mission-section-title');heading.id=`achievement-${id}`;section.append(heading);
+  for(const item of group.items){
+   const card=document.createElement('article');card.className=`achievement-card${item.unlocked?' unlocked':''}`;
+   const title=text('strong',item.title,'achievement-title');card.append(title);
+   const progress=document.createElement('progress');progress.max=item.target;progress.value=Math.min(item.progress,item.target);progress.setAttribute('aria-label',`${item.title}: ${depositNumber.format(progress.value)} de ${depositNumber.format(item.target)}`);
+   card.append(progress,text('span',`${depositNumber.format(progress.value)} / ${depositNumber.format(item.target)}`,'achievement-progress'));
+   if(!item.unlocked)card.append(text('span','Bloqueado','achievement-state'));
+   else if(own?.equippedTitleId===item.id)card.append(text('span','Equipado','achievement-state equipped'));
+   else{const equip=button('Equipar',()=>void action({action:'EQUIP_TITLE',itemId:item.id}),card,`title-equip:${item.id}`);equip.className='achievement-equip';equip.setAttribute('aria-label',`Equipar título ${item.title}`);}
+   section.append(card);
+  }
+  content.append(section);
+ }
+}
 function sectionHeading(label:string){const heading=document.createElement('h3');heading.className='mission-section-title';heading.textContent=label;return heading;}
 function missionDescription(id:string){return id==='care'?'Plante, regue, colha ou cuide dos animais.':id==='trade'?'Compre ou venda itens na fazenda.':id==='nature'?'Remova ervas ou insetos nas fazendas de amigos.':id==='animals'?'Alimente com sua ração um animal com fome na fazenda de um amigo.':'Avance esta tarefa para receber a recompensa.';}
-function countdownText(showLocalTime=true){const now=new Date(),midnight=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+1)),minutes=Math.max(0,Math.ceil((midnight.getTime()-now.getTime())/60_000)),hours=Math.floor(minutes/60),parts=new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',hourCycle:'h23'}).formatToParts(midnight),hour=parts.find(part=>part.type==='hour')?.value??'00';return `Novas missões em ${hours?`${hours}h `:''}${minutes%60}min${showLocalTime?` (às ${hour}h)`:''}`;}
+function countdownText(showLocalTime=true){const now=new Date(),midnight=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+1)),minutes=Math.max(0,Math.ceil((midnight.getTime()-now.getTime())/60_000)),hours=Math.floor(minutes/60),parts=new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',hourCycle:'h23'}).formatToParts(midnight),hour=parts.find(part=>part.type==='hour')?.value??'00';return `Novas tarefas diárias em ${hours?`${hours}h `:''}${minutes%60}min${showLocalTime?` (às ${hour}h)`:''}`;}
 function countdownNode(compact=false){const timer=text('span','','missions-countdown'),clock=document.createElement('span');clock.className='missions-clock-icon';clock.setAttribute('aria-hidden','true');clock.textContent='◷';timer.dataset.compact=String(compact);timer.append(clock,text('span',countdownText(!compact)));timer.setAttribute('aria-live','off');return timer;}
 function updateMissionCountdown(){for(const timer of modal.querySelectorAll<HTMLElement>('.missions-countdown')){const value=timer.lastElementChild;if(value)value.textContent=countdownText(timer.dataset.compact!=='true');}}
 function remainingVip(expiresAt?:string){const expiry=Date.parse(expiresAt??'');if(!Number.isFinite(expiry))return '';const minutes=Math.max(0,Math.ceil((expiry-Date.now())/60_000)),days=Math.floor(minutes/1440),hours=Math.floor(minutes%1440/60);return days?`${days}d ${hours}h restantes`:hours?`${hours}h restantes`:`${minutes%60}min restantes`;}
-function missionCard(category:string,titleText:string,description:string,value:number,max:number,reward?:number){const card=document.createElement('article');card.className='mission-card';const heading=document.createElement('div');heading.className='mission-heading';heading.append(text('span',category,'mission-category'),text('strong',titleText));if(reward&&reward>0)heading.append(missionReward(reward));card.append(heading);const detail=text('p','','mission-description');appendKeycaps(detail,description);card.append(detail);const progressRow=document.createElement('div');progressRow.className='mission-progress-row';const progress=document.createElement('progress');progress.max=Math.max(1,max);progress.value=Math.min(value,progress.max);progress.setAttribute('role','progressbar');progress.setAttribute('aria-valuenow',String(progress.value));progress.setAttribute('aria-valuemax',String(progress.max));progress.setAttribute('aria-label',`${titleText}: ${progress.value} de ${progress.max}`);progressRow.append(progress,text('span',`${progress.value} / ${progress.max}`));card.append(progressRow);return card;}
-function completedMission(titleText:string,reward:number){const row=document.createElement('article');row.className='mission-card mission-card-completed';const title=document.createElement('strong');const check=text('span','✓','mission-check');check.setAttribute('aria-hidden','true');title.append(check,document.createTextNode(titleText));row.append(title);if(reward<=0)return row;const amount=document.createElement('span');amount.className='mission-completed-reward';const coin=document.createElement('img');coin.src='/assets/classic/icons/moeda-verde.png';coin.alt='';amount.append(document.createTextNode(`+${reward} `),coin,document.createTextNode(' recebido'));row.append(amount);return row;}
-function missionReward(value:number){const reward=document.createElement('span');reward.className='mission-reward';const coin=document.createElement('img');coin.src='/assets/classic/icons/moeda-verde.png';coin.alt='';reward.append(document.createTextNode(`+${value} `),coin);return reward;}
+function missionCard(category:string,titleText:string,description:string,value:number,max:number,reward?:number,kind:RewardKind='green'){const card=document.createElement('article');card.className='mission-card';const heading=document.createElement('div');heading.className='mission-heading';heading.append(text('span',category,'mission-category'),text('strong',titleText));if(reward&&reward>0)heading.append(missionReward(reward,kind));card.append(heading);const detail=text('p','','mission-description');appendKeycaps(detail,description);card.append(detail);const progressRow=document.createElement('div');progressRow.className='mission-progress-row';const progress=document.createElement('progress');progress.max=Math.max(1,max);progress.value=Math.min(value,progress.max);progress.setAttribute('role','progressbar');progress.setAttribute('aria-valuenow',String(progress.value));progress.setAttribute('aria-valuemax',String(progress.max));progress.setAttribute('aria-label',`${titleText}: ${progress.value} de ${progress.max}`);progressRow.append(progress,text('span',`${progress.value} / ${progress.max}`));card.append(progressRow);return card;}
+function completedMission(titleText:string,reward:number,kind:RewardKind='green'){const row=document.createElement('article');row.className='mission-card mission-card-completed';const title=document.createElement('strong');const check=text('span','✓','mission-check');check.setAttribute('aria-hidden','true');title.append(check,document.createTextNode(titleText));row.append(title);if(reward<=0)return row;const amount=document.createElement('span');amount.className='mission-completed-reward';amount.append(document.createTextNode(`+${reward} `),rewardIcon(kind),document.createTextNode(' recebido'));row.append(amount);return row;}
+type RewardKind='green'|'xp';
+// Weekly tasks pay XP, so their chip must never reuse the green-coin icon of the daily ones.
+function rewardIcon(kind:RewardKind){const icon=document.createElement('img');icon.src=kind==='xp'?'/assets/classic/icons/xp.png':'/assets/classic/icons/moeda-verde.png';icon.alt=kind==='xp'?'XP':'verdes';return icon;}
+function missionReward(value:number,kind:RewardKind='green'){const reward=document.createElement('span');reward.className=`mission-reward mission-reward-${kind}`;reward.append(document.createTextNode(`+${value} `),rewardIcon(kind));return reward;}
 function appendKeycaps(parent:HTMLElement,value:string){for(const part of value.split(/\((\d)\)/g)){if(/^\d$/.test(part)){const key=document.createElement('kbd');key.textContent=part;parent.append(key);}else parent.append(document.createTextNode(part));}}
 function invitationForm(parent:HTMLElement){
  const input=document.createElement('input');input.placeholder='Cole o código de convite';input.setAttribute('aria-label','Código de convite');input.value=sessionStorage.getItem('colheita:invitation')??'';parent.append(input);
@@ -917,6 +1003,8 @@ async function acceptInvitation(code:string,panelGeneration:number,closeOnSucces
  try{await client.mutate('/v1/friend-invitations/accept',{code});if(generation!==sessionGeneration)return false;await refresh();if(generation!==sessionGeneration)return false;await migrateAvatar();if(generation!==sessionGeneration)return false;if(own&&closeOnSuccess&&modal.open&&dialogGeneration===panelGeneration)modal.close();return true;}
  catch(error){if(generation!==sessionGeneration)return false;if(onError)onError();else handleError(error);return false;}finally{syncPending();}
 }
+// Name, VIP badge and public title are rebuilt together, so a list refresh never drops the title.
+function friendIdentity(identity:HTMLElement,friend:Friend){const name=document.createElement('strong');name.textContent=friend.name;if(friend.vipActive)name.append(vipBadge());identity.replaceChildren(name);if(friend.equippedTitle)identity.append(text('small',friend.equippedTitle,'player-title'));}
 async function friends(){
  if(!api)return;const client=api,generation=sessionGeneration;dialog('Amigos');const panelGeneration=dialogGeneration;
  const invites=document.createElement('section');invites.className='invite-card';const title=document.createElement('h3');title.textContent='Convidar ou adicionar amigo';invites.append(title);paragraph('Crie um link válido por sete dias ou aceite um convite recebido.',invites);button('Criar convite',async()=>{
@@ -925,8 +1013,8 @@ async function friends(){
  },invites);invitationForm(invites);content.append(invites);
  const heading=document.createElement('h3');heading.className='friends-title';heading.textContent='Seus amigos';content.append(heading);const listPanel=document.createElement('div');listPanel.className='friend-list';listPanel.tabIndex=-1;content.append(listPanel);
  let friendRefresh=0;
- refreshDialog=()=>{const request=++friendRefresh;void client.get<Friend[]>('/v1/friends').then(list=>{if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open||request!==friendRefresh)return;for(const row of Array.from(listPanel.children)){const name=row.children[1],friend=list.find(item=>item.id===(row as HTMLElement).dataset.friendId);if(name&&friend){name.replaceChildren(document.createTextNode(friend.name));if(friend.vipActive)name.append(vipBadge());}}}).catch(()=>{});};
- try{const list=await client.get<Friend[]>('/v1/friends');if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open)return;for(const friend of list){const row=document.createElement('article');row.className='friend-card';row.dataset.friendId=friend.id;const badge=friendAvatar(friend);const name=document.createElement('strong');name.textContent=friend.name;if(friend.vipActive)name.append(vipBadge());row.append(badge,name);button('Visitar fazenda',async()=>{const navigation=++navigationGeneration;try{const farm=await client.get<Farm>(`/v1/farms/${friend.id}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||dialogGeneration!==panelGeneration||!modal.open)return;visited=farm;tool='CURSOR';render();modal.close();}catch(error){handleError(error);}},row);listPanel.append(row);}if(!list.length)paragraph('Nenhum amigo adicionado ainda.',listPanel);
+ refreshDialog=()=>{const request=++friendRefresh;void client.get<Friend[]>('/v1/friends').then(list=>{if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open||request!==friendRefresh)return;for(const row of Array.from(listPanel.children)){const identity=row.children[1] as HTMLElement|undefined,friend=list.find(item=>item.id===(row as HTMLElement).dataset.friendId);if(identity&&friend)friendIdentity(identity,friend);}}).catch(()=>{});};
+ try{const list=await client.get<Friend[]>('/v1/friends');if(generation!==sessionGeneration||dialogGeneration!==panelGeneration||!modal.open)return;for(const friend of list){const row=document.createElement('article');row.className='friend-card';row.dataset.friendId=friend.id;const badge=friendAvatar(friend);const identity=document.createElement('div');identity.className='friend-identity';friendIdentity(identity,friend);row.append(badge,identity);button('Visitar fazenda',async()=>{const navigation=++navigationGeneration;try{const farm=await client.get<Farm>(`/v1/farms/${friend.id}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||dialogGeneration!==panelGeneration||!modal.open)return;visited=farm;tool='CURSOR';render();modal.close();}catch(error){handleError(error);}},row);listPanel.append(row);}if(!list.length)paragraph('Nenhum amigo adicionado ainda.',listPanel);
  }
  catch(error){handleError(error);}
 }
@@ -994,7 +1082,7 @@ async function start(){
  }catch(error){showConnection();notify(error instanceof Error?error.message:'Servidor indisponível.');button('Tentar conectar novamente',start,login);}
 }
 element('notifications').onclick=notifications;element('events').onclick=()=>events();
-element('shop').onclick=()=>shop();element('deposit').onclick=deposit;element('missions').onclick=missions;element('friends').onclick=()=>void friends();
+element('shop').onclick=()=>shop();element('deposit').onclick=deposit;element('missions').onclick=missions;element('achievements').onclick=achievements;element('decorations').onclick=()=>decorations(true);element('friends').onclick=()=>void friends();
 element('home').onclick=()=>{navigationGeneration++;visited=undefined;tool='PLOW';render();};element('gift-visit').onclick=giftVisited;element('settings').onclick=()=>shortcutPanel('Ajustes',settings);element('close-modal').onclick=()=>{if(element('modal-title').textContent==='Presentear'){closeGiftComposer();return;}modal.close();showUpdateNotes();};
 modal.addEventListener('cancel',event=>{if(element('modal-title').textContent!=='Presentear')return;event.preventDefault();closeGiftComposer();});
 modal.addEventListener('close',showUpdateNotes);
@@ -1004,7 +1092,7 @@ window.addEventListener('offline',()=>showConnection('Sem conexão. Reconecte an
 window.addEventListener('online',()=>{void refresh();if(api)void reconcilePush(avatarUser,api).catch(()=>{});});
 document.addEventListener('pointerdown',event=>{if(healthPinned&&!['farm','plant-health','tools-bar','tool-tray','farm-header'].some(id=>element(id).contains(event.target as Node)))closeHealth();});
 modal.addEventListener('close',()=>{stopEvents();if(element('modal-title').textContent==='Eventos')stopCalendar();health(healthTile,healthPoint);window.clearInterval(missionsTimer);missionsTimer=undefined;});
-document.addEventListener('keydown',event=>{if(!own||event.repeat||event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement||(event.target as HTMLElement)?.tagName==='TEXTAREA')return;const shortcut=gameShortcut(event.key,!!visited);if(!shortcut)return;if(shortcut.action==='tool'){if(!modal.open)pickTool(shortcut.tool);return;}if(shortcut.action==='shop')shortcutPanel('Loja',()=>shop());else if(shortcut.action==='deposit')shortcutPanel('Depósito',deposit);else if(shortcut.action==='missions')shortcutPanel('Missões',missions);else if(shortcut.action==='plots')shortcutPanel('Terras da fazenda',tileList);else if(shortcut.action==='music')toggleMusic();else if(shortcut.action==='effects')toggleEffects();});
+document.addEventListener('keydown',event=>{if(!own||event.repeat||event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement||(event.target as HTMLElement)?.tagName==='TEXTAREA')return;const shortcut=gameShortcut(event.key,!!visited);if(!shortcut)return;if(shortcut.action==='tool'){if(!modal.open)pickTool(shortcut.tool);return;}if(shortcut.action==='shop')shortcutPanel('Loja',()=>shop());else if(shortcut.action==='deposit')shortcutPanel('Depósito',deposit);else if(shortcut.action==='missions')shortcutPanel('Tarefas',missions);else if(shortcut.action==='plots')shortcutPanel('Terras da fazenda',tileList);else if(shortcut.action==='music')toggleMusic();else if(shortcut.action==='effects')toggleEffects();});
 document.addEventListener('visibilitychange',()=>{syncMusic();if(!document.hidden)void refresh();});
 window.setInterval(()=>{if(!document.hidden)void refresh();},30_000);
 void start();

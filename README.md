@@ -26,12 +26,12 @@ npm.cmd run build:local --prefix web
 
 O build local configura a API em `http://127.0.0.1:8080`. Para iniciar uma API local com contas de desenvolvimento e PostgreSQL descartável, consulte [ONLINE.md](ONLINE.md).
 
-O cliente inclui um modo de revisão visual com dados sintéticos. Os menus de Loja, Depósito, Missões, Eventos (com a aba Calendário Diário), Amigos e Ajustes são acessíveis por botões; regras e contrato online do calendário estão em [ONLINE.md](ONLINE.md). A seleção de avatar é uma preferência local por conta e dispositivo, não uma atualização do perfil no banco.
+O cliente inclui um modo de revisão visual com dados sintéticos. Os menus de Loja, Depósito, Tarefas, Conquistas, Decorações, Eventos (com a aba Calendário Diário), Amigos e Ajustes são acessíveis por botões; regras e contrato online do calendário estão em [ONLINE.md](ONLINE.md). A seleção de avatar é uma preferência local por conta e dispositivo, não uma atualização do perfil no banco.
 
 | Tecla | Atalho no Web |
 | --- | --- |
 | `1`–`8` | Ferramentas da própria fazenda |
-| `B`, `V`, `Q` | Loja, Depósito, Missões |
+| `B`, `V`, `Q` | Loja, Depósito, Tarefas |
 | `M`, `N` | Música e efeitos |
 | `Esc` | Fechar janelas |
 
@@ -45,7 +45,7 @@ Duas tarefas fixas já contam durante o tutorial: cuidar da fazenda e realizar u
 
 A curva exige `25 + 3 × (nível − 1)²` XP para o próximo nível e preserva todo excedente decimal. Níveis tabelados concedem apenas ouro e verdes. Um ensaio sem pragas, com nabo, animais e reinvestimento, chegou ao nível 30 em 31,333 dias com três visitas diárias; uma visita levou 64 dias e só plantas, 74,667 dias. São rotinas controladas sobre o domínio Java, sem VIP ou fertilizantes, não uma garantia de prazo para qualquer jogador.
 
-A primeira rega inicia o crescimento. Terra seca reduz a velocidade; ervas daninhas e insetos pausam o crescimento até serem removidos (com os dois, só retoma após remover ambos) e não reduzem a colheita. Use herbicida e pesticida para removê-los. Cada temporada rende uma unidade; nas culturas com várias temporadas, a planta recomeça no estágio 1 após a coleta e precisa de nova rega. Retire a planta morta com a pá após a última colheita. Venda a produção no depósito. As listas da loja rolam pela roda do mouse ou pela barra lateral arrastável. Sementes e colheitas têm filtros Comuns e VIP. Os fertilizantes (comum, rápido, super e do amor) ficam na seção **Fertilizantes** da aba Sementes da loja e são escolhidos pela bandeja da ferramenta 8. Sementes e fertilizantes são comprados de 1 a 99 unidades por vez, pelo seletor de quantidade de cada item. Cada planta aceita um por temporada, qualquer que seja o tipo; ele reduz o tempo restante da temporada atual (o excedente se perde) e só vale em planta regada, úmida e sem pragas. O do amor é só para a plantação de amigos.
+A primeira rega inicia o crescimento. Terra seca reduz a velocidade; ervas daninhas e insetos pausam o crescimento até serem removidos (com os dois, só retoma após remover ambos) e não reduzem a colheita. Use herbicida e pesticida para removê-los. Cada temporada rende uma unidade; nas culturas com várias temporadas, a planta recomeça no estágio 1 após a coleta e precisa de nova rega. Retire a planta morta com a pá após a última colheita. Venda a produção no depósito. O saco de sementes da ferramenta de plantar mostra só as sementes que você tem; quando a escolhida acaba, passa para a próxima em estoque, e sem nenhuma ele indica a Loja ou as recompensas. As listas da loja rolam pela roda do mouse ou pela barra lateral arrastável. Sementes e colheitas têm filtros Comuns e VIP. Os fertilizantes (comum, rápido, super e do amor) ficam na seção **Fertilizantes** da aba Sementes da loja e são escolhidos pela bandeja da ferramenta 8. Sementes e fertilizantes são comprados de 1 a 99 unidades por vez, pelo seletor de quantidade de cada item. Cada planta aceita um por temporada, qualquer que seja o tipo; ele reduz o tempo restante da temporada atual (o excedente se perde) e só vale em planta regada, úmida e sem pragas. O do amor é só para a plantação de amigos.
 
 A aba **Animais** rola uma lista de dez animais econômicos e cinco protetores. Cada tipo tem limite próprio de um animal e compra alternativa em ouro ou verdes, liberada por nível. Produtores chegam adultos e alimentados por 8 h; após uma coleta única, desaparecem e deixam uma unidade no depósito. Animais de crescimento chegam bebês, alimentados por 12 h; clique no adulto para vendê-lo. A loja também vende o adulto e os produtos na mesma aba.
 

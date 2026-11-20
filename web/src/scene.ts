@@ -5,7 +5,6 @@ import {
   christmasActive,
   screenToWorld,
   periodAt,
-  backgroundBounds,
   tileCenter,
   tileArtRect,
   pickTile,
@@ -579,24 +578,12 @@ export class Scene {
     ctx.clearRect(0, 0, 1600, 900);
     ctx.fillStyle = period === "night" ? "#15464f" : "#84ba30";
     ctx.fillRect(0, 0, 1600, 900);
-    const background = this.sprite(
-      backgroundArtPath(period),
-    );
-    if (background) {
-      const bounds = backgroundBounds(
-        1600,
-        900,
-        background.image.width,
-        background.image.height,
-      );
-      ctx.drawImage(
-        background.image,
-        bounds.x,
-        bounds.y,
-        bounds.width,
-        bounds.height,
-      );
-    }
+    // The classic pack covers a paid pack while it loads or if its file is missing.
+    const background =
+      this.sprite(backgroundArtPath(period, this.farm?.activeBackgroundId)) ??
+      this.sprite(backgroundArtPath(period));
+    // The 1478 × 1064 art is stretched to the 1600 × 900 world so the whole picture shows, as in the file.
+    if (background) ctx.drawImage(background.image, 0, 0, 1600, 900);
     this.thing("classic/buildings/dog-house.png", 410, 900 - 556, 214);
     this.thing("classic/buildings/main-house.png", 735, 900 - 540, 420);
     this.fence([

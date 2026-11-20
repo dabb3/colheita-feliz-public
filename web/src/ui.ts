@@ -96,6 +96,7 @@ export function renderWallet(
   name.title = name.textContent ?? "";
   if(farm.vipActive)name.append(vipBadge());
   heading.append(name, text("span", `Nível ${farm.level ?? 1}`, "level-badge"));
+  const title = farm.equippedTitle ? text("small", farm.equippedTitle, "player-title") : undefined;
   const progress = document.createElement("progress");
   progress.max = 100;
   progress.value = xpPercent(farm.currentXp, farm.xpToNext);
@@ -119,7 +120,9 @@ export function renderWallet(
     row.append(image(`classic/icons/${icon}.png`), text("strong", value));
     coins.append(row);
   }
-  info.append(heading, progress, xp, coins);
+  info.append(heading);
+  if (title) info.append(title);
+  info.append(progress, xp, coins);
   root.append(picture, info);
 }
 

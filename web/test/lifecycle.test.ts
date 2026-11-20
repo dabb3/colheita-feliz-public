@@ -8,6 +8,7 @@ import * as presentation from '../src/presentation.ts';
 import * as uiPresentation from '../src/ui-presentation.ts';
 import * as avatar from '../src/avatar.ts';
 import * as inviteUrl from '../src/invite-url.ts';
+import * as backgroundCatalog from '../src/background-catalog.ts';
 import * as events from '../src/events.ts';
 
 const farm=owner=>({owner,name:owner,revision:'1',tiles:[],animals:[],seedCounts:{}});
@@ -50,7 +51,7 @@ test('cancel and escape close the composer and keep the visit while POST locks X
  assert.equal(elements.get('modal').open,false);assert.equal(h.get().visited.owner,'bob');assert.equal(text(elements.get('notice')),'Sementes enviadas.');assert.equal(mutations,1);assert.equal(elements.get('modal').listenerCounts.cancel,1);
 });
 test('visit menu keeps only Minha fazenda, Amigos and Presentear and home restores the own menu',()=>{
- const {h,elements,ctx}=app(),own={...farm('alice'),loginRewards:{completedDay:0,nextDay:1,available:true,rewards:[]}},others=['notifications','shop','deposit','missions','events','settings','more'];
+ const {h,elements,ctx}=app(),own={...farm('alice'),loginRewards:{completedDay:0,nextDay:1,available:true,rewards:[]}},others=['notifications','shop','deposit','missions','achievements','decorations','events','settings','more'];
  h.set({own,api:{pending:null}});h.receive({farm:own});
  assert.ok(others.every(id=>!elements.get(id).hidden));assert.equal(elements.get('home').hidden,true);assert.equal(elements.get('gift-visit').hidden,true);assert.equal(elements.get('friends').hidden,false);assert.equal(ctx.moreVisiting,false);
  h.visit({...farm('bob'),name:'Bob'});
@@ -156,7 +157,7 @@ function app(preferences=new Map(),pushLogoutOptions){
   querySelector(selector){return this.querySelectorAll(selector)[0]??null;},focus(){if(this.tag==='div'&&this.tabIndex===undefined)return;ctx.document.activeElement=this;},
   getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(name,handler){(this.listenerCounts??={})[name]=(this.listenerCounts[name]??0)+1;(this.listeners??={})[name]=handler;},close(){this.open=false;},showModal(){this.open=true;}});
  const storage={getItem:()=>null,setItem(){},removeItem(){}};
- const ctx={syncMobileCamera(){ctx.cameraSyncs=(ctx.cameraSyncs??0)+1;},setMoreMenuVisiting(value){ctx.moreVisiting=value;},reconcilePush:async()=>{},connectPush:async()=>{},suspendPush:pushLogoutOptions?.suspendPush??(async()=>{}),createClient:()=>({auth:{signOut:pushLogoutOptions?.signOut}}),renderPushSettings:()=>{},setMonotonic(value){monotonic=value;},performance:{now:()=>monotonic},...presentation,...uiPresentation,...avatar,...inviteUrl,history:{state:null,replaceState(){}},window:{localStorage:{getItem:key=>preferences.get(key)??null,setItem:(key,value)=>preferences.set(key,value)},COLHEITA_CONFIG:{development:!pushLogoutOptions},setInterval(callback,delay){intervals.set(delay,callback);return delay;},clearInterval(id){intervals.delete(id);},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make(id==='close-modal'||id==='retry'||id==='gift-visit'?'button':'div'));return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}addEventListener(){}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
+ const ctx={syncMobileCamera(){ctx.cameraSyncs=(ctx.cameraSyncs??0)+1;},setMoreMenuVisiting(value){ctx.moreVisiting=value;},reconcilePush:async()=>{},connectPush:async()=>{},suspendPush:pushLogoutOptions?.suspendPush??(async()=>{}),createClient:()=>({auth:{signOut:pushLogoutOptions?.signOut}}),renderPushSettings:()=>{},setMonotonic(value){monotonic=value;},performance:{now:()=>monotonic},...presentation,...uiPresentation,...backgroundCatalog,...avatar,...inviteUrl,history:{state:null,replaceState(){}},window:{localStorage:{getItem:key=>preferences.get(key)??null,setItem:(key,value)=>preferences.set(key,value)},COLHEITA_CONFIG:{development:!pushLogoutOptions},setInterval(callback,delay){intervals.set(delay,callback);return delay;},clearInterval(id){intervals.delete(id);},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make(id==='close-modal'||id==='retry'||id==='gift-visit'?'button':'div'));return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}addEventListener(){}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
  ctx.document.getElementById('farm-header').getBoundingClientRect=()=>({left:0,top:0,width:0,height:0,bottom:0});
  const uiSource=readFileSync(new URL('../src/ui.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(uiSource),ctx);
@@ -167,7 +168,7 @@ function app(preferences=new Map(),pushLogoutOptions){
  const eventsSource=readFileSync(new URL('../src/events.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');runInNewContext(stripTypeScriptTypes(eventsSource),ctx);
  runInNewContext(stripTypeScriptTypes(readFileSync(new URL('../src/away-report.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'')),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={events,updateOwnFarm,refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,friends,presentGift,closeGiftComposer,receive,dialog,health,renderHealth,positionHealth,animalTooltip,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),visit:value=>{visited=value;render();},calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
+ source+='\nglobalThis.h={events,updateOwnFarm,refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,achievements,decorations,friends,presentGift,closeGiftComposer,receive,dialog,health,renderHealth,positionHealth,animalTooltip,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),visit:value=>{visited=value;render();},calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:{...ctx.h,runTimeouts(){for(const [id,callback]of [...timeouts]){timeouts.delete(id);callback();}}},elements,listeners,audioClips,observers,ctx,intervals};
 }
 function openGift(h,elements,owner='bob',name='Bob'){h.visit({...farm(owner),name});elements.get('gift-visit').onclick();}
@@ -245,6 +246,30 @@ test('plant picker keeps reward seeds from the full catalog',()=>{
  const {h,elements}=app(),crop={id:'semente-bronze',name:'Semente de Bronze',spriteStem:'semente-bronze',acquisitionSource:'LOGIN_REWARD',requiredLevel:1};
  h.set({own:{...farm('alice'),level:2,seedCounts:{'semente-bronze':1}},catalog:{crops:[crop],animals:[],fertilizers:[],vip:{greenPrice:20}},api:{pending:null}});h.pickTool('PLANT');
  assert.ok(descendants(elements.get('tool-tray')).some(node=>node.getAttribute('aria-label')==='Semente de Bronze, 1 sementes'));
+});
+
+test('seed bag shows only held seeds and moves the selection when the last one is planted',()=>{
+ const {h,elements}=app(),crops=[{id:'nabo',name:'Nabo',spriteStem:'nabo',requiredLevel:1},{id:'milho',name:'Milho',spriteStem:'milho',requiredLevel:1},{id:'mini-bis',name:'Mini-Bis',spriteStem:'mini-bis',acquisitionSource:'LOGIN_REWARD',requiredLevel:1}];
+ const own={...farm('alice'),level:5,seedCounts:{nabo:1,milho:0,'mini-bis':1}};
+ h.set({own,catalog:{crops,animals:[],fertilizers:[],vip:{greenPrice:20}},api:{pending:null}});h.pickTool('PLANT');
+ const labels=()=>descendants(elements.get('tool-tray')).map(node=>node.getAttribute?.('aria-label')).filter(Boolean);
+ assert.deepEqual(labels(),['Nabo, 1 sementes','Mini-Bis, 1 sementes']);
+ h.receive({farm:{...own,revision:'2',seedCounts:{nabo:0,milho:0,'mini-bis':1}}});
+ assert.deepEqual(labels(),['Mini-Bis, 1 sementes']);
+ assert.equal(descendants(elements.get('tool-tray')).find(node=>node.getAttribute?.('aria-label')==='Mini-Bis, 1 sementes').getAttribute('aria-pressed'),'true');
+});
+
+test('empty seed bag explains where to get seeds and planting does not send a command',async()=>{
+ const {h,elements}=app(),sent=[];
+ h.set({own:{...farm('alice'),seedCounts:{nabo:0}},catalog:{crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',requiredLevel:1,seedPrices:{GOLD:300}}],animals:[],fertilizers:[],vip:{greenPrice:20}},api:{pending:null,mutate:async(_path,fields)=>{sent.push(fields);return{};}}});
+ h.pickTool('PLANT');
+ assert.match(text(elements.get('tool-tray')),/Você não tem sementes\. Compre na Loja ou resgate recompensas\./);
+ assert.ok(!descendants(elements.get('tool-tray')).some(node=>node.className==='tray-item'));
+ assert.doesNotMatch(text(elements.get('tool-tray')),/0 sementes/,'sem legenda de semente fantasma');
+ descendants(elements.get('tool-tray')).find(node=>node.textContent==='Abrir Loja').onclick();
+ assert.equal(elements.get('modal-title').textContent,'Loja');assert.equal(elements.get('tool-tray').hidden,true);
+ await h.tileAction({column:0,row:0,unlocked:true,state:'PLOWED'});
+ assert.equal(sent.length,0);assert.match(text(elements.get('notice')),/Você não tem sementes/);
 });
 
 test('stale calendar claim updates own farm silently after navigation and ignores logout response',async()=>{
@@ -711,6 +736,71 @@ test('animal popup shows protector feeding time left',()=>{
  const bar=descendants(content).find(node=>node.getAttribute('role')==='progressbar');
  assert.ok(bar);assert.equal(bar.getAttribute('aria-valuenow'),'50');assert.equal(bar.children[0].style.width,'50%');
 });
+test('Tarefas shows weekly XP tasks apart from the daily green ones and keeps finished ones until reset',()=>{
+ const {h,elements}=app(),nextResetAt=new Date(Date.now()+(2*24*60+3*60+5)*60_000).toISOString();
+ const weeklyTasks={weekStartsAt:'2026-11-22T03:00:00Z',nextResetAt,tasks:[{id:'harvest',title:'Colha 12 plantas',progress:0,target:12,rewardXp:100,done:false},{id:'buy-animals',title:'Compre 5 animais',progress:5,target:5,rewardXp:100,done:true},{id:'love-friends',title:'Adube 30 plantas de amigos com fertilizante do amor',progress:29,target:30,rewardXp:100,done:false}]};
+ h.set({own:{...farm('alice'),missions:[{id:'care',title:'Cuidar da fazenda',green:1,progress:0,target:1,done:false}],weeklyTasks}});h.missions();
+ const content=elements.get('modal-content'),caption=text(content);
+ assert.equal(elements.get('modal-title').textContent,'Tarefas');
+ assert.match(caption,/Diárias · Em andamento/);assert.match(caption,/Semanais/);
+ assert.match(caption,/Reinicia domingo às 00:00 \(horário de Brasília\) · faltam 2d 3h \d+min/);
+ const weekly=descendants(content).find(node=>node.className==='mission-section weekly-section');
+ assert.match(text(weekly),/0 \/ 12/);assert.match(text(weekly),/29 \/ 30/);assert.match(text(weekly),/Compre 5 animais\+100  recebido/);
+ const images=descendants(weekly).filter(node=>node.tag==='img').map(node=>node.src);
+ assert.ok(images.length>=3);assert.ok(images.every(src=>src==='/assets/classic/icons/xp.png'),'XP nunca usa moeda verde');
+ const daily=descendants(content).find(node=>node.className==='mission-section');
+ assert.ok(descendants(daily).some(node=>node.src==='/assets/classic/icons/moeda-verde.png'));
+});
+
+test('Conquistas groups titles, equips only unlocked ones and removes the active title',async()=>{
+ const {h,elements}=app(),sent=[];
+ const achievements=[{id:'plant-100',category:'plant',categoryLabel:'🌱 Plantio de sementes',title:'•° Camponês •°',target:100,progress:100,unlocked:true},{id:'plant-250',category:'plant',categoryLabel:'🌱 Plantio de sementes',title:'★ Playboy Rural ★',target:250,progress:100,unlocked:false},{id:'level-30',category:'level',categoryLabel:'⭐ Níveis',title:'<b>★ Veterano VIP ★</b>',target:30,progress:30,unlocked:true}];
+ const own={...farm('alice'),achievements,equippedTitleId:'level-30',equippedTitle:'<b>★ Veterano VIP ★</b>'};
+ h.set({own,api:{pending:null,prepareRequestId:async()=>{},mutate:async(_path,fields)=>{sent.push(fields);return{result:{success:true,message:'ok'},farm:{...own,revision:'2'}};}}});h.achievements();
+ const content=elements.get('modal-content'),caption=text(content);
+ assert.equal(elements.get('modal-title').textContent,'Conquistas');
+ assert.match(caption,/2 de 3 títulos liberados/);assert.match(caption,/🌱 Plantio de sementes/);assert.match(caption,/⭐ Níveis/);
+ assert.match(caption,/100 \/ 250/);assert.match(caption,/Bloqueado/);assert.match(caption,/Equipado/);
+ assert.ok(descendants(content).some(node=>node.textContent==='<b>★ Veterano VIP ★</b>'),'título é texto, não HTML');
+ assert.ok(!descendants(content).some(node=>node.getAttribute?.('aria-label')==='Equipar título ★ Playboy Rural ★'));
+ descendants(content).find(node=>node.getAttribute?.('aria-label')==='Equipar título •° Camponês •°').onclick();await new Promise(r=>setTimeout(r,0));
+ assert.equal(sent[0].action,'EQUIP_TITLE');assert.equal(sent[0].itemId,'plant-100');
+ descendants(elements.get('modal-content')).find(node=>node.textContent==='Remover título').onclick();await new Promise(r=>setTimeout(r,0));
+ assert.equal(sent[1].action,'CLEAR_TITLE');assert.equal(sent[1].itemId,undefined);
+});
+
+test('visited wallet shows the public title next to the VIP badge',()=>{
+ const {h,elements}=app();h.set({own:farm('alice')});h.visit({...farm('bob'),name:'Bob',vipActive:true,equippedTitle:'♛ Rei do Gado ♛'});
+ const wallet=elements.get('wallet');
+ assert.ok(descendants(wallet).some(node=>node.className==='player-title'&&node.textContent==='♛ Rei do Gado ♛'));
+ assert.ok(descendants(wallet).some(node=>node.className==='vip-badge'||String(node.className).includes('vip')),'VIP continua visível');
+});
+
+test('Decorações shows one pack at a time, confirms the purchase and applies owned packs for free',async()=>{
+ const {h,elements}=app(),sent=[];
+ const own={...farm('alice'),coins:'1000000',activeBackgroundId:'default',ownedBackgroundIds:['default','outono'],backgroundPrice:'1000000'};
+ h.set({own,api:{pending:null,prepareRequestId:async()=>{},mutate:async(_path,fields)=>{sent.push(fields);return{result:{success:true,message:'ok'},farm:{...own,revision:'2',coins:'0',activeBackgroundId:'inverno',ownedBackgroundIds:['default','inverno','outono']}};}}});
+ h.decorations(true);
+ const content=()=>elements.get('modal-content'),find=label=>descendants(content()).find(node=>node.getAttribute?.('aria-label')===label||node.textContent===label);
+ assert.equal(elements.get('modal-title').textContent,'Decorações');
+ assert.match(text(content()),/Clássico1 \/ 11Padrão · Equipado/);
+ find('Fundo anterior').onclick();assert.match(text(content()),/Jardim oriental11 \/ 11Não comprado/);
+ find('Próximo fundo').onclick();find('Próximo fundo').onclick();
+ assert.match(text(content()),/Inverno2 \/ 11Não comprado/);
+ find('Noite').onclick();
+ assert.ok(descendants(content()).some(node=>node.className==='decoration-preview'&&node.src==='/assets/classic/background/background-inverno-noite.png'));
+ find('Comprar e aplicar · 1.000.000 ouro').onclick();
+ assert.equal(sent.length,0,'a compra pede confirmação');assert.match(text(content()),/Gastar 1\.000\.000 ouro em Inverno\?/);
+ find('Confirmar compra').onclick();await new Promise(r=>setTimeout(r,0));
+ assert.deepEqual({...sent[0],expectedRevision:undefined},{action:'BUY_BACKGROUND',itemId:'inverno',currency:'GOLD',expectedRevision:undefined});
+ assert.match(text(content()),/Inverno2 \/ 11Equipado/,'o refresh mantém o slide e mostra o fundo ativo');
+ find('Próximo fundo').onclick();assert.match(text(content()),/Outono3 \/ 11Comprado/);
+ find('Aplicar').onclick();await new Promise(r=>setTimeout(r,0));
+ assert.deepEqual({...sent[1],expectedRevision:undefined},{action:'EQUIP_BACKGROUND',itemId:'outono',expectedRevision:undefined});
+ find('Próximo fundo').onclick();
+ const short=find('Ouro insuficiente');assert.ok(short);assert.equal(short.disabled,true);
+});
+
 test('open missions screen refreshes progress after a farm update',()=>{
  const {h,elements}=app(),farmState={...farm('alice'),missions:[{id:'m',title:'Colher',green:1,progress:1,target:2,done:false}]};
  h.set({own:farmState});h.missions();assert.match(text(elements.get('modal-content')),/1 \/ 2/);
@@ -882,6 +972,24 @@ test('shop quantities do not leak to the next account',async()=>{
  await h.logout();
  h.set({own:{...farm('bob'),level:10,coins:'1000'},catalog});h.shop();
  assert.ok(find('Comprar Nabo por 30 ouro'),'Bob começa em uma unidade');
+});
+
+test('weekly countdown follows the server clock, not a wrong device clock',()=>{
+ const {h,elements}=app(),own={...farm('alice'),serverTime:'2026-11-20T12:00:00Z',missions:[],weeklyTasks:{weekStartsAt:'2026-11-15T03:00:00Z',nextResetAt:'2026-11-22T03:00:00Z',tasks:[]}};
+ h.set({own});h.receive({farm:own});h.missions();
+ assert.match(text(elements.get('modal-content')),/faltam 1d 15h 0min/,'o relógio do aparelho (hoje real) não muda a contagem');
+});
+test('friend list refresh keeps, changes and removes the public title next to the VIP badge',async()=>{
+ const {h,elements}=app();let list=[{id:'bob',name:'Bob',vipActive:true,equippedTitle:'♛ Rei do Gado ♛'}];
+ const own=farm('alice');h.set({own,api:{get:async path=>path==='/v1/friends'?list:own}});await h.friends();
+ const identity=()=>descendants(elements.get('modal-content')).find(node=>node.className==='friend-identity');
+ const title=()=>descendants(identity()).find(node=>node.className==='player-title')?.textContent;
+ const vip=()=>descendants(identity()).some(node=>node.className?.includes?.('vip'));
+ assert.equal(title(),'♛ Rei do Gado ♛');assert.ok(vip());
+ const refresh=async()=>{h.receive({farm:{...h.get().own,revision:String(Number(h.get().own.revision)+1)}});for(let i=0;i<3;i++)await new Promise(r=>setTimeout(r,0));};
+ await refresh();assert.equal(title(),'♛ Rei do Gado ♛','o refresh não apaga o título');assert.ok(vip(),'nem o selo VIP');
+ list=[{...list[0],equippedTitle:'★ Mão na Enxada ★'}];await refresh();assert.equal(title(),'★ Mão na Enxada ★');
+ list=[{...list[0],equippedTitle:null,vipActive:false}];await refresh();assert.equal(title(),undefined);assert.equal(vip(),false);
 });
 
 test('late avatar response preserves a closed or replaced dialog',async()=>{

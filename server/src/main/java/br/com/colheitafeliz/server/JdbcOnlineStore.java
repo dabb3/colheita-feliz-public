@@ -26,7 +26,7 @@ import java.util.function.Function;
 final class JdbcOnlineStore implements AutoCloseable {
     static final int RECEIPTS_PER_ACTOR = 1000;
     record Player(UUID id, String name, boolean active, Instant registeredAt) {}
-    record Friend(UUID id,String name,boolean active,br.com.colheitafeliz.game.PlayerAvatar avatar,boolean vipActive) {}
+    record Friend(UUID id,String name,boolean active,br.com.colheitafeliz.game.PlayerAvatar avatar,boolean vipActive,String equippedTitle) {}
     record Farm(GameSnapshot snapshot, long revision, Instant time, LocalDate allowanceDay) {}
     record LoginRewardProgress(LocalDate lastClaimDate, int completedDay, long cycle, long totalClaims) {}
     record Receipt(String hash, JsonObject response) {}
@@ -111,6 +111,19 @@ final class JdbcOnlineStore implements AutoCloseable {
                     + schema + ".players(id), last_claim_date date, completed_day integer NOT NULL CHECK(completed_day BETWEEN 0 AND 30), "
                     + "cycle bigint NOT NULL CHECK(cycle > 0), total_claims bigint NOT NULL CHECK(total_claims > 0), "
                     + "created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at timestamptz NOT NULL)");
+            tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".weekly_task_progress (owner uuid PRIMARY KEY REFERENCES "
+                    + schema + ".players(id), week_start date NOT NULL CHECK(extract(isodow FROM week_start)=7), "
+                    + "harvests integer NOT NULL CHECK(harvests BETWEEN 0 AND 12), animals integer NOT NULL CHECK(animals BETWEEN 0 AND 5), "
+                    + "love integer NOT NULL CHECK(love BETWEEN 0 AND 30), updated_at timestamptz NOT NULL)");
+            tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".achievement_progress (owner uuid PRIMARY KEY REFERENCES "
+                    + schema + ".players(id), clean bigint NOT NULL DEFAULT 0 CHECK(clean >= 0), plant bigint NOT NULL DEFAULT 0 CHECK(plant >= 0), "
+                    + "harvest bigint NOT NULL DEFAULT 0 CHECK(harvest >= 0), spread bigint NOT NULL DEFAULT 0 CHECK(spread >= 0), "
+                    + "steal bigint NOT NULL DEFAULT 0 CHECK(steal >= 0), green_spent numeric(20,1) NOT NULL DEFAULT 0 CHECK(green_spent >= 0), "
+                    + "unlocked text NOT NULL DEFAULT '' CHECK(unlocked ~ '^([a-z0-9-]{1,40}(,[a-z0-9-]{1,40})*)?$'), "
+                    + "equipped_title varchar(40), updated_at timestamptz NOT NULL)");
+            tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".farm_backgrounds (owner uuid PRIMARY KEY REFERENCES "
+                    + schema + ".players(id), owned text NOT NULL DEFAULT '' CHECK(owned ~ '^([a-z_]{1,40}(,[a-z_]{1,40})*)?$'), "
+                    + "active varchar(40) NOT NULL DEFAULT 'default', updated_at timestamptz NOT NULL)");
             tx.execute("CREATE TABLE IF NOT EXISTS " + schema + ".cooperative_xp (actor uuid PRIMARY KEY REFERENCES "
                     + schema + ".players(id), day date NOT NULL, xp integer NOT NULL CHECK(xp >= 0))");
             tx.execute("CREATE TABLE IF NOT EXISTS "+schema+".update_note_views (actor uuid PRIMARY KEY REFERENCES "+schema
@@ -128,7 +141,7 @@ final class JdbcOnlineStore implements AutoCloseable {
                     +".players(id), last_seen_at timestamptz NOT NULL, ledger jsonb NOT NULL, pending jsonb)");
             tx.execute("ALTER TABLE "+schema+".away_reports ADD COLUMN IF NOT EXISTS pending jsonb");
             tx.execute("REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
-            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "pest_origins", "daily_allowances", "login_reward_progress", "cooperative_xp", "update_note_views", "seed_gifts", "push_subscriptions", "push_tests", "push_events", "crop_push_jobs", "crop_push_deliveries", "social_push_devices", "social_push_cursors", "social_push_deliveries", "away_reports")) {
+            for (String table : List.of("players", "farms", "receipts", "friendships", "invitations", "theft_cooldowns", "pest_cooldowns", "pest_origins", "daily_allowances", "login_reward_progress", "weekly_task_progress", "achievement_progress", "farm_backgrounds", "cooperative_xp", "update_note_views", "seed_gifts", "push_subscriptions", "push_tests", "push_events", "crop_push_jobs", "crop_push_deliveries", "social_push_devices", "social_push_cursors", "social_push_deliveries", "away_reports")) {
                 tx.execute("ALTER TABLE " + schema + "." + table + " ENABLE ROW LEVEL SECURITY");
                 tx.execute("REVOKE ALL ON " + schema + "." + table + " FROM PUBLIC");
             }
@@ -328,6 +341,46 @@ final class JdbcOnlineStore implements AutoCloseable {
                             + ".login_reward_progress WHERE owner=?", row -> new LoginRewardProgress(
                             row.getObject(1, LocalDate.class), row.getInt(2), row.getLong(3), row.getLong(4)), owner));
         }
+        WeeklyTasks.Progress weeklyTasks(UUID owner) {
+            return first(query("SELECT week_start,harvests,animals,love FROM " + schema + ".weekly_task_progress WHERE owner=?",
+                    row -> new WeeklyTasks.Progress(row.getObject(1, LocalDate.class), row.getInt(2), row.getInt(3), row.getInt(4)), owner));
+        }
+        void recordWeeklyTasks(UUID owner, WeeklyTasks.Progress progress, Instant now) {
+            execute("INSERT INTO " + schema + ".weekly_task_progress(owner,week_start,harvests,animals,love,updated_at) VALUES(?,?,?,?,?,?) "
+                            + "ON CONFLICT(owner) DO UPDATE SET week_start=EXCLUDED.week_start,harvests=EXCLUDED.harvests,"
+                            + "animals=EXCLUDED.animals,love=EXCLUDED.love,updated_at=EXCLUDED.updated_at",
+                    owner, progress.weekStart(), progress.harvests(), progress.animals(), progress.love(), java.sql.Timestamp.from(now));
+        }
+        Achievements.Progress achievements(UUID owner) {
+            var found = first(query("SELECT clean,plant,harvest,spread,steal,green_spent,unlocked,equipped_title FROM " + schema
+                    + ".achievement_progress WHERE owner=?", row -> new Achievements.Progress(row.getLong(1), row.getLong(2), row.getLong(3),
+                    row.getLong(4), row.getLong(5), row.getBigDecimal(6),
+                    row.getString(7).isEmpty() ? java.util.Set.of() : java.util.Set.of(row.getString(7).split(",")), row.getString(8)), owner));
+            return found == null ? Achievements.Progress.empty() : found;
+        }
+        void addAchievementCounters(UUID owner, Achievements.Delta delta, Instant now) {
+            execute("INSERT INTO " + schema + ".achievement_progress AS p(owner,clean,plant,harvest,spread,steal,green_spent,updated_at) "
+                            + "VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(owner) DO UPDATE SET clean=p.clean+EXCLUDED.clean,plant=p.plant+EXCLUDED.plant,"
+                            + "harvest=p.harvest+EXCLUDED.harvest,spread=p.spread+EXCLUDED.spread,steal=p.steal+EXCLUDED.steal,"
+                            + "green_spent=p.green_spent+EXCLUDED.green_spent,updated_at=EXCLUDED.updated_at",
+                    owner, delta.clean(), delta.plant(), delta.harvest(), delta.spread(), delta.steal(), delta.green(), java.sql.Timestamp.from(now));
+        }
+        void saveTitles(UUID owner, java.util.Set<String> unlocked, Achievements.Achievement equipped, Instant now) {
+            execute("INSERT INTO " + schema + ".achievement_progress(owner,unlocked,equipped_title,updated_at) VALUES(?,?,?,?) "
+                    + "ON CONFLICT(owner) DO UPDATE SET unlocked=EXCLUDED.unlocked,equipped_title=EXCLUDED.equipped_title,updated_at=EXCLUDED.updated_at",
+                    owner, String.join(",", new java.util.TreeSet<>(unlocked)), equipped == null ? null : equipped.id(), java.sql.Timestamp.from(now));
+        }
+        Backgrounds.State backgrounds(UUID owner) {
+            var found = first(query("SELECT owned,active FROM " + schema + ".farm_backgrounds WHERE owner=?",
+                    row -> new Backgrounds.State(row.getString(1).isEmpty() ? java.util.Set.of() : java.util.Set.of(row.getString(1).split(",")),
+                            row.getString(2)), owner));
+            return found == null ? Backgrounds.State.initial() : found;
+        }
+        void saveBackgrounds(UUID owner, Backgrounds.State state, Instant now) {
+            execute("INSERT INTO " + schema + ".farm_backgrounds(owner,owned,active,updated_at) VALUES(?,?,?,?) "
+                    + "ON CONFLICT(owner) DO UPDATE SET owned=EXCLUDED.owned,active=EXCLUDED.active,updated_at=EXCLUDED.updated_at",
+                    owner, String.join(",", new java.util.TreeSet<>(state.owned())), state.active(), java.sql.Timestamp.from(now));
+        }
         void recordLoginRewardProgress(UUID owner, LocalDate day, int completedDay, long cycle, long totalClaims, Instant now) {
             execute("INSERT INTO " + schema + ".login_reward_progress(owner,last_claim_date,completed_day,cycle,total_claims,updated_at) "
                             + "VALUES(?,?,?,?,?,?) ON CONFLICT(owner) DO UPDATE SET last_claim_date=EXCLUDED.last_claim_date, "
@@ -407,11 +460,12 @@ final class JdbcOnlineStore implements AutoCloseable {
                     r->r.getObject(1,UUID.class),actor,version,day).isEmpty();
         }
         List<Friend> friends(UUID actor,Instant now) {
-            return query("SELECT p.id,p.name,p.active,g.snapshot->'avatar',g.snapshot->>'vipExpiresAt' FROM " + schema + ".players p JOIN " + schema
+            // The equipped title comes in the same query, so the list never runs one lookup per friend.
+            return query("SELECT p.id,p.name,p.active,g.snapshot->'avatar',g.snapshot->>'vipExpiresAt',a.equipped_title FROM " + schema + ".players p JOIN " + schema
                     + ".friendships f ON p.id=CASE WHEN f.a=? THEN f.b ELSE f.a END LEFT JOIN " + schema
-                    + ".farms g ON g.owner=p.id WHERE (f.a=? OR f.b=?) AND p.active",
+                    + ".farms g ON g.owner=p.id LEFT JOIN " + schema + ".achievement_progress a ON a.owner=p.id WHERE (f.a=? OR f.b=?) AND p.active",
                     r -> new Friend(r.getObject(1, UUID.class), r.getString(2), r.getBoolean(3),publicAvatar(r.getString(4)),
-                            r.getString(5)!=null&&now.isBefore(Instant.parse(r.getString(5)))), actor, actor, actor);
+                            r.getString(5)!=null&&now.isBefore(Instant.parse(r.getString(5))),r.getString(6)), actor, actor, actor);
         }
         private br.com.colheitafeliz.game.PlayerAvatar publicAvatar(String json){
             var avatar=json==null?com.google.gson.JsonNull.INSTANCE:JsonParser.parseString(json);

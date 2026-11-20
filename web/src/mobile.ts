@@ -195,7 +195,7 @@ export function setMoreMenuVisiting(visiting: boolean) {
 function setupMoreMenu(media: MediaQueryList) {
   const more = document.getElementById('more') as HTMLButtonElement | null, menu = document.getElementById('more-menu');
   if (!more || !menu) return;
-  const moved = ['notifications', 'friends', 'settings', 'events'].map(id => document.getElementById(id)).filter((node): node is HTMLElement => !!node);
+  const moved = ['notifications', 'achievements', 'decorations', 'friends', 'settings', 'events'].map(id => document.getElementById(id)).filter((node): node is HTMLElement => !!node);
   // Placeholders keep the desktop order when the buttons return to the bar.
   const anchors = moved.map(node => {const anchor = document.createComment(node.id); node.before(anchor); return anchor;});
   const close = (focus = false) => {

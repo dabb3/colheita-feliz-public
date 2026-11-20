@@ -362,9 +362,38 @@ A inicialização cria aditivamente e de forma idempotente `colheita.login_rewar
 
 Incluir `login_reward_progress`, `farms` e demais tabelas existentes nos backups/restaurações. Publicar primeiro o backend com o catálogo das quatro culturas disponível e só então habilitar os claims no cliente. Jogadores existentes começam disponíveis para o dia 1, sem prêmios retroativos. Em rollback, desativar o calendário no código/cliente e preservar a tabela, os lotes e a leitura dos snapshots com sementes premiadas; não reverter para binário que não reconheça esses itens. O bônus UTC não faz parte do rollback do calendário.
 
+## Tarefas semanais
+
+O botão Missões passou a se chamar Tarefas; identificadores, rotas e o asset `missoes.png` continuam iguais. A fazenda própria traz `weeklyTasks` com `weekStartsAt`, `nextResetAt` e `tasks` (`id`, `title`, `progress`, `target`, `rewardXp`, `done`). A visita não recebe esse campo.
+
+A tabela privada `colheita.weekly_task_progress` guarda por dono `week_start` (sempre domingo) e os contadores `harvests` (até 12), `animals` (até 5) e `love` (até 30), com RLS e privilégios revogados como as demais, criada de forma aditiva na inicialização. O servidor conta `HARVEST` e `BUY_ANIMAL` bem-sucedidos em `POST /v1/me/actions` e `LOVE` bem-sucedido na rota de visita, para o visitante. Contador, XP, fazenda e recibo são gravados na mesma transação; o replay devolve o recibo sem contar de novo. A semana vira domingo 00:00 em `America/Sao_Paulo`; uma semana guardada mais nova que o relógio do servidor é mantida, sem voltar para a anterior. Rollback de código deixa a tabela sem uso.
+
+## Conquistas e títulos
+
+O botão Conquistas (ícone `conquistas.png`) abre as 40 conquistas de `conquistas.md`, em 9 categorias. A recompensa é só o título; liberado, nunca é revogado. No celular o botão fica em Mais, e na visita ele some como os outros painéis da própria fazenda.
+
+A tabela privada `colheita.achievement_progress` guarda por dono os contadores `clean`, `plant`, `harvest`, `spread`, `steal` e `green_spent`, os ids liberados e `equipped_title`, com RLS e privilégios revogados, criada de forma aditiva. Os contadores só sobem depois de uma ação bem-sucedida, na mesma transação da fazenda e do recibo, então o replay não conta de novo:
+
+- limpeza: `WEED` e `PESTICIDE` na própria fazenda e `CLEAN_WEEDS`/`CLEAN_INSECTS` em amigos, uma por ação; a limpeza automática do serviço VIP não conta;
+- plantio: `PLANT`; colheitas: `HARVEST`; pragas em amigos: `SPREAD_INSECTS` e `SPREAD_WEEDS`;
+- furtos: só `STEAL` com resultado `STOLEN`; bloqueio, proteção e mordida não contam;
+- verdes gastos: soma dos débitos reais em verdes do comando (carteira), inclusive compras em lote, VIP, serviços e terrenos; nunca a diferença de saldo.
+
+Esses contadores começam na implantação, sem retroatividade inventada. Nível, terrenos liberados e tipos de animal possuídos ao mesmo tempo são lidos do estado atual e liberam o título já na primeira leitura da fazenda.
+
+`EQUIP_TITLE` com `itemId` igual ao id da conquista equipa um título liberado da própria conta; id desconhecido retorna 400 e título bloqueado retorna `result.success=false`. `CLEAR_TITLE`, sem outros campos, remove o título. A fazenda própria traz `achievements` (`id`, `category`, `categoryLabel`, `title`, `target`, `progress`, `unlocked`), `equippedTitleId` e `equippedTitle`. A visita e `/v1/friends` trazem só `equippedTitle`, que o cliente mostra como texto ao lado do nome, sem tirar o selo VIP.
+
+## Decorações: fundos da fazenda
+
+O botão Decorações (ícone `decoracoes.png`) abre um carrossel com um fundo por vez, setas, prévia de dia, tarde e noite e o estado Padrão, Não comprado, Comprado ou Equipado. O fundo clássico é grátis e padrão. Os outros dez (`inverno`, `outono`, `savana`, `cerejeiras`, `floresta_encantada`, `tropical`, `mundo_dos_doces`, `planeta_alienigena`, `terra_vulcanica`, `jardim_oriental`) custam 1.000.000 de ouro cada e trazem os três períodos. Os arquivos ficam numa lista fechada em `web/src/background-catalog.ts`, com os nomes reais, inclusive `backgound-inverno.png`; os fundos de Natal não entram.
+
+`BUY_BACKGROUND` com `itemId` do pack (e `currency` ausente ou `GOLD`) debita 1.000.000 de ouro de uma vez, guarda o pack e já o aplica. Pack já comprado, `default` ou saldo menor retornam `result.success=false` sem cobrar; id desconhecido ou verdes retornam 400. `EQUIP_BACKGROUND` aplica de graça o padrão ou um pack da própria conta. A tabela privada `colheita.farm_backgrounds` guarda `owned` e `active` por dono, com RLS e privilégios revogados; conta sem registro usa o padrão. Compra, débito, recibo e fazenda vão na mesma transação, então retry e duas abas não cobram duas vezes.
+
+A fazenda própria traz `activeBackgroundId`, `ownedBackgroundIds` e `backgroundPrice`; a visita traz só `activeBackgroundId`. A cena desenha o pack da fazenda que está na tela, no período do relógio local de quem olha, e usa o clássico enquanto o pack carrega ou se o id for desconhecido.
+
 ## Ajuda diária de 100 ouro
 
-Missões oferece resgate manual de 100 ouro por dia UTC, sem acumular valores de dias ausentes e sem depender de saldo, nível ou VIP. O botão só aparece quando a API informa dailyAllowance; após o resgate fica bloqueado e mostra a próxima virada em data/hora local. Não há pagamento por GET, login ou tutorial, nem XP, verdes, itens ou progresso de tarefas. A regra fonte é a seção 12.1 de docs/game-rule.md.
+Tarefas oferece resgate manual de 100 ouro por dia UTC, sem acumular valores de dias ausentes e sem depender de saldo, nível ou VIP. O botão só aparece quando a API informa dailyAllowance; após o resgate fica bloqueado e mostra a próxima virada em data/hora local. Não há pagamento por GET, login ou tutorial, nem XP, verdes, itens ou progresso de tarefas. A regra fonte é a seção 12.1 de docs/game-rule.md.
 
 CLAIM_DAILY_ALLOWANCE usa POST /v1/me/actions e os identificadores/revisões existentes. O backend define o valor; campos extras como amount são recusados. A tabela privada colheita.daily_allowances guarda somente actor e last_claimed_day, com RLS/revogação como as demais tabelas, criada aditivamente na inicialização. Crédito, último dia e recibo são confirmados na mesma transação, sob lock por ator e fazenda; replay não paga novamente e rollback desfaz tudo. A data usa UTC explícito e retrocessos não reabrem dias já pagos.
 
