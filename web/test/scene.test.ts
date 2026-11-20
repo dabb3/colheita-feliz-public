@@ -67,6 +67,7 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  christmas=false;scene.update(farm);assert.deepEqual(periods,['night','night'],'event end resyncs the music');
  christmas=true;scene.update(farm);while(pending.length)pending.shift().onload();drawn.length=0;scene.update(farm);
  assert.ok(drawn.some(d=>d.path?.endsWith('/background-night.png'))&&!drawn.some(d=>d.path?.includes('natal')),'the night background stays original');
+ assert.deepEqual(drawn.find(d=>d.path?.endsWith('/background-night.png')).args,[0,0,1600,900],'the whole background fills the world, without the old bottom crop');
  scene.update({...farm,activeBackgroundId:'savana'});while(pending.length)pending.shift().onload();drawn.length=0;scene.update({...farm,activeBackgroundId:'savana'});
  assert.ok(drawn.some(d=>d.path?.endsWith('/background-savana-noite.png')),'the farm on screen draws its own pack');
  assert.ok(!drawn.some(d=>d.path?.endsWith('/background-night.png')),'a loaded pack replaces the classic art');

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {ownedSeeds,seedSelection,hungerGlow,periodAt,tileCenter,pickTile,animalPath,animalWalkingFrame,animalSoundPath,tileArtRect,backgroundBounds,animalShadowRect,spriteDrawRect,measureSpriteFootprint,widthForMatchingHeight,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand,friendFeedOptions} from '../src/presentation.ts';
+import {ownedSeeds,seedSelection,hungerGlow,periodAt,tileCenter,pickTile,animalPath,animalWalkingFrame,animalSoundPath,tileArtRect,animalShadowRect,spriteDrawRect,measureSpriteFootprint,widthForMatchingHeight,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand,friendFeedOptions} from '../src/presentation.ts';
 
 test('the updated idle dog matches the walking sprite height after alpha trim',()=>{
  // Trimmed boxes (>12 alpha) of cachorro.png and cachorro-andando.png at 1536×1024.
@@ -36,10 +36,6 @@ test('terrain variants normalize their opaque body to the same clickable diamond
   const expected=[center.x-85,center.y-36,170,72];
   actual.forEach((value,i)=>assert.ok(Math.abs(value-expected[i])<1e-8,`${terrain}: ${actual} != ${expected}`));
  }
-});
-test('background covers the viewport without stretching and stays top aligned',()=>{
- const bounds=backgroundBounds(1600,900,1478,1064);
- assert.deepEqual(bounds,{x:0,y:0,width:1600,height:1600*1064/1478});
 });
 test('animal shadow is centered on its ground anchor and scales with the animal',()=>{
  assert.deepEqual(animalShadowRect(100,500,100,.5),{x:83.75,y:500,rx:16.25,ry:2.6});

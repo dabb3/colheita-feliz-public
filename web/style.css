@@ -806,7 +806,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 .decoration-carousel{display:grid;gap:10px}
 .decoration-carousel:focus-visible{outline:3px solid #1668cd;outline-offset:3px}
 .decoration-stage{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px}
-.decoration-preview{width:100%;aspect-ratio:16/9;border:1px solid #c1cdae;border-radius:10px;object-fit:cover;background:#84ba30}
+.decoration-preview{width:100%;aspect-ratio:16/9;border:1px solid #c1cdae;border-radius:10px;object-fit:fill;background:#84ba30}
 .decoration-arrow{width:44px;height:44px;padding:0;font-size:26px;line-height:1}
 .decoration-heading{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px}
 .decoration-heading h3{margin:0;color:#57471f;font:700 20px Georgia,serif}

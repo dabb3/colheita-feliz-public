@@ -238,20 +238,6 @@ export function periodAt(date: Date): "day" | "sunset" | "night" {
       ? "sunset"
       : "night";
 }
-export function backgroundBounds(
-  viewportWidth: number,
-  viewportHeight: number,
-  imageWidth: number,
-  imageHeight: number,
-) {
-  const scale = Math.max(
-    viewportWidth / imageWidth,
-    viewportHeight / imageHeight,
-  );
-  const width = imageWidth * scale,
-    height = imageHeight * scale;
-  return { x: (viewportWidth - width) / 2, y: 0, width, height };
-}
 export function tileCenter(column: number, row: number) {
   return { x: 585 + (column - row) * 85, y: 400 + (column + row) * 36 };
 }
