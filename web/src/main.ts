@@ -9,6 +9,7 @@ import {takeInvite} from './invite-url.ts';
 import {renderWallet,control,text,image,renderDailyAllowance,friendAvatar,vipBadge} from './ui.ts';
 import {renderGiftComposer,renderLoginRewards,giftLimit,type GiftComposerState} from './ui-panels.ts';
 import {BACKGROUND_PACKS,backgroundPath,DEFAULT_BACKGROUND,type Period} from './background-catalog.ts';
+import {DecorationImageCache,LatestDecorationPreview} from './decoration-images.ts';
 import {fertilizerDuration,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText,purchaseQuantity} from './ui-presentation.ts';
 import {PROTECTED_ICON,notificationCount,renderNotifications} from './notifications.ts';
 import {renderAwayReport,startAwayLeaves} from './away-report.ts';
@@ -33,6 +34,9 @@ let calendarContext:{root:HTMLElement;client:ApiClient;session:number;dialog:num
 const depositNumber=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1});
 // Carousel position and preview period survive the panel refresh that follows each server reply.
 let decorationIndex=0,decorationPeriod:Period='day',decorationConfirm='';
+const decorationImages=new DecorationImageCache<HTMLImageElement>(()=>new Image(),8);
+const decorationPreviewRequest=new LatestDecorationPreview(decorationImages);
+let decorationVisibleImage:HTMLImageElement|undefined,decorationVisiblePath='',decorationVisibleOwner='';
 const depositPriceNumber=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2});
 const login=element('login');
 const {invite:inviteFromUrl,cleaned:cleanedUrl}=takeInvite(location.href);
@@ -910,7 +914,42 @@ function decorations(open=false,focusKey?:string){
  carousel.onkeydown=(event:KeyboardEvent)=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();move(event.key==='ArrowLeft'?-1:1);}};
  const stage=document.createElement('div');stage.className='decoration-stage';
  const prev=button('‹',()=>move(-1),stage,'decoration-prev');prev.className='decoration-arrow';prev.setAttribute('aria-label','Fundo anterior');
- const preview=document.createElement('img');preview.className='decoration-preview';preview.src=`/assets/${backgroundPath(pack.id,decorationPeriod)}`;preview.alt=`${pack.name}, ${decorationPeriod==='day'?'dia':decorationPeriod==='sunset'?'tarde':'noite'}`;stage.append(preview);
+ // Keep the decoded bitmap from the previous slide visible until the next one is ready.
+ const currentOwner=own?.owner??'',previewPath=`/assets/${backgroundPath(pack.id,decorationPeriod)}`;
+ const previewAlt=`${pack.name}, ${decorationPeriod==='day'?'dia':decorationPeriod==='sunset'?'tarde':'noite'}`;
+ const previous=decorationVisibleOwner===currentOwner?decorationVisibleImage:undefined;
+ const placeholder=document.createElement('div');placeholder.className='decoration-preview-placeholder';placeholder.setAttribute('role','img');placeholder.setAttribute('aria-label','Prévia carregando');
+ let shown:HTMLElement=previous??placeholder;
+ stage.append(shown);
+ const previewStatus=document.createElement('div');previewStatus.className='decoration-preview-status';previewStatus.setAttribute('role','status');previewStatus.textContent='Carregando prévia…';stage.append(previewStatus);
+ const panelGeneration=dialogGeneration;
+ const current=()=>dialogGeneration===panelGeneration&&modal.open&&content.contains(stage)&&own?.owner===currentOwner;
+ const warmNeighbors=()=>{
+  const left=BACKGROUND_PACKS[(decorationIndex+BACKGROUND_PACKS.length-1)%BACKGROUND_PACKS.length];
+  const right=BACKGROUND_PACKS[(decorationIndex+1)%BACKGROUND_PACKS.length];
+  decorationImages.preload([
+   ...(['day','sunset','night'] as const).map(period=>`/assets/${backgroundPath(pack.id,period)}`),
+   `/assets/${backgroundPath(left.id,decorationPeriod)}`,
+   `/assets/${backgroundPath(right.id,decorationPeriod)}`
+  ]);
+ };
+ const load=()=>{
+  previewStatus.className='decoration-preview-status';previewStatus.replaceChildren(document.createTextNode('Carregando prévia…'));previewStatus.hidden=false;
+  void decorationPreviewRequest.show(previewPath,image=>{
+   if(!current())return;
+   image.className='decoration-preview';image.alt=previewAlt;
+   shown.replaceWith(image);shown=image;
+   decorationVisibleImage=image;decorationVisibleOwner=currentOwner;decorationVisiblePath=previewPath;
+   previewStatus.hidden=true;warmNeighbors();
+  },()=>{
+   if(!current())return;
+   previewStatus.className='decoration-preview-status is-error';previewStatus.replaceChildren(document.createTextNode('Não foi possível carregar a imagem. '));
+   button('Tentar novamente',load,previewStatus);
+  });
+ };
+ if(previous&&decorationVisiblePath===previewPath){
+  decorationPreviewRequest.cancel();previous.alt=previewAlt;previewStatus.hidden=true;warmNeighbors();
+ }else load();
  const next=button('›',()=>move(1),stage,'decoration-next');next.className='decoration-arrow';next.setAttribute('aria-label','Próximo fundo');
  carousel.append(stage);
  const heading=document.createElement('div');heading.className='decoration-heading';heading.append(text('h3',pack.name),text('span',`${decorationIndex+1} / ${BACKGROUND_PACKS.length}`,'decoration-count'));
