@@ -34,6 +34,7 @@ import br.com.colheitafeliz.domain.player.VipStatus;
 public final class GameState {
     public static final int COLUMNS = 6;
     public static final int ROWS = 5;
+    public static final int MAX_PURCHASE_QUANTITY = 99;
     public static final int STARTING_COINS = 500;
     public static final BigDecimal VIP_PRICE = new BigDecimal("100");
     public static final BigDecimal AUTOMATION_PRICE = new BigDecimal("100");
@@ -489,10 +490,15 @@ public final class GameState {
         return buySeed(known, known.seedPrice().getKey());
     }
 
-    public ActionResult buySeed(CropType type, Currency currency) {
+    public ActionResult buySeed(CropType type, Currency currency) { return buySeed(type, currency, 1); }
+
+    /** Compra de 1 a {@value #MAX_PURCHASE_QUANTITY} sementes de uma vez: tudo é validado antes de mexer em saldo ou estoque. */
+    public ActionResult buySeed(CropType type, Currency currency, int quantity) {
         CropType known = catalog.get(type.id());
         if (known.acquisitionSource() != br.com.colheitafeliz.domain.inventory.AcquisitionSource.SHOP)
             return report(ActionResult.fail(known.name() + " só pode ser obtida como recompensa do calendário."));
+        if (quantity < 1 || quantity > MAX_PURCHASE_QUANTITY)
+            return report(ActionResult.fail("Escolha de 1 a " + MAX_PURCHASE_QUANTITY + " unidades."));
         if (!unlocked(known))
             return report(ActionResult.fail(known.name() + " libera no nível " + known.requiredLevel() + "."));
         if (known.vipOnly() && !vipActive())
@@ -500,16 +506,17 @@ public final class GameState {
         BigDecimal price = known.seedPrices().get(Objects.requireNonNull(currency));
         if (price == null)
             return report(ActionResult.fail(known.name() + " não é vendida por " + currencyName(currency) + "."));
-        try {
-            market.buySeed(known, currency);
-            ActionResult result = ActionResult.ok("+1 semente de " + known.name()
-                    + " | -" + GameText.money(price) + " " + currencyName(currency));
-            String missionReward = recordDailyMission("buy", 1);
-            if (!missionReward.isEmpty()) result = ActionResult.ok(result.message() + " " + missionReward);
-            return report(result);
-        } catch (IllegalStateException e) {
+        BigDecimal total = price.multiply(BigDecimal.valueOf(quantity));
+        if (quantity > Integer.MAX_VALUE - inventory.seeds(known))
+            return report(ActionResult.fail("O estoque de " + known.name() + " está cheio."));
+        if (wallet.balance(currency).compareTo(total) < 0)
             return report(ActionResult.fail("Moedas insuficientes."));
-        }
+        market.buySeed(known, currency, quantity);
+        ActionResult result = ActionResult.ok("+" + quantity + (quantity == 1 ? " semente de " : " sementes de ") + known.name()
+                + " | -" + GameText.money(total) + " " + currencyName(currency));
+        String missionReward = recordDailyMission("buy", quantity);
+        if (!missionReward.isEmpty()) result = ActionResult.ok(result.message() + " " + missionReward);
+        return report(result);
     }
 
     /** Concede uma única semente exclusiva do calendário, sem carteira ou termos de venda de produto. */
@@ -585,17 +592,25 @@ public final class GameState {
     }
 
     /** Compra um fertilizante numa das moedas da seção 5; não há revenda. */
-    public ActionResult buyFertilizer(String id, Currency currency) {
+    public ActionResult buyFertilizer(String id, Currency currency) { return buyFertilizer(id, currency, 1); }
+
+    /** Compra o lote inteiro ou nada, com um único débito. */
+    public ActionResult buyFertilizer(String id, Currency currency, int quantity) {
         FertilizerType type = fertilizer(id);
+        if (quantity < 1 || quantity > MAX_PURCHASE_QUANTITY)
+            return report(ActionResult.fail("Escolha de 1 a " + MAX_PURCHASE_QUANTITY + " unidades."));
         if (progress.level() < type.requiredLevel())
             return report(ActionResult.fail(type.name() + " libera no nível " + type.requiredLevel() + "."));
         BigDecimal price = type.prices().get(Objects.requireNonNull(currency));
         if (price == null) return report(ActionResult.fail(type.name() + " não é vendido por " + currencyName(currency) + "."));
-        if (wallet.balance(currency).compareTo(price) < 0) return report(ActionResult.fail("Moedas insuficientes."));
-        wallet.debit(currency, price);
-        inventory.addFertilizer(type.id(), 1);
-        return report(ActionResult.ok("+1 " + type.name().toLowerCase() + " | -" + GameText.money(price) + " " + currencyName(currency)
-                + (type.friendsOnly() ? " (use na plantação de amigos)" : "") + " " + recordDailyMission("purchase", 1)));
+        BigDecimal total = price.multiply(BigDecimal.valueOf(quantity));
+        if (quantity > Integer.MAX_VALUE - inventory.fertilizer(type.id()))
+            return report(ActionResult.fail("O estoque de " + type.name().toLowerCase() + " está cheio."));
+        if (wallet.balance(currency).compareTo(total) < 0) return report(ActionResult.fail("Moedas insuficientes."));
+        wallet.debit(currency, total);
+        inventory.addFertilizer(type.id(), quantity);
+        return report(ActionResult.ok("+" + quantity + " " + type.name().toLowerCase() + " | -" + GameText.money(total) + " " + currencyName(currency)
+                + (type.friendsOnly() ? " (use na plantação de amigos)" : "") + " " + recordDailyMission("purchase", quantity)));
     }
 
     public ActionResult buyFeed(AnimalType type) { return buyFeed(animalType(type.id()).feedId()); }

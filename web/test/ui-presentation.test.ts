@@ -87,3 +87,7 @@ test('animal care follows server priority without collecting a protector',()=>{
 test('fertilizer duration uses Portuguese hours and minutes',async()=>{
  const {fertilizerDuration}=await import('../src/ui-presentation.ts');assert.equal(fertilizerDuration(3600),'1 hora');assert.equal(fertilizerDuration(3660),'1 hora e 1 minuto');assert.equal(fertilizerDuration(7260),'2 horas e 1 minuto');assert.equal(fertilizerDuration(120),'2 minutos');
 });
+test('shop purchase quantity is clamped to 1..99 and junk falls back to 1',async()=>{
+ const {purchaseQuantity}=await import('../src/ui-presentation.ts');
+ for(const [input,expected]of [[1,1],[99,99],[0,1],[-5,1],[100,99],['42',42],['7.9',7],['',1],['abc',1],[undefined,1],[Number.NaN,1],[Infinity,1]])assert.equal(purchaseQuantity(input),expected,String(input));
+});

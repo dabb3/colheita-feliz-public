@@ -8,7 +8,7 @@ import {syncMobileCamera,setMoreMenuVisiting} from './mobile.ts';
 import {takeInvite} from './invite-url.ts';
 import {renderWallet,control,text,image,renderDailyAllowance,friendAvatar,vipBadge} from './ui.ts';
 import {renderGiftComposer,renderLoginRewards,giftLimit,type GiftComposerState} from './ui-panels.ts';
-import {fertilizerDuration,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText} from './ui-presentation.ts';
+import {fertilizerDuration,seedGrowthLabel,CROP_TIME_NOTICE,cropTimingText,purchaseQuantity} from './ui-presentation.ts';
 import {PROTECTED_ICON,notificationCount,renderNotifications} from './notifications.ts';
 import {renderAwayReport,startAwayLeaves} from './away-report.ts';
 import {GAME_AVATARS,googleAvatar,avatarSource,avatarImport,type AvatarChoice} from './avatar.ts';
@@ -265,7 +265,7 @@ function avatarSettings(){
  }
  if(!googlePhoto)paragraph('A foto do Google não está disponível nesta sessão.');
 }
-async function logout(){const suppression=suspendPush(api).catch(()=>{});stopCalendar();ownServerClock=undefined;giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner="";sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;setLoginStep('login');syncPending();stopEvents();await suppression;if(supabase)await supabase.auth.signOut();}
+async function logout(){const suppression=suspendPush(api).catch(()=>{});shopQuantities.clear();stopCalendar();ownServerClock=undefined;giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner="";sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;setLoginStep('login');syncPending();stopEvents();await suppression;if(supabase)await supabase.auth.signOut();}
 function showConnection(message?:string){element('connection').hidden=!message;element('connection').textContent=message??'';}
 function syncPending(){element('pending').hidden=!api?.pending;element<HTMLButtonElement>('retry').disabled=!!api?.busy;}
 async function retryPending(context?:NonNullable<typeof giftContext>){
@@ -625,11 +625,44 @@ function positionHealth(panel:HTMLElement,game:HTMLElement,point:{x:number;y:num
 function scheduleHealthClock(){window.clearTimeout(healthClockTimer);const tile=healthTile,panel=element('plant-health');if(panel.hidden||!tile||tile.state!=='GROWING'||!tile.watered||tile.paused||healthRemaining(tile)<=0)return;const remaining=healthRemaining(tile),delay=remaining<60?1000:Math.min(60_000,Math.max(1000,(remaining-59)*1000));healthClockTimer=window.setTimeout(()=>{if(!healthTile||!healthPoint)return;const current=healthTile,point=healthPoint,left=healthRemaining(current);updateHealthDisplay(current,left);if(left<=0)renderHealth(current,point,true);else scheduleHealthClock();},delay);}
 function tileList(){dialog('Terras da fazenda');const states:Record<string,string>={GRASS:'grama',PLOWED:'arada',DEAD:'planta morta',READY:'pronta',GROWING:'crescendo'};const grid=document.createElement('div');grid.className='tile-list';content.append(grid);for(const tile of display()?.tiles??[]){const crop=catalog.crops.find(c=>c.id===tile.cropId);const b=button(`Terra ${tile.column+1}, ${tile.row+1}: ${!tile.unlocked?'bloqueada':crop?.name??states[tile.state]}`,async()=>{modal.close();await tileAction(tile);},grid);b.title='Aplicar a ferramenta selecionada';}}
 function card(name:string,image?:string){const c=document.createElement('article');c.className='card';if(image){const img=document.createElement('img');img.loading='lazy';img.src='/assets/'+image;img.alt='';c.append(img);}const title=document.createElement('strong');title.textContent=name;c.append(title);return c;}
-function marketCard(name:string,imagePath:string,details:string,level:number,prices:Record<string,number>,kind:string,id:string,vip=false){
+// Quantity picked per item survives the shop re-render that follows each server reply.
+const shopQuantities=new Map<string,number>();
+function quantityStepper(name:string,key:string,initial:number,onChange:(quantity:number)=>void){
+ const selector=document.createElement('div');selector.className='market-quantity';selector.setAttribute('role','group');selector.setAttribute('aria-label',`Quantidade de ${name}`);
+ const input=document.createElement('input');input.type='number';input.min='1';input.max='99';input.step='1';input.inputMode='numeric';input.className='market-quantity-value';input.dataset.focusKey=`qty:${key}`;input.setAttribute('aria-label',`Quantidade de ${name}, de 1 a 99`);
+ const minus=button('−',()=>set(quantity-1),selector,`qty-minus:${key}`);minus.className='animal-feed-stepper';minus.setAttribute('aria-label',`Diminuir quantidade de ${name}`);selector.append(input);
+ const plus=button('+',()=>set(quantity+1),selector,`qty-plus:${key}`);plus.className='animal-feed-stepper';plus.setAttribute('aria-label',`Aumentar quantidade de ${name}`);
+ let quantity=purchaseQuantity(initial);input.value=String(quantity);
+ function sync(value:number){quantity=value;minus.disabled=quantity<=1;plus.disabled=quantity>=99;onChange(quantity);}
+ function set(value:unknown){sync(purchaseQuantity(value));input.value=String(quantity);}
+ // A number being typed already drives the total and the arrows; change/blur clamp the field itself.
+ const typed=()=>input.value.trim()!==''&&Number.isFinite(Number(input.value));
+ input.oninput=()=>{if(typed())sync(purchaseQuantity(input.value));};
+ // An empty or invalid field falls back to the last valid quantity.
+ input.onchange=input.onblur=()=>set(typed()?input.value:quantity);
+ input.onkeydown=(event:KeyboardEvent)=>{if(event.key==='ArrowUp'||event.key==='ArrowDown'){event.preventDefault();set(quantity+(event.key==='ArrowUp'?1:-1));}};
+ return {selector,set};
+}
+function marketCard(name:string,imagePath:string,details:string,level:number,prices:Record<string,number>,kind:string,id:string,vip=false,stock?:number){
  const c=document.createElement('article');c.className='card market-card';if(kind==='BUY_SEED'&&eventBoosted(own?.sundayHarvestEvent,id,eventNow()))c.append(text('span','2× XP','event-badge'));const title=document.createElement('h3');title.textContent=name;const art=image(imagePath,'market-art','lazy');const description=paragraph(details,c);description.className='market-details';const levelLabel=document.createElement('small');levelLabel.textContent=`Nível ${level}${vip?' · VIP':''}`;
  const locked=(own?.level??0)<level||vip&&!own?.vipActive;if(locked)c.classList.add('locked');c.prepend(title);c.insertBefore(art,description);c.append(levelLabel);
+ if(stock!==undefined){const owned=text('small',`Você tem ${stock}`,'market-stock');owned.dataset.marketStock=`${kind}:${id}`;c.append(owned);}
  if(locked){const badge=document.createElement('span');badge.className='lock-badge';badge.textContent=(own?.level??0)<level?`Nível ${level}`:'Exige VIP';c.append(badge);}
- for(const [currency,price]of Object.entries(prices)){const label=currency==='GOLD'?'ouro':'verdes',buy=button(`Comprar · ${price}`,()=>action({action:kind,itemId:id,currency}),c,`buy:${kind}:${id}:${currency}`);buy.className='market-buy';buy.disabled=locked;buy.setAttribute('aria-label',`Comprar ${name} por ${price} ${label}`);buy.title=locked?((own?.level??0)<level?`Nível ${level}`:'Exige VIP'):`${price} ${label}`;const coin=document.createElement('img');coin.className='price-coin';coin.src=`/assets/classic/icons/moeda-${currency==='GOLD'?'comum':'verde'}.png`;coin.alt='';buy.append(coin);}
+ const batch=kind==='BUY_SEED'||kind==='BUY_FERTILIZER',key=`${kind}:${id}`,updates:((quantity:number)=>void)[]=[];
+ const stepper=batch&&!locked?quantityStepper(name,key,shopQuantities.get(key)??1,quantity=>{shopQuantities.set(key,quantity);for(const update of updates)update(quantity);}):undefined;if(stepper)c.append(stepper.selector);
+ for(const [currency,price]of Object.entries(prices)){
+  const label=currency==='GOLD'?'ouro':'verdes',balance=Number(currency==='GOLD'?own?.coins??0:own?.greenCoins??0);
+  const buy=button('',()=>{const quantity=batch?shopQuantities.get(key)??1:1;void action(quantity>1?{action:kind,itemId:id,currency,quantity}:{action:kind,itemId:id,currency});},c,`buy:${kind}:${id}:${currency}`);buy.className='market-buy';
+  const coin=document.createElement('img');coin.className='price-coin';coin.src=`/assets/classic/icons/moeda-${currency==='GOLD'?'comum':'verde'}.png`;coin.alt='';
+  // Touch screens have no tooltip, so the reason for a disabled button is also shown as text.
+  const shortage=text('small','','market-shortage');shortage.hidden=true;c.append(shortage);
+  const update=(quantity:number)=>{const total=price*quantity,short=batch&&!locked&&balance<total,reason=`Saldo de ${label} insuficiente para ${quantity} ${quantity===1?'unidade':'unidades'}`;buy.disabled=locked||short;buy.replaceChildren(document.createTextNode(`Comprar · ${depositNumber.format(total)}`),coin);
+   buy.setAttribute('aria-label',`Comprar ${quantity>1?quantity+' ':''}${name} por ${depositNumber.format(total)} ${label}`);
+   buy.title=locked?((own?.level??0)<level?`Nível ${level}`:'Exige VIP'):short?reason:`${depositNumber.format(total)} ${label}`;
+   shortage.textContent=short?reason:'';shortage.hidden=!short;};
+  updates.push(update);update(1);
+ }
+ stepper?.set(shopQuantities.get(key)??1);
  return c;
 }
 type FeedId='producer'|'growth';
@@ -646,11 +679,12 @@ async function buyFeed(id:FeedId,quantity:number){
  const purchased=(own?.feed?.[id]??before)-before;if(purchased<=0)return;
  const meta=feedDetails.find(item=>item.id===id)!;notify(`+${purchased} ${meta.name}`);content.querySelector(`[data-feed-stock="${id}"]`)?.classList.add('feed-stock-pulse');
 }
-function shop(category='crops',focusKey?:string){
+type ShopCategory='crops'|'animals'|'vip';
+function shop(category:ShopCategory='crops',focusKey?:string){
  dialog('Loja');modal.dataset.shopCategory=category;const tabs=document.createElement('div');tabs.className='tabs shop-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Seções da Loja');tabs.setAttribute('aria-orientation','horizontal');content.append(tabs);
  refreshDialog=()=>shop(category);
- const tabItems=[['crops','Sementes'],['animals','Animais'],['fertilizers','Fertilizantes'],['vip','VIP'],['owned','Meus animais']] as const;
- for(const [id,label]of tabItems){const tab=button(label,()=>shop(id,`shop-tab:${id}`),tabs,`shop-tab:${id}`);tab.className=`shop-tab${id==='owned'?' owned-animals-tab':''}`;tab.id=`shop-tab-${id}`;tab.setAttribute('role','tab');tab.setAttribute('aria-selected',String(category===id));tab.setAttribute('aria-controls','shop-panel');tab.tabIndex=category===id?0:-1;if(id==='owned'){const icon=document.createElement('img');icon.src='/assets/classic/icons/icone-minha-fazenda.png';icon.alt='';icon.setAttribute('aria-hidden','true');tab.prepend(icon);}}
+ const tabItems=[['crops','Sementes'],['animals','Animais'],['vip','VIP']] as const;
+ for(const [id,label]of tabItems){const tab=button(label,()=>shop(id,`shop-tab:${id}`),tabs,`shop-tab:${id}`);tab.className='shop-tab';tab.id=`shop-tab-${id}`;tab.setAttribute('role','tab');tab.setAttribute('aria-selected',String(category===id));tab.setAttribute('aria-controls','shop-panel');tab.tabIndex=category===id?0:-1;}
  enableTabNavigation(tabs);
  const panel=document.createElement('div');panel.className='shop-panel';panel.id='shop-panel';panel.setAttribute('role','tabpanel');panel.setAttribute('aria-labelledby',`shop-tab-${category}`);panel.tabIndex=0;content.append(panel);
  const scroll=document.createElement('div');scroll.className='market-scroll';panel.append(scroll);
@@ -660,7 +694,12 @@ function shop(category='crops',focusKey?:string){
   enableTabNavigation(groups);
   const seedPanel=document.createElement('div');seedPanel.className='seed-panel';seedPanel.id='seed-panel';seedPanel.setAttribute('role','tabpanel');seedPanel.setAttribute('aria-labelledby',`seed-tab-${seedMarketGroup}`);seedPanel.tabIndex=0;panel.replaceChild(seedPanel,scroll);seedPanel.append(text('p',CROP_TIME_NOTICE,'muted crop-time-notice'),scroll);
   const cards=document.createElement('div');cards.className='market-cards';scroll.append(cards);
-  for(const crop of cropGroups(catalog.crops)[seedMarketGroup])cards.append(marketCard(crop.name,`classic/crops/plants_phase_one_to_five/${crop.spriteStem}_5.png`,seedGrowthLabel(crop),crop.requiredLevel,crop.seedPrices,'BUY_SEED',crop.id,crop.vipOnly));
+  for(const crop of cropGroups(catalog.crops)[seedMarketGroup])cards.append(marketCard(crop.name,`classic/crops/plants_phase_one_to_five/${crop.spriteStem}_5.png`,seedGrowthLabel(crop),crop.requiredLevel,crop.seedPrices,'BUY_SEED',crop.id,crop.vipOnly,own?.seedCounts?.[crop.id]??0));
+  // Fertilizers sit below the seeds whatever Comuns/VIP filter is active.
+  const fertilizerSection=document.createElement('section');fertilizerSection.className='market-fertilizers';fertilizerSection.setAttribute('aria-labelledby','market-fertilizers-title');
+  const fertilizerTitle=text('h3','Fertilizantes','market-section-title');fertilizerTitle.id='market-fertilizers-title';fertilizerSection.append(fertilizerTitle);
+  const fertilizerCards=document.createElement('div');fertilizerCards.className='market-cards';fertilizerSection.append(fertilizerCards);scroll.append(fertilizerSection);
+  for(const fertilizer of catalog.fertilizers)fertilizerCards.append(marketCard(fertilizer.name,`classic/icons/adubo-${fertilizer.id}.png`,`Reduz ${fertilizerDuration(fertilizer.reductionSeconds)}${fertilizer.friendsOnly?' · em amigos':''}`,fertilizer.requiredLevel,fertilizer.prices,'BUY_FERTILIZER',fertilizer.id,false,own?.fertilizers?.[fertilizer.id]??0));
  }
  if(category==='animals'){
   const feedMarket=document.createElement('section');feedMarket.className='animal-feed-market';feedMarket.append(text('h3','Rações'));
@@ -674,10 +713,6 @@ function shop(category='crops',focusKey?:string){
   scroll.append(feedMarket);
   const cards=document.createElement('div');cards.className='market-cards';scroll.append(cards);
   for(const animal of catalog.animals)cards.append(marketCard(animal.name,animal.id==='abelha'?'classic/animals/abelha/abelha.png':animalPath(animal.id,'ADULT',false,false,false),`${animal.productName} · ${animalSaleOffer(animal,!!own?.vipActive)}`,animal.requiredLevel,animal.prices,'BUY_ANIMAL',animal.id));
- }
- if(category==='fertilizers'){
-  const cards=document.createElement('div');cards.className='market-cards';scroll.append(cards);
-  for(const fertilizer of catalog.fertilizers)cards.append(marketCard(fertilizer.name,`classic/icons/adubo-${fertilizer.id}.png`,`Reduz ${fertilizerDuration(fertilizer.reductionSeconds)}${fertilizer.friendsOnly?' · em amigos':''}`,fertilizer.requiredLevel,fertilizer.prices,'BUY_FERTILIZER',fertilizer.id));
  }
  if(category==='vip'){
   const offer=document.createElement('article');offer.className='vip-offer';
@@ -721,19 +756,6 @@ function shop(category='crops',focusKey?:string){
     if(buyService.disabled){buyService.title='Saldo de verdes insuficiente.';purchase.append(text('small','Saldo de verdes insuficiente','vip-service-requirement'));}
    }
    card.append(artFrame,contentNode,purchase);services.append(card);
-  }
- }
- if(category==='owned'){
-  const producerFeed=own?.feed?.producer??0,growthFeed=own?.feed?.growth??0,feedCount=producerFeed+growthFeed,feedStatus=document.createElement('section');feedStatus.className='owned-feed-summary';feedStatus.append(text('strong',`Ração: ${feedCount}`));for(const meta of feedDetails){const count=own?.feed?.[meta.id]??0,entry=document.createElement('span');entry.className='owned-feed-count';entry.append(feedIcon(meta.id,'small'),text('span',`${meta.id==='producer'?'Produção':'Crescimento'} ×${count}`));feedStatus.append(entry);}const buyFeed=button('Comprar ração',()=>shop('animals','buy-feed:producer'),feedStatus,'owned-buy-feed');buyFeed.className='owned-feed-link';scroll.append(feedStatus);
-  const animals=own?.animals??[];
-  if(!animals.length){const empty=document.createElement('div');empty.className='owned-empty';const art=document.createElement('img');art.src=`/assets/${animalPath('galinha','ADULT',false,false,false)}`;art.alt='';art.setAttribute('aria-hidden','true');art.loading='lazy';const title=text('h3','Você ainda não tem animais');const products=catalog.animals.filter(type=>type.kind==='PRODUCER').slice(0,4).map(type=>type.productName.toLocaleLowerCase('pt-BR'));const productText=products.length?`Eles produzem ${products.join(', ')}${catalog.animals.filter(type=>type.kind==='PRODUCER').length>products.length?', entre outros produtos':''}.`:'Eles produzem itens para sua fazenda.';empty.append(art,title,text('p',productText));const viewAnimals=button('Ver animais à venda',()=>shop('animals','shop-tab:animals'),empty,'owned-empty-shop');viewAnimals.className='owned-empty-shop';scroll.append(empty);}
-  else{const cards=document.createElement('div');cards.className='owned-animal-list';scroll.append(cards);const stages:Record<string,string>={BABY:'Filhote',YOUNG:'Jovem',ADULT:'Adulto'};
-   for(const animal of animals){const type=catalog.animals.find(item=>item.id===animal.id);if(!type)continue;const cardNode=document.createElement('article');cardNode.className='owned-animal-card';const art=document.createElement('img');art.className='owned-animal-art';art.src=`/assets/${animalPath(animal.id,animal.stage,false,false,false)}`;art.alt='';art.loading='lazy';const details=document.createElement('div');details.className='owned-animal-details';const heading=document.createElement('div');heading.className='owned-animal-heading';heading.append(text('strong',type.name),text('span',stages[animal.stage]??animal.stage,'owned-animal-stage'));const statusLabel=animal.status==='HUNGRY'?'Com fome':animal.status==='READY'?(type.kind==='GROWING'?'Adulto pronto para venda':'Pronto para coletar'):type.kind==='PROTECTOR'?'Protegendo':type.kind==='GROWING'?'Crescendo':'Produzindo';const status=text('span',statusLabel,`animal-state animal-state-${animal.status.toLowerCase()}`);heading.append(status);details.append(heading);const sale=animalOwnedSale(animal);if(sale)details.append(text('small',sale));
-    addAnimalProgress(details,animal,type);
-    cardNode.append(art,details);const actions=document.createElement('div');actions.className='owned-animal-actions';const label=animal.status==='HUNGRY'?'Alimentar':animal.status==='READY'&&type.kind==='PRODUCER'?'Coletar':animal.status==='READY'&&type.kind==='GROWING'&&animal.stage==='ADULT'?'Vender adulto':undefined;
-    if(label){const feedAvailable=type.kind==='PRODUCER'?producerFeed:type.kind==='PROTECTOR'?feedCount:growthFeed,care=button(label,()=>action({action:'TEND_ANIMAL',itemId:animal.id}),actions,`tend:${animal.id}`);if(label==='Alimentar'&&feedAvailable===0){care.disabled=true;care.setAttribute('aria-disabled','true');care.title='Sem ração. Compre na Loja, aba Animais.';actions.append(text('small','Sem ração para alimentar.','owned-feed-warning'));}}
-    cardNode.append(actions);cards.append(cardNode);
-   }
   }
  }
  if(focusKey){const target=[...content.querySelectorAll<HTMLButtonElement>('[data-focus-key]')].find(item=>item.dataset.focusKey===focusKey);target?.focus({preventScroll:true});}
@@ -934,7 +956,7 @@ function presentGift(friend:Friend){
 }
 async function migrateAvatar(){const migration=own&&avatarImport(avatarStore,avatarUser,own.avatarSelected,googlePhoto);if(migration)await action(migration);}
 async function connect(user:string,token:()=>Promise<string>,photo?:unknown,displayName=''){
- shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner='';sessionGeneration++;navigationGeneration++;busy=false;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;ownServerClock=undefined;stopCalendar();closeScene();const generation=sessionGeneration;
+ shownBites.clear();shopQuantities.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner='';sessionGeneration++;navigationGeneration++;busy=false;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;ownServerClock=undefined;stopCalendar();closeScene();const generation=sessionGeneration;
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
  avatarUser=`${config.api}:${user}`;void connectPush(avatarUser,api).catch(()=>{});googlePhoto=googleAvatar(photo);avatarChoice='classic';loadAudioSettings();
  scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>{if(healthPinned&&!(tool==='CURSOR'&&tile.cropId))closeHealth();void tileAction(tile);},(id,pointerType)=>{if(pointerType==='touch'&&tool==='CURSOR'){playAnimalSound(id);animalPopup(id);return;}const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health,syncMusic,()=>{if(healthPinned)closeHealth();},(id,point)=>{if(id&&point){playAnimalSound(id);animalTooltip(id,point);}else animalTooltip(null);},()=>tool==='CURSOR');

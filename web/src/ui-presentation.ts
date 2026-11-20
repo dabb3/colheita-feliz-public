@@ -63,3 +63,9 @@ export function fertilizerDuration(seconds:number) {
  const minutes=Math.max(1,Math.ceil(seconds/60)),hours=Math.floor(minutes/60),rest=minutes%60;
  return [hours?`${hours} ${hours===1?'hora':'horas'}`:'',rest?`${rest} ${rest===1?'minuto':'minutos'}`:''].filter(Boolean).join(' e ');
 }
+
+/** Shop purchases accept 1 to 99 units; anything typed outside that range is clamped, and junk becomes 1. */
+export function purchaseQuantity(value:unknown):number {
+ const parsed=Math.trunc(Number(value));
+ return Number.isFinite(parsed)?Math.max(1,Math.min(99,parsed)):1;
+}

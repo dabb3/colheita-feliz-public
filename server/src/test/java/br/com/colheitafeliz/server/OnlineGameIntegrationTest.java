@@ -126,6 +126,81 @@ class OnlineGameIntegrationTest {
         assertEquals(backend, next);
     }
 
+    @Test void batchSeedPurchaseIsAtomicIdempotentAndBoundToItsQuantity() {
+        grantGold(alice, new java.math.BigDecimal("2500"));
+        var farm = service.farm(alice);
+        assertEquals("3000", farm.get("coins").getAsString());
+        var tooMany = service.command(alice, new Command(requestId(), farm.get("revision").getAsString(), "BUY_SEED", "nabo", "GOLD", null, null, null, null, null, 11));
+        assertFalse(tooMany.getAsJsonObject("result").get("success").getAsBoolean());
+        farm = service.farm(alice);
+        assertEquals("3000", farm.get("coins").getAsString());
+        assertEquals(0, farm.getAsJsonObject("seedCounts").get("nabo").getAsInt());
+
+        UUID request = requestId();
+        var batch = new Command(request, farm.get("revision").getAsString(), "BUY_SEED", "nabo", "GOLD", null, null, null, null, null, 10);
+        var reply = service.command(alice, batch);
+        assertTrue(reply.getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals("0", reply.getAsJsonObject("farm").get("coins").getAsString());
+        assertEquals(10, reply.getAsJsonObject("farm").getAsJsonObject("seedCounts").get("nabo").getAsInt());
+        assertEquals(reply, service.command(alice, batch), "retry devolve o mesmo recibo sem comprar de novo");
+        var reused = new Command(request, farm.get("revision").getAsString(), "BUY_SEED", "nabo", "GOLD", null, null, null, null, null, 9);
+        assertEquals(409, assertThrows(ApiFailure.class, () -> service.command(alice, reused)).status());
+        var stale = new Command(requestId(), farm.get("revision").getAsString(), "BUY_SEED", "nabo", "GOLD", null, null, null, null, null, 1);
+        assertEquals(409, assertThrows(ApiFailure.class, () -> service.command(alice, stale)).status());
+        assertEquals(10, service.farm(alice).getAsJsonObject("seedCounts").get("nabo").getAsInt());
+    }
+
+    @Test void httpAcceptsPurchaseQuantityOnlyAsAWholeNumberFromOneToNinetyNine() throws Exception {
+        Authenticator auth = header -> new Authenticator.Identity(alice, "Alice");
+        try (var http = new GameHttpServer(new java.net.InetSocketAddress("127.0.0.1", 0), service, auth,
+                java.util.Set.of("http://localhost:5173"), true, clock);
+             var client = java.net.http.HttpClient.newHttpClient()) {
+            http.start();
+            String base = "http://127.0.0.1:" + http.port();
+            for (String quantity : java.util.List.of("0", "100", "-1", "1.5", "\"2\"", "true")) {
+                var farm = service.farm(alice);
+                String body = "{\"requestId\":\"" + requestId() + "\",\"expectedRevision\":\"" + farm.get("revision").getAsString()
+                        + "\",\"action\":\"BUY_SEED\",\"itemId\":\"nabo\",\"currency\":\"GOLD\",\"quantity\":" + quantity + "}";
+                var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create(base + "/v1/me/actions"))
+                        .header("Authorization", "Bearer test").header("Content-Type", "application/json")
+                        .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body)).build();
+                assertEquals(400, client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode(), quantity);
+            }
+            for (String action : java.util.List.of("BUY_SEED\",\"itemId\":\"nabo", "BUY_ANIMAL\",\"itemId\":\"galinha")) {
+                var farm = service.farm(alice);
+                String body = "{\"requestId\":\"" + requestId() + "\",\"expectedRevision\":\"" + farm.get("revision").getAsString()
+                        + "\",\"action\":\"" + action + "\",\"currency\":\"GOLD\",\"quantity\":null}";
+                var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create(base + "/v1/me/actions"))
+                        .header("Authorization", "Bearer test").header("Content-Type", "application/json")
+                        .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body)).build();
+                var response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+                assertEquals(400, response.statusCode(), action);
+                assertTrue(response.body().contains("Quantidade inválida."), response.body());
+            }
+            var farm = service.farm(alice);
+            String body = "{\"requestId\":\"" + requestId() + "\",\"expectedRevision\":\"" + farm.get("revision").getAsString()
+                    + "\",\"action\":\"BUY_SEED\",\"itemId\":\"nabo\",\"currency\":\"GOLD\",\"quantity\":1}";
+            var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create(base + "/v1/me/actions"))
+                    .header("Authorization", "Bearer test").header("Content-Type", "application/json")
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body)).build();
+            assertEquals(200, client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode());
+            assertEquals("200", service.farm(alice).get("coins").getAsString());
+        }
+    }
+
+    private void grantGold(UUID player, java.math.BigDecimal amount) {
+        service.farm(player);
+        store.transaction(player, tx -> {
+            tx.lockFarms(player);
+            var saved = tx.farm(player);
+            var game = br.com.colheitafeliz.game.GameState.restore(clock::instant, clock,
+                    br.com.colheitafeliz.game.CropCatalogLoader.load(), saved.snapshot(), bound -> bound - 1);
+            game.wallet().credit(br.com.colheitafeliz.domain.economy.Currency.GOLD, amount);
+            tx.save(player, game.snapshot(), saved.revision() + 1, clock.instant());
+            return null;
+        });
+    }
+
     @Test void httpRejectsForgedFieldsMalformedBodiesAndUnapprovedOrigins() throws Exception {
         Authenticator auth = header -> {
             if (!"Bearer test".equals(header)) throw new ApiFailure(401, "Login necessário.");
