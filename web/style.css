@@ -336,6 +336,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,[r
 .market-quantity-value::-webkit-inner-spin-button,.market-quantity-value::-webkit-outer-spin-button{margin:0;-webkit-appearance:none}
 .market-card .market-quantity+.market-buy{margin-top:0}
 .market-card .market-stock{color:#426b36;font-weight:700}
+.market-card .market-shortage{color:#a33a1f;font-weight:700}
 .market-fertilizers{margin-top:18px;padding-top:12px;border-top:1px solid #d8ddc9}
 #modal-content .market-section-title{margin:0 0 8px;color:#57471f;font:700 17px Georgia,serif}
 @keyframes feed-stock-pulse{50%{transform:scale(1.16);box-shadow:0 0 0 3px #e4d18c}}

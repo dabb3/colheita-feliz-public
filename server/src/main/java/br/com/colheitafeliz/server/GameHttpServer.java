@@ -209,8 +209,9 @@ final class GameHttpServer implements AutoCloseable {
     }
     private static Integer quantity(JsonObject json) {
         var value = json.get("quantity");
-        if (value == null || value.isJsonNull()) return null;
-        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) throw new ApiFailure(400, "Quantidade inválida.");
+        // Sem o campo, a compra é de uma unidade; null explícito não faz parte do contrato.
+        if (value == null) return null;
+        if (value.isJsonNull() || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) throw new ApiFailure(400, "Quantidade inválida.");
         try { return value.getAsBigDecimal().intValueExact(); }
         catch (ArithmeticException | NumberFormatException e) { throw new ApiFailure(400, "Quantidade inválida."); }
     }

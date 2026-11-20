@@ -265,7 +265,7 @@ function avatarSettings(){
  }
  if(!googlePhoto)paragraph('A foto do Google não está disponível nesta sessão.');
 }
-async function logout(){const suppression=suspendPush(api).catch(()=>{});stopCalendar();ownServerClock=undefined;giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner="";sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;setLoginStep('login');syncPending();stopEvents();await suppression;if(supabase)await supabase.auth.signOut();}
+async function logout(){const suppression=suspendPush(api).catch(()=>{});shopQuantities.clear();stopCalendar();ownServerClock=undefined;giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner="";sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;setLoginStep('login');syncPending();stopEvents();await suppression;if(supabase)await supabase.auth.signOut();}
 function showConnection(message?:string){element('connection').hidden=!message;element('connection').textContent=message??'';}
 function syncPending(){element('pending').hidden=!api?.pending;element<HTMLButtonElement>('retry').disabled=!!api?.busy;}
 async function retryPending(context?:NonNullable<typeof giftContext>){
@@ -633,8 +633,13 @@ function quantityStepper(name:string,key:string,initial:number,onChange:(quantit
  const minus=button('−',()=>set(quantity-1),selector,`qty-minus:${key}`);minus.className='animal-feed-stepper';minus.setAttribute('aria-label',`Diminuir quantidade de ${name}`);selector.append(input);
  const plus=button('+',()=>set(quantity+1),selector,`qty-plus:${key}`);plus.className='animal-feed-stepper';plus.setAttribute('aria-label',`Aumentar quantidade de ${name}`);
  let quantity=purchaseQuantity(initial);input.value=String(quantity);
- function set(value:unknown){quantity=purchaseQuantity(value);input.value=String(quantity);minus.disabled=quantity<=1;plus.disabled=quantity>=99;onChange(quantity);}
- input.onchange=()=>set(input.value);
+ function sync(value:number){quantity=value;minus.disabled=quantity<=1;plus.disabled=quantity>=99;onChange(quantity);}
+ function set(value:unknown){sync(purchaseQuantity(value));input.value=String(quantity);}
+ // A number being typed already drives the total and the arrows; change/blur clamp the field itself.
+ const typed=()=>input.value.trim()!==''&&Number.isFinite(Number(input.value));
+ input.oninput=()=>{if(typed())sync(purchaseQuantity(input.value));};
+ // An empty or invalid field falls back to the last valid quantity.
+ input.onchange=input.onblur=()=>set(typed()?input.value:quantity);
  input.onkeydown=(event:KeyboardEvent)=>{if(event.key==='ArrowUp'||event.key==='ArrowDown'){event.preventDefault();set(quantity+(event.key==='ArrowUp'?1:-1));}};
  return {selector,set};
 }
@@ -649,9 +654,12 @@ function marketCard(name:string,imagePath:string,details:string,level:number,pri
   const label=currency==='GOLD'?'ouro':'verdes',balance=Number(currency==='GOLD'?own?.coins??0:own?.greenCoins??0);
   const buy=button('',()=>{const quantity=batch?shopQuantities.get(key)??1:1;void action(quantity>1?{action:kind,itemId:id,currency,quantity}:{action:kind,itemId:id,currency});},c,`buy:${kind}:${id}:${currency}`);buy.className='market-buy';
   const coin=document.createElement('img');coin.className='price-coin';coin.src=`/assets/classic/icons/moeda-${currency==='GOLD'?'comum':'verde'}.png`;coin.alt='';
-  const update=(quantity:number)=>{const total=price*quantity,short=batch&&!locked&&balance<total;buy.disabled=locked||short;buy.replaceChildren(document.createTextNode(`Comprar · ${depositNumber.format(total)}`),coin);
+  // Touch screens have no tooltip, so the reason for a disabled button is also shown as text.
+  const shortage=text('small','','market-shortage');shortage.hidden=true;c.append(shortage);
+  const update=(quantity:number)=>{const total=price*quantity,short=batch&&!locked&&balance<total,reason=`Saldo de ${label} insuficiente para ${quantity} ${quantity===1?'unidade':'unidades'}`;buy.disabled=locked||short;buy.replaceChildren(document.createTextNode(`Comprar · ${depositNumber.format(total)}`),coin);
    buy.setAttribute('aria-label',`Comprar ${quantity>1?quantity+' ':''}${name} por ${depositNumber.format(total)} ${label}`);
-   buy.title=locked?((own?.level??0)<level?`Nível ${level}`:'Exige VIP'):short?`Saldo de ${label} insuficiente`:`${depositNumber.format(total)} ${label}`;};
+   buy.title=locked?((own?.level??0)<level?`Nível ${level}`:'Exige VIP'):short?reason:`${depositNumber.format(total)} ${label}`;
+   shortage.textContent=short?reason:'';shortage.hidden=!short;};
   updates.push(update);update(1);
  }
  stepper?.set(shopQuantities.get(key)??1);
@@ -948,7 +956,7 @@ function presentGift(friend:Friend){
 }
 async function migrateAvatar(){const migration=own&&avatarImport(avatarStore,avatarUser,own.avatarSelected,googlePhoto);if(migration)await action(migration);}
 async function connect(user:string,token:()=>Promise<string>,photo?:unknown,displayName=''){
- shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner='';sessionGeneration++;navigationGeneration++;busy=false;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;ownServerClock=undefined;stopCalendar();closeScene();const generation=sessionGeneration;
+ shownBites.clear();shopQuantities.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner='';sessionGeneration++;navigationGeneration++;busy=false;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;ownServerClock=undefined;stopCalendar();closeScene();const generation=sessionGeneration;
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
  avatarUser=`${config.api}:${user}`;void connectPush(avatarUser,api).catch(()=>{});googlePhoto=googleAvatar(photo);avatarChoice='classic';loadAudioSettings();
  scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>{if(healthPinned&&!(tool==='CURSOR'&&tile.cropId))closeHealth();void tileAction(tile);},(id,pointerType)=>{if(pointerType==='touch'&&tool==='CURSOR'){playAnimalSound(id);animalPopup(id);return;}const command=animalClickCommand(id,!!visited);if(command)void action(command);else animalPopup(id);},health,syncMusic,()=>{if(healthPinned)closeHealth();},(id,point)=>{if(id&&point){playAnimalSound(id);animalTooltip(id,point);}else animalTooltip(null);},()=>tool==='CURSOR');

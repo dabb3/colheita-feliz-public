@@ -849,10 +849,39 @@ test('seed and fertilizer cards buy 1 to 99 units in one command with the total 
  assert.ok(find('Comprar 3 Nabo por 90 ouro'),'a quantidade escolhida sobrevive ao refresh');
  const field=find('Quantidade de Nabo, de 1 a 99');field.value='150';field.onchange();assert.equal(field.value,'99');
  assert.equal(find('Diminuir quantidade de Nabo').disabled,false);assert.equal(find('Aumentar quantidade de Nabo').disabled,true);
- const expensive=find('Comprar 99 Nabo por 2.970 ouro');assert.equal(expensive.disabled,true);assert.equal(expensive.title,'Saldo de ouro insuficiente');
- field.value='abc';field.onchange();assert.equal(field.value,'1');
+ const expensive=find('Comprar 99 Nabo por 2.970 ouro');assert.equal(expensive.disabled,true);assert.equal(expensive.title,'Saldo de ouro insuficiente para 99 unidades');
+ assert.match(text(content),/Saldo de ouro insuficiente para 99 unidades/,'o motivo aparece como texto, não só no tooltip');
+ field.value='abc';field.onchange();assert.equal(field.value,'99','texto inválido volta à última quantidade válida');
  find('Aumentar quantidade de Fertilizante comum').onclick();
  assert.equal(find('Comprar 2 Fertilizante comum por 2.000 ouro').disabled,true);
+});
+
+test('typed shop quantity drives the arrows, the total and the purchase',async()=>{
+ const {h,elements}=app(),sent=[];
+ const own={...farm('alice'),level:10,coins:'1000',greenCoins:'0',seedCounts:{nabo:0},fertilizers:{}};
+ const catalog={crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:3600,seasons:1,requiredLevel:1,seedPrices:{GOLD:30},vipOnly:false}],animals:[],fertilizers:[],vip:{greenPrice:10}};
+ h.set({own,catalog,api:{pending:null,prepareRequestId:async()=>{},mutate:async(_path,fields)=>{sent.push(fields);return{result:{success:true,message:'ok'},farm:{...own,revision:'2'}};}}});h.shop();
+ const content=elements.get('modal-content'),find=label=>descendants(content).find(node=>node.getAttribute('aria-label')===label);
+ const field=find('Quantidade de Nabo, de 1 a 99');field.value='10';field.oninput();
+ assert.ok(find('Comprar 10 Nabo por 300 ouro'),'o total acompanha a digitação');
+ field.onkeydown({key:'ArrowUp',preventDefault(){}});assert.equal(field.value,'11');
+ field.value='';field.oninput();assert.ok(find('Comprar 11 Nabo por 330 ouro'),'campo vazio não zera a quantidade');
+ field.onblur();assert.equal(field.value,'11');
+ find('Comprar 11 Nabo por 330 ouro').onclick();await new Promise(r=>setTimeout(r,0));
+ assert.equal(sent[0].quantity,11);
+ const fresh=find('Quantidade de Nabo, de 1 a 99');fresh.value='40';fresh.oninput();
+ assert.equal(find('Comprar 40 Nabo por 1.200 ouro').disabled,true);assert.match(text(content),/Saldo de ouro insuficiente para 40 unidades/);
+ fresh.value='2';fresh.oninput();assert.doesNotMatch(text(content),/insuficiente/);
+});
+test('shop quantities do not leak to the next account',async()=>{
+ const {h,elements}=app();
+ const catalog={crops:[{id:'nabo',name:'Nabo',spriteStem:'nabo',growthSeconds:3600,seasons:1,requiredLevel:1,seedPrices:{GOLD:30},vipOnly:false}],animals:[],fertilizers:[],vip:{greenPrice:10}};
+ const find=label=>descendants(elements.get('modal-content')).find(node=>node.getAttribute('aria-label')===label);
+ h.set({own:{...farm('alice'),level:10,coins:'1000'},catalog});h.shop();
+ find('Aumentar quantidade de Nabo').onclick();assert.ok(find('Comprar 2 Nabo por 60 ouro'));
+ await h.logout();
+ h.set({own:{...farm('bob'),level:10,coins:'1000'},catalog});h.shop();
+ assert.ok(find('Comprar Nabo por 30 ouro'),'Bob começa em uma unidade');
 });
 
 test('late avatar response preserves a closed or replaced dialog',async()=>{

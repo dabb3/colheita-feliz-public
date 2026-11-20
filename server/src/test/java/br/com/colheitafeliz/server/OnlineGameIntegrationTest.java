@@ -166,6 +166,17 @@ class OnlineGameIntegrationTest {
                         .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body)).build();
                 assertEquals(400, client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString()).statusCode(), quantity);
             }
+            for (String action : java.util.List.of("BUY_SEED\",\"itemId\":\"nabo", "BUY_ANIMAL\",\"itemId\":\"galinha")) {
+                var farm = service.farm(alice);
+                String body = "{\"requestId\":\"" + requestId() + "\",\"expectedRevision\":\"" + farm.get("revision").getAsString()
+                        + "\",\"action\":\"" + action + "\",\"currency\":\"GOLD\",\"quantity\":null}";
+                var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create(base + "/v1/me/actions"))
+                        .header("Authorization", "Bearer test").header("Content-Type", "application/json")
+                        .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body)).build();
+                var response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+                assertEquals(400, response.statusCode(), action);
+                assertTrue(response.body().contains("Quantidade inválida."), response.body());
+            }
             var farm = service.farm(alice);
             String body = "{\"requestId\":\"" + requestId() + "\",\"expectedRevision\":\"" + farm.get("revision").getAsString()
                     + "\",\"action\":\"BUY_SEED\",\"itemId\":\"nabo\",\"currency\":\"GOLD\",\"quantity\":1}";
