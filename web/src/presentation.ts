@@ -566,11 +566,21 @@ export function toolbarTrayToggle(
     ["PLANT", "FERTILIZE", "LOVE"].includes(next) && !(current === next && open)
   );
 }
+/** Small, deterministic pest movements; respect the OS reduced-motion preference. */
+export function pestSpriteMotion(kind: "weed" | "worm", seconds: number, tileSeed: number, index = 0, reduced = false): { dx: number; dy: number; angle: number } {
+  if (reduced) return { dx: 0, dy: 0, angle: 0 };
+  const phase = seconds * (kind === "weed" ? 1.3 : 2.0) + tileSeed * 1.73 + index * 1.9;
+  return kind === "weed"
+    ? { dx: 0, dy: 0, angle: Math.sin(phase) * 0.055 }
+    : { dx: Math.sin(phase) * 5, dy: Math.cos(phase * 0.8) * 1.7, angle: Math.sin(phase * 0.7) * 0.055 };
+}
 export type TileEffect =
   | "plow"
   | "plant"
   | "water"
   | "harvest"
+  | "spread-weed"
+  | "spread-pest"
   | "weed"
   | "pest"
   | "fertilize";
@@ -584,6 +594,8 @@ export function tileEffect(
     return "harvest";
   if (!previous.cropId && current.cropId) return "plant";
   if (previous.dry && !current.dry && !!current.cropId) return "water";
+  if (!previous.weeds && current.weeds) return "spread-weed";
+  if (previous.insects < current.insects) return "spread-pest";
   if (previous.weeds && !current.weeds) return "weed";
   if (previous.insects > 0 && current.insects === 0) return "pest";
   if (!previous.fertilized && current.fertilized) return "fertilize";
