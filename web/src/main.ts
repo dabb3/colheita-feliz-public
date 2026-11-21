@@ -93,8 +93,8 @@ function toggleMusic(){musicEnabled=!musicEnabled;saveAudioSettings();syncAudioR
 function shortcutPanel(title:string,open:()=>void){if(shortcutPanelState(modal.open,element('modal-title').textContent,title)==='close')modal.close();else open();}
 function actionIcon(action:string,itemId?:string){
  if(action==='CLAIM_DAILY_ALLOWANCE')return 'classic/icons/moeda-comum.png';
- if(action==='SPREAD_INSECTS')return 'classic/effects/verme_1.png';
- if(action==='SPREAD_WEEDS')return 'classic/effects/erva_daninha_1.png';
+ if(action==='SPREAD_INSECTS')return 'classic/effects/minhoca-nova.png';
+ if(action==='SPREAD_WEEDS')return 'classic/effects/erva-nova.png';
  const icon:Record<string,string>={PLOW:'hud/pa-ui',PLANT:'hud/saco-ui',WATER:'hud/regador-ui',WEED:'hud/herbicida-ui',PESTICIDE:'hud/pesticida-ui',CLEAN_WEEDS:'hud/herbicida-ui',CLEAN_INSECTS:'hud/pesticida-ui',HARVEST:'hud/mao-restaurada',STEAL:'hud/mao-restaurada',FERTILIZE:'adubo-comum',LOVE:'adubo-amor'};
  if(action==='TEND_ANIMAL'&&itemId)return animalPath(itemId,'ADULT',false,false,false);
  if(action.startsWith('BUY_')||action.startsWith('SELL_'))return `classic/icons/${action.startsWith('BUY_')?'moeda-comum':'moeda-verde'}.png`;
@@ -328,7 +328,7 @@ function render(){
 function renderTools(){
  if(own&&!visited)selectedSeed=seedSelection(catalog.crops,own.seedCounts,selectedSeed);
  const toolbar=element('tools');toolbar.replaceChildren();
- const definitions=visited?[['CURSOR','Inspecionar plantas','cursor-ui'],['STEAL','Furtar colheita','mao-restaurada'],['LOVE','Fertilizante do amor','adubo-amor'],['SPREAD_INSECTS','Lançar inseto · 1/6h','verme_1'],['SPREAD_WEEDS','Lançar erva · 1/6h','erva_daninha_1'],['CLEAN_WEEDS','Tirar ervas do amigo','herbicida-ui'],['CLEAN_INSECTS','Matar insetos do amigo','pesticida-ui']]:toolDefinitions;
+ const definitions=visited?[['CURSOR','Inspecionar plantas','cursor-ui'],['STEAL','Furtar colheita','mao-restaurada'],['LOVE','Fertilizante do amor','adubo-amor'],['SPREAD_INSECTS','Lançar inseto · 1/6h','minhoca-nova'],['SPREAD_WEEDS','Lançar erva · 1/6h','erva-nova'],['CLEAN_WEEDS','Tirar ervas do amigo','herbicida-ui'],['CLEAN_INSECTS','Matar insetos do amigo','pesticida-ui']]:toolDefinitions;
  if(!definitions.some(d=>d[0]===tool)){tool=definitions[0][0];trayOpen=false;}
  element('farm').style.cursor='url("/assets/classic/icons/cursor-action.png") 1 1, auto';
  for(const [index,[id,label,icon]] of definitions.entries()){

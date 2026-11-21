@@ -28,8 +28,8 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  const lastTerrain=drawn.findLastIndex(d=>typeof d.path==='string'&&/terrain\/(grama-default|terra-molhada)\.png$/.test(d.path));
  const firstPlant=drawn.findIndex(d=>typeof d.path==='string'&&d.path.endsWith('nabo_3.png'));
  assert.ok(firstPlant>lastTerrain,'all terrain must be drawn before any plant');
- assert.ok(drawn.some(d=>typeof d.path==='string'&&/erva_daninha_[1-4]\.png$/.test(d.path)));
- assert.ok(drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('verme_2.png')));
+ assert.ok(drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('erva-nova.png')));
+ assert.ok(drawn.filter(d=>typeof d.path==='string'&&d.path.endsWith('minhoca-nova.png')).length>=2,'two worms rendered individually');
  assert.ok(drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('balde-vaca.png')));
  assert.ok(images.some(image=>image.src.endsWith('colmeia-abelha-atlas.png')));
  assert.ok(drawn.some(d=>d.args.at(-2)===156&&d.args.at(-1)===78));

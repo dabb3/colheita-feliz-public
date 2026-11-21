@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {ownedSeeds,seedSelection,hungerGlow,periodAt,tileCenter,pickTile,animalPath,animalWalkingFrame,animalSoundPath,tileArtRect,animalShadowRect,spriteDrawRect,measureSpriteFootprint,widthForMatchingHeight,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand,friendFeedOptions} from '../src/presentation.ts';
+import {ownedSeeds,seedSelection,pestSpriteMotion,hungerGlow,periodAt,tileCenter,pickTile,animalPath,animalWalkingFrame,animalSoundPath,tileArtRect,animalShadowRect,spriteDrawRect,measureSpriteFootprint,widthForMatchingHeight,animalMotion,beeOffset,animalFlip,animalStatusText,animalActionLabel,animalLayer,animalInsidePen,animationFrame,cropHeight,toolShortcutOrder,gameShortcut,shortcutPanelState,tileEffect,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropTooltipModel,untilUtcMidnight,cropGroups,soundForAction,animalProductPath,showAnimalProduct,actionRewardModel,animalClickCommand,friendFeedOptions} from '../src/presentation.ts';
 
 test('the updated idle dog matches the walking sprite height after alpha trim',()=>{
  // Trimmed boxes (>12 alpha) of cachorro.png and cachorro-andando.png at 1536×1024.
@@ -246,4 +246,26 @@ test('seed bag lists only whole positive stock and keeps a held selection',()=>{
  assert.equal(seedSelection(crops,counts,'mini-bis'),'mini-bis');
  assert.equal(seedSelection(crops,counts,'milho'),'nabo','selected seed ran out');
  assert.equal(seedSelection(crops,{},'milho'),'milho','nothing held keeps the old id');
+});
+
+
+test('new praga sprites sway or crawl smoothly and stop moving with reduced motion',()=>{
+ const weed0=pestSpriteMotion('weed',0,3),weed1=pestSpriteMotion('weed',2,3);
+ const worm0=pestSpriteMotion('worm',0,3),worm1=pestSpriteMotion('worm',2,3);
+ assert.notEqual(weed0.angle,weed1.angle,'weed sways over time');
+ assert.equal(weed0.dx,0);assert.equal(weed0.dy,0);
+ assert.ok(Math.abs(weed1.angle)<=0.055);
+ assert.notEqual(worm0.dx,worm1.dx,'worm crawls over time');
+ assert.ok(Math.abs(worm1.dx)<=5&&Math.abs(worm1.dy)<=1.7);
+ assert.deepEqual(pestSpriteMotion('weed',10,3,0,true),{dx:0,dy:0,angle:0});
+ assert.deepEqual(pestSpriteMotion('worm',10,3,0,true),{dx:0,dy:0,angle:0});
+});
+
+test('pragas entering and leaving a plot trigger distinct arrival and cleaning effects',()=>{
+ const plain={cropId:'nabo',state:'GROWING',weeds:false,insects:0};
+ assert.equal(tileEffect(plain,{...plain,weeds:true}),'spread-weed');
+ assert.equal(tileEffect(plain,{...plain,insects:2}),'spread-pest');
+ assert.equal(tileEffect({...plain,weeds:true},plain),'weed');
+ assert.equal(tileEffect({...plain,insects:2},plain),'pest');
+ assert.equal(tileEffect(plain,plain),null);
 });
