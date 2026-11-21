@@ -189,7 +189,10 @@ export class ApiClient {
       signal: AbortSignal.timeout(65_000),
       cache: "no-store",
     });
-    const json = await response.json();
+    // Proxy errors may be HTML or empty; their HTTP status still defines receipt recovery.
+    let json;
+    try { json = await response.json(); }
+    catch (error) { if (response.ok) throw error; }
     const serverTiming = response.headers.get("Server-Timing");
     if (serverTiming)
       try {
@@ -217,7 +220,8 @@ export class ApiClient {
     if (!response.ok)
       throw new ApiError(
         response.status,
-        json.error ?? "Não foi possível concluir.",
+        typeof json?.error === "string" && json.error.trim()
+          ? json.error : "Não foi possível concluir. Tente novamente.",
       );
     const lease = json?.requestLease,
       serverDate = Date.parse(response.headers.get("Date") ?? "");

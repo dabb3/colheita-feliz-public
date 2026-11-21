@@ -289,7 +289,7 @@ async function retryPending(context?:NonNullable<typeof giftContext>){
   if(context){if(reply.farm)updateOwnFarm(reply.farm);if(!currentGift())return;if(reply.result?.success)leaveGift(reply.result.message);else{context!.state.phase='ready';context!.state.message=reply.result?.message??'O presente não foi enviado.';}return;}
   if(!currentPanel()){if(reply.farm&&generation===sessionGeneration&&api===client)updateOwnFarm(reply.farm);return;}receive(reply,true,actionName);if(reply.code&&currentPanel()){dialog('Convite confirmado');paragraph(reply.code);}
  }catch(error){if(generation===sessionGeneration&&api===client){if(currentGift()){context!.state.phase=client.pending?.path==='/v1/gifts'?'unknown':'load-error';context!.state.message=error instanceof Error?error.message:'Não foi possível confirmar o presente.';context!.state.canSend=false;context!.paint?.();}else if(!context&&currentPanel())handleError(error);}}
- finally{if(generation===sessionGeneration&&api===client){busy=false;syncPending();if(currentGift()){modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;if(context!.state.phase==='ready')context!.reload?.();else context!.paint?.();}else if(!context&&currentPanel()){modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;await refresh();}}}
+ finally{if(generation===sessionGeneration&&api===client){busy=false;syncPending();if(currentGift()){modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;if(context!.state.phase==='ready')context!.reload?.();else context!.paint?.();}else if(!context&&currentPanel()){modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;await refresh(true);}}}
 }
 function closeGiftComposer(){const context=giftContext;if(!context||context.state.phase==='sending'||context.client!==api||context.session!==sessionGeneration||context.dialog!==dialogGeneration||!modal.open)return false;leaveGift(context.client.pending?'O envio continua pendente. Sair não desfaz a tentativa; você pode recuperar o mesmo pedido ao reabrir Presentear nesta fazenda.':undefined);return true;}
 /** Gifts start from the visited farm, so leaving the composer closes it and keeps the visit. */
@@ -425,14 +425,26 @@ function renderToolTray(){
  const detail=seeds?`${count} sementes`:selectedFertilizerType?.friendsOnly?'plantação de amigos':`reduz ${formatToolDuration(selectedFertilizerType?.reductionSeconds??0)} · ${count} no estoque`;
  const caption=document.createElement('span');caption.id='tool-tray-caption';caption.className='tray-caption';caption.textContent=selected?`${selected} · ${detail}`:'';tray.append(caption);
 }
-async function refresh(){
- if(!api||busy)return;const client=api,generation=sessionGeneration,navigation=navigationGeneration;
- try{
-  const farm=await client.get<Farm>('/v1/me/farm');if(generation!==sessionGeneration)return;updateOwnFarm(farm);
-  if(visited&&navigation===navigationGeneration){const target=visited.owner;const incoming=await client.get<Farm>(`/v1/farms/${target}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||visited?.owner!==target)return;visited=acceptFarm(visited,incoming);}
-  showConnection();render();void client.prepareRequestId().catch(()=>{});
- }catch(error){if(generation===sessionGeneration)handleError(error);}
+let refreshing:{client:ApiClient;generation:number;promise:Promise<void>;again:boolean}|undefined;
+function refresh(required=false):Promise<void>{
+ if(!api||busy)return Promise.resolve();const client=api,generation=sessionGeneration,navigation=navigationGeneration;
+ if(refreshing?.client===client&&refreshing.generation===generation){if(required)refreshing.again=true;return refreshing.promise;}
+ const current={client,generation,promise:Promise.resolve(),again:false};refreshing=current;
+ current.promise=(async()=>{
+  try{
+   const farm=await client.get<Farm>('/v1/me/farm');if(generation!==sessionGeneration||api!==client)return;updateOwnFarm(farm);
+   if(visited&&navigation===navigationGeneration){const target=visited.owner;const incoming=await client.get<Farm>(`/v1/farms/${target}/visit`);if(generation!==sessionGeneration||api!==client||navigation!==navigationGeneration||visited?.owner!==target)return;visited=acceptFarm(visited,incoming);}
+   showConnection();render();void client.prepareRequestId().catch(()=>{});
+  }catch(error){if(generation===sessionGeneration&&api===client)handleError(error);}
+  finally{if(refreshing===current){
+   refreshing=undefined;
+   // A mutation can invalidate a GET already in flight; its recovery needs a later snapshot.
+   if(current.again&&generation===sessionGeneration&&api===client)await refresh();
+  }}
+ })();
+ return current.promise;
 }
+
 function loginRewardPending(client:ApiClient){try{return client.pending?.path==='/v1/me/actions'&&JSON.parse(client.pending.body).action==='CLAIM_LOGIN_REWARD';}catch{return false;}}
 function calendarCurrent(context:NonNullable<typeof calendarContext>){return calendarContext===context&&api===context.client&&sessionGeneration===context.session&&dialogGeneration===context.dialog&&modal.open&&element('modal-title').textContent==='Eventos';}
 function calendarClock(context:NonNullable<typeof calendarContext>){const clock=ownServerClock?.owner===own?.owner?ownServerClock:undefined;context.anchorServer=clock?.server??Number.NaN;context.anchorClient=clock?.client??performance.now();context.resetAt=own?.loginRewards?.nextResetAt??'';context.checkedResetAt=undefined;}
@@ -544,7 +556,7 @@ async function runAction(fields:CommandFields,path='/v1/me/actions'):Promise<Rep
  socialInFlightAction=path.endsWith('/visit-actions')&&isSocialAction(requested)?requested:undefined;
  busy=true;paintSocialTools();let stale=false;const client=api,generation=sessionGeneration,previousFarm=own,animalReady=fields.action==='TEND_ANIMAL'&&own.animals.some(animal=>animal.id===fields.itemId&&animal.status==='READY');
  try{const reply=await client.mutate(path,{...fields,expectedRevision:path==='/v1/me/actions'?own.revision:visited!.revision});if(generation===sessionGeneration){if(reply.result?.success&&reply.farm){await fadeSoldDepositRows(fields,reply.farm);if(generation!==sessionGeneration)return;}const bitten=receive(reply,false,String(fields.action));if(reply.result?.success&&own){const reward=actionRewardModel(previousFarm,own),selling=String(fields.action).startsWith('SELL_');if(selling){notifySale(reward.coins,reward.greens);if(reward.coins>0)animateGoldBalance(Number(previousFarm.coins??0),Number(own.coins??0));}else notifyAction(reply.result.message,String(fields.action),typeof fields.itemId==='string'?fields.itemId:undefined,reward);const cue=reward.leveledUp?'levelup':soundForAction(String(fields.action),animalReady);if(cue)playEffect(cue);}else if(reply.result){playEffect('acao-bloqueada');if(!bitten)notify(reply.result.message);}}return reply;}
- catch(error){stale=error instanceof ApiError&&[409,410].includes(error.status);if(generation===sessionGeneration){if(stale)invalidateSocialClock();handleError(error);}}finally{if(generation===sessionGeneration){socialInFlightAction=undefined;busy=false;syncPending();if(stale)void refresh();else void client.prepareRequestId().catch(()=>{});}}
+ catch(error){stale=error instanceof ApiError&&[409,410].includes(error.status);if(generation===sessionGeneration){if(stale)invalidateSocialClock();handleError(error);}}finally{if(generation===sessionGeneration){socialInFlightAction=undefined;busy=false;syncPending();if(stale)void refresh(true);else void client.prepareRequestId().catch(()=>{});}}
 }
 let animalSound:HTMLAudioElement|undefined;
 function playAnimalSound(id:string){
@@ -1095,7 +1107,7 @@ function setupLoginInvitation(){
 async function acceptInvitation(code:string,panelGeneration:number,closeOnSuccess:boolean,onError?:()=>void):Promise<boolean>{
  if(!api){if(onError)onError();else notify('Entre antes de aceitar o convite.');return false;}
  const client=api,generation=sessionGeneration;
- try{await client.mutate('/v1/friend-invitations/accept',{code});if(generation!==sessionGeneration)return false;await refresh();if(generation!==sessionGeneration)return false;await migrateAvatar();if(generation!==sessionGeneration)return false;if(own&&closeOnSuccess&&modal.open&&dialogGeneration===panelGeneration)modal.close();return true;}
+ try{await client.mutate('/v1/friend-invitations/accept',{code});if(generation!==sessionGeneration)return false;await refresh(true);if(generation!==sessionGeneration)return false;await migrateAvatar();if(generation!==sessionGeneration)return false;if(own&&closeOnSuccess&&modal.open&&dialogGeneration===panelGeneration)modal.close();return true;}
  catch(error){if(generation!==sessionGeneration)return false;if(onError)onError();else handleError(error);return false;}finally{syncPending();}
 }
 // Name, VIP badge and public title are rebuilt together, so a list refresh never drops the title.

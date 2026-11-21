@@ -584,13 +584,21 @@ test('settings render the persisted owner photo without sending a referrer',()=>
  assert.equal(avatar.src,'https://lh3.googleusercontent.com/a/owner-photo');assert.equal(avatar.referrerPolicy,'no-referrer');
 });
 
-test('out-of-order refresh responses with equal revisions keep the newest projection in the UI',async()=>{
- const {h}=app(),first=deferred(),second=deferred();let reads=0;
- const initial={...farm('alice'),revision:'7',serverTime:'2026-11-01T12:00:00Z'};
- const older={...initial,serverTime:'2026-11-01T12:01:00Z'},newer={...initial,serverTime:'2026-11-01T12:02:00Z'};
- h.set({own:initial,api:{pending:null,get:()=>++reads===1?first.promise:second.promise,prepareRequestId:async()=>{}}});
- const slow=h.refresh(),fast=h.refresh();second.resolve(newer);await fast;first.resolve(older);await slow;
- assert.equal(h.get().own,newer);
+test('concurrent refresh triggers share one farm request and release after completion',async()=>{
+ const {h}=app(),response=deferred();let reads=0;
+ const initial=farm('alice'),updated={...initial,revision:'2'};
+ h.set({own:initial,api:{pending:null,get:()=>{reads++;return response.promise;},prepareRequestId:async()=>{}}});
+ const first=h.refresh(),second=h.refresh();assert.equal(reads,1);
+ response.resolve(updated);await Promise.all([first,second]);assert.equal(h.get().own,updated);
+ await h.refresh();assert.equal(reads,2);
+});
+test('failed refresh can be retried and does not block a different client',async()=>{
+ const {h}=app(),old=deferred();let reads=0;
+ h.set({own:farm('alice'),api:{get:()=>old.promise,prepareRequestId:async()=>{}}});const previous=h.refresh();
+ const current={...farm('bob'),revision:'2'};
+ h.set({own:farm('bob'),api:{get:async()=>{if(++reads===1)throw new Error('offline');return current;},prepareRequestId:async()=>{}}});
+ await h.refresh();assert.equal(reads,1);await h.refresh();assert.equal(h.get().own,current);
+ old.resolve({...farm('alice'),revision:'3'});await previous;assert.equal(h.get().own,current);
 });
 
 function marketFixture(h){
@@ -1475,4 +1483,28 @@ test('a calendar refresh that finishes after leaving and reopening the tab updat
  assert.equal(find('Resgatar recompensa').disabled,false,'the new day is offered at once');assert.ok(text(elements.get('modal-content')).includes('Próximo resgate em'));
  const late=deferred();h.set({own:after,api:{pending:null,busy:false,get:()=>late.promise}});h.receive({farm:after});h.loginCalendar();find('Atualizar calendário').onclick();tabs()[0].onclick();tabs()[1].onclick();const logout=h.logout();
  late.resolve({...after,revision:'3'});await logout;await new Promise(resolve=>setTimeout(resolve,0));assert.equal(h.get().own,undefined,'a response after logout is still dropped');
+});
+
+
+test('a revision conflict queues one fresh read after an older in-flight refresh',async()=>{
+ for(const status of [409,410]){
+  const {h}=app(),old=deferred();let reads=0;
+  const initial=farm('alice'),latest={...initial,revision:'2'};
+  h.set({own:initial,api:{pending:null,get:()=>++reads===1?old.promise:Promise.resolve(latest),
+   mutate:async()=>{throw new ApiError(status,'Revisão antiga');},prepareRequestId:async()=>{}}});
+  const refresh=h.refresh();h.pickTool('PLOW');await h.tileAction({column:0,row:0,unlocked:true,state:'GRASS'});
+  const duplicate=h.refresh();assert.equal(reads,1,'the required refresh waits instead of overlapping');
+  old.resolve(initial);await Promise.all([refresh,duplicate]);
+  assert.equal(reads,2);assert.equal(h.get().own,latest);
+ }
+});
+
+
+test('an older refresh projection cannot replace a newer action reply at equal revision',async()=>{
+ const {h}=app(),response=deferred();
+ const initial={...farm('alice'),revision:'7',serverTime:'2026-11-01T12:00:00Z'};
+ const older={...initial,serverTime:'2026-11-01T12:01:00Z'},newer={...initial,serverTime:'2026-11-01T12:02:00Z'};
+ h.set({own:initial,api:{pending:null,get:()=>response.promise,prepareRequestId:async()=>{}}});
+ const refresh=h.refresh();h.receive({farm:newer});response.resolve(older);await refresh;
+ assert.equal(h.get().own,newer);
 });

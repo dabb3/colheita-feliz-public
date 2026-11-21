@@ -192,3 +192,29 @@ test('hungry animals get a red silhouette halo instead of the tiny feed icon, wi
  reduced=true;drawn.length=0;scene.update(farm);const still=drawn.filter(d=>/vaca\/vaca[^/]*\.png$/.test(d.path)).map(d=>d.blur);
  drawn.length=0;scene.update(farm);assert.deepEqual(drawn.filter(d=>/vaca\/vaca[^/]*\.png$/.test(d.path)).map(d=>d.blur),still,'reduced motion keeps the halo still');
 });
+
+
+test('background transitions retain the last image while both replacements load or fail',()=>{
+ const pending=[],drawn=[];let period='day';
+ const context={clearRect(){drawn.length=0;},fillRect(){},save(){},restore(){},translate(){},rotate(){},drawImage(image){drawn.push(image.src);}};
+ const environment={...presentation,periodAt:()=>period,performance:{now:()=>0},AbortController,console:{warn(){}},
+  window:{requestAnimationFrame:()=>1,cancelAnimationFrame(){}},document:{hidden:false},
+  Image:class{width=1600;height=900;src;constructor(){pending.push(this);}}};
+ const source=readFileSync(new URL('../src/scene.ts',import.meta.url),'utf8').replace(/^import\b[\s\S]*?;\s*/gm,'').replace('export class Scene','class Scene');
+ runInNewContext(stripTypeScriptTypes(source)+'\nglobalThis.Scene=Scene;',environment);
+ const scene=new environment.Scene({width:1600,getContext:()=>context,addEventListener(){}},{animals:[],crops:[]},()=>{},()=>{},()=>{});
+ const farm={owner:'alice',activeBackgroundId:'inverno',tiles:[],animals:[]};scene.update(farm);
+ const day=pending.find(image=>image.src.endsWith('/backgound-inverno.png'));day.onload();
+ assert.ok(drawn.includes(day.src));
+ period='sunset';scene.update({...farm,activeBackgroundId:'outono'});
+ assert.ok(drawn.includes(day.src),'keep the last loaded art instead of the green fill');
+ const requested=pending.find(image=>image.src.endsWith('/background-outono-tarde.png'));
+ requested.onerror();assert.ok(drawn.includes(day.src),'a failed replacement cannot erase the last background');
+ const fallback=pending.find(image=>image.src.endsWith('/background-sunset.png'));fallback.onload();
+ assert.ok(drawn.includes(fallback.src));assert.ok(!drawn.includes(day.src));
+ period='night';scene.update({...farm,activeBackgroundId:'savana'});
+ const stale=pending.find(image=>image.src.endsWith('/background-savana-noite.png'));
+ scene.update({...farm,activeBackgroundId:'inverno'});
+ const current=pending.find(image=>image.src.endsWith('/background-inverno-noite.png'));current.onload();stale.onload();
+ assert.ok(drawn.includes(current.src));assert.ok(!drawn.includes(stale.src),'late completion must not replace the selected pack');scene.close();
+});
