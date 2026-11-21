@@ -155,11 +155,6 @@ aceita clientes anteriores. O frontend novo diante de API antiga mantém estado 
 e não supõe disponibilidade. Presentes continuam 24h; prioridade do dono, proteção,
 mordida e demais regras não mudam. Não misturar binários de API com intervalos distintos.
 
-Revisão isolada: `npm.cmd run review:social --prefix web`, em
-`http://127.0.0.1:5177/?state=waiting`. Estados `ready`, `boundary` e `unknown`
-usam a interface, a câmera e os sprites reais com respostas sintéticas, sem API ou
-save. [Evidências desktop/mobile](docs/visual-review/timers-sociais-3h/README.md).
-
 Antes disso, cada temporada tem uma janela exclusiva de cinco minutos para o dono após amadurecer. O servidor deriva o instante efetivo dos dados de crescimento já persistidos, considerando água, solo seco, pausas e fertilizantes; não conta desde o primeiro acesso à fazenda. O dono pode colher na hora. O visitante recebe mensagem com o tempo restante, sem consumir seu limite diário. Ao completar cinco minutos, ainda precisa cumprir as demais condições de furto. A temporada seguinte ganha outra janela. Não há campo novo no save nem migração de snapshots; plantas existentes usam seu histórico de crescimento e não recebem cinco minutos extras por causa do deploy.
 
 A inicialização cria, de forma aditiva e idempotente, `colheita.theft_cooldowns` (`actor` e `last_stolen_at`), com RLS e privilégios públicos revogados como nas demais tabelas privadas. Não altera snapshots ou o save desktop v20. Jogadores sem registro começam com furto disponível; não há reconstrução retroativa de furtos anteriores à implantação. Incluir essa tabela no backup/restauração do schema. Não apagar registros para limpar recibos: expiração do recibo não libera o limite.
