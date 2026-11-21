@@ -357,7 +357,7 @@ function invalidateSocialClock(){socialSyncedOwner='';stopSocialClock();paintSoc
 /** Only the social command actually being sent or recovered is labelled Pendente. */
 function pendingSocialAction():Parameters<typeof socialCooldown>[0]|undefined{
  const pending=api?.pending;
- if(!pending?.path.endsWith('/visit-actions'))return undefined;
+ if(!pending||typeof pending.path!=='string'||!pending.path.endsWith('/visit-actions'))return undefined;
  try{
   const action:unknown=JSON.parse(pending.body).action;
   return typeof action==='string'&&isSocialAction(action)?action:undefined;
