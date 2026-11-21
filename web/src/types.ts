@@ -48,7 +48,13 @@ export interface AwayReport {
   care:{waterings:number;pestsRemoved:number;animalCares:number};
   pending:({kind:'AUTOMATION';serviceId:string;name:string;expiredAt:string}|{kind:'VIP';expiredAt:string}|{kind:'FEED';animalId:string;name:string;stock:number})[];
 }
+export interface SocialCooldowns {
+  stealNextAt: string|null;
+  insectsNextAt: string|null;
+  weedsNextAt: string|null;
+}
 export interface Farm {
+  socialCooldowns?: SocialCooldowns;
   automations?: (AutomationService & {expiresAt:string|null;status:"ACTIVE"|"SUSPENDED"|"EXPIRED"|"NOT_PURCHASED"})[];
   updateNotes?: UpdateNotes;
   awayReport?: AwayReport;

@@ -11,8 +11,115 @@ import * as inviteUrl from '../src/invite-url.ts';
 import * as backgroundCatalog from '../src/background-catalog.ts';
 import {DecorationImageCache,LatestDecorationPreview} from '../src/decoration-images.ts';
 import * as events from '../src/events.ts';
+import * as socialCooldowns from '../src/social-cooldowns.ts';
 
-const farm=owner=>({owner,name:owner,revision:'1',tiles:[],animals:[],seedCounts:{}});
+const socialFarm=(owner='alice')=>({...farm(owner),serverTime:'2026-11-21T12:00:00Z',socialCooldowns:{stealNextAt:null,insectsNextAt:'2026-11-21T12:00:02Z',weedsNextAt:null}});
+const socialButton=(elements,id)=>descendants(elements.get('tools')).find(node=>node.getAttribute?.('data-social-action')===id);
+test('social toolbar keeps focus and button identity while counting down and releasing exactly',()=>{
+ const {h,elements,ctx,intervals}=app(),own=socialFarm();h.set({own,api:{pending:null}});h.receive({farm:own});h.visit(farm('bob'));
+ const worm=socialButton(elements,'SPREAD_INSECTS'),steal=socialButton(elements,'STEAL'),weed=socialButton(elements,'SPREAD_WEEDS');
+ assert.equal(worm.getAttribute('aria-disabled'),'true');assert.match(worm.getAttribute('aria-label'),/02s/);
+ assert.equal(steal.getAttribute('aria-disabled'),'false');assert.equal(weed.getAttribute('aria-disabled'),'false');
+ worm.focus();h.pickTool('SPREAD_INSECTS');assert.equal(h.get().tool,'CURSOR');assert.match(text(elements.get('notice')),/poderá tentar/);
+ h.setNow(1999);intervals.get(1000)();assert.equal(worm.getAttribute('aria-disabled'),'true');assert.match(worm.getAttribute('aria-label'),/01s/);
+ h.setNow(2000);intervals.get(1000)();assert.equal(worm.getAttribute('aria-disabled'),'false');assert.equal(socialButton(elements,'SPREAD_INSECTS'),worm);assert.equal(ctx.document.activeElement,worm);assert.equal(intervals.has(1000),false);
+ h.pickTool('SPREAD_INSECTS');assert.equal(h.get().tool,'SPREAD_INSECTS');
+});
+test('unknown API and invalid clock block selection and every social dispatch but keep cleaning available',async()=>{
+ const {h,elements}=app();let posts=0;h.set({own:{...farm('alice'),socialCooldowns:undefined,serverTime:undefined},api:{pending:null,mutate:async()=>{posts++;return{};}}});h.visit(farm('bob'));
+ for(const id of ['STEAL','SPREAD_INSECTS','SPREAD_WEEDS']){assert.match(socialButton(elements,id).getAttribute('aria-label'),/Verificando/);h.pickTool(id);assert.equal(h.get().tool,'CURSOR');await h.runAction({action:id,column:0,row:0},'/v1/farms/bob/visit-actions');}
+ assert.equal(posts,0);h.pickTool('CLEAN_WEEDS');assert.equal(h.get().tool,'CLEAN_WEEDS');
+ const own={...socialFarm(),serverTime:'invalid'};h.receive({farm:own});assert.equal(socialButton(elements,'STEAL').getAttribute('aria-disabled'),'true');
+});
+test('an ineligible pest attempt keeps its selected tool while sending and after a confirmed refusal',async()=>{
+ const {h,elements}=app(),own=socialFarm(),request=deferred();let posts=0;
+ const api={pending:null,prepareRequestId:async()=>{},mutate(){
+  posts++;api.pending={path:'/v1/farms/bob/visit-actions',body:'{"action":"SPREAD_WEEDS"}'};
+  return request.promise;
+ }};
+ h.set({own,api});h.receive({farm:own});h.visit(farm('bob'));h.pickTool('SPREAD_WEEDS');
+ const sent=h.tileAction({column:0,row:0,state:'GROWING',watered:false});
+ assert.equal(h.get().tool,'SPREAD_WEEDS','do not drop the active tool while sending');
+ assert.match(socialButton(elements,'SPREAD_WEEDS').getAttribute('aria-label'),/Pendente/);
+ for(const other of ['STEAL','SPREAD_INSECTS']){
+  assert.match(socialButton(elements,other).getAttribute('aria-label'),/Aguarde/);
+  assert.doesNotMatch(socialButton(elements,other).getAttribute('aria-label'),/Pendente/);
+ }
+ api.pending=null;
+ request.resolve({farm:{...own,revision:'2',serverTime:'2026-11-21T12:00:01Z'},result:{success:false,message:'Praga indisponível: escolha uma planta em crescimento e já regada.'}});
+ await sent;
+ assert.equal(posts,1);
+ assert.equal(h.get().tool,'SPREAD_WEEDS','an ineligible plot must not force the player to reselect');
+ assert.equal(socialButton(elements,'SPREAD_WEEDS').getAttribute('aria-disabled'),'false');
+ assert.equal(socialButton(elements,'SPREAD_WEEDS').getAttribute('aria-pressed'),'true');
+ assert.match(socialButton(elements,'SPREAD_WEEDS').getAttribute('aria-label'),/Pronto/);
+});
+
+test('an unrelated pending request is labelled Aguarde rather than pretending all social attempts are pending',()=>{
+ const {h,elements}=app(),own=socialFarm();
+ const api={pending:{path:'/v1/me/actions',body:'{"action":"BUY_SEED"}'}};
+ h.set({own,api});h.receive({farm:own});h.visit(farm('bob'));
+ for(const action of ['STEAL','SPREAD_INSECTS','SPREAD_WEEDS']){
+  const label=socialButton(elements,action).getAttribute('aria-label');
+  assert.match(label,/Aguarde/);assert.doesNotMatch(label,/Pendente/);
+  h.pickTool(action);assert.equal(h.get().tool,'CURSOR');
+ }
+ // Legacy or partially restored pending metadata must never crash the toolbar.
+ api.pending={body:'{"action":"STEAL"}'};
+ h.receive({});
+ assert.match(socialButton(elements,'STEAL').getAttribute('aria-label'),/Aguarde/);
+});
+
+test('protected reply starts timer immediately, deselects the action and rejects delayed snapshots',async()=>{
+ const {h,elements}=app(),own=socialFarm();let posts=0;
+ const after={...own,revision:'2',serverTime:'2026-11-21T12:00:01Z',socialCooldowns:{...own.socialCooldowns,stealNextAt:'2026-11-21T15:00:01Z'}};
+ h.set({own,api:{pending:null,prepareRequestId:async()=>{},mutate:async()=>{posts++;return{farm:after,result:{success:false,message:'Animal protegeu a plantação.'}};}}});h.receive({farm:own});h.visit(farm('bob'));h.pickTool('STEAL');
+ await h.tileAction({column:0,row:0,cropId:'nabo',state:'READY'});
+ assert.equal(posts,1);assert.equal(h.get().tool,'CURSOR');assert.match(socialButton(elements,'STEAL').getAttribute('aria-label'),/3h/);
+ h.receive({farm:own});assert.equal(h.get().own.revision,'2');assert.match(socialButton(elements,'STEAL').getAttribute('aria-label'),/3h/);
+ h.pickTool('STEAL');await h.runAction({action:'STEAL'},'/v1/farms/bob/visit-actions');assert.equal(posts,1);
+ assert.equal(h.healthAction({state:'READY'},true,false),undefined);
+});
+test('uncertain social request stays consultable and blocked until the same receipt is recovered',async()=>{
+ const {h,elements}=app(),own=socialFarm(),post=deferred();let posts=0;
+ const api={pending:null,prepareRequestId:async()=>{},mutate(){posts++;api.pending={path:'/v1/farms/bob/visit-actions',body:'{"action":"STEAL"}'};return post.promise;}};
+ h.set({own,api});h.receive({farm:own});h.visit(farm('bob'));h.pickTool('STEAL');const sent=h.tileAction({state:'READY',column:0,row:0});
+ assert.match(socialButton(elements,'STEAL').getAttribute('aria-label'),/Pendente/);
+ assert.match(socialButton(elements,'SPREAD_WEEDS').getAttribute('aria-label'),/Aguarde/);
+ assert.equal(h.get().tool,'STEAL','keep selection while a receipt is still being confirmed');
+ h.pickTool('STEAL');assert.equal(h.get().tool,'STEAL');
+ post.reject(new Error('offline'));await sent;
+ assert.match(socialButton(elements,'STEAL').getAttribute('aria-label'),/Pendente/);
+ assert.equal(h.get().tool,'CURSOR','once the result becomes uncertain, switch to inspection for safety');
+ assert.equal(posts,1);
+});
+test('hidden tab stops its timer and resynchronizes before offering attempts; logout discards the clock',async()=>{
+ const {h,elements,ctx,listeners,intervals}=app(),own=socialFarm();let reads=0;
+ h.set({own,api:{pending:null,get:async path=>{reads++;return path==='/v1/me/farm'?{...own,serverTime:'2026-11-21T12:00:03Z'}:farm('bob');},prepareRequestId:async()=>{}}});h.receive({farm:own});h.visit(farm('bob'));
+ ctx.document.hidden=true;listeners.get('visibilitychange')();assert.equal(intervals.has(1000),false);
+ h.setNow(100000);ctx.document.hidden=false;listeners.get('visibilitychange')();assert.match(socialButton(elements,'STEAL').getAttribute('aria-label'),/Verificando/);
+ await new Promise(resolve=>setTimeout(resolve,0));assert.equal(socialButton(elements,'SPREAD_INSECTS').getAttribute('aria-disabled'),'false');assert.equal(reads,2);
+ await h.logout();assert.equal(intervals.has(1000),false);
+ h.set({own:{...farm('carol'),socialCooldowns:undefined},api:{pending:null}});h.visit(farm('bob'));assert.match(socialButton(elements,'STEAL').getAttribute('aria-label'),/Verificando/);
+});
+
+test('successful pest reply starts only its timer and survives changing the visited friend',async()=>{
+ const {h,elements}=app(),own=farm('alice');
+ const after={...own,revision:'2',socialCooldowns:{...own.socialCooldowns,insectsNextAt:'2026-11-21T15:00:00Z'}};
+ h.set({own,api:{pending:null,prepareRequestId:async()=>{},mutate:async()=>({farm:after,result:{success:true,message:'Inseto lançado.'}})}});h.receive({farm:own});h.visit(farm('bob'));h.pickTool('SPREAD_INSECTS');
+ await h.tileAction({column:0,row:0,state:'GROWING'});assert.equal(h.get().tool,'CURSOR');
+ for(const friend of ['bob','carol']){h.visit(farm(friend));assert.equal(socialButton(elements,'SPREAD_INSECTS').getAttribute('aria-disabled'),'true');assert.equal(socialButton(elements,'STEAL').getAttribute('aria-disabled'),'false');assert.equal(socialButton(elements,'SPREAD_WEEDS').getAttribute('aria-disabled'),'false');}
+ for(const id of ['LOVE','CLEAN_WEEDS','CLEAN_INSECTS']){h.pickTool(id);assert.equal(h.get().tool,id);const button=descendants(elements.get('tools')).find(n=>n.getAttribute?.('data-tool')===id);assert.equal(button.getAttribute('aria-pressed'),'true');}
+});
+
+test('newer economic snapshot with an older deadline cannot release a known cooldown or trust device time',()=>{
+ const {h,elements,ctx}=app(),own=socialFarm();ctx.Date=class extends Date{static now(){return 0;}};
+ h.set({own,api:{pending:null}});h.receive({farm:own});h.visit(farm('bob'));
+ h.receive({farm:{...own,revision:'9',serverTime:'2026-11-21T12:00:01Z',socialCooldowns:{...own.socialCooldowns,insectsNextAt:null}}});
+ assert.equal(socialButton(elements,'SPREAD_INSECTS').getAttribute('aria-disabled'),'true');assert.match(socialButton(elements,'SPREAD_INSECTS').getAttribute('aria-label'),/01s/);
+});
+
+const farm=owner=>({owner,name:owner,revision:'1',serverTime:'2026-11-21T12:00:00Z',socialCooldowns:{stealNextAt:null,insectsNextAt:null,weedsNextAt:null},tiles:[],animals:[],seedCounts:{}});
 function deferred(){let resolve,reject;const promise=new Promise((accept,fail)=>{resolve=accept;reject=fail;});return{promise,resolve,reject};}
 test('friend list offers only Visitar fazenda and keeps IDs despite homonyms',async()=>{
  const {h,elements}=app();let target='';
@@ -58,7 +165,7 @@ test('visit menu keeps only Minha fazenda, Amigos and Presentear and home restor
  h.visit({...farm('bob'),name:'Bob'});
  assert.ok(others.every(id=>elements.get(id).hidden),'own-farm panels leave the top menu');
  assert.equal(elements.get('home').hidden,false);assert.equal(elements.get('friends').hidden,false);assert.equal(elements.get('gift-visit').hidden,false);assert.equal(elements.get('gift-visit').getAttribute('aria-label'),'Presentear Bob');assert.equal(ctx.moreVisiting,true);
- assert.ok(descendants(elements.get('tools')).some(node=>node.getAttribute?.('aria-label')==='Furtar colheita'||node.title==='Furtar colheita'||text(node).includes('Furtar')),'social toolbar stays available');
+ assert.ok(descendants(elements.get('tools')).some(node=>node.getAttribute?.('aria-label')==='Furtar colheita'||node.title?.startsWith('Furtar colheita')||text(node).includes('Furtar')),'social toolbar stays available');
  h.visit({...farm('carol'),name:'Carol'});assert.equal(elements.get('gift-visit').getAttribute('aria-label'),'Presentear Carol');
  elements.get('home').onclick();
  assert.ok(others.every(id=>!elements.get(id).hidden));assert.equal(elements.get('home').hidden,true);assert.equal(elements.get('gift-visit').hidden,true);assert.equal(ctx.moreVisiting,false);
@@ -158,7 +265,7 @@ function app(preferences=new Map(),pushLogoutOptions){
   querySelector(selector){return this.querySelectorAll(selector)[0]??null;},focus(){if(this.tag==='div'&&this.tabIndex===undefined)return;ctx.document.activeElement=this;},
   getBoundingClientRect:()=>({left:0,top:0,width:1600,height:900}),addEventListener(name,handler){(this.listenerCounts??={})[name]=(this.listenerCounts[name]??0)+1;(this.listeners??={})[name]=handler;},close(){this.open=false;},showModal(){this.open=true;}});
  const storage={getItem:()=>null,setItem(){},removeItem(){}};
- const ctx={syncMobileCamera(){ctx.cameraSyncs=(ctx.cameraSyncs??0)+1;},setMoreMenuVisiting(value){ctx.moreVisiting=value;},reconcilePush:async()=>{},connectPush:async()=>{},suspendPush:pushLogoutOptions?.suspendPush??(async()=>{}),createClient:()=>({auth:{signOut:pushLogoutOptions?.signOut}}),renderPushSettings:()=>{},setMonotonic(value){monotonic=value;},performance:{now:()=>monotonic},...presentation,...uiPresentation,...backgroundCatalog,DecorationImageCache,LatestDecorationPreview,...avatar,...inviteUrl,history:{state:null,replaceState(){}},window:{localStorage:{getItem:key=>preferences.get(key)??null,setItem:(key,value)=>preferences.set(key,value)},COLHEITA_CONFIG:{development:!pushLogoutOptions},setInterval(callback,delay){intervals.set(delay,callback);return delay;},clearInterval(id){intervals.delete(id);},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make(id==='close-modal'||id==='retry'||id==='gift-visit'?'button':'div'));return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Image:class{constructor(){const image=make('img');image.naturalWidth=1478;image.decode=async()=>{};return image;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}addEventListener(){}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
+ const ctx={syncMobileCamera(){ctx.cameraSyncs=(ctx.cameraSyncs??0)+1;},setMoreMenuVisiting(value){ctx.moreVisiting=value;},reconcilePush:async()=>{},connectPush:async()=>{},suspendPush:pushLogoutOptions?.suspendPush??(async()=>{}),createClient:()=>({auth:{signOut:pushLogoutOptions?.signOut}}),renderPushSettings:()=>{},setMonotonic(value){monotonic=value;},performance:{now:()=>monotonic},...socialCooldowns,...presentation,...uiPresentation,...backgroundCatalog,DecorationImageCache,LatestDecorationPreview,...avatar,...inviteUrl,history:{state:null,replaceState(){}},window:{localStorage:{getItem:key=>preferences.get(key)??null,setItem:(key,value)=>preferences.set(key,value)},COLHEITA_CONFIG:{development:!pushLogoutOptions},setInterval(callback,delay){intervals.set(delay,callback);return delay;},clearInterval(id){intervals.delete(id);},setTimeout(callback){const id=++nextTimeout;timeouts.set(id,callback);return id;},clearTimeout(id){timeouts.delete(id);},matchMedia(){return{matches:false};},requestAnimationFrame(callback){callback();return 1;},addEventListener(){}},document:{hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,make(id==='close-modal'||id==='retry'||id==='gift-visit'?'button':'div'));return elements.get(id);},createElement:make,createElementNS(_namespace,tag){return make(tag);},createTextNode:text=>text,addEventListener(name,handler){listeners.set(name,handler);}},location:{href:'http://localhost',origin:'http://localhost'},sessionStorage:storage,navigator:{onLine:true},URL,ApiError,acceptFarm,animalPath:()=>'',animalStatusText:(status)=>status,animalActionLabel:(status)=>status==='READY'?'Recolher produto':null,clearTimeout(){},ResizeObserver:class{constructor(callback){this.callback=callback;observers.push(this);}observe(target){this.target=target;}disconnect(){this.disconnected=true;}},Image:class{constructor(){const image=make('img');image.naturalWidth=1478;image.decode=async()=>{};return image;}},Audio:class{paused=true;playCount=0;loop=false;volume=0;constructor(path){this.path=path;audioClips.push(this);}addEventListener(){}play(){this.paused=false;this.playCount++;return Promise.resolve();}pause(){this.paused=true;}},HTMLInputElement:class{},HTMLSelectElement:class{}};
  ctx.document.getElementById('farm-header').getBoundingClientRect=()=>({left:0,top:0,width:0,height:0,bottom:0});
  const uiSource=readFileSync(new URL('../src/ui.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');
  runInNewContext(stripTypeScriptTypes(uiSource),ctx);
@@ -169,7 +276,7 @@ function app(preferences=new Map(),pushLogoutOptions){
  const eventsSource=readFileSync(new URL('../src/events.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');runInNewContext(stripTypeScriptTypes(eventsSource),ctx);
  runInNewContext(stripTypeScriptTypes(readFileSync(new URL('../src/away-report.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'')),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={events,updateOwnFarm,refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,handleAnimalClick,missions,achievements,decorations,friends,presentGift,closeGiftComposer,receive,dialog,health,renderHealth,positionHealth,animalTooltip,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),visit:value=>{visited=value;render();},calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
+ source+='\nglobalThis.h={runAction,healthAction,events,updateOwnFarm,refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,handleAnimalClick,missions,achievements,decorations,friends,presentGift,closeGiftComposer,receive,dialog,health,renderHealth,positionHealth,animalTooltip,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited,tool}),visit:value=>{visited=value;render();},calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;socialSyncedOwner=own?.socialCooldowns?own.owner:"";if(own?.socialCooldowns){const server=Date.parse(own.serverTime??"");ownServerClock=Number.isFinite(server)?{owner:own.owner,server,client:performance.now()}:undefined;}catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:{...ctx.h,runTimeouts(){for(const [id,callback]of [...timeouts]){timeouts.delete(id);callback();}}},elements,listeners,audioClips,observers,ctx,intervals};
 }
 function openGift(h,elements,owner='bob',name='Bob'){h.visit({...farm(owner),name});elements.get('gift-visit').onclick();}
@@ -371,8 +478,8 @@ test('pest tools exist only in visits and send the selected plot with its revisi
  const api={pending:null,mutate:async(path,command)=>{sent.push({path,command});return{result:{success:false,message:'Disponível em 1h 0min 0s.'}};},prepareRequestId:()=>Promise.resolve()};
  h.set({own,api});h.receive({});assert.ok(!text(elements.get('tools')).includes('1/6h'));
  h.set({own,visited,api});h.receive({});
- for(const [action,label,asset]of [['SPREAD_INSECTS','Lançar inseto · 1/6h','minhoca-nova'],['SPREAD_WEEDS','Lançar erva · 1/6h','erva-nova']]){
-  const choice=descendants(elements.get('tools')).find(n=>n.getAttribute?.('aria-label')===label);assert.ok(choice);assert.ok(choice.children.some(n=>n.src===`/assets/classic/effects/${asset}.png`));
+ for(const [action,label,asset]of [['SPREAD_INSECTS','Lançar inseto','minhoca-nova'],['SPREAD_WEEDS','Lançar erva','erva-nova']]){
+  const choice=descendants(elements.get('tools')).find(n=>n.getAttribute?.('aria-label')?.startsWith(label));assert.ok(choice);assert.ok(choice.children.some(n=>n.src===`/assets/classic/effects/${asset}.png`));
   choice.onclick();await h.tileAction({column:2,row:1,harvestRevision:'9'});
   assert.equal(text(elements.get('notice')),'Disponível em 1h 0min 0s.');
   const last=sent.at(-1);assert.equal(last.path,'/v1/farms/bob/visit-actions');assert.equal(JSON.stringify(last.command),JSON.stringify({action,column:2,row:1,harvestRevision:'9',expectedRevision:'42'}));
@@ -387,7 +494,7 @@ test('pest tool guidance explains growth, watering and blocked cooldown without 
  const bounds={left:0,top:0,width:1280,height:720};ctx.document.getElementById('game').getBoundingClientRect=()=>bounds;ctx.document.getElementById('farm').getBoundingClientRect=()=>bounds;
  const panel=ctx.document.getElementById('plant-health');panel.getBoundingClientRect=()=>({width:360,height:280});
  const tile={column:0,row:0,cropId:'nabo',state:'GROWING',watered:true,season:1,seasons:1,remainingSeconds:3600,nominalRemainingSeconds:3600};
- h.pickTool('SPREAD_INSECTS');assert.match(text(elements.get('notice')),/em crescimento e já regada/);assert.match(text(elements.get('notice')),/bloqueada.*consome.*6h/i);assert.doesNotMatch(text(elements.get('notice')),/prote[cç][aã]o/i);h.health(tile,{x:585,y:400},'tap');assert.equal(panel.hidden,true);h.pickTool('CURSOR');h.health(tile,{x:585,y:400},'tap');assert.equal(panel.hidden,false);
+ h.pickTool('SPREAD_INSECTS');assert.match(text(elements.get('notice')),/em crescimento e já regada/);assert.match(text(elements.get('notice')),/bloqueada.*consome.*3h/i);assert.doesNotMatch(text(elements.get('notice')),/prote[cç][aã]o/i);h.health(tile,{x:585,y:400},'tap');assert.equal(panel.hidden,true);h.pickTool('CURSOR');h.health(tile,{x:585,y:400},'tap');assert.equal(panel.hidden,false);
  clientNow+=60000;h.runTimeouts();assert.ok(!text(panel).includes('Lançar inseto nesta planta'));h.pickTool('SPREAD_WEEDS');assert.equal(panel.hidden,true);
  assert.equal(panel.querySelector('.crop-growth-value').textContent,'59min');
 });
@@ -753,7 +860,7 @@ test('animal popup shows protector feeding time left',()=>{
 test('Tarefas shows weekly XP tasks apart from the daily green ones and keeps finished ones until reset',()=>{
  const {h,elements}=app(),nextResetAt=new Date(Date.now()+(2*24*60+3*60+5)*60_000).toISOString();
  const weeklyTasks={weekStartsAt:'2026-11-22T03:00:00Z',nextResetAt,tasks:[{id:'harvest',title:'Colha 12 plantas',progress:0,target:12,rewardXp:100,done:false},{id:'buy-animals',title:'Compre 5 animais',progress:5,target:5,rewardXp:100,done:true},{id:'love-friends',title:'Adube 30 plantas de amigos com fertilizante do amor',progress:29,target:30,rewardXp:100,done:false}]};
- h.set({own:{...farm('alice'),missions:[{id:'care',title:'Cuidar da fazenda',green:1,progress:0,target:1,done:false}],weeklyTasks}});h.missions();
+ h.set({own:{...farm('alice'),serverTime:new Date().toISOString(),missions:[{id:'care',title:'Cuidar da fazenda',green:1,progress:0,target:1,done:false}],weeklyTasks}});h.missions();
  const content=elements.get('modal-content'),caption=text(content);
  assert.equal(elements.get('modal-title').textContent,'Tarefas');
  assert.match(caption,/Diárias · Em andamento/);assert.match(caption,/Semanais/);
