@@ -23,6 +23,7 @@ import {
   animationFrame,
   cropHeight,
   tileEffect,
+  pestSpriteMotion,
   showAnimalProduct,
   hungerGlow,
   animalProductPath,
@@ -538,6 +539,8 @@ export class Scene {
         plant: "#88d354",
         water: "#68c8ff",
         harvest: "#ffe36e",
+        "spread-weed": "#7fbc4a",
+        "spread-pest": "#d8945d",
         weed: "#a7d455",
         pest: "#df7a75",
         fertilize: "#d3a8f1",
@@ -570,6 +573,15 @@ export class Scene {
       }
       ctx.restore();
     }
+  }
+  /** The new pests grow/pop in only when a successful farm update first adds them. */
+  private pestEntrance(column: number, row: number, kind: "spread-weed" | "spread-pest", reduced: boolean): number {
+    if (reduced) return 1;
+    const applied = this.tileEffects.find(effect =>
+      effect.column === column && effect.row === row && effect.kind === kind);
+    if (!applied) return 1;
+    const progress = Math.max(0, Math.min(1, (performance.now() - applied.started) / 400));
+    return 0.28 + 0.72 * (1 - (1 - progress) ** 3);
   }
   private fence(points: number[][]) {
     const ctx = this.ctx;
@@ -689,14 +701,18 @@ export class Scene {
         ready = tile.state === "READY";
       if (ready)
         this.matureGlow(p.x, p.y - 10, seconds, tile.column + tile.row);
-      if (tile.weeds)
-        this.thing(
-          `classic/effects/erva_daninha_${animationFrame(seconds, 4, 0.16) + 1}.png`,
-          p.x + 2,
-          p.y + 20,
-          72,
-          true,
-        );
+      if (tile.weeds) {
+        // The weeds remain rooted beside the crop; only their leaves sway.
+        const reduced = reducedMotion();
+        const motion = pestSpriteMotion("weed", seconds, tile.row * 6 + tile.column, 0, reduced);
+        const entrance = this.pestEntrance(tile.column, tile.row, "spread-weed", reduced);
+        ctx.save();
+        ctx.translate(p.x - 29, p.y + 21);
+        ctx.rotate(motion.angle);
+        ctx.scale(entrance, entrance);
+        this.thing("classic/effects/erva-nova.png", 0, 0, 51, true);
+        ctx.restore();
+      }
       if (tile.state === "DEAD") {
         const plant = this.sprite("classic/terrain/planta-morta.png", true);
         if (plant) {
@@ -721,14 +737,21 @@ export class Scene {
           cropHeight(tile.stage),
           tile.dry && !ready,
         );
-      if (tile.insects > 0)
-        this.thing(
-          `classic/effects/verme_${Math.min(3, tile.insects)}.png`,
-          p.x - 4,
-          p.y + 21,
-          70,
-          true,
-        );
+      if (tile.insects > 0) {
+        const reduced = reducedMotion();
+        const count = Math.min(3, tile.insects);
+        const entrance = this.pestEntrance(tile.column, tile.row, "spread-pest", reduced);
+        // Separate tiny crawlers instead of a static, stretched bitmap of 2-3 worms.
+        for (let index = 0; index < count; index++) {
+          const motion = pestSpriteMotion("worm", seconds, tile.row * 6 + tile.column, index, reduced);
+          ctx.save();
+          ctx.translate(p.x + (index - (count - 1) / 2) * 25 + motion.dx, p.y + 20 + motion.dy);
+          ctx.rotate(motion.angle);
+          ctx.scale(entrance, entrance);
+          this.thing("classic/effects/minhoca-nova.png", 0, 0, count === 1 ? 59 : 45, true);
+          ctx.restore();
+        }
+      }
       if (this.farm.own && tile.protected) {
         this.thing("classic/icons/icone-cadeado.png",p.x+58,p.y+6,18,true);
       }
