@@ -28,6 +28,13 @@ O build local configura a API em `http://127.0.0.1:8080`. Para iniciar uma API l
 
 O cliente inclui um modo de revisão visual com dados sintéticos. Os menus de Loja, Depósito, Tarefas, Conquistas, Decorações, Eventos (com a aba Calendário Diário), Amigos e Ajustes são acessíveis por botões; regras e contrato online do calendário estão em [ONLINE.md](ONLINE.md). A seleção de avatar é uma preferência local por conta e dispositivo, não uma atualização do perfil no banco.
 
+Para revisar as pragas, use `npm.cmd run review --prefix web` e abra
+`http://127.0.0.1:5174/?pests`. Em viewport vertical, acrescente `&camera=left`
+ou `&camera=right` para câmera aproximada. As pragas do terreno usam larguras
+de 27 (erva) e 23 (minhoca) em unidades do mundo; respeitam movimento reduzido.
+Comparações reais desktop/mobile e limites estão na
+[revisão corretiva do PR #107](docs/visual-review/pragas-correcao/README.md).
+
 | Tecla | Atalho no Web |
 | --- | --- |
 | `1`–`8` | Ferramentas da própria fazenda |

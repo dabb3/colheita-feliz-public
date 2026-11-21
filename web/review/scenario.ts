@@ -1,3 +1,4 @@
+import { cameraLayout } from "../src/mobile.ts";
 import {renderEvents} from '../src/events.ts';
 import {renderNotifications} from '../src/notifications.ts';
 import { Scene } from "../src/scene.ts";
@@ -63,7 +64,7 @@ const tiles = Array.from({ length: 30 }, (_, i) => {
     column,
     row,
     unlocked: column < 5,
-    state: column === 4 ? "DEAD" : stage === 5 ? "READY" : "GROWING",
+    state: column === 4 && !params.has("pests") ? "DEAD" : stage === 5 ? "READY" : "GROWING",
     cropId: column < 5 ? crop.id : undefined,
     stage,
     season: 1,
@@ -71,8 +72,8 @@ const tiles = Array.from({ length: 30 }, (_, i) => {
     watered: true,
     dry: column === 1,
     paused: false,
-    weeds: column === 2,
-    insects: column === 3 ? (row % 3) + 1 : 0,
+    weeds: params.has("pests") ? column === 0 || column === 4 : column === 2,
+    insects: params.has("pests") ? (column === 4 ? 3 : column >= 1 && column <= 3 ? column : 0) : column === 3 ? (row % 3) + 1 : 0,
     fertilized: false,
     protected: false,
     harvestRevision: "1",
@@ -139,6 +140,13 @@ const farm = {
   nextPlot: { column: 5, row: 0 },
 } as Farm;
 scene.update(farm);
+if (params.has("pests") && params.has("camera")) {
+  const viewport = document.getElementById("scene")!;
+  const width = window.innerWidth, height = window.innerHeight;
+  const layout = cameraLayout(width, height, { zoom: 1.4, centerX: params.get("camera") === "right" ? 830 : 600, centerY: 555 });
+  viewport.style.cssText = `position:fixed;inset:0;width:${width}px;height:${height}px;overflow:hidden;z-index:100`;
+  canvas.style.cssText = `position:absolute;transform:none;max-width:none;width:${layout.width}px;height:${layout.height}px;left:${layout.x}px;top:${layout.y}px`;
+}
 renderWallet(document.getElementById("wallet")!, farm);
 
 const modal = document.getElementById("modal") as HTMLDialogElement;

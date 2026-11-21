@@ -1,9 +1,63 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
 import * as presentation from '../src/presentation.ts';
+
+test('launch icons and original cleaning sprays retain their approved bytes',()=>{
+ const icons={
+  'effects/erva-nova.png':'74e984e5ae559d9d97e4be778a9e50445f5321c4a6c2255f72a702f90f7150bc',
+  'effects/minhoca-nova.png':'d53850ad0720a0d55bc8d9fee74cbbacfbb9250397c70940409d9b8c10f8942b',
+  'icons/hud/herbicida-ui.png':'798872d29c791e6458628dc0b7be7a653264b3a52df7f9b3a50ad33f93e6b61b',
+  'icons/hud/pesticida-ui.png':'63e23413ad00bb13ab59095fee52dfdd4c3990244ea53fdf5912c11fd80b6836',
+ };
+ for(const [path,hash] of Object.entries(icons))assert.equal(createHash('sha256').update(readFileSync(new URL('../../assets/classic/'+path,import.meta.url))).digest('hex'),hash,path);
+});
+
+test('pests stay small, separated and rooted through growth, arrival, removal and reduced motion',()=>{
+ const pending=[],drawn=[],stack=[];let now=1000,reduced=false,pose={x:0,y:0,angle:0,scale:1};
+ const context={clearRect(){},fillRect(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},stroke(){},fill(){},ellipse(){},fillText(){},
+  save(){stack.push({...pose});},restore(){pose=stack.pop();},translate(x,y){pose.x+=x;pose.y+=y;},rotate(a){pose.angle+=a;},scale(x){pose.scale*=x;},
+  drawImage(image,...args){drawn.push({path:image.src,args,pose:{...pose}});},
+  createRadialGradient(){return{addColorStop(){}};},getImageData(x,y,w,h){return{data:new Uint8ClampedArray(w*h*4).fill(255)};}};
+ const environment={...presentation,periodAt:()=>'day',performance:{now:()=>now},AbortController,
+  window:{requestAnimationFrame:()=>1,cancelAnimationFrame(){},matchMedia:()=>({matches:reduced})},document:{createElement:()=>({getContext:()=>context})},
+  Image:class{width=100;height=60;src;constructor(){pending.push(this);}}};
+ const source=readFileSync(new URL('../src/scene.ts',import.meta.url),'utf8').replace(/^import\b[\s\S]*?;\s*/gm,'').replace('export class Scene','class Scene');
+ runInNewContext(stripTypeScriptTypes(source)+'\nglobalThis.Scene=Scene;',environment);
+ const scene=new environment.Scene({getContext:()=>context,addEventListener(){}},{crops:[{id:'nabo',spriteStem:'nabo'}],animals:[]},()=>{},()=>{},()=>{});
+ const tile={column:0,row:0,unlocked:true,state:'GROWING',cropId:'nabo',stage:1,weeds:true,insects:3};
+ const update=t=>{drawn.length=0;scene.update({owner:"pest-review",own:true,tiles:[t],animals:[]});while(pending.length)pending.shift().onload();drawn.length=0;scene.update({owner:"pest-review",own:true,tiles:[t],animals:[]});};
+ update(tile);
+ scene.sprites.get('classic/effects/minhoca-nova.png:true:').footCenterX=0.938596;
+ for(const stage of [1,3,5]) for(const count of [1,2,3]) for(const time of [2000,2750,3500]) {
+  now=time;update({...tile,stage,insects:count});
+  const worms=drawn.filter(d=>d.path?.endsWith('minhoca-nova.png')),weed=drawn.find(d=>d.path?.endsWith('erva-nova.png'));
+  assert.equal(worms.length,count);assert.equal(weed.args.at(-2),27);
+  assert.deepEqual([weed.pose.x,weed.pose.y],[550,397],'weed rotates around its fixed soil base');
+  assert.equal(weed.args.at(-3)+weed.args.at(-1),0,'trimmed weed bottom is the local rotation origin');
+  for(const [i,worm] of worms.entries()) {
+   assert.equal(worm.args.at(-2),23);
+   assert.equal(worm.args.at(-4),-11.5,"asymmetric source is centered by its visible bounds");
+   assert.ok(worm.pose.y+worm.args.at(-3)>weed.pose.y+2,"worm silhouette clears the weed base");
+   const dx=worm.pose.x-585,dy=worm.pose.y-400;
+   assert.ok((Math.abs(dx)+12)/85+(dy+2)/36<1,'worm fits inside the tile diamond');
+   if(i)assert.ok(worm.pose.x-worms[i-1].pose.x>=23,'worm silhouettes cannot overlap');
+  }
+ }
+ now=5000;update({...tile,weeds:false,insects:0});now=6000;update(tile);
+ assert.ok(scene.pestEntrance(0,0,'spread-weed',false)<1);
+ now=6150;const middle=scene.pestEntrance(0,0,'spread-weed',false);assert.ok(middle>.28&&middle<1);
+ now=6300;assert.equal(scene.pestEntrance(0,0,'spread-weed',false),1);
+ reduced=true;now=7000;update({...tile,weeds:false,insects:0});update(tile);
+ for(const d of drawn.filter(d=>/erva-nova|minhoca-nova/.test(d.path)))assert.deepEqual([d.pose.angle,d.pose.scale],[0,1]);
+ assert.equal(scene.pestEntrance(0,0,'spread-pest',true),1);
+ update({...tile,weeds:false,insects:0});assert.ok(!drawn.some(d=>/erva-nova|minhoca-nova/.test(d.path)));
+ assert.ok(scene.tileEffects.some(e=>e.kind==='weed'),'existing cleaning effect remains');
+ scene.close();
+});
 
 test('scene draws stage-sized plants, real pests, ready props and trimmed hive without economic calls',()=>{
  const drawn=[],texts=[],pending=[],images=[],events=new Map(),selected=[],hovered=[];
@@ -28,7 +82,8 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  const lastTerrain=drawn.findLastIndex(d=>typeof d.path==='string'&&/terrain\/(grama-default|terra-molhada)\.png$/.test(d.path));
  const firstPlant=drawn.findIndex(d=>typeof d.path==='string'&&d.path.endsWith('nabo_3.png'));
  assert.ok(firstPlant>lastTerrain,'all terrain must be drawn before any plant');
- assert.ok(drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('erva-nova.png')));
+ assert.ok(drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('erva-nova.png')&&d.args.at(-2)===27));
+ assert.ok(drawn.filter(d=>d.path?.endsWith('minhoca-nova.png')).every(d=>d.args.at(-2)===23));
  assert.ok(drawn.filter(d=>typeof d.path==='string'&&d.path.endsWith('minhoca-nova.png')).length>=2,'two worms rendered individually');
  assert.ok(drawn.some(d=>typeof d.path==='string'&&d.path.endsWith('balde-vaca.png')));
  assert.ok(images.some(image=>image.src.endsWith('colmeia-abelha-atlas.png')));
