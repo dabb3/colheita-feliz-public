@@ -254,9 +254,9 @@ test('new praga sprites sway or crawl smoothly and stop moving with reduced moti
  const worm0=pestSpriteMotion('worm',0,3),worm1=pestSpriteMotion('worm',2,3);
  assert.notEqual(weed0.angle,weed1.angle,'weed sways over time');
  assert.equal(weed0.dx,0);assert.equal(weed0.dy,0);
- assert.ok(Math.abs(weed1.angle)<=0.055);
+ assert.ok(Math.abs(weed1.angle)<=Math.PI/60);
  assert.notEqual(worm0.dx,worm1.dx,'worm crawls over time');
- assert.ok(Math.abs(worm1.dx)<=5&&Math.abs(worm1.dy)<=1.7);
+ assert.ok(Math.abs(worm1.dx)<=3&&Math.abs(worm1.dy)<=1);
  assert.deepEqual(pestSpriteMotion('weed',10,3,0,true),{dx:0,dy:0,angle:0});
  assert.deepEqual(pestSpriteMotion('worm',10,3,0,true),{dx:0,dy:0,angle:0});
 });
@@ -268,4 +268,14 @@ test('pragas entering and leaving a plot trigger distinct arrival and cleaning e
  assert.equal(tileEffect({...plain,weeds:true},plain),'weed');
  assert.equal(tileEffect({...plain,insects:2},plain),'pest');
  assert.equal(tileEffect(plain,plain),null);
+});
+
+test('pest motion stays deterministic and within soil bounds across complete cycles',()=>{
+ for(let seed=0;seed<30;seed++) for(let time=0;time<12;time+=.125) for(let index=0;index<3;index++) {
+  const weed=pestSpriteMotion('weed',time,seed,index),worm=pestSpriteMotion('worm',time,seed,index);
+  assert.equal(weed.dx,0);assert.equal(weed.dy,0);
+  assert.ok(Math.abs(weed.angle)<=3*Math.PI/180);
+  assert.ok(Math.abs(worm.dx)<=3&&Math.abs(worm.dy)<=1&&Math.abs(worm.angle)<=4*Math.PI/180);
+  assert.deepEqual(pestSpriteMotion('worm',time,seed,index),worm);
+ }
 });

@@ -579,7 +579,7 @@ export class Scene {
     const applied = this.tileEffects.find(effect =>
       effect.column === column && effect.row === row && effect.kind === kind);
     if (!applied) return 1;
-    const progress = Math.max(0, Math.min(1, (performance.now() - applied.started) / 400));
+    const progress = Math.max(0, Math.min(1, (performance.now() - applied.started) / 300));
     return 0.28 + 0.72 * (1 - (1 - progress) ** 3);
   }
   private fence(points: number[][]) {
@@ -706,10 +706,10 @@ export class Scene {
         const motion = pestSpriteMotion("weed", seconds, tile.row * 6 + tile.column, 0, reduced);
         const entrance = this.pestEntrance(tile.column, tile.row, "spread-weed", reduced);
         ctx.save();
-        ctx.translate(p.x - 29, p.y + 21);
+        ctx.translate(p.x - 35, p.y - 3);
         ctx.rotate(motion.angle);
         ctx.scale(entrance, entrance);
-        this.thing("classic/effects/erva-nova.png", 0, 0, 51, true);
+        this.thing("classic/effects/erva-nova.png", 0, 0, 27, true);
         ctx.restore();
       }
       if (tile.state === "DEAD") {
@@ -739,15 +739,17 @@ export class Scene {
       if (tile.insects > 0) {
         const reduced = reducedMotion();
         const count = Math.min(3, tile.insects);
+        const worm = this.sprite("classic/effects/minhoca-nova.png", true);
         const entrance = this.pestEntrance(tile.column, tile.row, "spread-pest", reduced);
         // Separate tiny crawlers instead of a static, stretched bitmap of 2-3 worms.
         for (let index = 0; index < count; index++) {
           const motion = pestSpriteMotion("worm", seconds, tile.row * 6 + tile.column, index, reduced);
           ctx.save();
-          ctx.translate(p.x + (index - (count - 1) / 2) * 25 + motion.dx, p.y + 20 + motion.dy);
+          ctx.translate(p.x + (index - (count - 1) / 2) * 29 + motion.dx, p.y + 14 + (index % 2) * 5 + motion.dy);
           ctx.rotate(motion.angle);
           ctx.scale(entrance, entrance);
-          this.thing("classic/effects/minhoca-nova.png", 0, 0, count === 1 ? 59 : 45, true);
+          // Center the visible crawler; its lowest pixels are near the right tip.
+          if (worm) this.drawSprite(worm, 23 * (worm.footCenterX - 0.5), 0, 23);
           ctx.restore();
         }
       }
