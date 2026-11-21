@@ -64,7 +64,8 @@ export class Scene {
   private onEmptyTap: () => void;
   private animalHoverTimer?: number;
   private hoveredAnimal?: string;
-  private pointerType = "mouse";
+  /** The click following a touch may be reported as a MouseEvent on iOS Safari. */
+  private lastPointerDown?: { type: string; x: number; y: number; time: number };
   private onHover: (
     tile: Tile | null,
     point: { x: number; y: number } | null,
@@ -106,12 +107,28 @@ export class Scene {
     canvas.height = 900;
     canvas.addEventListener(
       "pointerdown",
-      (e) => { this.pointerType = e.pointerType; },
+      (e) => {
+        this.lastPointerDown = {
+          type: e.pointerType || "mouse",
+          x: e.clientX,
+          y: e.clientY,
+          time: performance.now(),
+        };
+      },
+      { signal: this.events.signal },
+    );
+    canvas.addEventListener(
+      "pointercancel",
+      () => { this.lastPointerDown = undefined; },
       { signal: this.events.signal },
     );
     canvas.addEventListener(
       "pointermove",
       (e) => {
+        // A drag must not be remembered as a tap when Safari synthesizes its click.
+        if (this.lastPointerDown?.type === "touch" && e.pointerType === "touch" &&
+            Math.hypot(e.clientX - this.lastPointerDown.x, e.clientY - this.lastPointerDown.y) > 24)
+          this.lastPointerDown = undefined;
         const p = this.point(e);
         const pick = p ? pickTile(p.x, p.y) : null;
         const animal = e.pointerType === "mouse" && !pick && p ? this.animalAt(p) : undefined;
@@ -151,6 +168,7 @@ export class Scene {
     canvas.addEventListener(
       "click",
       (e) => {
+        const pointerType = this.clickPointerType(e);
         if (!this.farm) return;
         const p = this.point(e);
         if (!p) {
@@ -162,15 +180,14 @@ export class Scene {
           const tile = this.farm.tiles.find(
             (t) => t.column === pick.column && t.row === pick.row,
           );
-          if (tile) this.onTile(tile, "pointerType" in e ? String(e.pointerType) : "mouse");
+          if (tile) this.onTile(tile, pointerType);
           else this.onEmptyTap();
           return;
         }
         this.onEmptyTap();
         const animal = this.animalAt(p);
         if (animal) {
-          const pointerType = "pointerType" in e && e.pointerType ? String(e.pointerType) : this.pointerType;
-          onAnimal(animal, e.detail === 0 ? "mouse" : pointerType);
+          onAnimal(animal, pointerType);
         }
       },
       { signal: this.events.signal },
@@ -178,6 +195,20 @@ export class Scene {
     // Cap redraws at 30 fps; requestAnimationFrame pauses naturally in hidden tabs.
     this.animation = window.requestAnimationFrame(this.animate);
   }
+  private clickPointerType(event: MouseEvent): string {
+    const down = this.lastPointerDown;
+    this.lastPointerDown = undefined; // A touch must not leak into a later mouse/keyboard click.
+    const reported = "pointerType" in event && typeof event.pointerType === "string" && event.pointerType
+      ? event.pointerType : "mouse";
+    const age = down ? performance.now() - down.time : Infinity;
+    // iOS may report a synthetic click as mouse (even detail === 0). Prefer the real
+    // pointerdown only for the same recent tap, not an unrelated or stale click.
+    if (down && down.type !== "mouse" && age >= 0 && age <= 1500 &&
+        Math.hypot(event.clientX - down.x, event.clientY - down.y) <= 24)
+      return down.type;
+    return reported;
+  }
+
   private clearAnimalHover() {
     if (this.animalHoverTimer !== undefined) window.clearTimeout(this.animalHoverTimer);
     this.animalHoverTimer = undefined;

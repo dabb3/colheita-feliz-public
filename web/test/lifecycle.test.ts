@@ -169,7 +169,7 @@ function app(preferences=new Map(),pushLogoutOptions){
  const eventsSource=readFileSync(new URL('../src/events.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'');runInNewContext(stripTypeScriptTypes(eventsSource),ctx);
  runInNewContext(stripTypeScriptTypes(readFileSync(new URL('../src/away-report.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace(/^export /mg,'')),ctx);
  let source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8').replace(/^import .*$/mg,'').replace('void start();','');
- source+='\nglobalThis.h={events,updateOwnFarm,refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,missions,achievements,decorations,friends,presentGift,closeGiftComposer,receive,dialog,health,renderHealth,positionHealth,animalTooltip,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),visit:value=>{visited=value;render();},calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
+ source+='\nglobalThis.h={events,updateOwnFarm,refresh,logout,syncMusic,toggleMusic,toggleEffects,playEffect,shop,animalPopup,handleAnimalClick,missions,achievements,decorations,friends,presentGift,closeGiftComposer,receive,dialog,health,renderHealth,positionHealth,animalTooltip,connect,setLoginStep,pickTool,tileAction,settings,avatarSettings,notify,notifyAction,loginCalendar,submitLoginReward,tickLoginCalendar,stopCalendar,dialogGeneration:()=>dialogGeneration,acceptInvitation,get:()=>({own,visited}),visit:value=>{visited=value;render();},calendarInfo:()=>calendarContext?{anchorServer:calendarContext.anchorServer,anchorClient:calendarContext.anchorClient,resetAt:calendarContext.resetAt,checkedResetAt:calendarContext.checkedResetAt,phase:calendarContext.phase,message:calendarContext.message}:undefined,setNow:value=>setMonotonic(value),set:(v)=>{own=v.own;visited=v.visited;api=v.api;catalog=v.catalog??{crops:[],fertilizers:[],animals:[],vip:{greenPrice:20}};}};';
  runInNewContext(stripTypeScriptTypes(source),ctx);return{h:{...ctx.h,runTimeouts(){for(const [id,callback]of [...timeouts]){timeouts.delete(id);callback();}}},elements,listeners,audioClips,observers,ctx,intervals};
 }
 function openGift(h,elements,owner='bob',name='Bob'){h.visit({...farm(owner),name});elements.get('gift-visit').onclick();}
@@ -717,6 +717,19 @@ test('open animal popup refreshes after a successful state update',()=>{
  h.receive({farm:{...farmState,revision:'2',animals:[{id:'vaca',stage:'ADULT',status:'PRODUCING',remainingSeconds:3600}]}});
  assert.doesNotMatch(text(elements.get('modal-content')),/Recolher produto/);assert.match(text(elements.get('modal-content')),/PRODUCING/);
 });
+test('iOS touch opens the animal details even with another tool selected and never sends a tend command',()=>{
+ const {h,elements}=app(),sent=[];
+ const own={...farm('alice'),own:true,level:3,feed:{producer:2,growth:1},animals:[{id:'vaca',stage:'ADULT',status:'PRODUCING',remainingSeconds:3600}]};
+ const catalog={crops:[],fertilizers:[],feedPrices:{producer:10,growth:10},animals:[{id:'vaca',name:'Vaca',kind:'PRODUCER',productName:'Leite'}],vip:{greenPrice:20}};
+ h.set({own,catalog,api:{pending:null,mutate:async(_path,command)=>{sent.push(command);return{result:{success:false,message:'Não há nada para recolher.'}};},prepareRequestId:async()=>{}}});
+ h.pickTool('WATER');
+ h.handleAnimalClick('vaca','touch');
+ assert.equal(elements.get('modal-title').textContent,'Vaca');
+ assert.equal(elements.get('modal').open,true);
+ assert.match(text(elements.get('modal-content')),/PRODUCING/);
+ assert.equal(sent.length,0,'touch must not issue TEND_ANIMAL even if another tool was selected');
+});
+
 test('protector popup shows remaining feeding progress at 6h, 3h and hunger',()=>{
  const {h,elements}=app(),catalog={crops:[],fertilizers:[],animals:[{id:'cachorro-robo',name:'Cachorro',kind:'PROTECTOR'}],vip:{greenPrice:20}};
  for(const [status,remaining,expected]of [['PRODUCING',21600,100],['PRODUCING',10800,50],['HUNGRY',0,0]]){

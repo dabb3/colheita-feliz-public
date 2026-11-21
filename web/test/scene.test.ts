@@ -16,7 +16,7 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
   Image:class{width=100;height=200;onload;onerror;src;constructor(){pending.push(this);images.push(this);}}};
  const source=readFileSync(new URL('../src/scene.ts',import.meta.url),'utf8').replace(/^import\b[\s\S]*?;\s*/gm,'').replace('export class Scene','class Scene');
  runInNewContext(stripTypeScriptTypes(source)+'\nglobalThis.Scene=Scene;',environment);
- const scene=new environment.Scene(canvas,{crops:[{id:'nabo',spriteStem:'nabo'}],animals:[{id:'vaca',kind:'PRODUCER'},{id:'abelha',kind:'PROTECTOR'},{id:'cachorro-robo',kind:'PROTECTOR'}]},(tile,pointer)=>tilesSelected.push({tile,pointer}),id=>selected.push(id),tile=>hovered.push(tile),value=>periods.push(value),()=>{},()=>{},()=>canInspect);
+ const scene=new environment.Scene(canvas,{crops:[{id:'nabo',spriteStem:'nabo'}],animals:[{id:'vaca',kind:'PRODUCER'},{id:'abelha',kind:'PROTECTOR'},{id:'cachorro-robo',kind:'PROTECTOR'}]},(tile,pointer)=>tilesSelected.push({tile,pointer}),(id,pointerType)=>selected.push({id,pointerType}),tile=>hovered.push(tile),value=>periods.push(value),()=>{},()=>{},()=>canInspect);
  const tile={column:0,row:0,unlocked:true,state:'READY',cropId:'nabo',stage:3,weeds:true,insects:2};
  const farm={owner:'alice',own:true,nextPlot:{column:1,row:0},tiles:[tile,{column:0,row:1,unlocked:true,state:'GRASS'}],animals:[{id:'vaca',stage:'ADULT',status:'READY'},{id:'abelha',stage:'ADULT',status:'PRODUCING'},{id:'cachorro-robo',stage:'ADULT',status:'PRODUCING'}]};
  scene.update(farm);
@@ -34,7 +34,33 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  assert.ok(images.some(image=>image.src.endsWith('colmeia-abelha-atlas.png')));
  assert.ok(drawn.some(d=>d.args.at(-2)===156&&d.args.at(-1)===78));
  events.get('click')({clientX:1515,clientY:400});
- assert.deepEqual(selected,['vaca']);
+ assert.deepEqual(selected,[{id:'vaca',pointerType:'mouse'}]);
+ // iOS Safari can emit mouse/zero-detail click after a real touch pointerdown.
+ events.get('pointerdown')({clientX:1515,clientY:400,pointerType:'touch'});
+ events.get('click')({clientX:1515,clientY:400,pointerType:'mouse',detail:0});
+ assert.deepEqual(selected.at(-1),{id:'vaca',pointerType:'touch'},'iOS tap keeps its touch origin');
+ events.get('click')({clientX:1515,clientY:400,pointerType:'mouse',detail:0});
+ assert.equal(selected.at(-1).pointerType,'mouse','the next click cannot reuse a stale touch');
+ events.get('pointerdown')({clientX:1515,clientY:400,pointerType:'touch'});
+ events.get('pointercancel')({});
+ events.get('click')({clientX:1515,clientY:400,pointerType:'mouse'});
+ assert.equal(selected.at(-1).pointerType,'mouse','cancelled touches cannot affect a later click');
+ events.get('pointerdown')({clientX:700,clientY:400,pointerType:'touch'});
+ events.get('click')({clientX:1515,clientY:400,pointerType:'mouse'});
+ assert.equal(selected.at(-1).pointerType,'mouse','a touch elsewhere cannot hijack a mouse click');
+ now=2000;
+ events.get('pointerdown')({clientX:1515,clientY:400,pointerType:'touch'});
+ now=4000;
+ events.get('click')({clientX:1515,clientY:400,pointerType:'mouse'});
+ assert.equal(selected.at(-1).pointerType,'mouse','a delayed unrelated click cannot inherit a touch');
+ events.get('click')({clientX:1515,clientY:400,pointerType:'touch',detail:0});
+ assert.equal(selected.at(-1).pointerType,'touch','native Android touch remains a touch even with detail zero');
+ events.get('pointerdown')({clientX:1515,clientY:400,pointerType:'mouse'});
+ events.get('click')({clientX:1515,clientY:400,pointerType:'mouse',detail:1});
+ assert.equal(selected.at(-1).pointerType,'mouse','desktop mouse remains unchanged');
+ events.get('pointerdown')({clientX:585,clientY:400,pointerType:'touch'});
+ events.get('click')({clientX:585,clientY:400,pointerType:'mouse',detail:0});
+ assert.equal(tilesSelected.at(-1).pointer,'touch','iOS synthesised click also preserves tile tap origin');
  events.get('pointermove')({clientX:585,clientY:400});assert.equal(hovered.at(-1).state,'READY');
  canInspect=false;
  for(const pointerType of ['mouse','touch']){
