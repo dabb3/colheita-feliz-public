@@ -20,7 +20,6 @@ import {
   animalFlip,
   animalLayer,
   animalInsidePen,
-  animationFrame,
   cropHeight,
   tileEffect,
   pestSpriteMotion,
