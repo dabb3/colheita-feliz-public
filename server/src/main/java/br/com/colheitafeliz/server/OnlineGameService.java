@@ -33,8 +33,8 @@ final class OnlineGameService implements AutoCloseable {
     private static final BigDecimal DAILY_ALLOWANCE = BigDecimal.valueOf(100);
     private static final ZoneId LOGIN_REWARD_ZONE = ZoneId.of("America/Sao_Paulo");
     private static final Set<String> PEST_ACTIONS = Set.of("SPREAD_INSECTS", "SPREAD_WEEDS");
-    // Decisão de 2026-11-13: furto e cada tipo de praga liberam uma nova tentativa a cada 6 horas.
-    static final Duration THEFT_COOLDOWN = Duration.ofHours(6), PEST_COOLDOWN = Duration.ofHours(6), GIFT_COOLDOWN = Duration.ofHours(24);
+    // Decisão de 2026-11-21: furto e cada tipo de praga liberam uma nova tentativa a cada 3 horas.
+    static final Duration THEFT_COOLDOWN = Duration.ofHours(3), PEST_COOLDOWN = Duration.ofHours(3), GIFT_COOLDOWN = Duration.ofHours(24);
     private static final Set<String> VISIT_ACTIONS = Set.of("STEAL", "LOVE", "SPREAD_INSECTS", "SPREAD_WEEDS", "CLEAN_WEEDS", "CLEAN_INSECTS", "FEED_ANIMAL");
     private static final Set<String> CLEAN_ACTIONS = Set.of("CLEAN_WEEDS", "CLEAN_INSECTS");
     // Orçamento de XP cooperativo por visitante e dia UTC, compartilhado pelas ações de ajuda a amigos.
@@ -280,7 +280,7 @@ final class OnlineGameService implements AutoCloseable {
                     Instant lastTheft = tx.lastTheft(actor);
                     Instant availableAt = lastTheft == null ? now : lastTheft.plus(THEFT_COOLDOWN);
                     if (now.isBefore(availableAt)) {
-                        theft = br.com.colheitafeliz.game.TheftAttempt.blocked("Você já usou sua tentativa de furto nas últimas 6 horas. Nova tentativa em "
+                        theft = br.com.colheitafeliz.game.TheftAttempt.blocked("Você já usou sua tentativa de furto nas últimas 3 horas. Nova tentativa em "
                                 + remaining(now, availableAt) + ".");
                     } else {
                         var target = destination.game().farm().tile(command.column(), command.row()).crop();
@@ -295,7 +295,7 @@ final class OnlineGameService implements AutoCloseable {
                     Instant last = tx.lastPest(actor, command.action());
                     Instant availableAt = last == null ? now : last.plus(PEST_COOLDOWN);
                     if (now.isBefore(availableAt)) {
-                        result = ActionResult.fail("Você já lançou esse tipo de praga nas últimas 6 horas. Disponível em "
+                        result = ActionResult.fail("Você já lançou esse tipo de praga nas últimas 3 horas. Disponível em "
                                 + remaining(now, availableAt) + ".");
                     } else {
                         var pest = command.action().equals("SPREAD_INSECTS")
@@ -517,7 +517,15 @@ final class OnlineGameService implements AutoCloseable {
         long revision = force || !compared.equals(loaded.before()) ? Math.incrementExact(loaded.revision()) : loaded.revision();
         tx.save(loaded.owner(), snapshot, revision, loaded.game().now());
         var view = OnlineViews.farm(loaded.owner(), loaded.name(), loaded.game(), revision, own);
+        view.addProperty("serverTime", clock.instant().toString());
         if (own) {
+            Instant theft = tx.lastTheft(loaded.owner());
+            Instant insects = tx.lastPest(loaded.owner(), "SPREAD_INSECTS");
+            Instant weeds = tx.lastPest(loaded.owner(), "SPREAD_WEEDS");
+            view.add("socialCooldowns", object(
+                    "stealNextAt", theft == null ? null : theft.plus(THEFT_COOLDOWN).toString(),
+                    "insectsNextAt", insects == null ? null : insects.plus(PEST_COOLDOWN).toString(),
+                    "weedsNextAt", weeds == null ? null : weeds.plus(PEST_COOLDOWN).toString()));
             LocalDate today = LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC);
             boolean available = loaded.allowanceDay() == null || today.isAfter(loaded.allowanceDay());
             LocalDate resetDay = (available ? today : loaded.allowanceDay()).plusDays(1);

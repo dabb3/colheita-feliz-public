@@ -52,7 +52,7 @@ async function farmApi(page: Page) {
 }
 
 async function login(page: Page) {
-  await page.goto('/');
+  await page.goto('/', {waitUntil: 'domcontentloaded'});
   await page.getByRole('button', {name: 'Testar como Alice'}).click();
   await expect(page.locator('#game')).toBeVisible();
   await expect(page.locator('#wallet')).toContainText('Alice');
@@ -135,5 +135,21 @@ test('period and pack changes retain the previous background until the fallback 
     expect(await pixel()).toEqual(previous);
     await page.screenshot({path: test.info().outputPath('background-loading.png')});
     release(); await expect.poll(pixel).not.toEqual(previous);
+  } finally { release(); }
+});
+
+
+test('first entry uses a quiet placeholder until any background is ready', async ({page}) => {
+  await page.clock.install({time: new Date('2026-11-21T15:00:00Z')});
+  await farmApi(page);
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/assets/classic/background/*', async route => { await gate; await route.continue(); });
+  try {
+    await login(page);
+    const pixel = () => page.locator('#farm').evaluate((canvas: HTMLCanvasElement) =>
+      Array.from(canvas.getContext('2d')!.getImageData(10, 10, 1, 1).data));
+    expect(await pixel()).toEqual([231, 227, 216, 255]);
+    release(); await expect.poll(pixel).not.toEqual([231, 227, 216, 255]);
   } finally { release(); }
 });

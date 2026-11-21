@@ -3,6 +3,16 @@ import assert from 'node:assert/strict';
 import {ApiClient, ApiError, acceptFarm} from '../src/api.ts';
 
 function memory() { const entries = new Map(); return { getItem: k => entries.get(k) ?? null, setItem: (k,v) => entries.set(k,v), removeItem: k => entries.delete(k) }; }
+
+test('an unconfirmed social attempt keeps the same receipt until its snapshot and result arrive',async()=>{
+ let confirmed=false;const bodies=[];
+ const api=new ApiClient('http://localhost','alice',async()=>'token',memory(),async(url,init)=>{
+  if(url.endsWith('/v1/request-id'))return new Response('{"requestId":"social-receipt"}');
+  bodies.push(init.body);return new Response(JSON.stringify(confirmed?{result:{success:false},farm:{owner:'alice',revision:'2'}}:{}));
+ });
+ await assert.rejects(api.mutate('/v1/farms/bob/visit-actions',{action:'STEAL'}));assert.ok(api.pending);
+ confirmed=true;await api.retry();assert.equal(api.pending,null);assert.equal(bodies[0],bodies[1]);
+});
 test('a diagnostic logger failure cannot turn a confirmed action into an unknown result',async()=>{
  const previous=console.debug;console.debug=()=>{throw new Error('logger unavailable');};
  try{

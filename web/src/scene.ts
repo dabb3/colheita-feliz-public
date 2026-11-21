@@ -619,7 +619,8 @@ export class Scene {
     const resolution = this.canvas.width / 1600;
     if (resolution !== 1) ctx.setTransform(resolution, 0, 0, resolution, 0, 0);
     ctx.clearRect(0, 0, 1600, 900);
-    ctx.fillStyle = period === "night" ? "#15464f" : "#84ba30";
+    // A quiet placeholder also covers first entry, before any background is available.
+    ctx.fillStyle = period === "night" ? "#27343c" : "#e7e3d8";
     ctx.fillRect(0, 0, 1600, 900);
     // Keep the last rendered art when both the new period and its classic fallback are loading.
     const background =
