@@ -64,6 +64,10 @@ test('an unrelated pending request is labelled Aguarde rather than pretending al
   assert.match(label,/Aguarde/);assert.doesNotMatch(label,/Pendente/);
   h.pickTool(action);assert.equal(h.get().tool,'CURSOR');
  }
+ // Legacy or partially restored pending metadata must never crash the toolbar.
+ api.pending={body:'{"action":"STEAL"}'};
+ h.receive({});
+ assert.match(socialButton(elements,'STEAL').getAttribute('aria-label'),/Aguarde/);
 });
 
 test('protected reply starts timer immediately, deselects the action and rejects delayed snapshots',async()=>{
