@@ -31,6 +31,41 @@ test('unknown API and invalid clock block selection and every social dispatch bu
  assert.equal(posts,0);h.pickTool('CLEAN_WEEDS');assert.equal(h.get().tool,'CLEAN_WEEDS');
  const own={...socialFarm(),serverTime:'invalid'};h.receive({farm:own});assert.equal(socialButton(elements,'STEAL').getAttribute('aria-disabled'),'true');
 });
+test('an ineligible pest attempt keeps its selected tool while sending and after a confirmed refusal',async()=>{
+ const {h,elements}=app(),own=socialFarm(),request=deferred();let posts=0;
+ const api={pending:null,prepareRequestId:async()=>{},mutate(){
+  posts++;api.pending={path:'/v1/farms/bob/visit-actions',body:'{"action":"SPREAD_WEEDS"}'};
+  return request.promise;
+ }};
+ h.set({own,api});h.receive({farm:own});h.visit(farm('bob'));h.pickTool('SPREAD_WEEDS');
+ const sent=h.tileAction({column:0,row:0,state:'GROWING',watered:false});
+ assert.equal(h.get().tool,'SPREAD_WEEDS','do not drop the active tool while sending');
+ assert.match(socialButton(elements,'SPREAD_WEEDS').getAttribute('aria-label'),/Pendente/);
+ for(const other of ['STEAL','SPREAD_INSECTS']){
+  assert.match(socialButton(elements,other).getAttribute('aria-label'),/Aguarde/);
+  assert.doesNotMatch(socialButton(elements,other).getAttribute('aria-label'),/Pendente/);
+ }
+ api.pending=null;
+ request.resolve({farm:{...own,revision:'2',serverTime:'2026-11-21T12:00:01Z'},result:{success:false,message:'Praga indisponível: escolha uma planta em crescimento e já regada.'}});
+ await sent;
+ assert.equal(posts,1);
+ assert.equal(h.get().tool,'SPREAD_WEEDS','an ineligible plot must not force the player to reselect');
+ assert.equal(socialButton(elements,'SPREAD_WEEDS').getAttribute('aria-disabled'),'false');
+ assert.equal(socialButton(elements,'SPREAD_WEEDS').getAttribute('aria-pressed'),'true');
+ assert.match(socialButton(elements,'SPREAD_WEEDS').getAttribute('aria-label'),/Pronto/);
+});
+
+test('an unrelated pending request is labelled Aguarde rather than pretending all social attempts are pending',()=>{
+ const {h,elements}=app(),own=socialFarm();
+ const api={pending:{path:'/v1/me/actions',body:'{"action":"BUY_SEED"}'}};
+ h.set({own,api});h.receive({farm:own});h.visit(farm('bob'));
+ for(const action of ['STEAL','SPREAD_INSECTS','SPREAD_WEEDS']){
+  const label=socialButton(elements,action).getAttribute('aria-label');
+  assert.match(label,/Aguarde/);assert.doesNotMatch(label,/Pendente/);
+  h.pickTool(action);assert.equal(h.get().tool,'CURSOR');
+ }
+});
+
 test('protected reply starts timer immediately, deselects the action and rejects delayed snapshots',async()=>{
  const {h,elements}=app(),own=socialFarm();let posts=0;
  const after={...own,revision:'2',serverTime:'2026-11-21T12:00:01Z',socialCooldowns:{...own.socialCooldowns,stealNextAt:'2026-11-21T15:00:01Z'}};
@@ -45,8 +80,14 @@ test('uncertain social request stays consultable and blocked until the same rece
  const {h,elements}=app(),own=socialFarm(),post=deferred();let posts=0;
  const api={pending:null,prepareRequestId:async()=>{},mutate(){posts++;api.pending={path:'/v1/farms/bob/visit-actions',body:'{"action":"STEAL"}'};return post.promise;}};
  h.set({own,api});h.receive({farm:own});h.visit(farm('bob'));h.pickTool('STEAL');const sent=h.tileAction({state:'READY',column:0,row:0});
- assert.match(socialButton(elements,'STEAL').getAttribute('aria-label'),/Pendente/);h.pickTool('STEAL');assert.equal(h.get().tool,'CURSOR');
- post.reject(new Error('offline'));await sent;assert.match(socialButton(elements,'STEAL').getAttribute('aria-label'),/Pendente/);assert.equal(posts,1);
+ assert.match(socialButton(elements,'STEAL').getAttribute('aria-label'),/Pendente/);
+ assert.match(socialButton(elements,'SPREAD_WEEDS').getAttribute('aria-label'),/Aguarde/);
+ assert.equal(h.get().tool,'STEAL','keep selection while a receipt is still being confirmed');
+ h.pickTool('STEAL');assert.equal(h.get().tool,'STEAL');
+ post.reject(new Error('offline'));await sent;
+ assert.match(socialButton(elements,'STEAL').getAttribute('aria-label'),/Pendente/);
+ assert.equal(h.get().tool,'CURSOR','once the result becomes uncertain, switch to inspection for safety');
+ assert.equal(posts,1);
 });
 test('hidden tab stops its timer and resynchronizes before offering attempts; logout discards the clock',async()=>{
  const {h,elements,ctx,listeners,intervals}=app(),own=socialFarm();let reads=0;
