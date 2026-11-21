@@ -26,6 +26,19 @@ npm.cmd run build:local --prefix web
 
 O build local configura a API em `http://127.0.0.1:8080`. Para iniciar uma API local com contas de desenvolvimento e PostgreSQL descartável, consulte [ONLINE.md](ONLINE.md).
 
+Os testes de navegador usam o cliente compilado, imagens reais e respostas de API sintéticas,
+sem contas ou serviços de produção. Após o build local acima, execute:
+
+```powershell
+cd web
+npx.cmd playwright install chromium
+npm.cmd run test:browser
+```
+
+No Linux, use `npx` e `npm`. O servidor de teste ocupa `127.0.0.1:5173` e precisa
+dessa porta livre. O CI instala o Chromium com suas dependências de sistema e
+salva traces quando um cenário falha.
+
 O cliente inclui um modo de revisão visual com dados sintéticos. Os menus de Loja, Depósito, Tarefas, Conquistas, Decorações, Eventos (com a aba Calendário Diário), Amigos e Ajustes são acessíveis por botões; regras e contrato online do calendário estão em [ONLINE.md](ONLINE.md). A seleção de avatar é uma preferência local por conta e dispositivo, não uma atualização do perfil no banco.
 
 Para revisar as pragas, use `npm.cmd run review --prefix web` e abra

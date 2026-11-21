@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {ApiClient, acceptFarm} from '../src/api.ts';
+import {ApiClient, ApiError, acceptFarm} from '../src/api.ts';
 
 function memory() { const entries = new Map(); return { getItem: k => entries.get(k) ?? null, setItem: (k,v) => entries.set(k,v), removeItem: k => entries.delete(k) }; }
 test('a diagnostic logger failure cannot turn a confirmed action into an unknown result',async()=>{
@@ -243,4 +243,24 @@ test('consuming an older issuance preserves a newer adopted lease for the next a
  await api.get('/v1/me/farm');release();await action;
  await api.mutate('/v1/me/actions',{action:'WATER'});
  assert.deepEqual(bodies.map(body=>body.requestId),[id2,id1]);assert.equal(issued,1);
+});
+
+
+test('HTTP errors retain status without exposing HTML or requiring a JSON body',async()=>{
+ for(const [status,body] of [[502,'<html>private proxy details</html>'],[503,''],[429,'busy'],[409,'null']]){
+  const api=new ApiClient('http://localhost','alice',async()=>'token',memory(),async()=>new Response(body,{status}));
+  await assert.rejects(api.get('/v1/me/farm'),error=>error instanceof ApiError&&error.status===status&&!error.message.includes('private proxy details'));
+ }
+});
+test('non-JSON mutation errors preserve uncertain receipts and clear definitive rejections',async()=>{
+ for(const status of [503,409]){
+  const storage=memory();
+  const api=new ApiClient('http://localhost','alice',async()=>'token',storage,async url=>url.endsWith('/v1/request-id')?new Response('{"requestId":"receipt"}'):new Response('<html>proxy</html>',{status}));
+  await assert.rejects(api.mutate('/v1/me/actions',{action:'PLOW'}),error=>error instanceof ApiError&&error.status===status);
+  assert.equal(!!api.pending,status===503);
+ }
+});
+test('a malformed success cannot clear an uncertain action receipt',async()=>{
+ const api=new ApiClient('http://localhost','alice',async()=>'token',memory(),async url=>url.endsWith('/v1/request-id')?new Response('{"requestId":"receipt"}'):new Response('<html>not a confirmation</html>'));
+ await assert.rejects(api.mutate('/v1/me/actions',{action:'PLOW'}));assert.ok(api.pending);
 });

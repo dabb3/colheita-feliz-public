@@ -48,6 +48,7 @@ export class Scene {
   private ctx: CanvasRenderingContext2D;
   private sprites = new Map<string, Sprite | null>();
   private failedSprites = new Set<string>();
+  private lastBackground?: Sprite;
   private farm?: Farm;
   private tileEffects: {
     column: number;
@@ -620,10 +621,11 @@ export class Scene {
     ctx.clearRect(0, 0, 1600, 900);
     ctx.fillStyle = period === "night" ? "#15464f" : "#84ba30";
     ctx.fillRect(0, 0, 1600, 900);
-    // The classic pack covers a paid pack while it loads or if its file is missing.
+    // Keep the last rendered art when both the new period and its classic fallback are loading.
     const background =
       this.sprite(backgroundArtPath(period, this.farm?.activeBackgroundId)) ??
-      this.sprite(backgroundArtPath(period));
+      this.sprite(backgroundArtPath(period)) ?? this.lastBackground;
+    if (background) this.lastBackground = background;
     // The 1478 × 1064 art is stretched to the 1600 × 900 world so the whole picture shows, as in the file.
     if (background) ctx.drawImage(background.image, 0, 0, 1600, 900);
     this.thing("classic/buildings/dog-house.png", 410, 900 - 556, 214);

@@ -51,6 +51,20 @@ jobs:
           npm test
           npm run build:local
 
+      - name: Verify browser flows against the local client and synthetic API
+        working-directory: web
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:browser
+
+      - name: Save browser failure traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: web-browser-results
+          path: web/test-results/
+          retention-days: 7
+
       - name: Verify Fly deploy guards without network or credentials
         run: bash .github/scripts/test-deploy-fly.sh
 
