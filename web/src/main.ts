@@ -18,7 +18,7 @@ import {GAME_AVATARS,googleAvatar,avatarSource,avatarImport,type AvatarChoice} f
 import {musicArtPath,seedArtPath,ownedSeeds,seedSelection,periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalSoundPath,animalStatusText,animalActionLabel,animalClickCommand,friendFeedOptions,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
 
 let eventsTimer:number|undefined,eventsBoundary='',eventsRoot:HTMLElement|undefined;
-let socialTimer:number|undefined,socialSyncedOwner='';
+let socialTimer:number|undefined,socialSyncedOwner='',socialInFlightAction:Parameters<typeof socialCooldown>[0]|undefined;
 const socialButtons=new Map<string,{button:HTMLButtonElement;badge:HTMLElement;label:string}>();
 const config=window.COLHEITA_CONFIG;
 const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
@@ -275,7 +275,7 @@ function avatarSettings(){
  }
  if(!googlePhoto)paragraph('A foto do Google não está disponível nesta sessão.');
 }
-async function logout(){const suppression=suspendPush(api).catch(()=>{});shopQuantities.clear();stopSocialClock();socialSyncedOwner='';stopCalendar();ownServerClock=undefined;giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner="";sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;setLoginStep('login');syncPending();stopEvents();await suppression;if(supabase)await supabase.auth.signOut();}
+async function logout(){const suppression=suspendPush(api).catch(()=>{});shopQuantities.clear();stopSocialClock();socialSyncedOwner='';socialInFlightAction=undefined;stopCalendar();ownServerClock=undefined;giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner="";sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;setLoginStep('login');syncPending();stopEvents();await suppression;if(supabase)await supabase.auth.signOut();}
 function showConnection(message?:string){element('connection').hidden=!message;element('connection').textContent=message??'';}
 function syncPending(){element('pending').hidden=!api?.pending;element<HTMLButtonElement>('retry').disabled=!!api?.busy;paintSocialTools();}
 async function retryPending(context?:NonNullable<typeof giftContext>){
@@ -354,8 +354,22 @@ function renderTools(){
 // Friends-only fertilizers keep their own selection so a visit never changes the home Adubar tool.
 function stopSocialClock(){window.clearInterval(socialTimer);socialTimer=undefined;}
 function invalidateSocialClock(){socialSyncedOwner='';stopSocialClock();paintSocialTools();}
+/** Only the social command actually being sent or recovered is labelled Pendente. */
+function pendingSocialAction():Parameters<typeof socialCooldown>[0]|undefined{
+ const pending=api?.pending;
+ if(!pending?.path.endsWith('/visit-actions'))return undefined;
+ try{
+  const action:unknown=JSON.parse(pending.body).action;
+  return typeof action==='string'&&isSocialAction(action)?action:undefined;
+ }catch{return undefined;}
+}
 function currentSocialState(id:Parameters<typeof socialCooldown>[0]){
- return socialCooldown(id,own?.socialCooldowns,socialSyncedOwner===own?.owner&&navigator.onLine?eventNow():Number.NaN,busy||!!api?.pending);
+ const pending=pendingSocialAction(),ownAttempt=pending===id||socialInFlightAction===id;
+ const state=socialCooldown(id,own?.socialCooldowns,socialSyncedOwner===own?.owner&&navigator.onLine?eventNow():Number.NaN,ownAttempt);
+ // Other requests prevent new commands but must not claim that all three attempts were spent.
+ return !ownAttempt&&(busy||!!api?.pending)
+  ? {...state,available:false,label:'Aguarde',message:'Aguarde a conclusão da ação em andamento.',waiting:false}
+  : state;
 }
 function blockSocialAction(id:string){
  if(!visited||!isSocialAction(id))return false;
@@ -372,7 +386,7 @@ function paintSocialTools(){
   button.setAttribute('aria-label',`${label}. ${state.label}. ${state.message}`);
   button.classList.toggle('social-unavailable',!state.available);
   button.title=`${label}. ${state.message}`;
-  if(!state.available&&tool===id){tool='CURSOR';trayOpen=false;closeHealth();element('farm').style.cursor='url("/assets/classic/icons/cursor-action.png") 1 1, auto';}
+  if(!state.available&&tool===id&&!busy){tool='CURSOR';trayOpen=false;closeHealth();element('farm').style.cursor='url("/assets/classic/icons/cursor-action.png") 1 1, auto';}
   waiting ||= state.waiting;
  }
  if(visited){for(const button of element('tools').children)button.setAttribute('aria-pressed',String(button.getAttribute('data-tool')===tool));if(tool==='CURSOR')element('tool-name').textContent='Inspecionar plantas';}
@@ -526,9 +540,11 @@ async function runAction(fields:CommandFields,path='/v1/me/actions'):Promise<Rep
  if(!api||!own||busy)return;
  if(path.endsWith('/visit-actions')&&blockSocialAction(String(fields.action)))return;
  if(!navigator.onLine){notify('Sem conexão. Reconecte antes de agir.');return;}
+ const requested=String(fields.action);
+ socialInFlightAction=path.endsWith('/visit-actions')&&isSocialAction(requested)?requested:undefined;
  busy=true;paintSocialTools();let stale=false;const client=api,generation=sessionGeneration,previousFarm=own,animalReady=fields.action==='TEND_ANIMAL'&&own.animals.some(animal=>animal.id===fields.itemId&&animal.status==='READY');
  try{const reply=await client.mutate(path,{...fields,expectedRevision:path==='/v1/me/actions'?own.revision:visited!.revision});if(generation===sessionGeneration){if(reply.result?.success&&reply.farm){await fadeSoldDepositRows(fields,reply.farm);if(generation!==sessionGeneration)return;}const bitten=receive(reply,false,String(fields.action));if(reply.result?.success&&own){const reward=actionRewardModel(previousFarm,own),selling=String(fields.action).startsWith('SELL_');if(selling){notifySale(reward.coins,reward.greens);if(reward.coins>0)animateGoldBalance(Number(previousFarm.coins??0),Number(own.coins??0));}else notifyAction(reply.result.message,String(fields.action),typeof fields.itemId==='string'?fields.itemId:undefined,reward);const cue=reward.leveledUp?'levelup':soundForAction(String(fields.action),animalReady);if(cue)playEffect(cue);}else if(reply.result){playEffect('acao-bloqueada');if(!bitten)notify(reply.result.message);}}return reply;}
- catch(error){stale=error instanceof ApiError&&[409,410].includes(error.status);if(generation===sessionGeneration){if(stale)invalidateSocialClock();handleError(error);}}finally{if(generation===sessionGeneration){busy=false;syncPending();if(stale)void refresh();else void client.prepareRequestId().catch(()=>{});}}
+ catch(error){stale=error instanceof ApiError&&[409,410].includes(error.status);if(generation===sessionGeneration){if(stale)invalidateSocialClock();handleError(error);}}finally{if(generation===sessionGeneration){socialInFlightAction=undefined;busy=false;syncPending();if(stale)void refresh();else void client.prepareRequestId().catch(()=>{});}}
 }
 let animalSound:HTMLAudioElement|undefined;
 function playAnimalSound(id:string){
@@ -631,7 +647,7 @@ function updateHealthDisplay(tile:Tile,remaining=healthRemaining(tile),ready=til
 }
 function formatRemaining(seconds:number){const total=Math.max(0,Math.ceil(seconds));if(total<60)return `${total}s`;const minutes=Math.ceil(total/60),hours=Math.floor(minutes/60),days=Math.floor(hours/24);if(days)return `${days}d ${hours%24}h`;return hours?`${hours}h ${minutes%60}min`:`${minutes}min`;}
 function addChip(parent:HTMLElement,label:string,iconPath:string,kind:'problem'|'benefit'){const chip=document.createElement('span');chip.className=`crop-status-chip is-${kind}`;const icon=document.createElement('img');icon.src=iconPath;icon.alt='';chip.append(icon,document.createTextNode(label));parent.append(chip);}
-function healthAction(tile:Tile,ready:boolean,dead:boolean){if(visited){if(isSocialAction(tool)&&!currentSocialState(tool).available)return undefined;if(tool==='CURSOR')return undefined;if(tool==='CLEAN_WEEDS'||tool==='CLEAN_INSECTS'){if(dead||!visitCleanAvailable(tool,tile))return undefined;return tool==='CLEAN_WEEDS'?{label:'Tirar ervas do amigo',icon:'/assets/classic/icons/hud/herbicida-ui.png'}:{label:'Matar insetos do amigo',icon:'/assets/classic/icons/hud/pesticida-ui.png'};}if(tool==='SPREAD_INSECTS'||tool==='SPREAD_WEEDS'){if(ready||dead||!tile.watered||(tool==='SPREAD_INSECTS'?tile.insects>0:tile.weeds))return undefined;return tool==='SPREAD_INSECTS'?{label:'Lançar inseto nesta planta · 1/3h',icon:'/assets/classic/effects/verme_1.png'}:{label:'Lançar erva nesta planta · 1/3h',icon:'/assets/classic/effects/erva_daninha_1.png'};}return ready?{label:'Furtar colheita',icon:'/assets/classic/icons/hud/mao-restaurada.png'}:undefined;}if(dead)return{label:'Remover com a pá',icon:'/assets/classic/icons/hud/pa-ui.png',key:'2'};if(tile.weeds)return{label:'Tirar ervas',icon:'/assets/classic/icons/hud/herbicida-ui.png',key:'5'};if(tile.insects>0)return{label:'Matar insetos',icon:'/assets/classic/icons/hud/pesticida-ui.png',key:'6'};if(tile.dry&&tile.state==='GROWING')return{label:'Regar',icon:'/assets/classic/icons/hud/regador-ui.png',key:'4'};if(ready)return{label:'Colher com a luvinha',icon:'/assets/classic/icons/hud/mao-restaurada.png',key:'7'};return undefined;}
+function healthAction(tile:Tile,ready:boolean,dead:boolean){if(visited){if(isSocialAction(tool)&&!currentSocialState(tool).available)return undefined;if(tool==='CURSOR')return undefined;if(tool==='CLEAN_WEEDS'||tool==='CLEAN_INSECTS'){if(dead||!visitCleanAvailable(tool,tile))return undefined;return tool==='CLEAN_WEEDS'?{label:'Tirar ervas do amigo',icon:'/assets/classic/icons/hud/herbicida-ui.png'}:{label:'Matar insetos do amigo',icon:'/assets/classic/icons/hud/pesticida-ui.png'};}if(tool==='SPREAD_INSECTS'||tool==='SPREAD_WEEDS'){if(ready||dead||!tile.watered||(tool==='SPREAD_INSECTS'?tile.insects>0:tile.weeds))return undefined;return tool==='SPREAD_INSECTS'?{label:'Lançar inseto nesta planta · 1/3h',icon:'/assets/classic/effects/minhoca-nova.png'}:{label:'Lançar erva nesta planta · 1/3h',icon:'/assets/classic/effects/erva-nova.png'};}return ready?{label:'Furtar colheita',icon:'/assets/classic/icons/hud/mao-restaurada.png'}:undefined;}if(dead)return{label:'Remover com a pá',icon:'/assets/classic/icons/hud/pa-ui.png',key:'2'};if(tile.weeds)return{label:'Tirar ervas',icon:'/assets/classic/icons/hud/herbicida-ui.png',key:'5'};if(tile.insects>0)return{label:'Matar insetos',icon:'/assets/classic/icons/hud/pesticida-ui.png',key:'6'};if(tile.dry&&tile.state==='GROWING')return{label:'Regar',icon:'/assets/classic/icons/hud/regador-ui.png',key:'4'};if(ready)return{label:'Colher com a luvinha',icon:'/assets/classic/icons/hud/mao-restaurada.png',key:'7'};return undefined;}
 function positionHealth(panel:HTMLElement,game:HTMLElement,point:{x:number;y:number}){
  healthPinned=healthTapPinned;
  const animal=panel.className.includes('animal-tooltip'),fixed=!animal&&window.matchMedia('(max-width:1100px)').matches;
@@ -1129,7 +1145,7 @@ function handleAnimalClick(id:string,pointerType:string){
  if(command)void action(command);else animalPopup(id);
 }
 async function connect(user:string,token:()=>Promise<string>,photo?:unknown,displayName=''){
- shownBites.clear();shopQuantities.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner='';sessionGeneration++;navigationGeneration++;busy=false;stopSocialClock();socialSyncedOwner='';music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;ownServerClock=undefined;stopCalendar();closeScene();const generation=sessionGeneration;
+ shownBites.clear();shopQuantities.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner='';sessionGeneration++;navigationGeneration++;busy=false;stopSocialClock();socialSyncedOwner='';socialInFlightAction=undefined;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;ownServerClock=undefined;stopCalendar();closeScene();const generation=sessionGeneration;
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
  avatarUser=`${config.api}:${user}`;void connectPush(avatarUser,api).catch(()=>{});googlePhoto=googleAvatar(photo);avatarChoice='classic';loadAudioSettings();
  scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>{if(healthPinned&&!(tool==='CURSOR'&&tile.cropId))closeHealth();void tileAction(tile);},handleAnimalClick,health,syncMusic,()=>{if(healthPinned)closeHealth();},(id,point)=>{if(id&&point){playAnimalSound(id);animalTooltip(id,point);}else animalTooltip(null);},()=>tool==='CURSOR');
