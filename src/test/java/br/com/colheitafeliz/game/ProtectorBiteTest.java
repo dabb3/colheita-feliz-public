@@ -37,6 +37,7 @@ class ProtectorBiteTest {
         var calls=new java.util.ArrayList<Integer>();
         var result=visits.attemptSteal(owner,visitor,0,0,1,"Visitante",bound->{calls.add(bound);return bound==100?roll:fine;});
         assertEquals(kind,result.kind().name());assertFalse(result.result().success());assertTrue(result.consumesCooldown());
+        assertTrue(result.result().message().contains("3 horas"));
         assertEquals(0,new BigDecimal(debit).compareTo(result.goldDebited()));
         assertEquals(0,new BigDecimal(balance).subtract(new BigDecimal(debit)).compareTo(visitor.wallet().coins()));
         assertEquals(before.greenCoins(),visitor.greenCoins());assertEquals(before.produce(),visitor.snapshot().produce());

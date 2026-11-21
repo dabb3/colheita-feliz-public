@@ -216,6 +216,9 @@ class OnlineGameIntegrationTest {
             var own = client.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base + "/v1/me/farm"))
                     .header("Authorization", "Bearer test").build(), java.net.http.HttpResponse.BodyHandlers.ofString());
             assertEquals(200, own.statusCode());
+            var cooldowns = com.google.gson.JsonParser.parseString(own.body()).getAsJsonObject().getAsJsonObject("socialCooldowns");
+            assertEquals(3, cooldowns.size());
+            for (var entry : cooldowns.entrySet()) assertTrue(entry.getValue().isJsonNull());
             String timing = own.headers().firstValue("Server-Timing").orElseThrow();
             assertTrue(timing.contains("auth;dur="));
             assertTrue(timing.contains("db_connect;dur="));
@@ -608,11 +611,37 @@ class OnlineGameIntegrationTest {
         assertEquals("200", service.farm(alice).get("coins").getAsString());
     }
 
-    @Test void theftCooldownIsGlobalSurvivesRestartAndExpiresAtExactlySixHours() {
+    @Test void socialCooldownsArePrivateAndReadHistoricalIndependentDeadlinesWithoutMigration() {
+        connectFriends();
+        var unused = service.farm(bob).getAsJsonObject("socialCooldowns");
+        assertNotNull(unused);
+        assertEquals(3, unused.size());
+        for (String key : java.util.List.of("stealNextAt", "insectsNextAt", "weedsNextAt")) assertTrue(unused.get(key).isJsonNull());
+        var now = clock.instant();
+        store.transaction(bob, tx -> {
+            tx.recordTheft(bob, now.minusSeconds(14400));
+            tx.recordPest(bob, "SPREAD_INSECTS", now.minusSeconds(7200));
+            tx.recordPest(bob, "SPREAD_WEEDS", now);
+            return null;
+        });
+        var own = service.farm(bob);
+        assertEquals(now.toString(), own.get("serverTime").getAsString());
+        var deadlines = own.getAsJsonObject("socialCooldowns");
+        assertEquals(now.minusSeconds(3600).toString(), deadlines.get("stealNextAt").getAsString());
+        assertEquals(now.plusSeconds(3600).toString(), deadlines.get("insectsNextAt").getAsString());
+        assertEquals(now.plusSeconds(10800).toString(), deadlines.get("weedsNextAt").getAsString());
+        assertFalse(service.visit(alice, bob).has("socialCooldowns"));
+        for (var friend : service.friends(alice)) assertFalse(friend.getAsJsonObject().has("socialCooldowns"));
+        assertEquals(now.minusSeconds(14400), store.transaction(bob, tx -> tx.lastTheft(bob)));
+    }
+
+    @Test void theftCooldownIsGlobalSurvivesRestartAndExpiresAtExactlyThreeHours() {
         UUID carol = prepareTheftFriends();
         var first = theftCommand(bob, alice);
         var success = service.visitAction(bob, alice, first);
         assertTrue(success.getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(clock.instant().plusSeconds(10800).toString(), success.getAsJsonObject("farm").getAsJsonObject("socialCooldowns").get("stealNextAt").getAsString());
+        assertFalse(success.getAsJsonObject("visitedFarm").has("socialCooldowns"));
         clock.advanceSeconds(3600);
         assertEquals(success, service.visitAction(bob, alice, first));
         store.close();
@@ -623,14 +652,27 @@ class OnlineGameIntegrationTest {
         var ownerBefore = service.farm(carol);
         var refused = service.visitAction(bob, carol, theftCommand(bob, carol));
         assertFalse(refused.getAsJsonObject("result").get("success").getAsBoolean());
-        assertTrue(refused.getAsJsonObject("result").get("message").getAsString().contains("5h 0min 0s"));
+        assertTrue(refused.getAsJsonObject("result").get("message").getAsString().contains("2h 0min 0s"));
         assertEquals(before.get("revision"), service.farm(bob).get("revision"));
         assertEquals(ownerBefore.get("revision"), service.farm(carol).get("revision"));
-        clock.advanceSeconds(17999);
+        clock.advanceSeconds(7199);
         assertFalse(service.visitAction(bob, carol, theftCommand(bob, carol)).getAsJsonObject("result").get("success").getAsBoolean());
         clock.advanceSeconds(1);
         assertTrue(service.visitAction(bob, carol, theftCommand(bob, carol)).getAsJsonObject("result").get("success").getAsBoolean());
         assertEquals(2, quantity(service.farm(bob)));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"10799,false", "10800,true", "14400,true"})
+    void historicalTheftUsesThreeHoursWithoutResettingIt(long elapsed, boolean allowed) {
+        prepareTheftFriends();
+        var historical = clock.instant().minusSeconds(elapsed);
+        store.transaction(bob, tx -> { tx.recordTheft(bob, historical); return null; });
+        var before = service.farm(bob).getAsJsonObject("socialCooldowns");
+        assertEquals(historical.plusSeconds(10800).toString(), before.get("stealNextAt").getAsString());
+        var reply = service.visitAction(bob, alice, theftCommand(bob, alice));
+        assertEquals(allowed, reply.getAsJsonObject("result").get("success").getAsBoolean());
+        assertEquals(allowed ? clock.instant() : historical, store.transaction(bob, tx -> tx.lastTheft(bob)));
     }
 
     @Test void refusedTheftDoesNotSpendCooldownAndLoveRemainsAvailable() {
@@ -773,8 +815,8 @@ class OnlineGameIntegrationTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.CsvSource({"SPREAD_INSECTS,21540,false","SPREAD_INSECTS,21600,true","SPREAD_INSECTS,21660,true","SPREAD_WEEDS,21540,false","SPREAD_WEEDS,21600,true","SPREAD_WEEDS,21660,true"})
-    void historicalPestTimestampUsesSixHoursWithoutResettingIt(String kind,long elapsed,boolean allowed){
+    @org.junit.jupiter.params.provider.CsvSource({"SPREAD_INSECTS,10799,false","SPREAD_INSECTS,10800,true","SPREAD_INSECTS,14400,true","SPREAD_WEEDS,10799,false","SPREAD_WEEDS,10800,true","SPREAD_WEEDS,14400,true"})
+    void historicalPestTimestampUsesThreeHoursWithoutResettingIt(String kind,long elapsed,boolean allowed){
         preparePestFriends(false);var historical=clock.instant().minusSeconds(elapsed);
         store.transaction(bob,tx->{tx.recordPest(bob,kind,historical);return null;});
         store.close();store=new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"),"postgres","",testSchema);store.initialize(alice);
@@ -786,12 +828,16 @@ class OnlineGameIntegrationTest {
         assertNull(store.transaction(bob,tx->tx.lastPest(bob,kind.equals("SPREAD_WEEDS")?"SPREAD_INSECTS":"SPREAD_WEEDS")));
         assertNull(store.transaction(bob,tx->tx.lastTheft(bob)));
     }
-    @Test void pestLimitsAreIndependentGlobalPersistedAndExpireAfterExactlySixHours() {
+    @Test void pestLimitsAreIndependentGlobalPersistedAndExpireAfterExactlyThreeHours() {
         UUID carol = preparePestFriends(false);
         var before = service.farm(bob);
         var insect = pestCommand(bob, alice, "SPREAD_INSECTS");
         var first = service.visitAction(bob, alice, insect);
         assertTrue(first.getAsJsonObject("result").get("success").getAsBoolean());
+        var deadlines = first.getAsJsonObject("farm").getAsJsonObject("socialCooldowns");
+        assertEquals(clock.instant().plusSeconds(10800).toString(), deadlines.get("insectsNextAt").getAsString());
+        assertTrue(deadlines.get("stealNextAt").isJsonNull());
+        assertTrue(deadlines.get("weedsNextAt").isJsonNull());
         assertEquals(first, service.visitAction(bob, alice, insect));
         assertTrue(service.visitAction(bob, alice, pestCommand(bob, alice, "SPREAD_WEEDS")).getAsJsonObject("result").get("success").getAsBoolean());
         var after = service.farm(bob);
@@ -802,7 +848,7 @@ class OnlineGameIntegrationTest {
         store = new JdbcOnlineStore(System.getenv("TEST_DATABASE_URL"), "postgres", "", testSchema);
         store.initialize(alice);
         service = new OnlineGameService(store, clock, bound -> bound - 1, 5);
-        clock.advanceSeconds(21599);
+        clock.advanceSeconds(10799);
         for (String kind : java.util.List.of("SPREAD_INSECTS", "SPREAD_WEEDS")) {
             var refused = service.visitAction(bob, carol, pestCommand(bob, carol, kind));
             assertFalse(refused.getAsJsonObject("result").get("success").getAsBoolean());
@@ -825,6 +871,8 @@ class OnlineGameIntegrationTest {
         var visitorBefore = service.farm(bob);
         var blocked = service.visitAction(bob, alice, pestCommand(bob, alice, kind));
         assertFalse(blocked.getAsJsonObject("result").get("success").getAsBoolean());
+        var deadlines = blocked.getAsJsonObject("farm").getAsJsonObject("socialCooldowns");
+        assertEquals(clock.instant().plusSeconds(10800).toString(), deadlines.get(kind.equals("SPREAD_INSECTS") ? "insectsNextAt" : "weedsNextAt").getAsString());
         assertTrue(blocked.getAsJsonObject("result").get("message").getAsString().contains("protegido"));
         assertHidesProtection(blocked.getAsJsonObject("visitedFarm"));
         assertEquals(clock.instant(), store.transaction(bob, tx -> tx.lastPest(bob, kind)));
@@ -832,7 +880,7 @@ class OnlineGameIntegrationTest {
         assertEquals(ownerBefore.get("tiles"), service.farm(alice).get("tiles"));
         assertEquals(visitorBefore.get("revision"), service.farm(bob).get("revision"));
         var refused = service.visitAction(bob, carol, pestCommand(bob, carol, kind));
-        assertTrue(refused.getAsJsonObject("result").get("message").getAsString().contains("6h 0min 0s"));
+        assertTrue(refused.getAsJsonObject("result").get("message").getAsString().contains("3h 0min 0s"));
         assertNull(store.transaction(bob, tx -> tx.lastTheft(bob)));
     }
 
@@ -853,6 +901,8 @@ class OnlineGameIntegrationTest {
             var command = kind.equals("LOVE") ? loveCommand(bob, owner) : pestCommand(bob, owner, kind);
             var reply = service.visitAction(bob, owner, command);
             assertFalse(reply.getAsJsonObject("result").get("success").getAsBoolean());
+            assertEquals(service.farm(bob).get("socialCooldowns"), reply.getAsJsonObject("farm").get("socialCooldowns"));
+            for (var deadline : reply.getAsJsonObject("farm").getAsJsonObject("socialCooldowns").entrySet()) assertTrue(deadline.getValue().isJsonNull());
             messages.add(reply.getAsJsonObject("result").get("message").getAsString());
         }
         assertEquals(messages.get(0), messages.get(1));
@@ -1246,7 +1296,7 @@ class OnlineGameIntegrationTest {
         assertTrue(confirmed(() -> service.visitAction(bob, alice, insects)));
         service.visitAction(bob, alice, insects);
         assertEquals(1, progress(bob, "spread-100"), "replay da praga não conta de novo");
-        assertFalse(confirmed(() -> service.visitAction(bob, carol, pestCommand(bob, carol, "SPREAD_INSECTS"))), "recarga de 6 horas");
+        assertFalse(confirmed(() -> service.visitAction(bob, carol, pestCommand(bob, carol, "SPREAD_INSECTS"))), "recarga de 3 horas");
         assertEquals(1, progress(bob, "spread-100"), "praga recusada não conta");
 
         var cure = new Command(requestId(), service.farm(alice).get("revision").getAsString(), "PESTICIDE", null, null, 0, 0, null);

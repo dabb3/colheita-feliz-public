@@ -224,7 +224,7 @@ final class GameHttpServer implements AutoCloseable {
         if (count > limit) throw new ApiFailure(429, "Muitas ações. Aguarde um minuto.");
     }
     private static void send(HttpExchange exchange, int status, Object value) throws IOException {
-        byte[] bytes = OnlineViews.JSON.toJson(value).getBytes(StandardCharsets.UTF_8);
+        byte[] bytes = OnlineViews.RESPONSE_JSON.toJson(value).getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
         String timing = RequestTimings.header();
         if (timing != null) exchange.getResponseHeaders().set("Server-Timing", timing);
