@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
   if (test.info().title === 'critical login, farm, zoom, shop and deposit views produce review screenshots') {
     await page.screenshot({ path: test.info().outputPath('login.png'), animations: 'disabled' });
   }
-  await page.locator('#login .login-test-button').click();
+  await page.getByRole('button', { name: 'Testar como Alice' }).click();
   await expect(page.locator('#game')).toBeVisible();
   await expect(page.locator('#farm')).toBeVisible();
 });
