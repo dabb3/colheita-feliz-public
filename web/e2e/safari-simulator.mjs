@@ -12,27 +12,28 @@ function simctl(args, options = {}) {
   return execFileSync('xcrun', ['simctl', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...options }).trim();
 }
 
-function compatibleIosMajors() {
+function compatibleIosVersions() {
   const sdks = execFileSync('xcodebuild', ['-showsdks'], { encoding: 'utf8' });
-  const majors = new Set([...sdks.matchAll(/-sdk iphonesimulator(\d+)/g)].map(match => Number(match[1])));
-  if (!majors.size) throw new Error('The selected Xcode exposes no iOS Simulator SDK.');
-  return majors;
+  const versions = new Set([...sdks.matchAll(/-sdk iphonesimulator(\d+\.\d+)/g)].map(match => match[1]));
+  if (!versions.size) throw new Error('The selected Xcode exposes no iOS Simulator SDK.');
+  return versions;
 }
 
 function chooseSimulator() {
   const inventory = JSON.parse(simctl(['list', 'devices', 'available', '--json']));
-  const supportedMajors = compatibleIosMajors();
+  const supportedVersions = compatibleIosVersions();
   const candidates = Object.entries(inventory.devices).flatMap(([runtime, devices]) => {
     const version = runtime.match(/iOS-(\d+)-(\d+)/);
-    if (!version || !supportedMajors.has(Number(version[1]))) return [];
+    const versionName = version ? `${version[1]}.${version[2]}` : null;
+    if (!versionName || !supportedVersions.has(versionName)) return [];
     return devices.filter(device => device.name.startsWith('iPhone ')).map(device => ({
       ...device,
       runtime,
-      version: `${version[1]}.${version[2]}`,
+      version: versionName,
       versionKey: Number(version[1]) * 100 + Number(version[2]),
     }));
   }).sort((a, b) => b.versionKey - a.versionKey || a.name.localeCompare(b.name));
-  if (!candidates.length) throw new Error(`No available iPhone Simulator matches the selected Xcode SDKs (iOS ${[...supportedMajors].join(', ')}).`);
+  if (!candidates.length) throw new Error(`No available iPhone Simulator matches the selected Xcode SDKs (iOS ${[...supportedVersions].join(', ')}).`);
   return candidates[0];
 }
 
@@ -91,6 +92,8 @@ try {
     'appium:udid': simulator.udid,
     browserName: 'Safari',
     'appium:newCommandTimeout': 120,
+    'appium:wdaLaunchTimeout': 180_000,
+    'appium:showXcodeLog': true,
   } } });
   sessionId = created.sessionId ?? created.value?.sessionId;
   assert.ok(sessionId, 'Appium returned a W3C session id');
