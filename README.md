@@ -53,6 +53,8 @@ npm run test:safari:simulator --prefix web
 
 O CI usa macOS 15, Xcode 16.4 e PostgreSQL 17 descartável. Os testes usam contas sintéticas e não acessam produção. Relatórios, traces, screenshots e logs ficam nos artefatos do CI por sete dias. Não há comparação pixel a pixel versionada: este checkout Windows não oferece baseline de captura macOS. O job Safari consome minutos de GitHub Actions.
 
+O toque na fazenda usa o evento recebido pelo canvas para corrigir o deslocamento entre coordenadas do WebDriver e o viewport do Safari; o artefato `result.json` registra a calibração observada.
+
 O cliente inclui um modo de revisão visual com dados sintéticos. Os menus de Loja, Depósito, Tarefas, Conquistas, Decorações, Eventos (com a aba Calendário Diário), Amigos e Ajustes são acessíveis por botões; regras e contrato online do calendário estão em [ONLINE.md](ONLINE.md). A seleção de avatar é uma preferência local por conta e dispositivo, não uma atualização do perfil no banco.
 
 Para revisar as pragas, use `npm.cmd run review --prefix web` e abra

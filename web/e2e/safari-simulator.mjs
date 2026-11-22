@@ -130,6 +130,15 @@ try {
     return elementId;
   };
   const click = async selector => call(`/element/${await find(selector)}/click`, 'POST');
+  const touch = async (x, y) => {
+    await call('/actions', 'POST', { actions: [{ type: 'pointer', id: 'finger', parameters: { pointerType: 'touch' }, actions: [
+      { type: 'pointerMove', duration: 0, x, y },
+      { type: 'pointerDown', button: 0 },
+      { type: 'pause', duration: 100 },
+      { type: 'pointerUp', button: 0 },
+    ] }] });
+    await call('/actions', 'DELETE');
+  };
   const screenshot = async name => {
     const data = await call('/screenshot');
     const file = resolve(artifacts, `${name}.png`);
@@ -149,15 +158,24 @@ try {
 
   const plot = await execute("const canvas=document.querySelector('#farm'),c=canvas.getBoundingClientRect(),x=Math.round(c.left+c.width*1010/1600),y=Math.round(c.top+c.height*580/900); window.__iosPointerEvents=[]; for(const type of ['pointerdown','pointerup','click']) canvas.addEventListener(type,e=>window.__iosPointerEvents.push({type:e.type,pointerType:e.pointerType,clientX:e.clientX,clientY:e.clientY}),true); return {x,y,rect:{left:c.left,top:c.top,width:c.width,height:c.height},viewport:{width:innerWidth,height:innerHeight,visualWidth:visualViewport?.width,visualHeight:visualViewport?.height,offsetTop:visualViewport?.offsetTop},hit:document.elementFromPoint(x,y)?.tagName}");
   result.touchDiagnostics = plot.value;
-  await call('/actions', 'POST', { actions: [{ type: 'pointer', id: 'finger', parameters: { pointerType: 'touch' }, actions: [
-    { type: 'pointerMove', duration: 0, x: plot.value.x, y: plot.value.y },
-    { type: 'pointerDown', button: 0 },
-    { type: 'pause', duration: 100 },
-    { type: 'pointerUp', button: 0 },
-  ] }] });
-  await call('/actions', 'DELETE');
+  await touch(plot.value.x, plot.value.y);
   result.touchDiagnostics.events = (await execute('return window.__iosPointerEvents')).value;
-  await waitFor(async () => (await execute("return document.querySelector('#modal-title').textContent === 'Comprar terra' && document.querySelector('#modal').open")).value, 'touch opening the plot panel');
+  const plotPanelOpen = async () => (await execute("return document.querySelector('#modal-title').textContent === 'Comprar terra' && document.querySelector('#modal').open")).value;
+  if (!(await plotPanelOpen())) {
+    const pointerUp = result.touchDiagnostics.events.findLast(event => event.type === 'pointerup');
+    if (pointerUp) {
+      const corrected = {
+        x: Math.round(plot.value.x + plot.value.x - pointerUp.clientX),
+        y: Math.round(plot.value.y + plot.value.y - pointerUp.clientY),
+      };
+      result.touchDiagnostics.correction = { from: { x: plot.value.x, y: plot.value.y }, to: corrected, observed: pointerUp };
+      if (corrected.x !== plot.value.x || corrected.y !== plot.value.y) {
+        await touch(corrected.x, corrected.y);
+        result.touchDiagnostics.events = (await execute('return window.__iosPointerEvents')).value;
+      }
+    }
+  }
+  await waitFor(plotPanelOpen, 'touch opening the plot panel');
   await screenshot('plot-touch');
   await click('#close-modal');
 
