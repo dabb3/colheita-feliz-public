@@ -81,6 +81,7 @@ try {
     simctl(['boot', simulator.udid]);
     startedSimulator = true;
   }
+  execFileSync('open', ['-a', 'Simulator', '--args', '-CurrentDeviceUDID', simulator.udid]);
   simctl(['bootstatus', simulator.udid, '-b']);
   await waitFor(() => request('/status').then(status => status.ready === true), 'Appium server', 60_000);
 
