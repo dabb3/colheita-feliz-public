@@ -33,6 +33,7 @@ test('login opens the synthetic farm and loads a bounded canvas', async ({ page 
 
 test('mobile touch selects a locked plot and opens the purchase panel', async ({ page }, testInfo) => {
   test.skip(!mobileProject(testInfo.project.name), 'Runs in mobile WebKit projects.');
+  test.skip(testInfo.project.name === 'webkit-mobile-compact', 'The next plot is outside the initial compact camera view; pan-to-selection is covered with native touch in the iOS Simulator suite.');
   const canvas = page.locator('#farm');
   const bounds = await canvas.boundingBox();
   expect(bounds).not.toBeNull();
@@ -86,10 +87,18 @@ test('compact and large mobile profiles keep farm and shop controls in bounds', 
   const expected = testInfo.project.name === 'webkit-mobile-compact' ? { width: 320, height: 568 } : { width: 430, height: 932 };
   await expect.poll(() => page.evaluate(() => ({ width: visualViewport!.width, height: visualViewport!.height }))).toEqual(expected);
   await expect(page.locator('#camera-controls')).toBeVisible();
+  const scene = await page.locator('#scene').boundingBox();
+  expect(scene).not.toBeNull();
+  expect(scene!.x).toBeGreaterThanOrEqual(0);
+  expect(scene!.y).toBeGreaterThanOrEqual(0);
+  expect(scene!.x + scene!.width).toBeLessThanOrEqual(expected.width + 1);
+  expect(scene!.y + scene!.height).toBeLessThanOrEqual(expected.height + 1);
   const canvas = await page.locator('#farm').boundingBox();
   expect(canvas).not.toBeNull();
-  expect(canvas!.x).toBeGreaterThanOrEqual(0);
-  expect(canvas!.x + canvas!.width).toBeLessThanOrEqual(expected.width + 1);
+  expect(canvas!.x).toBeLessThanOrEqual(scene!.x + 1);
+  expect(canvas!.y).toBeLessThanOrEqual(scene!.y + 1);
+  expect(canvas!.x + canvas!.width).toBeGreaterThanOrEqual(scene!.x + scene!.width - 1);
+  expect(canvas!.y + canvas!.height).toBeGreaterThanOrEqual(scene!.y + scene!.height - 1);
   await page.locator('#more').click();
   await page.locator('#shop').click();
   const dialog = await page.locator('#modal').boundingBox();

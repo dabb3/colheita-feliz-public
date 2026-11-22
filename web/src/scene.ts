@@ -66,7 +66,8 @@ export class Scene {
   private animalHoverTimer?: number;
   private hoveredAnimal?: string;
   /** The click following a touch may be reported as a MouseEvent on iOS Safari. */
-  private lastPointerDown?: { type: string; x: number; y: number; time: number };
+  private lastPointerDown?: { type: string; x: number; y: number; time: number; pointerId: number; moved: boolean };
+  private draggedClick?: { x: number; y: number; expires: number };
   private onHover: (
     tile: Tile | null,
     point: { x: number; y: number } | null,
@@ -114,7 +115,18 @@ export class Scene {
           x: e.clientX,
           y: e.clientY,
           time: performance.now(),
+          pointerId: e.pointerId,
+          moved: false,
         };
+      },
+      { signal: this.events.signal },
+    );
+    if (typeof window.addEventListener === "function") window.addEventListener(
+      "pointerup",
+      (e) => {
+        const down = this.lastPointerDown;
+        if (down && down.pointerId === e.pointerId && down.moved)
+          this.draggedClick = {x: e.clientX, y: e.clientY, expires: performance.now() + 450};
       },
       { signal: this.events.signal },
     );
@@ -126,9 +138,12 @@ export class Scene {
     canvas.addEventListener(
       "pointermove",
       (e) => {
+        const down = this.lastPointerDown;
+        if (down && down.pointerId === e.pointerId && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10)
+          down.moved = true;
         // A drag must not be remembered as a tap when Safari synthesizes its click.
-        if (this.lastPointerDown?.type === "touch" && e.pointerType === "touch" &&
-            Math.hypot(e.clientX - this.lastPointerDown.x, e.clientY - this.lastPointerDown.y) > 24)
+        if (down?.type === "touch" && e.pointerType === "touch" &&
+            Math.hypot(e.clientX - down.x, e.clientY - down.y) > 24)
           this.lastPointerDown = undefined;
         const p = this.point(e);
         const pick = p ? pickTile(p.x, p.y) : null;
@@ -169,6 +184,14 @@ export class Scene {
     canvas.addEventListener(
       "click",
       (e) => {
+        const dragged = this.draggedClick;
+        this.draggedClick = undefined;
+        if (dragged && performance.now() <= dragged.expires && Math.hypot(e.clientX - dragged.x, e.clientY - dragged.y) <= 24) {
+          this.lastPointerDown = undefined;
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          return;
+        }
         const pointerType = this.clickPointerType(e);
         if (!this.farm) return;
         const p = this.point(e);
