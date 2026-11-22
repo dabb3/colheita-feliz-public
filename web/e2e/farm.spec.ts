@@ -3,7 +3,10 @@ import { expect, test } from '@playwright/test';
 test.beforeEach(async ({ page }) => {
   page.on('pageerror', error => test.info().annotations.push({ type: 'pageerror', description: error.message }));
   await page.goto('/');
-  await page.getByRole('button', { name: 'Testar como Alice' }).click();
+  if (test.info().title === 'critical login, farm, zoom, shop and deposit views produce review screenshots') {
+    await page.screenshot({ path: test.info().outputPath('login.png'), animations: 'disabled' });
+  }
+  await page.locator('#login .login-test-button').click();
   await expect(page.locator('#game')).toBeVisible();
   await expect(page.locator('#farm')).toBeVisible();
 });
@@ -77,7 +80,7 @@ test('mobile zoom changes the canvas scale without hiding controls', async ({ pa
 });
 
 test('shop remains visible and scrollable in portrait and landscape', async ({ page }) => {
-  for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
+  for (const viewport of [{ width: 390, height: 600 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport);
     await expect.poll(() => page.evaluate(() => ({ width: window.visualViewport?.width, height: window.visualViewport?.height }))).toEqual(viewport);
     if (viewport.width < viewport.height) {
@@ -104,9 +107,6 @@ test('shop remains visible and scrollable in portrait and landscape', async ({ p
 });
 
 test('critical login, farm, zoom, shop and deposit views produce review screenshots', async ({ page }, testInfo) => {
-  await page.goto('/');
-  await page.screenshot({ path: testInfo.outputPath('login.png'), animations: 'disabled' });
-  await page.getByRole('button', { name: 'Testar como Alice' }).click();
   await expect(page.locator('#game')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('farm.png'), animations: 'disabled' });
   if (testInfo.project.name === 'webkit-iphone') {
