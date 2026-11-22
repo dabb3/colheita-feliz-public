@@ -116,6 +116,7 @@ try {
     browserName: 'Safari',
     'appium:newCommandTimeout': 120,
     'appium:wdaLaunchTimeout': 300_000,
+    'appium:webviewConnectTimeout': 30_000,
     'appium:showXcodeLog': true,
   } } });
   sessionId = created.sessionId ?? created.value?.sessionId;
