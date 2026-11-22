@@ -14,7 +14,7 @@ function simctl(args, options = {}) {
 
 function compatibleIosMajors() {
   const sdks = execFileSync('xcodebuild', ['-showsdks'], { encoding: 'utf8' });
-  const majors = new Set([...sdks.matchAll(/iOS Simulator\s+(\d+)/g)].map(match => Number(match[1])));
+  const majors = new Set([...sdks.matchAll(/-sdk iphonesimulator(\d+)/g)].map(match => Number(match[1])));
   if (!majors.size) throw new Error('The selected Xcode exposes no iOS Simulator SDK.');
   return majors;
 }
