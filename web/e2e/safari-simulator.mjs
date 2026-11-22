@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { request as httpRequest } from 'node:http';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -44,14 +45,35 @@ if (process.argv.includes('--list')) {
 }
 
 async function request(path, method = 'GET', body) {
-  const response = await fetch(`${appium}${path}`, {
-    method,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
+  const timeoutMs = 600_000;
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(new URL(`${appium}${path}`), {
+      method,
+      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    }, response => {
+      let payload = '';
+      response.setEncoding('utf8');
+      response.on('data', chunk => { payload += chunk; });
+      response.on('end', () => {
+        let result;
+        try {
+          result = JSON.parse(payload);
+        } catch (error) {
+          reject(error);
+          return;
+        }
+        if ((response.statusCode ?? 500) >= 400 || result.value?.error) {
+          reject(new Error(`${method} ${path}: ${JSON.stringify(result.value ?? result)}`));
+          return;
+        }
+        resolve(result.value ?? result);
+      });
+    });
+    req.setTimeout(timeoutMs, () => req.destroy(new Error(`Timed out after ${timeoutMs}ms: ${method} ${path}`)));
+    req.on('error', reject);
+    if (body !== undefined) req.write(JSON.stringify(body));
+    req.end();
   });
-  const result = await response.json();
-  if (!response.ok || result.value?.error) throw new Error(`${method} ${path}: ${JSON.stringify(result.value ?? result)}`);
-  return result.value ?? result;
 }
 
 async function waitFor(check, label, timeout = 30_000) {
@@ -93,7 +115,7 @@ try {
     'appium:udid': simulator.udid,
     browserName: 'Safari',
     'appium:newCommandTimeout': 120,
-    'appium:wdaLaunchTimeout': 180_000,
+    'appium:wdaLaunchTimeout': 300_000,
     'appium:showXcodeLog': true,
   } } });
   sessionId = created.sessionId ?? created.value?.sessionId;
