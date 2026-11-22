@@ -26,6 +26,19 @@ npm.cmd run build:local --prefix web
 
 O build local configura a API em `http://127.0.0.1:8080`. Para iniciar uma API local com contas de desenvolvimento e PostgreSQL descartável, consulte [ONLINE.md](ONLINE.md).
 
+### E2E WebKit e Safari
+
+Playwright executa Chromium desktop, WebKit desktop e WebKit com o perfil oficial de iPhone. Esse último perfil simula viewport e touch; não equivale ao Safari do iOS. No Windows, Linux ou macOS, instale os navegadores com `npx --prefix web playwright install chromium webkit`. Depois inicie a API local de desenvolvimento descrita em [ONLINE.md](ONLINE.md) e rode `npm run test:e2e --prefix web`. Os projetos individuais usam `test:e2e:chromium`, `test:e2e:webkit` e `test:e2e:iphone`.
+
+No macOS, o Safari real do iOS Simulator requer Xcode e um runtime iOS instalado. Com `./dev.sh` ativo, abra outro terminal, inicie Appium com o driver XCUITest fixado e execute `npm run test:safari:simulator --prefix web`:
+
+```sh
+npx --yes appium@2.19.0 driver install xcuitest@9.10.5
+npx --yes appium@2.19.0 --address 127.0.0.1 --port 4723
+```
+
+O CI usa macOS 15, Xcode 16.4 e PostgreSQL 17 descartável. O teste escolhe um iPhone disponível no Simulator. O fluxo usa a API Java local e contas sintéticas; não acessa Supabase ou Fly.io. Playwright guarda screenshots, traces e vídeos de falha; o Safari Simulator guarda screenshots e logs como artefatos do CI. Não há comparação pixel a pixel versionada, pois o ambiente de referência macOS não está disponível neste checkout Windows. O job macOS consome minutos de GitHub Actions, sem serviço pago de dispositivos.
+
 O cliente inclui um modo de revisão visual com dados sintéticos. Os menus de Loja, Depósito, Tarefas, Conquistas, Decorações, Eventos (com a aba Calendário Diário), Amigos e Ajustes são acessíveis por botões; regras e contrato online do calendário estão em [ONLINE.md](ONLINE.md). A seleção de avatar é uma preferência local por conta e dispositivo, não uma atualização do perfil no banco.
 
 Para revisar as pragas, use `npm.cmd run review --prefix web` e abra

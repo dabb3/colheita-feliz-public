@@ -8,8 +8,19 @@
     "build": "npm run typecheck && node scripts/build.mjs",
     "build:local": "npm run typecheck && node scripts/build.mjs --local",
     "serve": "node scripts/serve.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:chromium": "playwright test --project=chromium-desktop",
+    "test:e2e:webkit": "playwright test --project=webkit-desktop",
+    "test:e2e:iphone": "playwright test --project=webkit-iphone",
+    "test:safari:simulator": "node e2e/safari-simulator.mjs",
     "review": "node scripts/review.mjs"
   },
-  "dependencies": {"@supabase/supabase-js": "2.118.0"},
-  "devDependencies": {"typescript": "7.0.2", "esbuild": "0.28.2"}
+  "dependencies": {
+    "@supabase/supabase-js": "2.118.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  }
 }
