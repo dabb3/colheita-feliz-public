@@ -147,7 +147,8 @@ try {
   await waitFor(async () => (await execute("return document.querySelector('#farm').width > 0 && document.querySelector('#farm').height > 0")).value, 'farm canvas');
   await screenshot('farm');
 
-  const plot = await execute("const c=document.querySelector('#farm').getBoundingClientRect(); return {x:Math.round(c.left+c.width*1010/1600),y:Math.round(c.top+c.height*580/900)}");
+  const plot = await execute("const canvas=document.querySelector('#farm'),c=canvas.getBoundingClientRect(),x=Math.round(c.left+c.width*1010/1600),y=Math.round(c.top+c.height*580/900); window.__iosPointerEvents=[]; for(const type of ['pointerdown','pointerup','click']) canvas.addEventListener(type,e=>window.__iosPointerEvents.push({type:e.type,pointerType:e.pointerType,clientX:e.clientX,clientY:e.clientY}),true); return {x,y,rect:{left:c.left,top:c.top,width:c.width,height:c.height},viewport:{width:innerWidth,height:innerHeight,visualWidth:visualViewport?.width,visualHeight:visualViewport?.height,offsetTop:visualViewport?.offsetTop},hit:document.elementFromPoint(x,y)?.tagName}");
+  result.touchDiagnostics = plot.value;
   await call('/actions', 'POST', { actions: [{ type: 'pointer', id: 'finger', parameters: { pointerType: 'touch' }, actions: [
     { type: 'pointerMove', duration: 0, x: plot.value.x, y: plot.value.y },
     { type: 'pointerDown', button: 0 },
@@ -155,6 +156,7 @@ try {
     { type: 'pointerUp', button: 0 },
   ] }] });
   await call('/actions', 'DELETE');
+  result.touchDiagnostics.events = (await execute('return window.__iosPointerEvents')).value;
   await waitFor(async () => (await execute("return document.querySelector('#modal-title').textContent === 'Comprar terra' && document.querySelector('#modal').open")).value, 'touch opening the plot panel');
   await screenshot('plot-touch');
   await click('#close-modal');
