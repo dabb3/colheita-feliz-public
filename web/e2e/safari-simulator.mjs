@@ -135,7 +135,7 @@ try {
     const [viewportRect, screenInfo, browser] = await Promise.all([
       call('/execute/sync', 'POST', { script: 'mobile: viewportRect', args: [] }),
       call('/execute/sync', 'POST', { script: 'mobile: deviceScreenInfo', args: [] }),
-      execute("const c=document.querySelector('#farm'),r=c.getBoundingClientRect(); return {inner:{width:innerWidth,height:innerHeight},visual:{width:visualViewport?.width,height:visualViewport?.height,scale:visualViewport?.scale,offsetLeft:visualViewport?.offsetLeft,offsetTop:visualViewport?.offsetTop},canvas:{left:r.left,top:r.top,width:r.width,height:r.height},hit:document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.tagName}"),
+      execute("const c=document.querySelector('#farm'),r=c.getBoundingClientRect(),p=document.createElement('div'); p.style.cssText='position:fixed;visibility:hidden;padding-left:env(safe-area-inset-left);padding-top:env(safe-area-inset-top)'; document.body.append(p); const safeAreaInsets={left:parseFloat(getComputedStyle(p).paddingLeft),top:parseFloat(getComputedStyle(p).paddingTop)}; p.remove(); return {inner:{width:innerWidth,height:innerHeight},visual:{width:visualViewport?.width,height:visualViewport?.height,scale:visualViewport?.scale,offsetLeft:visualViewport?.offsetLeft,offsetTop:visualViewport?.offsetTop},safeAreaInsets,canvas:{left:r.left,top:r.top,width:r.width,height:r.height},hit:document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.tagName}"),
     ]);
     return { viewportRect, screenInfo, browser: browser.value };
   };
