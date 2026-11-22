@@ -140,6 +140,12 @@ try {
   await screenshot('more-menu');
   await click('#shop');
   await waitFor(async () => (await execute("return document.querySelector('#modal').open && document.querySelector('#modal-title').textContent === 'Loja'")).value, 'shop panel');
+  await screenshot('shop');
+  const dialog = await execute("const r=document.querySelector('#modal').getBoundingClientRect(); return {top:r.top,bottom:r.bottom,height:innerHeight}");
+  assert.ok(dialog.value.top >= 0 && dialog.value.bottom <= dialog.value.height + 1, `shop dialog fits viewport: ${JSON.stringify(dialog.value)}`);
+
+  await call('/orientation', 'POST', { orientation: 'LANDSCAPE' });
+  await waitFor(async () => (await execute('return innerWidth > innerHeight')).value, 'landscape orientation');
   const scrolling = await execute("const e=document.querySelector('#modal-content'); return e.scrollHeight >= e.clientHeight");
   assert.equal(scrolling.value, true, 'shop content has a scroll container');
   const scrollHeight = await execute("return document.querySelector('#modal-content').scrollHeight");
@@ -148,12 +154,6 @@ try {
   await execute("const e=document.querySelector('#modal-content'); e.scrollTop=e.scrollHeight");
   await waitFor(async () => (await execute("return document.querySelector('#modal-content').scrollTop > 0")).value, 'scrolling shop content');
   await execute("document.querySelector('#modal-content').scrollTop=0");
-  await screenshot('shop');
-  const dialog = await execute("const r=document.querySelector('#modal').getBoundingClientRect(); return {top:r.top,bottom:r.bottom,height:innerHeight}");
-  assert.ok(dialog.value.top >= 0 && dialog.value.bottom <= dialog.value.height + 1, `shop dialog fits viewport: ${JSON.stringify(dialog.value)}`);
-
-  await call('/orientation', 'POST', { orientation: 'LANDSCAPE' });
-  await waitFor(async () => (await execute('return innerWidth > innerHeight')).value, 'landscape orientation');
   const landscapeDialog = await execute("const r=document.querySelector('#modal').getBoundingClientRect(); return {top:r.top,bottom:r.bottom,height:innerHeight}");
   assert.ok(landscapeDialog.value.top >= 0 && landscapeDialog.value.bottom <= landscapeDialog.value.height + 1, `landscape shop dialog fits viewport: ${JSON.stringify(landscapeDialog.value)}`);
   await screenshot('shop-landscape');

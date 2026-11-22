@@ -80,7 +80,7 @@ test('mobile zoom changes the canvas scale without hiding controls', async ({ pa
 });
 
 test('shop remains visible and scrollable in portrait and landscape', async ({ page }) => {
-  for (const viewport of [{ width: 390, height: 600 }, { width: 844, height: 390 }]) {
+  for (const viewport of [{ width: 390, height: 400 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport);
     await expect.poll(() => page.evaluate(() => ({ width: window.visualViewport?.width, height: window.visualViewport?.height }))).toEqual(viewport);
     if (viewport.width < viewport.height) {
