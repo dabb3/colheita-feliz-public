@@ -14,7 +14,7 @@
     "test:e2e:iphone": "playwright test --project=webkit-iphone",
     "test:safari:simulator": "node e2e/safari-simulator.mjs",
     "review": "node scripts/review.mjs",
-    "test:browser": "playwright test --project=chromium-desktop"
+    "test:browser": "playwright test e2e/farm.spec.ts --project=chromium-desktop"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.118.0"
