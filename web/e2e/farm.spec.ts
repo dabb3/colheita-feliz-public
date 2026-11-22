@@ -95,7 +95,7 @@ test('shop remains visible and scrollable in portrait and landscape', async ({ p
     expect(dialog).not.toBeNull();
     expect(dialog!.y).toBeGreaterThanOrEqual(0);
     expect(dialog!.y + dialog!.height).toBeLessThanOrEqual(viewport.height + 1);
-    const content = page.locator('#modal-content');
+    const content = page.locator('.market-scroll');
     await expect(content).toBeVisible();
     const scrollHeight = await content.evaluate(node => node.scrollHeight);
     const clientHeight = await content.evaluate(node => node.clientHeight);

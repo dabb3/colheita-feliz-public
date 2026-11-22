@@ -146,14 +146,14 @@ try {
 
   await call('/orientation', 'POST', { orientation: 'LANDSCAPE' });
   await waitFor(async () => (await execute('return innerWidth > innerHeight')).value, 'landscape orientation');
-  const scrolling = await execute("const e=document.querySelector('#modal-content'); return e.scrollHeight >= e.clientHeight");
+  const scrolling = await execute("const e=document.querySelector('.market-scroll'); return e.scrollHeight >= e.clientHeight");
   assert.equal(scrolling.value, true, 'shop content has a scroll container');
-  const scrollHeight = await execute("return document.querySelector('#modal-content').scrollHeight");
-  const clientHeight = await execute("return document.querySelector('#modal-content').clientHeight");
+  const scrollHeight = await execute("return document.querySelector('.market-scroll').scrollHeight");
+  const clientHeight = await execute("return document.querySelector('.market-scroll').clientHeight");
   assert.ok(scrollHeight.value > clientHeight.value, 'shop content overflows its scroll container');
-  await execute("const e=document.querySelector('#modal-content'); e.scrollTop=e.scrollHeight");
-  await waitFor(async () => (await execute("return document.querySelector('#modal-content').scrollTop > 0")).value, 'scrolling shop content');
-  await execute("document.querySelector('#modal-content').scrollTop=0");
+  await execute("const e=document.querySelector('.market-scroll'); e.scrollTop=e.scrollHeight");
+  await waitFor(async () => (await execute("return document.querySelector('.market-scroll').scrollTop > 0")).value, 'scrolling shop content');
+  await execute("document.querySelector('.market-scroll').scrollTop=0");
   const landscapeDialog = await execute("const r=document.querySelector('#modal').getBoundingClientRect(); return {top:r.top,bottom:r.bottom,height:innerHeight}");
   assert.ok(landscapeDialog.value.top >= 0 && landscapeDialog.value.bottom <= landscapeDialog.value.height + 1, `landscape shop dialog fits viewport: ${JSON.stringify(landscapeDialog.value)}`);
   await screenshot('shop-landscape');
