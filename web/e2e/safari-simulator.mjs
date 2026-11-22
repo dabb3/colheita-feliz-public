@@ -162,13 +162,14 @@ try {
   result.touchDiagnostics.events = (await execute('return window.__iosPointerEvents')).value;
   const plotPanelOpen = async () => (await execute("return document.querySelector('#modal-title').textContent === 'Comprar terra' && document.querySelector('#modal').open")).value;
   if (!(await plotPanelOpen())) {
-    const pointerUp = result.touchDiagnostics.events.findLast(event => event.type === 'pointerup');
-    if (pointerUp) {
+    const pointerEvent = result.touchDiagnostics.events.findLast(event => event.type === 'pointerup')
+      ?? result.touchDiagnostics.events.findLast(event => event.type === 'pointerdown');
+    if (pointerEvent) {
       const corrected = {
-        x: Math.round(plot.value.x + plot.value.x - pointerUp.clientX),
-        y: Math.round(plot.value.y + plot.value.y - pointerUp.clientY),
+        x: Math.round(plot.value.x + plot.value.x - pointerEvent.clientX),
+        y: Math.round(plot.value.y + plot.value.y - pointerEvent.clientY),
       };
-      result.touchDiagnostics.correction = { from: { x: plot.value.x, y: plot.value.y }, to: corrected, observed: pointerUp };
+      result.touchDiagnostics.correction = { from: { x: plot.value.x, y: plot.value.y }, to: corrected, observed: pointerEvent };
       if (corrected.x !== plot.value.x || corrected.y !== plot.value.y) {
         await touch(corrected.x, corrected.y);
         result.touchDiagnostics.events = (await execute('return window.__iosPointerEvents')).value;
