@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { request as httpRequest } from 'node:http';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { viewportPointToScreen } from './safari-coordinates.mjs';
 
 const appium = process.env.APPIUM_URL ?? 'http://127.0.0.1:4723';
 const appUrl = process.env.E2E_APP_URL ?? 'http://127.0.0.1:5173';
@@ -130,14 +131,25 @@ try {
     return elementId;
   };
   const click = async selector => call(`/element/${await find(selector)}/click`, 'POST');
-  const touch = async (x, y) => {
-    await call('/actions', 'POST', { actions: [{ type: 'pointer', id: 'finger', parameters: { pointerType: 'touch' }, actions: [
-      { type: 'pointerMove', duration: 0, x, y },
+  const screenGeometry = async () => {
+    const [viewportRect, screenInfo, browser] = await Promise.all([
+      call('/execute/sync', 'POST', { script: 'mobile: viewportRect', args: [] }),
+      call('/execute/sync', 'POST', { script: 'mobile: deviceScreenInfo', args: [] }),
+      execute("const c=document.querySelector('#farm'),r=c.getBoundingClientRect(); return {inner:{width:innerWidth,height:innerHeight},visual:{width:visualViewport?.width,height:visualViewport?.height,scale:visualViewport?.scale,offsetLeft:visualViewport?.offsetLeft,offsetTop:visualViewport?.offsetTop},canvas:{left:r.left,top:r.top,width:r.width,height:r.height},hit:document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.tagName}"),
+    ]);
+    return { viewportRect, screenInfo, browser: browser.value };
+  };
+  const touch = async (x, y, finger = 'finger') => {
+    const geometry = await screenGeometry();
+    const screenPoint = viewportPointToScreen({ x, y }, geometry.viewportRect, geometry.screenInfo);
+    await call('/actions', 'POST', { actions: [{ type: 'pointer', id: finger, parameters: { pointerType: 'touch' }, actions: [
+      { type: 'pointerMove', duration: 0, x: screenPoint.x, y: screenPoint.y },
       { type: 'pointerDown', button: 0 },
       { type: 'pause', duration: 100 },
       { type: 'pointerUp', button: 0 },
     ] }] });
     await call('/actions', 'DELETE');
+    return { screenPoint, geometry };
   };
   const screenshot = async name => {
     const data = await call('/screenshot');
@@ -156,29 +168,61 @@ try {
   await waitFor(async () => (await execute("return document.querySelector('#farm').width > 0 && document.querySelector('#farm').height > 0")).value, 'farm canvas');
   await screenshot('farm');
 
-  const plot = await execute("const canvas=document.querySelector('#farm'),c=canvas.getBoundingClientRect(),x=Math.round(c.left+c.width*1010/1600),y=Math.round(c.top+c.height*580/900); window.__iosPointerEvents=[]; for(const type of ['pointerdown','pointerup','click']) canvas.addEventListener(type,e=>window.__iosPointerEvents.push({type:e.type,pointerType:e.pointerType,clientX:e.clientX,clientY:e.clientY}),true); return {x,y,rect:{left:c.left,top:c.top,width:c.width,height:c.height},viewport:{width:innerWidth,height:innerHeight,visualWidth:visualViewport?.width,visualHeight:visualViewport?.height,offsetTop:visualViewport?.offsetTop},hit:document.elementFromPoint(x,y)?.tagName}");
+  const plot = await execute("const canvas=document.querySelector('#farm'),c=canvas.getBoundingClientRect(),x=Math.round(c.left+c.width*1010/1600),y=Math.round(c.top+c.height*580/900); window.__iosPointerEvents=[]; for(const type of ['pointerdown','pointerup','pointercancel','click']) canvas.addEventListener(type,e=>window.__iosPointerEvents.push({type:e.type,pointerType:e.pointerType,pointerId:e.pointerId,clientX:e.clientX,clientY:e.clientY}),true); return {x,y,rect:{left:c.left,top:c.top,width:c.width,height:c.height},viewport:{width:innerWidth,height:innerHeight,visualWidth:visualViewport?.width,visualHeight:visualViewport?.height,visualScale:visualViewport?.scale,offsetTop:visualViewport?.offsetTop},hit:document.elementFromPoint(x,y)?.tagName}");
   result.touchDiagnostics = plot.value;
-  await touch(plot.value.x, plot.value.y);
+  result.touchDiagnostics.mapping = await touch(plot.value.x, plot.value.y);
   result.touchDiagnostics.events = (await execute('return window.__iosPointerEvents')).value;
   const plotPanelOpen = async () => (await execute("return document.querySelector('#modal-title').textContent === 'Comprar terra' && document.querySelector('#modal').open")).value;
-  if (!(await plotPanelOpen())) {
-    const pointerEvent = result.touchDiagnostics.events.findLast(event => event.type === 'pointerup')
-      ?? result.touchDiagnostics.events.findLast(event => event.type === 'pointerdown');
-    if (pointerEvent) {
-      const corrected = {
-        x: Math.round(plot.value.x + plot.value.x - pointerEvent.clientX),
-        y: Math.round(plot.value.y + plot.value.y - pointerEvent.clientY),
-      };
-      result.touchDiagnostics.correction = { from: { x: plot.value.x, y: plot.value.y }, to: corrected, observed: pointerEvent };
-      if (corrected.x !== plot.value.x || corrected.y !== plot.value.y) {
-        await touch(corrected.x, corrected.y);
-        result.touchDiagnostics.events = (await execute('return window.__iosPointerEvents')).value;
-      }
-    }
-  }
   await waitFor(plotPanelOpen, 'touch opening the plot panel');
+  const observed = result.touchDiagnostics.events.find(event => event.type === 'pointerup');
+  assert.ok(observed, 'Safari reports the native touch pointerup');
+  assert.ok(Math.abs(observed.clientX - plot.value.x) <= 1 && Math.abs(observed.clientY - plot.value.y) <= 1,
+    `mapped touch reaches intended CSS point: intended=${plot.value.x},${plot.value.y} observed=${observed.clientX},${observed.clientY}`);
   await screenshot('plot-touch');
   await click('#close-modal');
+
+  // Drive actual W3C touch input through the farm camera, then verify a tap still selects a safe panel.
+  const beforeGestureActions = (await execute("return window.__farmTestActions ?? 0")).value;
+  await call('/execute/sync', 'POST', { script: "window.__farmTestActions=0; const f=window.fetch; window.fetch=(...a)=>{if(String(a[0]).includes('/v1/me/actions')) window.__farmTestActions++; return f(...a)}", args: [] });
+  const canvasRect = (await execute("const r=document.querySelector('#farm').getBoundingClientRect(); return {left:r.left,top:r.top,width:r.width,height:r.height}")).value;
+  const center = { x: canvasRect.left + canvasRect.width * .72, y: canvasRect.top + canvasRect.height * .58 };
+  const panStart = await screenGeometry();
+  const start = viewportPointToScreen(center, panStart.viewportRect, panStart.screenInfo);
+  const endCss = { x: center.x - 42, y: center.y + 28 };
+  const end = viewportPointToScreen(endCss, panStart.viewportRect, panStart.screenInfo);
+  await call('/actions', 'POST', { actions: [{ type: 'pointer', id: 'pan', parameters: { pointerType: 'touch' }, actions: [
+    { type: 'pointerMove', duration: 0, x: start.x, y: start.y }, { type: 'pointerDown', button: 0 },
+    { type: 'pointerMove', duration: 450, x: end.x, y: end.y }, { type: 'pointerUp', button: 0 },
+  ] }] }); await call('/actions', 'DELETE');
+  const pinchStartCss = { x: center.x - 35, y: center.y }, pinchEndCss = { x: center.x + 35, y: center.y };
+  const pinchStart = viewportPointToScreen(pinchStartCss, panStart.viewportRect, panStart.screenInfo);
+  const pinchEnd = viewportPointToScreen(pinchEndCss, panStart.viewportRect, panStart.screenInfo);
+  await call('/actions', 'POST', { actions: [
+    { type: 'pointer', id: 'pinch-left', parameters: { pointerType: 'touch' }, actions: [
+      { type: 'pointerMove', duration: 0, x: pinchStart.x, y: pinchStart.y }, { type: 'pointerDown', button: 0 },
+      { type: 'pause', duration: 100 }, { type: 'pointerMove', duration: 450, x: pinchStart.x - 22, y: pinchStart.y }, { type: 'pointerUp', button: 0 },
+    ] },
+    { type: 'pointer', id: 'pinch-right', parameters: { pointerType: 'touch' }, actions: [
+      { type: 'pointerMove', duration: 0, x: pinchEnd.x, y: pinchEnd.y }, { type: 'pointerDown', button: 0 },
+      { type: 'pause', duration: 100 }, { type: 'pointerMove', duration: 450, x: pinchEnd.x + 22, y: pinchEnd.y }, { type: 'pointerUp', button: 0 },
+    ] },
+  ] }); await call('/actions', 'DELETE');
+  const interruptedStart = viewportPointToScreen(center, panStart.viewportRect, panStart.screenInfo);
+  await call('/actions', 'POST', { actions: [{ type: 'pointer', id: 'interrupted-pan', parameters: { pointerType: 'touch' }, actions: [
+    { type: 'pointerMove', duration: 0, x: interruptedStart.x, y: interruptedStart.y },
+    { type: 'pointerDown', button: 0 }, { type: 'pointerMove', duration: 150, x: interruptedStart.x - 18, y: interruptedStart.y + 12 },
+  ] }] });
+  await call('/actions', 'DELETE');
+  await click('#tools button[aria-label="Selecionar"]');
+  await touch(center.x, center.y);
+  result.cameraGestures = { pan: { start, end }, pinch: { start: [pinchStart, pinchEnd], spread: 44 }, apiActionsBefore: beforeGestureActions, apiActionsAfter: (await execute('return window.__farmTestActions')).value };
+  assert.equal(result.cameraGestures.apiActionsAfter, 0, 'camera and follow-up selection touch do not send farm actions');
+  if ((await execute("return document.querySelector('#modal').open")).value) await click('#close-modal');
+  await click('#zoom-out');
+  assert.equal((await execute("return document.querySelector('#modal').open")).value, false, 'zoom control remains usable after gestures');
+  await click('#more');
+  assert.ok((await execute("return document.querySelector('#more-menu')?.getBoundingClientRect().width > 0")).value, 'navigation panel remains usable after interrupted gesture');
+  await click('#more');
 
   const beforeZoom = await execute("return getComputedStyle(document.querySelector('#farm')).width");
   await click('#zoom-in');

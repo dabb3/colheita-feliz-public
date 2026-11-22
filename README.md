@@ -104,3 +104,48 @@ Todas as imagens desse projeto foram criados com Imagegen.
 Os terrenos usam uma grade isométrica uniforme de 170 × 72 unidades, elevada para deixar a última fileira acima da barra de ferramentas. O desenho compensa as margens transparentes dos sprites com sobreposição entre os tiles; plantas, destaque e cliques acompanham a mesma projeção.
 
 APENAS PARA USO NÃO COMERCIAL - Esse projeto tem por objetivo levatar um jogo do orkut por simples nostalgia de jogar Colheita Feliz novamente.
+
+## Testes locais de navegador e servidor
+
+### Windows (PowerShell 7)
+
+Requisitos: Node.js 24, JDK 21, Docker Desktop com daemon Linux acessível e espaço para PostgreSQL 17 temporário. O repositório inclui um wrapper Gradle 8.14.5. O diagnóstico abaixo é somente leitura, salvo uma pequena prova de escrita removida no diretório Gradle configurado:
+
+```powershell
+pwsh -NoProfile -File scripts/doctor.ps1
+pwsh -NoProfile -File scripts/doctor.ps1 -Json
+```
+
+Para testes Java incluindo integração, use o banco exclusivo criado pelo script; ele escolhe uma porta loopback aleatória, grava apenas em tmpfs e remove somente seu próprio container:
+
+```powershell
+npm ci --ignore-scripts --prefix web
+pwsh -NoProfile -File scripts/test-local.ps1
+```
+
+O script usa JDK 21 em `~/.jdks/corretto-21.0.12.1`, quando presente, sem alterar as variáveis persistentes do Windows. Se seu JDK 21 estiver em outro local, defina `$env:JAVA_HOME` apenas nessa sessão antes de executar. Não use o banco de desenvolvimento do `compose.yaml` para esses testes.
+
+### macOS (Safari iOS Simulator)
+
+Requisitos: Xcode 16.4 com iPhone Simulator, Node.js 24, JDK 21, PostgreSQL 17 local descartável e Appium 2 com XCUITest 9.10.5. Com o simulador iPhone disponível e Appium iniciado em `127.0.0.1:4723`:
+
+```sh
+npm ci --ignore-scripts --prefix web
+npm run build:local --prefix web
+npm run test:safari:coordinates --prefix web
+node web/e2e/safari-simulator.mjs --list
+npm run test:safari:simulator --prefix web
+```
+
+Antes do último comando, deixe PostgreSQL 17, a API Gradle em `127.0.0.1:8080`, o cliente web em `127.0.0.1:5173` e Appium em `127.0.0.1:4723` rodando com o banco descartável. O teste do Simulator usa ações W3C de toque e coordenadas convertidas pelos metadados do XCUITest. A emulação iOS/WebKit e o iPhone Simulator não substituem a validação em Safari num iPhone físico; esse teste precisa de dispositivo real e não é declarado como coberto por CI.
+
+### WebKit móvel e referências visuais
+
+```sh
+npm ci --ignore-scripts --prefix web
+npx --prefix web playwright install webkit
+npm run test:browser --prefix web
+npm run test:e2e --prefix web
+```
+
+`test:browser` usa API sintética em memória e não precisa de servidor. `test:e2e` também executa contra a API de desenvolvimento local em `127.0.0.1:8080`, ligada a um PostgreSQL temporário. Os perfis WebKit `webkit-mobile-compact` e `webkit-mobile-large` exercitam 320×568 e 430×932 CSS px. Eles são navegadores emulados. As referências de tela usam a plataforma do runner e ficam em `web/e2e/farm.spec.ts-snapshots/`; revise as imagens antes de atualizar referências.
