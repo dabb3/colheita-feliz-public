@@ -26,18 +26,32 @@ npm.cmd run build:local --prefix web
 
 O build local configura a API em `http://127.0.0.1:8080`. Para iniciar uma API local com contas de desenvolvimento e PostgreSQL descartável, consulte [ONLINE.md](ONLINE.md).
 
+Os testes de navegador usam o cliente compilado, imagens reais e respostas de API sintéticas,
+sem contas ou serviços de produção. Após o build local acima, execute:
+
+```powershell
+cd web
+npx.cmd playwright install chromium
+npm.cmd run test:browser
+```
+
+No Linux, use `npx` e `npm`. O servidor de teste ocupa `127.0.0.1:5173` e precisa
+dessa porta livre. O CI instala o Chromium com suas dependências de sistema e
+salva traces quando um cenário falha.
+
 ### E2E WebKit e Safari
 
-Playwright executa Chromium desktop, WebKit desktop e WebKit com o perfil oficial de iPhone. Esse último perfil simula viewport e touch; não equivale ao Safari do iOS. No Windows, Linux ou macOS, instale os navegadores com `npx --prefix web playwright install chromium webkit`. Depois inicie a API local de desenvolvimento descrita em [ONLINE.md](ONLINE.md) e rode `npm run test:e2e --prefix web`. Os projetos individuais usam `test:e2e:chromium`, `test:e2e:webkit` e `test:e2e:iphone`.
+Playwright verifica os fluxos browser existentes em Chromium e os novos cenários de layout em Chromium desktop, WebKit desktop e WebKit com perfil iPhone. Esse perfil simula viewport e toque; não equivale ao Safari real do iOS. Instale os browsers com `npx --prefix web playwright install chromium webkit`. Inicie a API local conforme [ONLINE.md](ONLINE.md), rode os testes com `npm run test:e2e --prefix web`; a suíte já existente com API mock roda com `npm run test:browser --prefix web`.
 
-No macOS, o Safari real do iOS Simulator requer Xcode e um runtime iOS instalado. Com `./dev.sh` ativo, abra outro terminal, inicie Appium com o driver XCUITest fixado e execute `npm run test:safari:simulator --prefix web`:
+No macOS, o Safari do iOS Simulator requer Xcode e runtime iOS. Com a API Java local e o cliente servidos, instale Appium/XCUITest e rode o fluxo real:
 
 ```sh
 npx --yes appium@2.19.0 driver install xcuitest@9.10.5
 npx --yes appium@2.19.0 --address 127.0.0.1 --port 4723
+npm run test:safari:simulator --prefix web
 ```
 
-O CI usa macOS 15, Xcode 16.4 e PostgreSQL 17 descartável. O teste escolhe um iPhone disponível no Simulator. O fluxo usa a API Java local e contas sintéticas; não acessa Supabase ou Fly.io. Playwright guarda screenshots, traces e vídeos de falha; o Safari Simulator guarda screenshots e logs como artefatos do CI. Não há comparação pixel a pixel versionada, pois o ambiente de referência macOS não está disponível neste checkout Windows. O job macOS consome minutos de GitHub Actions, sem serviço pago de dispositivos.
+O CI usa macOS 15, Xcode 16.4 e PostgreSQL 17 descartável. Os testes usam contas sintéticas e não acessam produção. Relatórios, traces, screenshots e logs ficam nos artefatos do CI por sete dias. Não há comparação pixel a pixel versionada: este checkout Windows não oferece baseline de captura macOS. O job Safari consome minutos de GitHub Actions.
 
 O cliente inclui um modo de revisão visual com dados sintéticos. Os menus de Loja, Depósito, Tarefas, Conquistas, Decorações, Eventos (com a aba Calendário Diário), Amigos e Ajustes são acessíveis por botões; regras e contrato online do calendário estão em [ONLINE.md](ONLINE.md). A seleção de avatar é uma preferência local por conta e dispositivo, não uma atualização do perfil no banco.
 

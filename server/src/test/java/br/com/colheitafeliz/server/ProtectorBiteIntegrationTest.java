@@ -54,19 +54,22 @@ class ProtectorBiteIntegrationTest {
     @Test void bittenAttemptBurnsOnlyGoldAndReplayReturnsExactReceipt(){
         var command=request();var ownerBefore=farm(owner);var before=farm(visitor);
         var reply=service.visitAction(visitor,owner,command);
+        assertEquals(clock.instant().plusSeconds(10800).toString(),reply.getAsJsonObject("farm").getAsJsonObject("socialCooldowns").get("stealNextAt").getAsString());
         assertEquals("BITTEN",kind(reply));assertFalse(reply.getAsJsonObject("result").get("success").getAsBoolean());
         assertEquals("50",reply.getAsJsonObject("theftOutcome").get("goldDebited").getAsString());
         var after=farm(visitor);assertEquals(0,new BigDecimal(before.get("coins").getAsString()).subtract(new BigDecimal("50")).compareTo(new BigDecimal(after.get("coins").getAsString())));
         unchangedRewards(before,after);assertEquals(ownerBefore,farm(owner));assertEquals(clock.instant(),store.transaction(visitor,tx->tx.lastTheft(visitor)));
         assertEquals(reply,service.visitAction(visitor,owner,command));assertEquals(1,rolls.get());assertEquals(after,farm(visitor));
+        clock.advance(60);assertEquals(reply,service.visitAction(visitor,owner,command));assertEquals(1,rolls.get());
     }
     @Test void noBiteStillConsumesGlobalAttemptWithoutWalletOrRewardsChanges(){
         roll=30;var command=request();var before=farm(visitor);var ownerBefore=farm(owner);
         var reply=service.visitAction(visitor,owner,command);assertEquals("PROTECTED",kind(reply));assertEquals("0",reply.getAsJsonObject("theftOutcome").get("goldDebited").getAsString());
-        assertEquals(before,farm(visitor));assertEquals(ownerBefore,farm(owner));assertEquals(clock.instant(),store.transaction(visitor,tx->tx.lastTheft(visitor)));
+        assertEquals(clock.instant().plusSeconds(10800).toString(),reply.getAsJsonObject("farm").getAsJsonObject("socialCooldowns").get("stealNextAt").getAsString());
+        var after=farm(visitor);before.add("socialCooldowns",after.get("socialCooldowns"));assertEquals(before,after);assertEquals(ownerBefore,farm(owner));assertEquals(clock.instant(),store.transaction(visitor,tx->tx.lastTheft(visitor)));
         assertEquals("BLOCKED",kind(service.visitAction(visitor,owner,request())));assertEquals(1,rolls.get());
-        clock.advance(21599);assertEquals("BLOCKED",kind(service.visitAction(visitor,owner,request())));assertEquals(1,rolls.get());
-        clock.advance(1);assertEquals("STOLEN",kind(service.visitAction(visitor,owner,request()))); // The global attempt is available again after 6h.
+        clock.advance(10799);assertEquals("BLOCKED",kind(service.visitAction(visitor,owner,request())));assertEquals(1,rolls.get());
+        clock.advance(1);assertEquals("PROTECTED",kind(service.visitAction(visitor,owner,request())));assertEquals(2,rolls.get()); // The attempt is available after 3h; the animals are still fed.
     }
     @Test void exclusiveWindowPrecedesProtectionAndUsesExactFiveMinutes(){
         prepare(5,299,false);var before=farm(visitor);

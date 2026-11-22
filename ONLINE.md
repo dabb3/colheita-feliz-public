@@ -114,7 +114,7 @@ Ao abrir a própria fazenda, o servidor atualiza o nome público pelo perfil aut
 
 ## Consistência e operação
 
-Na visita a amigos, a toolbar oferece **Lançar inseto** e **Lançar erva**, cada qual limitado a um sucesso global por jogador a cada 6 horas reais; a tentativa bloqueada por terra protegida também consome esse prazo. Selecione a ferramenta e depois uma planta em crescimento já regada. A [regra de pragas entre visitantes](docs/game-rule.md#131-pragas-lançadas-por-visitantes) define elegibilidade, coexistência e limpeza. As ferramentas normais do dono continuam removendo as pragas. A recusa informa o tempo restante quando o limite estiver ativo. Não há custo, estoque consumível ou recompensa por lançar pragas, nem compartilhamento de limite com o furto.
+Na visita a amigos, a toolbar oferece **Lançar inseto** e **Lançar erva**, cada qual com uma tentativa consumível global por jogador a cada 3 horas reais; aplicação bem-sucedida e tentativa válida bloqueada por proteção consomem esse prazo. Selecione a ferramenta e depois uma planta em crescimento já regada. A [regra de pragas entre visitantes](docs/game-rule.md#131-pragas-lançadas-por-visitantes) define elegibilidade, coexistência e limpeza. As ferramentas normais do dono continuam removendo as pragas. Não há custo, estoque consumível ou recompensa por lançar pragas, nem compartilhamento de limite com o furto ou com a outra espécie de praga.
 
 As ações `SPREAD_INSECTS` e `SPREAD_WEEDS` são exclusivas de `POST /v1/farms/{owner}/visit-actions`. Exigem amizade ativa, revisão da fazenda e da temporada; não são aceitas na rota própria. A inicialização cria de forma aditiva e idempotente a tabela privada `colheita.pest_cooldowns`, com chave `(actor, kind)` e `last_applied_at`, RLS e revogação de privilégios como nas demais tabelas. A aplicação e o prazo são gravados na mesma transação do recibo e das fazendas, sob os locks existentes. Rollback desfaz ambos; replay não renova a janela. O horário não vem do cliente e a expiração de recibos não remove os limites.
 
@@ -126,7 +126,34 @@ A limpeza da infestação lançada pelo próprio visitante é permitida, mas nã
 
 Na lista **Amigos**, cada cartão oferece só **Visitar fazenda**. O presente parte da fazenda visitada: durante a visita, o menu superior mostra apenas **Minha fazenda**, **Amigos** e **Presentear** (ícone `presente.png`, cópia transparente de 112 px de `asset_presente.jpg` em `web/public`), sem atalhos para Loja, Depósito, Tarefas, Eventos ou terras; no mobile em retrato, Amigos volta à barra porque Mais fica oculto. A barra inferior de ações da visita não muda. Presentear abre um compositor exclusivo do dono da fazenda visitada, com avatar, sementes em estoque e rodapé fixo; o histórico de recebidos não aparece nessa lista. O compositor consulta `GET /v1/gifts`, o estoque próprio e a projeção pública do destinatário antes de habilitar o envio. Falhas de consulta mantêm o amigo fixo e oferecem revalidação local; se já houver um recibo pendente, a recuperação fica disponível mesmo quando a consulta secundária falhar. Um recibo pendente para outro amigo só é recuperado na fazenda dele.
 
-O furto online segue o limite global da [regra de furto](docs/game-rule.md#13-furto-de-temporadas): um sucesso por jogador a cada 6 horas reais, independentemente da fazenda. O servidor calcula o prazo a partir do último sucesso; recusas e ajuda com amor não gastam a vez. A recusa mostra horas, minutos e segundos restantes pela mensagem já exibida no cliente.
+O furto online segue o limite global da [regra de furto](docs/game-rule.md#13-furto-de-temporadas): uma tentativa consumível por jogador a cada 3 horas reais, independentemente da fazenda. Sucesso e tentativa válida impedida por animal protetor, com ou sem mordida, gastam a vez. Ações inelegíveis e tentativas nos cinco minutos de exclusividade do dono não consomem o prazo; ajuda com amor também não o consome.
+
+### Timers privados das ações sociais
+
+O snapshot autenticado próprio (`GET /v1/me/farm` e `reply.farm` nas ações de
+visita) inclui `socialCooldowns` com `stealNextAt`, `insectsNextAt` e `weedsNextAt`.
+Cada valor é um instante UTC ISO-8601 de último uso + 3h, ou `null` se nunca usado.
+Um instante passado indica disponibilidade. Fazendas visitadas, perfis públicos e
+amigos não recebem esse objeto. A leitura acontece na transação atual, com o mesmo
+relógio do serviço usado para `serverTime`. Falhas por proteção já devolvem o novo
+prazo; replay retorna o recibo original e não renova nenhum horário.
+
+A barra usa `serverTime` ancorado em `performance.now()`. Só furto e lançamento de
+cada praga ficam cinza durante a espera, com contador no próprio botão. `aria-disabled`
+mantém foco e consulta por toque, clique, Enter ou espaço; consultar informa a espera
+sem enviar tentativa. O limite exato libera automaticamente. O agendador atualiza
+somente os estados existentes, preservando foco, sem reconstruir a barra por segundo
+nem consultar a API a cada tick. Seleção, ações no terreno e entradas por teclado
+também verificam disponibilidade. Um pedido em trânsito ou incerto continua pendente
+até a confirmação do mesmo recibo. Dados ausentes, relógio inválido, suspensão ou
+reconexão exibem “Verificando…” até uma leitura autorizada. Troca de conta descarta
+o relógio e o agendador; respostas antigas não reduzem prazos já conhecidos.
+
+Publicar **API primeiro e frontend depois**. Não há migração, reset ou escrita nos
+registros antigos: uso há 4h fica disponível; uso há 2h mantém 1h restante. A API nova
+aceita clientes anteriores. O frontend novo diante de API antiga mantém estado neutro
+e não supõe disponibilidade. Presentes continuam 24h; prioridade do dono, proteção,
+mordida e demais regras não mudam. Não misturar binários de API com intervalos distintos.
 
 Antes disso, cada temporada tem uma janela exclusiva de cinco minutos para o dono após amadurecer. O servidor deriva o instante efetivo dos dados de crescimento já persistidos, considerando água, solo seco, pausas e fertilizantes; não conta desde o primeiro acesso à fazenda. O dono pode colher na hora. O visitante recebe mensagem com o tempo restante, sem consumir seu limite diário. Ao completar cinco minutos, ainda precisa cumprir as demais condições de furto. A temporada seguinte ganha outra janela. Não há campo novo no save nem migração de snapshots; plantas existentes usam seu histórico de crescimento e não recebem cinco minutos extras por causa do deploy.
 

@@ -432,7 +432,7 @@ final class JdbcOnlineStore implements AutoCloseable {
                 sql.append(" ON CONFLICT(owner) DO UPDATE SET ruleset=EXCLUDED.ruleset,revision=EXCLUDED.revision,game_time=EXCLUDED.game_time,snapshot=EXCLUDED.snapshot RETURNING owner) ");
             }
             sql.append("INSERT INTO ").append(schema).append(".receipts (actor,request_id,hash,response,expires_at) VALUES (?,?,?,?::jsonb,?)");
-            values.add(actor); values.add(request); values.add(hash); values.add(JSON.toJson(response)); values.add(java.sql.Timestamp.from(expires));
+            values.add(actor); values.add(request); values.add(hash); values.add(response.toString()); values.add(java.sql.Timestamp.from(expires));
             execute(sql.toString(), values.toArray());
             if (pendingSaves != null) for (var farm : pendingSaves.values())
                 cropPushStore().reconcileIfEligible(this, farm.owner(), farm.snapshot(), farm.time());

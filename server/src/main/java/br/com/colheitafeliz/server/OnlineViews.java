@@ -10,11 +10,12 @@ import java.util.UUID;
 
 final class OnlineViews {
     static final Gson JSON = new Gson();
+    static final Gson RESPONSE_JSON = new com.google.gson.GsonBuilder().serializeNulls().create();
     private OnlineViews() {}
 
     static JsonObject object(Object... values) {
         JsonObject result = new JsonObject();
-        for (int i = 0; i < values.length; i += 2) result.add((String) values[i], JSON.toJsonTree(values[i + 1]));
+        for (int i = 0; i < values.length; i += 2) result.add((String) values[i], values[i + 1] instanceof com.google.gson.JsonElement element ? element : JSON.toJsonTree(values[i + 1]));
         return result;
     }
 

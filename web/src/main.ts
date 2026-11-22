@@ -1,4 +1,5 @@
 import {renderEvents,eventBoosted,eventStatus,eventCountdown} from './events.ts';
+import {isSocialAction,socialCooldown,mergeSocialCooldowns} from './social-cooldowns.ts';
 import {connectPush,suspendPush,reconcilePush,renderPushSettings} from './push.ts';
 import {createClient} from '@supabase/supabase-js';
 import type {Farm,Catalog,Tile,Animal,AnimalType,Reply,CommandFields,Friend,Gifts,AwayReport,SundayHarvestEvent} from './types.ts';
@@ -17,6 +18,8 @@ import {GAME_AVATARS,googleAvatar,avatarSource,avatarImport,type AvatarChoice} f
 import {musicArtPath,seedArtPath,ownedSeeds,seedSelection,periodAt,sceneTransform,worldToScreen,tileCenter,animalPath,animalSoundPath,animalStatusText,animalActionLabel,animalClickCommand,friendFeedOptions,animalSaleOffer,animalOwnedSale,gameShortcut,shortcutPanelState,toolbarTrayToggle,tileCommand,visitCleanAvailable,cropGroups,soundForAction,actionRewardModel,cropRemainingAfter,cropNominalRemainingAfter} from './presentation.ts';
 
 let eventsTimer:number|undefined,eventsBoundary='',eventsRoot:HTMLElement|undefined;
+let socialTimer:number|undefined,socialSyncedOwner='',socialInFlightAction:Parameters<typeof socialCooldown>[0]|undefined;
+const socialButtons=new Map<string,{button:HTMLButtonElement;badge:HTMLElement;label:string}>();
 const config=window.COLHEITA_CONFIG;
 const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const modal=element<HTMLDialogElement>('modal'),content=element('modal-content'),modalFooter=element('modal-footer');
@@ -272,9 +275,9 @@ function avatarSettings(){
  }
  if(!googlePhoto)paragraph('A foto do Google não está disponível nesta sessão.');
 }
-async function logout(){const suppression=suspendPush(api).catch(()=>{});shopQuantities.clear();stopCalendar();ownServerClock=undefined;giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner="";sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;setLoginStep('login');syncPending();stopEvents();await suppression;if(supabase)await supabase.auth.signOut();}
+async function logout(){const suppression=suspendPush(api).catch(()=>{});shopQuantities.clear();stopSocialClock();socialSyncedOwner='';socialInFlightAction=undefined;stopCalendar();ownServerClock=undefined;giftContext=undefined;giftReturn=undefined;modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;shownBites.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner="";sessionGeneration++;navigationGeneration++;busy=false;music?.pause();api=undefined;own=undefined;visited=undefined;closeScene();sessionStorage.removeItem('colheita:local-user');modal.close();element('game').hidden=true;element('welcome').hidden=false;setLoginStep('login');syncPending();stopEvents();await suppression;if(supabase)await supabase.auth.signOut();}
 function showConnection(message?:string){element('connection').hidden=!message;element('connection').textContent=message??'';}
-function syncPending(){element('pending').hidden=!api?.pending;element<HTMLButtonElement>('retry').disabled=!!api?.busy;}
+function syncPending(){element('pending').hidden=!api?.pending;element<HTMLButtonElement>('retry').disabled=!!api?.busy;paintSocialTools();}
 async function retryPending(context?:NonNullable<typeof giftContext>){
  if(!api||busy||!api.pending)return;const client=api,generation=sessionGeneration,panelGeneration=dialogGeneration,pending=client.pending,actionName=(()=>{try{return pending?.body?JSON.parse(pending.body).action:undefined;}catch{return undefined;}})(),recipientId=(()=>{try{return pending?.path==='/v1/gifts'?JSON.parse(pending.body).recipientId:undefined;}catch{return undefined;}})();
  const local=!!context&&giftContext===context&&context.client===client&&context.session===generation&&context.dialog===dialogGeneration&&context.recipientId===recipientId&&modal.open;
@@ -286,7 +289,7 @@ async function retryPending(context?:NonNullable<typeof giftContext>){
   if(context){if(reply.farm)updateOwnFarm(reply.farm);if(!currentGift())return;if(reply.result?.success)leaveGift(reply.result.message);else{context!.state.phase='ready';context!.state.message=reply.result?.message??'O presente não foi enviado.';}return;}
   if(!currentPanel()){if(reply.farm&&generation===sessionGeneration&&api===client)updateOwnFarm(reply.farm);return;}receive(reply,true,actionName);if(reply.code&&currentPanel()){dialog('Convite confirmado');paragraph(reply.code);}
  }catch(error){if(generation===sessionGeneration&&api===client){if(currentGift()){context!.state.phase=client.pending?.path==='/v1/gifts'?'unknown':'load-error';context!.state.message=error instanceof Error?error.message:'Não foi possível confirmar o presente.';context!.state.canSend=false;context!.paint?.();}else if(!context&&currentPanel())handleError(error);}}
- finally{if(generation===sessionGeneration&&api===client){busy=false;syncPending();if(currentGift()){modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;if(context!.state.phase==='ready')context!.reload?.();else context!.paint?.();}else if(!context&&currentPanel()){modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;await refresh();}}}
+ finally{if(generation===sessionGeneration&&api===client){busy=false;syncPending();if(currentGift()){modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;if(context!.state.phase==='ready')context!.reload?.();else context!.paint?.();}else if(!context&&currentPanel()){modal.removeAttribute('closedby');element<HTMLButtonElement>('close-modal').disabled=false;await refresh(true);}}}
 }
 function closeGiftComposer(){const context=giftContext;if(!context||context.state.phase==='sending'||context.client!==api||context.session!==sessionGeneration||context.dialog!==dialogGeneration||!modal.open)return false;leaveGift(context.client.pending?'O envio continua pendente. Sair não desfaz a tentativa; você pode recuperar o mesmo pedido ao reabrir Presentear nesta fazenda.':undefined);return true;}
 /** Gifts start from the visited farm, so leaving the composer closes it and keeps the visit. */
@@ -327,16 +330,16 @@ function render(){
 }
 function renderTools(){
  if(own&&!visited)selectedSeed=seedSelection(catalog.crops,own.seedCounts,selectedSeed);
- const toolbar=element('tools');toolbar.replaceChildren();
- const definitions=visited?[['CURSOR','Inspecionar plantas','cursor-ui'],['STEAL','Furtar colheita','mao-restaurada'],['LOVE','Fertilizante do amor','adubo-amor'],['SPREAD_INSECTS','Lançar inseto · 1/6h','minhoca-nova'],['SPREAD_WEEDS','Lançar erva · 1/6h','erva-nova'],['CLEAN_WEEDS','Tirar ervas do amigo','herbicida-ui'],['CLEAN_INSECTS','Matar insetos do amigo','pesticida-ui']]:toolDefinitions;
+ const toolbar=element('tools');toolbar.replaceChildren();socialButtons.clear();
+ const definitions=visited?[['CURSOR','Inspecionar plantas','cursor-ui'],['STEAL','Furtar colheita','mao-restaurada'],['LOVE','Fertilizante do amor','adubo-amor'],['SPREAD_INSECTS','Lançar inseto','minhoca-nova'],['SPREAD_WEEDS','Lançar erva','erva-nova'],['CLEAN_WEEDS','Tirar ervas do amigo','herbicida-ui'],['CLEAN_INSECTS','Matar insetos do amigo','pesticida-ui']]:toolDefinitions;
  if(!definitions.some(d=>d[0]===tool)){tool=definitions[0][0];trayOpen=false;}
  element('farm').style.cursor='url("/assets/classic/icons/cursor-action.png") 1 1, auto';
  for(const [index,[id,label,icon]] of definitions.entries()){
-  const b=button(label,()=>pickTool(id),toolbar);b.classList.add('tool-button');b.title=label;b.setAttribute('aria-label',label);b.setAttribute('aria-pressed',String(tool===id));b.textContent='';
+  const b=button(label,()=>pickTool(id),toolbar);b.classList.add('tool-button');b.setAttribute('data-tool',id);b.title=label;b.setAttribute('aria-label',label);b.setAttribute('aria-pressed',String(tool===id));b.textContent='';
   const pest=id==='SPREAD_INSECTS'||id==='SPREAD_WEEDS';
   const selectedIcon=id==='FERTILIZE'?`adubo-${selectedFertilizer}`:id==='LOVE'?`adubo-${selectedLoveFertilizer}`:icon,image=document.createElement('img');image.alt='';image.src=pest?`/assets/classic/effects/${icon}.png`:`/assets/classic/icons/${selectedIcon.startsWith('adubo-')?'':'hud/'}${selectedIcon}.png`;b.append(image);
   if(id===tool&&id!=='CURSOR'&&!pest)element('farm').style.cursor=`url("/assets/classic/icons/cursors/${selectedIcon}.png") 16 16, auto`;
-  if(pest){const limit=document.createElement('span');limit.className='tool-count';limit.textContent='1/6h';b.append(limit);}
+  if(isSocialAction(id)){const badge=document.createElement('span');badge.className='social-cooldown';b.setAttribute('data-social-action',id);b.append(badge);socialButtons.set(id,{button:b,badge,label});}
   if(id==='PLANT'){
    const crop=catalog.crops.find(item=>item.id===selectedSeed),seedCount=own?.seedCounts?.[selectedSeed]??0;
    if(crop){const seed=document.createElement('img');seed.className='tool-selected-item';seed.alt='';seed.src=`/assets/${seedArtPath(crop.spriteStem)}`;b.append(seed);const count=document.createElement('span');count.className='tool-count';count.textContent=`x${seedCount}`;b.append(count);b.classList.toggle('empty',seedCount===0);}
@@ -345,11 +348,53 @@ function renderTools(){
   if(id===tool)element('tool-name').textContent=label;
   if(!visited){const key=document.createElement('span');key.className='tool-key';key.textContent=String(index+1);b.append(key);}
  }
+ paintSocialTools();
  renderToolTray();
 }
 // Friends-only fertilizers keep their own selection so a visit never changes the home Adubar tool.
+function stopSocialClock(){window.clearInterval(socialTimer);socialTimer=undefined;}
+function invalidateSocialClock(){socialSyncedOwner='';stopSocialClock();paintSocialTools();}
+/** Only the social command actually being sent or recovered is labelled Pendente. */
+function pendingSocialAction():Parameters<typeof socialCooldown>[0]|undefined{
+ const pending=api?.pending;
+ if(!pending||typeof pending.path!=='string'||!pending.path.endsWith('/visit-actions'))return undefined;
+ try{
+  const action:unknown=JSON.parse(pending.body).action;
+  return typeof action==='string'&&isSocialAction(action)?action:undefined;
+ }catch{return undefined;}
+}
+function currentSocialState(id:Parameters<typeof socialCooldown>[0]){
+ const pending=pendingSocialAction(),ownAttempt=pending===id||socialInFlightAction===id;
+ const state=socialCooldown(id,own?.socialCooldowns,socialSyncedOwner===own?.owner&&navigator.onLine?eventNow():Number.NaN,ownAttempt);
+ // Other requests prevent new commands but must not claim that all three attempts were spent.
+ return !ownAttempt&&(busy||!!api?.pending)
+  ? {...state,available:false,label:'Aguarde',message:'Aguarde a conclusão da ação em andamento.',waiting:false}
+  : state;
+}
+function blockSocialAction(id:string){
+ if(!visited||!isSocialAction(id))return false;
+ const state=currentSocialState(id);if(state.available)return false;
+ notify(state.message);return true;
+}
+function paintSocialTools(){
+ let waiting=false;
+ for(const [id,{button,badge,label}] of socialButtons){
+  if(!isSocialAction(id))continue;
+  const state=currentSocialState(id);
+  if(badge.textContent!==state.label)badge.textContent=state.label;
+  button.setAttribute('aria-disabled',String(!state.available));
+  button.setAttribute('aria-label',`${label}. ${state.label}. ${state.message}`);
+  button.classList.toggle('social-unavailable',!state.available);
+  button.title=`${label}. ${state.message}`;
+  if(!state.available&&tool===id&&!busy){tool='CURSOR';trayOpen=false;closeHealth();element('farm').style.cursor='url("/assets/classic/icons/cursor-action.png") 1 1, auto';}
+  waiting ||= state.waiting;
+ }
+ if(visited){for(const button of element('tools').children)button.setAttribute('aria-pressed',String(button.getAttribute('data-tool')===tool));if(tool==='CURSOR')element('tool-name').textContent='Inspecionar plantas';}
+ if(visited&&own&&!document.hidden&&waiting){if(socialTimer===undefined)socialTimer=window.setInterval(paintSocialTools,1000);}
+ else stopSocialClock();
+}
 function toolFertilizer(){return tool==='LOVE'?selectedLoveFertilizer:selectedFertilizer;}
-function pickTool(id:string){const previous=tool;trayOpen=toolbarTrayToggle(previous,id,trayOpen);tool=id;renderTools();if(healthTile&&(id!=='CURSOR'||element('plant-health').dataset.layout==='flow'))closeHealth();else if(healthTile&&healthPoint)renderHealth(healthTile,healthPoint,true);if(id==='SPREAD_INSECTS'||id==='SPREAD_WEEDS')notify('Escolha uma planta de um amigo, em crescimento e já regada. Se a tentativa for bloqueada, ela consome o limite de 6h.');if(id==='CLEAN_WEEDS'||id==='CLEAN_INSECTS')notify('Escolha uma planta do amigo com ervas ou insetos. Limpeza elegível dá 2 XP, até 20 XP de ajuda por dia; limpar a própria praga não dá recompensa.');}
+function pickTool(id:string){if(blockSocialAction(id))return;const previous=tool;trayOpen=toolbarTrayToggle(previous,id,trayOpen);tool=id;renderTools();if(healthTile&&(id!=='CURSOR'||element('plant-health').dataset.layout==='flow'))closeHealth();else if(healthTile&&healthPoint)renderHealth(healthTile,healthPoint,true);if(id==='SPREAD_INSECTS'||id==='SPREAD_WEEDS')notify('Escolha uma planta de um amigo, em crescimento e já regada. Se a tentativa for bloqueada, ela consome o limite de 3h.');if(id==='CLEAN_WEEDS'||id==='CLEAN_INSECTS')notify('Escolha uma planta do amigo com ervas ou insetos. Limpeza elegível dá 2 XP, até 20 XP de ajuda por dia; limpar a própria praga não dá recompensa.');}
 function renderToolTray(){
  const tray=element('tool-tray');tray.replaceChildren();const seeds=tool==='PLANT',fertilizers=tool==='FERTILIZE'||tool==='LOVE';
  tray.hidden=!trayOpen||(!seeds&&!fertilizers);if(tray.hidden)return;
@@ -380,14 +425,26 @@ function renderToolTray(){
  const detail=seeds?`${count} sementes`:selectedFertilizerType?.friendsOnly?'plantação de amigos':`reduz ${formatToolDuration(selectedFertilizerType?.reductionSeconds??0)} · ${count} no estoque`;
  const caption=document.createElement('span');caption.id='tool-tray-caption';caption.className='tray-caption';caption.textContent=selected?`${selected} · ${detail}`:'';tray.append(caption);
 }
-async function refresh(){
- if(!api||busy)return;const client=api,generation=sessionGeneration,navigation=navigationGeneration;
- try{
-  const farm=await client.get<Farm>('/v1/me/farm');if(generation!==sessionGeneration)return;updateOwnFarm(farm);
-  if(visited&&navigation===navigationGeneration){const target=visited.owner;const incoming=await client.get<Farm>(`/v1/farms/${target}/visit`);if(generation!==sessionGeneration||navigation!==navigationGeneration||visited?.owner!==target)return;visited=acceptFarm(visited,incoming);}
-  showConnection();render();void client.prepareRequestId().catch(()=>{});
- }catch(error){if(generation===sessionGeneration)handleError(error);}
+let refreshing:{client:ApiClient;generation:number;promise:Promise<void>;again:boolean}|undefined;
+function refresh(required=false):Promise<void>{
+ if(!api||busy)return Promise.resolve();const client=api,generation=sessionGeneration,navigation=navigationGeneration;
+ if(refreshing?.client===client&&refreshing.generation===generation){if(required)refreshing.again=true;return refreshing.promise;}
+ const current={client,generation,promise:Promise.resolve(),again:false};refreshing=current;
+ current.promise=(async()=>{
+  try{
+   const farm=await client.get<Farm>('/v1/me/farm');if(generation!==sessionGeneration||api!==client)return;updateOwnFarm(farm);
+   if(visited&&navigation===navigationGeneration){const target=visited.owner;const incoming=await client.get<Farm>(`/v1/farms/${target}/visit`);if(generation!==sessionGeneration||api!==client||navigation!==navigationGeneration||visited?.owner!==target)return;visited=acceptFarm(visited,incoming);}
+   showConnection();render();void client.prepareRequestId().catch(()=>{});
+  }catch(error){if(generation===sessionGeneration&&api===client)handleError(error);}
+  finally{if(refreshing===current){
+   refreshing=undefined;
+   // A mutation can invalidate a GET already in flight; its recovery needs a later snapshot.
+   if(current.again&&generation===sessionGeneration&&api===client)await refresh();
+  }}
+ })();
+ return current.promise;
 }
+
 function loginRewardPending(client:ApiClient){try{return client.pending?.path==='/v1/me/actions'&&JSON.parse(client.pending.body).action==='CLAIM_LOGIN_REWARD';}catch{return false;}}
 function calendarCurrent(context:NonNullable<typeof calendarContext>){return calendarContext===context&&api===context.client&&sessionGeneration===context.session&&dialogGeneration===context.dialog&&modal.open&&element('modal-title').textContent==='Eventos';}
 function calendarClock(context:NonNullable<typeof calendarContext>){const clock=ownServerClock?.owner===own?.owner?ownServerClock:undefined;context.anchorServer=clock?.server??Number.NaN;context.anchorClient=clock?.client??performance.now();context.resetAt=own?.loginRewards?.nextResetAt??'';context.checkedResetAt=undefined;}
@@ -461,18 +518,25 @@ function calendarTab(root:HTMLElement){
 function handleError(error:unknown){
  const message=error instanceof Error?error.message:'Falha de conexão.';
  if(error instanceof ApiError){notify(message);if(error.status===409||error.status===410)void refresh();}
- else{showConnection('Conexão interrompida. Aguarde o servidor e tente novamente.');notify(message);}
+ else{invalidateSocialClock();showConnection('Conexão interrompida. Aguarde o servidor e tente novamente.');notify(message);}
  syncPending();
 }
 function updateOwnFarm(farm:Farm){
  const previous=own;
  own=acceptFarm(own,farm);
- if(own===farm){const server=Date.parse(farm.serverTime??'');if(Number.isFinite(server))ownServerClock={owner:farm.owner,server,client:performance.now()};}
- if(own===farm)collectUpdateNotes(farm);
+ if(own===farm){
+  const timers=mergeSocialCooldowns(previous?.owner===farm.owner?previous.socialCooldowns:undefined,farm.socialCooldowns);
+  if(timers!==farm.socialCooldowns)own={...farm,socialCooldowns:timers};
+  const server=Date.parse(farm.serverTime??'');
+  ownServerClock=Number.isFinite(server)?{owner:farm.owner,server,client:performance.now()}:undefined;
+  socialSyncedOwner=Number.isFinite(server)&&!!farm.socialCooldowns?farm.owner:'';
+  collectUpdateNotes(farm);
+ }
  collectAwayReport(farm);
  if(previous&&own!==previous&&own.tiles.some(tile=>tile.state==='READY'&&previous.tiles.some(old=>
   old.column===tile.column&&old.row===tile.row&&old.cropId===tile.cropId&&old.season===tile.season&&old.state==='GROWING'
  )))playEffect('planta-pronta-para-colher');
+ paintSocialTools();
 }
 function receive(reply:Reply,announce=true,actionName?:string){
  if(reply.farm)updateOwnFarm(reply.farm);
@@ -486,10 +550,13 @@ async function action(fields:CommandFields,path='/v1/me/actions'):Promise<void>{
 /** Same as action(), but hands the reply to callers that show the result in place. */
 async function runAction(fields:CommandFields,path='/v1/me/actions'):Promise<Reply|undefined>{
  if(!api||!own||busy)return;
+ if(path.endsWith('/visit-actions')&&blockSocialAction(String(fields.action)))return;
  if(!navigator.onLine){notify('Sem conexão. Reconecte antes de agir.');return;}
- busy=true;let stale=false;const client=api,generation=sessionGeneration,previousFarm=own,animalReady=fields.action==='TEND_ANIMAL'&&own.animals.some(animal=>animal.id===fields.itemId&&animal.status==='READY');
+ const requested=String(fields.action);
+ socialInFlightAction=path.endsWith('/visit-actions')&&isSocialAction(requested)?requested:undefined;
+ busy=true;paintSocialTools();let stale=false;const client=api,generation=sessionGeneration,previousFarm=own,animalReady=fields.action==='TEND_ANIMAL'&&own.animals.some(animal=>animal.id===fields.itemId&&animal.status==='READY');
  try{const reply=await client.mutate(path,{...fields,expectedRevision:path==='/v1/me/actions'?own.revision:visited!.revision});if(generation===sessionGeneration){if(reply.result?.success&&reply.farm){await fadeSoldDepositRows(fields,reply.farm);if(generation!==sessionGeneration)return;}const bitten=receive(reply,false,String(fields.action));if(reply.result?.success&&own){const reward=actionRewardModel(previousFarm,own),selling=String(fields.action).startsWith('SELL_');if(selling){notifySale(reward.coins,reward.greens);if(reward.coins>0)animateGoldBalance(Number(previousFarm.coins??0),Number(own.coins??0));}else notifyAction(reply.result.message,String(fields.action),typeof fields.itemId==='string'?fields.itemId:undefined,reward);const cue=reward.leveledUp?'levelup':soundForAction(String(fields.action),animalReady);if(cue)playEffect(cue);}else if(reply.result){playEffect('acao-bloqueada');if(!bitten)notify(reply.result.message);}}return reply;}
- catch(error){stale=error instanceof ApiError&&[409,410].includes(error.status);if(generation===sessionGeneration)handleError(error);}finally{if(generation===sessionGeneration){busy=false;syncPending();if(stale)void refresh();else void client.prepareRequestId().catch(()=>{});}}
+ catch(error){stale=error instanceof ApiError&&[409,410].includes(error.status);if(generation===sessionGeneration){if(stale)invalidateSocialClock();handleError(error);}}finally{if(generation===sessionGeneration){socialInFlightAction=undefined;busy=false;syncPending();if(stale)void refresh(true);else void client.prepareRequestId().catch(()=>{});}}
 }
 let animalSound:HTMLAudioElement|undefined;
 function playAnimalSound(id:string){
@@ -526,6 +593,7 @@ function confirmPlot(tile:Tile){
  confirm.disabled=!tile.purchasable||tile.price===undefined||tile.requiredLevel===undefined||(own.level??0)<tile.requiredLevel;
 }
 async function tileAction(tile:Tile){
+ if(blockSocialAction(tool))return;
  if(tool==='CURSOR'&&tile.cropId){health(tile,tileCenter(tile.column,tile.row),'tap');return;}
  if(visited&&tool==='CURSOR')return;
  if(visited&&(tool==='CLEAN_WEEDS'||tool==='CLEAN_INSECTS')&&!visitCleanAvailable(tool,tile)){notify(tool==='CLEAN_WEEDS'?'Esta planta não tem ervas daninhas.':'Esta planta não tem insetos.');return;}
@@ -591,7 +659,7 @@ function updateHealthDisplay(tile:Tile,remaining=healthRemaining(tile),ready=til
 }
 function formatRemaining(seconds:number){const total=Math.max(0,Math.ceil(seconds));if(total<60)return `${total}s`;const minutes=Math.ceil(total/60),hours=Math.floor(minutes/60),days=Math.floor(hours/24);if(days)return `${days}d ${hours%24}h`;return hours?`${hours}h ${minutes%60}min`:`${minutes}min`;}
 function addChip(parent:HTMLElement,label:string,iconPath:string,kind:'problem'|'benefit'){const chip=document.createElement('span');chip.className=`crop-status-chip is-${kind}`;const icon=document.createElement('img');icon.src=iconPath;icon.alt='';chip.append(icon,document.createTextNode(label));parent.append(chip);}
-function healthAction(tile:Tile,ready:boolean,dead:boolean){if(visited){if(tool==='CURSOR')return undefined;if(tool==='CLEAN_WEEDS'||tool==='CLEAN_INSECTS'){if(dead||!visitCleanAvailable(tool,tile))return undefined;return tool==='CLEAN_WEEDS'?{label:'Tirar ervas do amigo',icon:'/assets/classic/icons/hud/herbicida-ui.png'}:{label:'Matar insetos do amigo',icon:'/assets/classic/icons/hud/pesticida-ui.png'};}if(tool==='SPREAD_INSECTS'||tool==='SPREAD_WEEDS'){if(ready||dead||!tile.watered||(tool==='SPREAD_INSECTS'?tile.insects>0:tile.weeds))return undefined;return tool==='SPREAD_INSECTS'?{label:'Lançar inseto nesta planta · 1/6h',icon:'/assets/classic/effects/verme_1.png'}:{label:'Lançar erva nesta planta · 1/6h',icon:'/assets/classic/effects/erva_daninha_1.png'};}return ready?{label:'Furtar colheita',icon:'/assets/classic/icons/hud/mao-restaurada.png'}:undefined;}if(dead)return{label:'Remover com a pá',icon:'/assets/classic/icons/hud/pa-ui.png',key:'2'};if(tile.weeds)return{label:'Tirar ervas',icon:'/assets/classic/icons/hud/herbicida-ui.png',key:'5'};if(tile.insects>0)return{label:'Matar insetos',icon:'/assets/classic/icons/hud/pesticida-ui.png',key:'6'};if(tile.dry&&tile.state==='GROWING')return{label:'Regar',icon:'/assets/classic/icons/hud/regador-ui.png',key:'4'};if(ready)return{label:'Colher com a luvinha',icon:'/assets/classic/icons/hud/mao-restaurada.png',key:'7'};return undefined;}
+function healthAction(tile:Tile,ready:boolean,dead:boolean){if(visited){if(isSocialAction(tool)&&!currentSocialState(tool).available)return undefined;if(tool==='CURSOR')return undefined;if(tool==='CLEAN_WEEDS'||tool==='CLEAN_INSECTS'){if(dead||!visitCleanAvailable(tool,tile))return undefined;return tool==='CLEAN_WEEDS'?{label:'Tirar ervas do amigo',icon:'/assets/classic/icons/hud/herbicida-ui.png'}:{label:'Matar insetos do amigo',icon:'/assets/classic/icons/hud/pesticida-ui.png'};}if(tool==='SPREAD_INSECTS'||tool==='SPREAD_WEEDS'){if(ready||dead||!tile.watered||(tool==='SPREAD_INSECTS'?tile.insects>0:tile.weeds))return undefined;return tool==='SPREAD_INSECTS'?{label:'Lançar inseto nesta planta · 1/3h',icon:'/assets/classic/effects/minhoca-nova.png'}:{label:'Lançar erva nesta planta · 1/3h',icon:'/assets/classic/effects/erva-nova.png'};}return ready?{label:'Furtar colheita',icon:'/assets/classic/icons/hud/mao-restaurada.png'}:undefined;}if(dead)return{label:'Remover com a pá',icon:'/assets/classic/icons/hud/pa-ui.png',key:'2'};if(tile.weeds)return{label:'Tirar ervas',icon:'/assets/classic/icons/hud/herbicida-ui.png',key:'5'};if(tile.insects>0)return{label:'Matar insetos',icon:'/assets/classic/icons/hud/pesticida-ui.png',key:'6'};if(tile.dry&&tile.state==='GROWING')return{label:'Regar',icon:'/assets/classic/icons/hud/regador-ui.png',key:'4'};if(ready)return{label:'Colher com a luvinha',icon:'/assets/classic/icons/hud/mao-restaurada.png',key:'7'};return undefined;}
 function positionHealth(panel:HTMLElement,game:HTMLElement,point:{x:number;y:number}){
  healthPinned=healthTapPinned;
  const animal=panel.className.includes('animal-tooltip'),fixed=!animal&&window.matchMedia('(max-width:1100px)').matches;
@@ -1039,7 +1107,7 @@ function setupLoginInvitation(){
 async function acceptInvitation(code:string,panelGeneration:number,closeOnSuccess:boolean,onError?:()=>void):Promise<boolean>{
  if(!api){if(onError)onError();else notify('Entre antes de aceitar o convite.');return false;}
  const client=api,generation=sessionGeneration;
- try{await client.mutate('/v1/friend-invitations/accept',{code});if(generation!==sessionGeneration)return false;await refresh();if(generation!==sessionGeneration)return false;await migrateAvatar();if(generation!==sessionGeneration)return false;if(own&&closeOnSuccess&&modal.open&&dialogGeneration===panelGeneration)modal.close();return true;}
+ try{await client.mutate('/v1/friend-invitations/accept',{code});if(generation!==sessionGeneration)return false;await refresh(true);if(generation!==sessionGeneration)return false;await migrateAvatar();if(generation!==sessionGeneration)return false;if(own&&closeOnSuccess&&modal.open&&dialogGeneration===panelGeneration)modal.close();return true;}
  catch(error){if(generation!==sessionGeneration)return false;if(onError)onError();else handleError(error);return false;}finally{syncPending();}
 }
 // Name, VIP badge and public title are rebuilt together, so a list refresh never drops the title.
@@ -1089,7 +1157,7 @@ function handleAnimalClick(id:string,pointerType:string){
  if(command)void action(command);else animalPopup(id);
 }
 async function connect(user:string,token:()=>Promise<string>,photo?:unknown,displayName=''){
- shownBites.clear();shopQuantities.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner='';sessionGeneration++;navigationGeneration++;busy=false;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;ownServerClock=undefined;stopCalendar();closeScene();const generation=sessionGeneration;
+ shownBites.clear();shopQuantities.clear();pendingUpdateNotes=[];shownUpdateNotes.clear();notesOwner='';sessionGeneration++;navigationGeneration++;busy=false;stopSocialClock();socialSyncedOwner='';socialInFlightAction=undefined;music?.pause();music=undefined;musicTrack='';own=undefined;visited=undefined;ownServerClock=undefined;stopCalendar();closeScene();const generation=sessionGeneration;
  api=new ApiClient(config.api,user,token,sessionStorage);syncPending();
  avatarUser=`${config.api}:${user}`;void connectPush(avatarUser,api).catch(()=>{});googlePhoto=googleAvatar(photo);avatarChoice='classic';loadAudioSettings();
  scene=new Scene(element<HTMLCanvasElement>('farm'),catalog,tile=>{if(healthPinned&&!(tool==='CURSOR'&&tile.cropId))closeHealth();void tileAction(tile);},handleAnimalClick,health,syncMusic,()=>{if(healthPinned)closeHealth();},(id,point)=>{if(id&&point){playAnimalSound(id);animalTooltip(id,point);}else animalTooltip(null);},()=>tool==='CURSOR');
@@ -1133,12 +1201,13 @@ modal.addEventListener('cancel',event=>{if(element('modal-title').textContent!==
 modal.addEventListener('close',showUpdateNotes);
 element('farm').addEventListener('camerachange',()=>health(healthTile,healthPoint,'resize'));
 element('retry').onclick=()=>retryPending();
-window.addEventListener('offline',()=>showConnection('Sem conexão. Reconecte antes de agir.'));
-window.addEventListener('online',()=>{void refresh();if(api)void reconcilePush(avatarUser,api).catch(()=>{});});
+window.addEventListener('offline',()=>{invalidateSocialClock();showConnection('Sem conexão. Reconecte antes de agir.');});
+window.addEventListener('online',()=>{invalidateSocialClock();void refresh();if(api)void reconcilePush(avatarUser,api).catch(()=>{});});
 document.addEventListener('pointerdown',event=>{if(healthPinned&&!['farm','plant-health','tools-bar','tool-tray','farm-header'].some(id=>element(id).contains(event.target as Node)))closeHealth();});
 modal.addEventListener('close',()=>{stopEvents();if(element('modal-title').textContent==='Eventos')stopCalendar();health(healthTile,healthPoint);window.clearInterval(missionsTimer);missionsTimer=undefined;});
 document.addEventListener('keydown',event=>{if(!own||event.repeat||event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement||(event.target as HTMLElement)?.tagName==='TEXTAREA')return;const shortcut=gameShortcut(event.key,!!visited);if(!shortcut)return;if(shortcut.action==='tool'){if(!modal.open)pickTool(shortcut.tool);return;}if(shortcut.action==='shop')shortcutPanel('Loja',()=>shop());else if(shortcut.action==='deposit')shortcutPanel('Depósito',deposit);else if(shortcut.action==='missions')shortcutPanel('Tarefas',missions);else if(shortcut.action==='plots')shortcutPanel('Terras da fazenda',tileList);else if(shortcut.action==='music')toggleMusic();else if(shortcut.action==='effects')toggleEffects();});
-document.addEventListener('visibilitychange',()=>{syncMusic();if(!document.hidden)void refresh();});
+document.addEventListener('visibilitychange',()=>{syncMusic();invalidateSocialClock();if(!document.hidden)void refresh();});
+window.addEventListener('pageshow',()=>{invalidateSocialClock();if(own)void refresh();});
 window.setInterval(()=>{if(!document.hidden)void refresh();},30_000);
 void start();
 

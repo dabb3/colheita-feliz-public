@@ -1,127 +1,155 @@
-import { expect, test } from '@playwright/test';
+import {test, expect, type Page} from '@playwright/test';
+import {readFileSync} from 'node:fs';
 
-test.beforeEach(async ({ page }) => {
-  page.on('pageerror', error => test.info().annotations.push({ type: 'pageerror', description: error.message }));
-  await page.goto('/');
-  if (test.info().title === 'critical login, farm, zoom, shop and deposit views produce review screenshots') {
-    await page.screenshot({ path: test.info().outputPath('login.png'), animations: 'disabled' });
-  }
-  await page.getByRole('button', { name: 'Testar como Alice' }).click();
-  await expect(page.locator('#game')).toBeVisible();
-  await expect(page.locator('#farm')).toBeVisible();
-});
+const data = (name: string) => JSON.parse(readFileSync(new URL(`../../assets/data/${name}.json`, import.meta.url), 'utf8'));
 
-test.afterEach(async () => {
-  const errors = test.info().annotations.filter(annotation => annotation.type === 'pageerror');
-  expect(errors, 'unexpected browser exceptions').toEqual([]);
-});
-
-test('login opens the synthetic farm and loads a bounded canvas', async ({ page }, testInfo) => {
-  const canvas = page.locator('#farm');
-  if (testInfo.project.name === 'webkit-iphone') {
-    await expect(page.locator('#camera-controls')).toBeVisible();
-    await expect.poll(() => canvas.evaluate(node => node.width)).toBeLessThanOrEqual(3200);
-    await expect.poll(() => canvas.evaluate(node => node.height)).toBeLessThanOrEqual(1800);
-  } else {
-    await expect(canvas).toHaveJSProperty('width', 1600);
-    await expect(canvas).toHaveJSProperty('height', 900);
-    await expect(page.locator('#camera-controls')).toBeHidden();
-  }
-});
-
-test('mobile touch selects a locked plot and opens the purchase panel', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== 'webkit-iphone', 'Touch profile runs in the iPhone project.');
-  const canvas = page.locator('#farm');
-  const bounds = await canvas.boundingBox();
-  expect(bounds).not.toBeNull();
-  await page.touchscreen.tap(bounds!.x + bounds!.width * 1010 / 1600, bounds!.y + bounds!.height * 580 / 900);
-  await expect(page.locator('#modal')).toHaveJSProperty('open', true);
-  await expect(page.locator('#modal-title')).toHaveText('Comprar terra');
-});
-
-test('dragging the camera does not activate a plot and a later touch still works', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== 'webkit-iphone', 'Touch profile runs in the iPhone project.');
-  await page.addInitScript(() => {
-    const original = window.fetch.bind(window);
-    (window as typeof window & { farmActions: number }).farmActions = 0;
-    window.fetch = (input, init) => {
-      if (new URL(typeof input === 'string' ? input : input instanceof Request ? input.url : input.href).pathname === '/v1/me/actions' && init?.method === 'POST') {
-        (window as typeof window & { farmActions: number }).farmActions++;
-        return Promise.resolve(new Response(JSON.stringify({ error: 'Blocked by E2E safety guard' }), { status: 409, headers: { 'Content-Type': 'application/json' } }));
-      }
-      return original(input, init);
-    };
-  });
-  await page.reload();
-  await expect(page.locator('#game')).toBeVisible();
-  await page.getByRole('button', { name: 'Arar / limpar' }).click();
-  const canvas = page.locator('#farm');
-  const bounds = await canvas.boundingBox();
-  expect(bounds).not.toBeNull();
-  const start = { x: bounds!.x + bounds!.width * 585 / 1600, y: bounds!.y + bounds!.height * 400 / 900 };
-  const end = { x: bounds!.x + bounds!.width * 670 / 1600, y: bounds!.y + bounds!.height * 436 / 900 };
-  await page.mouse.move(start.x, start.y);
-  await page.mouse.down();
-  await page.mouse.move(end.x, end.y, { steps: 8 });
-  await page.mouse.up();
-  expect(await page.evaluate(() => (window as typeof window & { farmActions: number }).farmActions)).toBe(0);
-  await page.getByRole('button', { name: 'Selecionar' }).click();
-  await page.touchscreen.tap(bounds!.x + bounds!.width * 1010 / 1600, bounds!.y + bounds!.height * 580 / 900);
-  await expect(page.locator('#modal-title')).toHaveText('Comprar terra');
-});
-
-test('mobile zoom changes the canvas scale without hiding controls', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== 'webkit-iphone', 'Touch profile runs in the iPhone project.');
-  const canvas = page.locator('#farm');
-  const before = await canvas.evaluate(node => getComputedStyle(node).width);
-  await page.getByRole('button', { name: 'Aproximar' }).click();
-  await expect.poll(() => canvas.evaluate(node => getComputedStyle(node).width)).not.toBe(before);
-  await expect(page.getByRole('button', { name: 'Afastar' })).toBeVisible();
-});
-
-test('shop remains visible and scrollable in portrait and landscape', async ({ page }) => {
-  for (const viewport of [{ width: 390, height: 400 }, { width: 844, height: 390 }]) {
-    await page.setViewportSize(viewport);
-    await expect.poll(() => page.evaluate(() => ({ width: window.visualViewport?.width, height: window.visualViewport?.height }))).toEqual(viewport);
-    if (viewport.width < viewport.height) {
-      await page.locator('#more').click();
-      await page.locator('#shop').click();
-    } else {
-      await page.locator('#shop').click();
+// Exercise the built client and real assets without production credentials or services.
+async function farmApi(page: Page) {
+  const farm = {
+    owner: 'alice', name: 'Alice', own: true, revision: '1', serverTime: '2026-11-21T15:00:00Z',
+    coins: '500', greenCoins: '5', level: 1, currentXp: '0', xpToNext: '25', avatarSelected: true,
+    seedCounts: {nabo: 2}, fertilizers: {}, feed: {}, animals: [], missions: [],
+    activeBackgroundId: 'inverno', ownedBackgroundIds: ['default', 'inverno', 'outono'],
+    tiles: [{column: 0, row: 0, unlocked: true, state: 'GRASS', stage: 0, season: 1, seasons: 1,
+      watered: false, dry: false, paused: false, weeds: false, insects: 0, fertilized: false,
+      harvestRevision: '1', remainingSeconds: 0, nominalRemainingSeconds: 0}],
+  };
+  const bodies: string[] = [], receipts = new Map();
+  let ids = 0, loseNextResponse = false;
+  await page.route('http://127.0.0.1:8080/**', async route => {
+    const request = route.request(), path = new URL(request.url()).pathname;
+    const json = (body: unknown) => route.fulfill({json: body});
+    if (path === '/health') return json({development: true});
+    if (path === '/v1/catalog') return json({crops: data('crops'), animals: data('animals'),
+      fertilizers: data('fertilizers'), feedPrices: {producer: 120, growth: 80}, vip: {greenPrice: 100}});
+    if (path === '/v1/request-id') return json({requestId: `browser-receipt-${++ids}`});
+    if (path === '/v1/me/farm') return json(farm);
+    if (path === '/v1/me/actions') {
+      const body = request.postData()!; bodies.push(body);
+      const command = JSON.parse(body);
+      expect(request.headers().authorization).toBe('Bearer dev-alice');
+      if (receipts.has(command.requestId)) return json(receipts.get(command.requestId));
+      expect(command.expectedRevision).toBe(farm.revision);
+      const tile = farm.tiles[0];
+      if (command.action === 'PLOW') { expect(tile.state).toBe('GRASS'); tile.state = 'PLOWED'; }
+      else if (command.action === 'PLANT') {
+        expect(tile.state).toBe('PLOWED'); expect(command.itemId).toBe('nabo');
+        Object.assign(tile, {state: 'GROWING', cropId: 'nabo', stage: 1}); farm.seedCounts.nabo--;
+      } else if (command.action === 'WATER') { expect(tile.state).toBe('GROWING'); tile.watered = true; }
+      else if (command.action === 'EQUIP_BACKGROUND') farm.activeBackgroundId = command.itemId;
+      else throw new Error(`Unexpected command: ${command.action}`);
+      farm.revision = String(Number(farm.revision) + 1);
+      const reply = structuredClone({farm, result: {success: true, message: 'Ação concluída.'}});
+      receipts.set(command.requestId, reply);
+      if (loseNextResponse) { loseNextResponse = false; return route.abort('failed'); }
+      return json(reply);
     }
-    await expect(page.locator('#modal')).toHaveJSProperty('open', true);
-    await expect(page.locator('#modal-title')).toHaveText('Loja');
-    const dialog = await page.locator('#modal').boundingBox();
-    expect(dialog).not.toBeNull();
-    expect(dialog!.y).toBeGreaterThanOrEqual(0);
-    expect(dialog!.y + dialog!.height).toBeLessThanOrEqual(viewport.height + 1);
-    const content = page.locator('.market-scroll');
-    await expect(content).toBeVisible();
-    const scrollHeight = await content.evaluate(node => node.scrollHeight);
-    const clientHeight = await content.evaluate(node => node.clientHeight);
-    expect(scrollHeight).toBeGreaterThan(clientHeight);
-    await content.evaluate(node => { node.scrollTop = node.scrollHeight; });
-    await expect.poll(() => content.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
-    await page.locator('#close-modal').click();
-  }
+    // Push capabilities must not contact any real service during browser tests.
+    if (path.startsWith('/v1/push/')) return route.fulfill({status: 503, json: {error: 'Disabled in browser tests'}});
+    throw new Error(`Unexpected API request: ${path}`);
+  });
+  return {farm, bodies, loseResponse() { loseNextResponse = true; }};
+}
+
+async function login(page: Page) {
+  await page.goto('/', {waitUntil: 'domcontentloaded'});
+  await page.getByRole('button', {name: 'Testar como Alice'}).click();
+  await expect(page.locator('#game')).toBeVisible();
+  await expect(page.locator('#wallet')).toContainText('Alice');
+}
+
+async function touchPlot(page: Page) {
+  const point = await page.locator('#farm').evaluate(canvas => {
+    const rect = canvas.getBoundingClientRect();
+    return {x: rect.left + 585 * rect.width / 1600, y: rect.top + 400 * rect.height / 900};
+  });
+  await page.touchscreen.tap(point.x, point.y);
+}
+
+test('development login opens the actual farm without a pending action', async ({page}) => {
+  await farmApi(page); await login(page);
+  await expect(page.locator('#tools').getByRole('button', {name: 'Selecionar', exact: true})).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#pending')).toBeHidden();
 });
 
-test('critical login, farm, zoom, shop and deposit views produce review screenshots', async ({ page }, testInfo) => {
-  await expect(page.locator('#game')).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('farm.png'), animations: 'disabled' });
-  if (testInfo.project.name === 'webkit-iphone') {
-    await page.getByRole('button', { name: 'Aproximar' }).click();
-    await page.screenshot({ path: testInfo.outputPath('farm-zoom.png'), animations: 'disabled' });
-    await page.locator('#more').click();
-    await page.screenshot({ path: testInfo.outputPath('more.png'), animations: 'disabled' });
-    await page.locator('#shop').click();
-  } else {
-    await page.locator('#shop').click();
-  }
-  await expect(page.locator('#modal-title')).toHaveText('Loja');
-  await page.screenshot({ path: testInfo.outputPath('shop.png'), animations: 'disabled' });
-  await page.locator('#close-modal').click();
-  await page.locator('#deposit').click();
-  await expect(page.locator('#modal-title')).toHaveText('Depósito');
-  await page.screenshot({ path: testInfo.outputPath('deposit.png'), animations: 'disabled' });
+test('mobile touch can plow, plant and water the same plot', async ({browser}) => {
+  const context = await browser.newContext({viewport: {width: 390, height: 844}, hasTouch: true, isMobile: true});
+  try {
+    const page = await context.newPage(), api = await farmApi(page); await login(page);
+    await page.getByRole('button', {name: 'Arar / limpar', exact: true}).tap(); await touchPlot(page);
+    await expect.poll(() => api.farm.revision).toBe('2');
+    await expect(page.locator('#pending')).toBeHidden();
+    await page.getByRole('button', {name: 'Plantar', exact: true}).tap();
+    await page.getByRole('button', {name: 'Nabo, 2 sementes', exact: true}).tap(); await touchPlot(page);
+    await expect.poll(() => api.farm.revision).toBe('3');
+    await expect(page.locator('#pending')).toBeHidden();
+    await page.getByRole('button', {name: 'Regar', exact: true}).tap(); await touchPlot(page);
+    await expect.poll(() => api.farm.revision).toBe('4');
+    await expect(page.locator('#pending')).toBeHidden();
+    expect(api.farm.tiles[0].watered).toBe(true);
+    expect(api.bodies.map(body => JSON.parse(body).action)).toEqual(['PLOW', 'PLANT', 'WATER']);
+    await page.screenshot({path: test.info().outputPath('mobile-watered.png')});
+  } finally { await context.close(); }
+});
+
+test('lost action response survives reload and replays the same receipt once', async ({page}) => {
+  const api = await farmApi(page); await login(page); api.loseResponse();
+  await page.getByRole('button', {name: 'Arar / limpar', exact: true}).click();
+  const canvas = page.locator('#farm');
+  await canvas.click({position: await canvas.evaluate(node => ({x: 585 * node.clientWidth / 1600, y: 400 * node.clientHeight / 900}))});
+  await expect(page.locator('#pending')).toBeVisible();
+  expect(api.farm.revision).toBe('2');
+  await page.reload(); await expect(page.locator('#game')).toBeVisible();
+  await page.getByRole('button', {name: 'Confirmar ação pendente'}).click();
+  await expect(page.locator('#pending')).toBeHidden();
+  expect(api.bodies).toHaveLength(2); expect(api.bodies[1]).toBe(api.bodies[0]);
+  expect(api.farm.revision).toBe('2');
+});
+
+test('period and pack changes retain the previous background until the fallback loads', async ({page}) => {
+  await page.clock.install({time: new Date('2026-11-21T15:00:00Z')});
+  const api = await farmApi(page);
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/assets/classic/background/*', async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('background-sunset.png') || path.endsWith('background-inverno-tarde.png')) { await gate; await route.continue(); }
+    else if (path.endsWith('background-outono-tarde.png')) await route.abort('failed');
+    else await route.continue();
+  });
+  try {
+    const winterLoaded = page.waitForResponse('**/backgound-inverno.png');
+    await login(page); await (await winterLoaded).finished();
+    const pixel = () => page.locator('#farm').evaluate((canvas: HTMLCanvasElement) =>
+      Array.from(canvas.getContext('2d')!.getImageData(10, 10, 1, 1).data));
+    await expect.poll(pixel).not.toEqual([132, 186, 48, 255]);
+    // Wait for the equipped winter art, not the classic image that may arrive first.
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    const previous = await pixel();
+    const requested = page.waitForRequest('**/background-sunset.png');
+    await page.clock.setSystemTime(new Date('2026-11-21T20:00:00Z')); await requested;
+    await page.locator('#decorations').click(); await page.getByRole('button', {name: 'Próximo fundo'}).click();
+    await page.getByRole('button', {name: 'Aplicar', exact: true}).click();
+    await expect.poll(() => api.farm.activeBackgroundId).toBe('outono');
+    await page.getByRole('button', {name: 'Fechar', exact: true}).click();
+    expect(await pixel()).toEqual(previous);
+    await page.screenshot({path: test.info().outputPath('background-loading.png')});
+    release(); await expect.poll(pixel).not.toEqual(previous);
+  } finally { release(); }
+});
+
+
+test('first entry uses a quiet placeholder until any background is ready', async ({page}) => {
+  await page.clock.install({time: new Date('2026-11-21T15:00:00Z')});
+  await farmApi(page);
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/assets/classic/background/*', async route => { await gate; await route.continue(); });
+  try {
+    await login(page);
+    const pixel = () => page.locator('#farm').evaluate((canvas: HTMLCanvasElement) =>
+      Array.from(canvas.getContext('2d')!.getImageData(10, 10, 1, 1).data));
+    expect(await pixel()).toEqual([231, 227, 216, 255]);
+    release(); await expect.poll(pixel).not.toEqual([231, 227, 216, 255]);
+  } finally { release(); }
 });

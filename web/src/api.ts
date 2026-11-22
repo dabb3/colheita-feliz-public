@@ -146,6 +146,9 @@ export class ApiClient {
         throw new Error("A resposta não confirmou o resultado do presente.");
       if (pending.path === "/v1/me/actions" && JSON.parse(pending.body).action === "CLAIM_LOGIN_REWARD" && typeof response?.result?.success !== "boolean")
         throw new Error("A resposta não confirmou o resgate da recompensa.");
+      if (pending.path.endsWith('/visit-actions') && ['STEAL','SPREAD_INSECTS','SPREAD_WEEDS'].includes(JSON.parse(pending.body).action)
+          && (typeof response?.result?.success !== 'boolean' || !response.farm))
+        throw new Error('A resposta não confirmou o resultado da tentativa. Recupere a ação pendente.');
       this.clear(pending);
       return response;
     } catch (error) {
@@ -186,7 +189,10 @@ export class ApiClient {
       signal: AbortSignal.timeout(65_000),
       cache: "no-store",
     });
-    const json = await response.json();
+    // Proxy errors may be HTML or empty; their HTTP status still defines receipt recovery.
+    let json;
+    try { json = await response.json(); }
+    catch (error) { if (response.ok) throw error; }
     const serverTiming = response.headers.get("Server-Timing");
     if (serverTiming)
       try {
@@ -214,7 +220,8 @@ export class ApiClient {
     if (!response.ok)
       throw new ApiError(
         response.status,
-        json.error ?? "Não foi possível concluir.",
+        typeof json?.error === "string" && json.error.trim()
+          ? json.error : "Não foi possível concluir. Tente novamente.",
       );
     const lease = json?.requestLease,
       serverDate = Date.parse(response.headers.get("Date") ?? "");
