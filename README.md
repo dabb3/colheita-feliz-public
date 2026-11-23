@@ -121,9 +121,11 @@ Para testes Java incluindo integração, use o banco exclusivo criado pelo scrip
 ```powershell
 npm ci --ignore-scripts --prefix web
 pwsh -NoProfile -File scripts/test-local.ps1
+# Opcional: force todas as tasks Gradle novamente
+pwsh -NoProfile -File scripts/test-local.ps1 -RerunTasks
 ```
 
-O script usa JDK 21 em `~/.jdks/corretto-21.0.12.1`, quando presente, sem alterar as variáveis persistentes do Windows. Se seu JDK 21 estiver em outro local, defina `$env:JAVA_HOME` apenas nessa sessão antes de executar. Não use o banco de desenvolvimento do `compose.yaml` para esses testes.
+O script usa JDK 21 em `~/.jdks/corretto-21.0.12.1`, quando presente, sem alterar as variáveis persistentes do Windows. Se seu JDK 21 estiver em outro local, defina `$env:JAVA_HOME` apenas nessa sessão antes de executar. O PostgreSQL descartável usa tmpfs de até 1 GiB; em falha, o script salva o log do container em `%TEMP%` antes de removê-lo. Ele remove somente o container criado pelo próprio teste. `-RerunTasks` força todas as tasks Gradle a executar e leva mais tempo. Não use o banco de desenvolvimento do `compose.yaml` para esses testes.
 
 ### macOS (Safari iOS Simulator)
 

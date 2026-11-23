@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param()
+param([switch]$RerunTasks)
 $ErrorActionPreference = 'Stop'
 $docker = Get-Command docker -ErrorAction Stop
 $name = "colheita-test-$([Guid]::NewGuid().ToString('N'))"
@@ -9,13 +9,14 @@ $oldGradleHome = $env:GRADLE_USER_HOME
 $oldDatabaseUrl = $env:TEST_DATABASE_URL
 $oldDatabaseUser = $env:TEST_DATABASE_USER
 $started = $false
+$verificationPassed = $false
 try {
   $jdk = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { Join-Path $env:USERPROFILE '.jdks\corretto-21.0.12.1' }
   if (-not (Test-Path (Join-Path $jdk 'bin\java.exe'))) { throw 'JDK 21 was not found. Set JAVA_HOME for this PowerShell process and rerun.' }
   $env:JAVA_HOME = $jdk
   $env:PATH = "$jdk\bin;$env:PATH"
   $env:GRADLE_USER_HOME = Join-Path $env:TEMP "gradle-colheita-test-$([Guid]::NewGuid().ToString('N'))"
-  & $docker.Source run --detach --rm --name $name --publish '127.0.0.1::5432' --tmpfs '/var/lib/postgresql/data:rw,noexec,nosuid,size=512m' --env POSTGRES_DB=colheita_test --env POSTGRES_USER=postgres --env POSTGRES_HOST_AUTH_METHOD=trust postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b | Out-Null
+  & $docker.Source run --detach --rm --name $name --publish '127.0.0.1::5432' --tmpfs '/var/lib/postgresql/data:rw,noexec,nosuid,size=1g' --env POSTGRES_DB=colheita_test --env POSTGRES_USER=postgres --env POSTGRES_HOST_AUTH_METHOD=trust postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b | Out-Null
   if ($LASTEXITCODE -ne 0) { throw "Could not start isolated PostgreSQL container (docker exit $LASTEXITCODE)." }
   $started = $true
   $mapping = (& $docker.Source port $name '5432/tcp' 2>&1 | Select-Object -First 1).ToString().Trim()
@@ -36,11 +37,24 @@ try {
   if ($LASTEXITCODE -ne 0) { throw "Web typecheck failed (exit $LASTEXITCODE)." }
   npm run build:local --prefix web
   if ($LASTEXITCODE -ne 0) { throw "Local web build failed (exit $LASTEXITCODE)." }
-  & .\gradlew.bat --no-daemon test build :server:integrationTest
+  $gradleArgs = @('--no-daemon')
+  if ($RerunTasks) { $gradleArgs += '--rerun-tasks' }
+  $gradleArgs += @('test', 'build', ':server:integrationTest')
+  & .\gradlew.bat @gradleArgs
   if ($LASTEXITCODE -ne 0) { throw "Gradle verification failed (exit $LASTEXITCODE)." }
+  $verificationPassed = $true
   Write-Output "Local verification passed against disposable PostgreSQL at 127.0.0.1:$port. Container: $name"
 } finally {
   if ($started) {
+    if (-not $verificationPassed) {
+      $postgresLog = Join-Path $env:TEMP "$name-postgres.log"
+      try {
+        & $docker.Source logs $name 2>&1 | Set-Content -LiteralPath $postgresLog
+        Write-Warning "PostgreSQL logs saved to $postgresLog"
+      } catch {
+        Write-Warning "Could not save PostgreSQL logs for ${name}: $_"
+      }
+    }
     & $docker.Source rm --force $name *> $null
     if ($LASTEXITCODE -ne 0) { Write-Warning "Could not remove the owned container $name." }
   }
