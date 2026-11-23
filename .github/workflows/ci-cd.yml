@@ -95,7 +95,7 @@ jobs:
           DATABASE_USER: postgres
           ALLOWED_ORIGINS: http://127.0.0.1:5173
         run: |
-          setsid bash ./gradlew --no-daemon :server:run > "$RUNNER_TEMP/colheita-api.log" 2>&1 &
+          bash ./gradlew --no-daemon :server:run > "$RUNNER_TEMP/colheita-api.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/colheita-api.pid"
           for _ in {1..60}; do
             if curl --fail --silent http://127.0.0.1:8080/health >/dev/null; then exit 0; fi
@@ -111,9 +111,16 @@ jobs:
       - name: Stop synthetic development API
         if: always()
         run: |
+          stop_process_tree() {
+            local parent="$1" child
+            while IFS= read -r child; do
+              [ -z "$child" ] || stop_process_tree "$child"
+            done < <(pgrep -P "$parent" || true)
+            kill "$parent" 2>/dev/null || true
+          }
           if [ -f "$RUNNER_TEMP/colheita-api.pid" ]; then
             api_pid="$(cat "$RUNNER_TEMP/colheita-api.pid")"
-            kill -- "-$api_pid" 2>/dev/null || true
+            stop_process_tree "$api_pid"
             wait "$api_pid" 2>/dev/null || true
           fi
 
@@ -341,10 +348,17 @@ jobs:
           api_pid=
           web_pid=
           appium_pid=
+          stop_process_tree() {
+            local parent="$1" child
+            while IFS= read -r child; do
+              [ -z "$child" ] || stop_process_tree "$child"
+            done < <(pgrep -P "$parent" || true)
+            kill "$parent" 2>/dev/null || true
+          }
           cleanup() {
             [ -z "$appium_pid" ] || kill "$appium_pid" 2>/dev/null || true
             [ -z "$web_pid" ] || kill "$web_pid" 2>/dev/null || true
-            [ -z "$api_pid" ] || kill -- "-$api_pid" 2>/dev/null || true
+            [ -z "$api_pid" ] || stop_process_tree "$api_pid"
             [ -z "$appium_pid" ] || wait "$appium_pid" 2>/dev/null || true
             [ -z "$web_pid" ] || wait "$web_pid" 2>/dev/null || true
             [ -z "$api_pid" ] || wait "$api_pid" 2>/dev/null || true
@@ -353,7 +367,7 @@ jobs:
             "$(brew --prefix postgresql@17)/bin/pg_ctl" -D "$RUNNER_TEMP/colheita-postgres" stop 2>/dev/null || true
           }
           trap cleanup EXIT
-          setsid bash ./gradlew --no-daemon :server:run > "$RUNNER_TEMP/colheita-api.log" 2>&1 &
+          bash ./gradlew --no-daemon :server:run > "$RUNNER_TEMP/colheita-api.log" 2>&1 &
           api_pid=$!
           npm run serve --prefix web > web/test-results/safari-simulator/web.log 2>&1 &
           web_pid=$!
