@@ -140,7 +140,7 @@ try {
   await screenshot('farm');
 
   // Measure Safari's content origin once using a harmless navigation button. Reuse that origin for every W3C touch.
-  const calibration = await execute("const e=document.querySelector('#more'),r=e.getBoundingClientRect(); window.__touchCalibration=null; window.__touchPointerUps=[]; window.addEventListener('pointerup',event=>{const observed={x:event.clientX,y:event.clientY,pointerType:event.pointerType}; window.__touchPointerUps.push(observed); if(event.pointerType==='touch')window.__touchCalibration=observed}, {capture:true}) ; return {x:r.left+r.width/2,y:r.top+r.height/2}");
+  const calibration = await execute("const e=document.querySelector('#more'),r=e.getBoundingClientRect(); window.__touchCalibration=null; window.__touchPointerUps=[]; window.addEventListener('pointerup',event=>{const observed={x:event.clientX,y:event.clientY,pointerType:event.pointerType}; window.__touchPointerUps.push(observed); if(event.pointerType==='touch')window.__touchCalibration={...observed}}, {capture:true}) ; return {x:r.left+r.width/2,y:r.top+r.height/2}");
   const calibrationCssPoint = requireFinitePoint(calibration.value, 'Intended calibration point');
   const calibrationGeometry = await screenGeometry();
   const calibrationPoint = viewportPointToScreen(calibrationCssPoint, calibrationGeometry.viewportRect, calibrationGeometry.screenInfo);
@@ -150,12 +150,15 @@ try {
     { type: 'pointerDown', button: 0 }, { type: 'pause', duration: 100 }, { type: 'pointerUp', button: 0 },
   ] }] }); await call('/actions', 'DELETE');
   await waitFor(async () => {
-    const observed = await execute('return {touch:window.__touchCalibration,pointerUps:window.__touchPointerUps}');
-    result.touchDiagnostics.calibration.pointerUps = observed.value.pointerUps;
-    if (!observed.value.touch) throw new Error(`No touch pointerup observed; pointerups=${JSON.stringify(observed.value.pointerUps)}`);
-    return observed.value.touch;
+    const [observed, pointerUps] = await Promise.all([
+      execute('return window.__touchCalibration === null ? null : JSON.stringify(window.__touchCalibration)'),
+      execute('return JSON.stringify(window.__touchPointerUps)'),
+    ]);
+    result.touchDiagnostics.calibration.pointerUps = JSON.parse(pointerUps.value);
+    if (!observed.value) throw new Error(`No touch pointerup observed; pointerups=${JSON.stringify(result.touchDiagnostics.calibration.pointerUps)}`);
+    return observed.value;
   }, 'safe navigation calibration touch');
-  const calibrationEvent = requireTouchPoint((await execute('return window.__touchCalibration')).value, 'Observed calibration');
+  const calibrationEvent = requireTouchPoint(JSON.parse((await execute('return JSON.stringify(window.__touchCalibration)')).value), 'Observed calibration');
   coordinateCorrection = {x: calibration.value.x - calibrationEvent.x, y: calibration.value.y - calibrationEvent.y};
   assert.ok(Math.abs(coordinateCorrection.x) <= 10 && Math.abs(coordinateCorrection.y) <= 10,
     `Safari content origin correction remains small: ${JSON.stringify(coordinateCorrection)}`);
