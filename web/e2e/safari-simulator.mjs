@@ -124,6 +124,7 @@ try {
   assert.ok(sessionId, 'Appium returned a W3C session id');
   const call = (path, method = 'GET', body) => request(`/session/${sessionId}${path}`, method, body);
   const execute = async (script, args = []) => ({ value: await call('/execute/sync', 'POST', { script, args }) });
+  let coordinateCorrection = {x: 0, y: 0};
   const find = async selector => {
     const found = await call('/element', 'POST', { using: 'css selector', value: selector });
     const elementId = found['element-6066-11e4-a52e-4f735466cecf'] ?? found.ELEMENT;
@@ -141,7 +142,7 @@ try {
   };
   const touch = async (x, y, finger = 'finger') => {
     const geometry = await screenGeometry();
-    const screenPoint = viewportPointToScreen({ x, y }, geometry.viewportRect, geometry.screenInfo);
+    const screenPoint = viewportPointToScreen({ x, y }, geometry.viewportRect, {...geometry.screenInfo, coordinateCorrection});
     await call('/actions', 'POST', { actions: [{ type: 'pointer', id: finger, parameters: { pointerType: 'touch' }, actions: [
       { type: 'pointerMove', duration: 0, x: screenPoint.x, y: screenPoint.y },
       { type: 'pointerDown', button: 0 },
@@ -168,8 +169,25 @@ try {
   await waitFor(async () => (await execute("return document.querySelector('#farm').width > 0 && document.querySelector('#farm').height > 0")).value, 'farm canvas');
   await screenshot('farm');
 
+  // Measure Safari's content origin once using a harmless navigation button. Reuse that origin for every W3C touch.
+  const calibration = await execute("const e=document.querySelector('#more'),r=e.getBoundingClientRect(); window.__touchCalibration=null; window.addEventListener('pointerup',event=>{if(event.pointerType==='touch')window.__touchCalibration={x:event.clientX,y:event.clientY,type:event.pointerType}}, {capture:true,once:true}); return {x:r.left+r.width/2,y:r.top+r.height/2}");
+  const calibrationGeometry = await screenGeometry();
+  const calibrationPoint = viewportPointToScreen(calibration.value, calibrationGeometry.viewportRect, calibrationGeometry.screenInfo);
+  await call('/actions', 'POST', { actions: [{ type: 'pointer', id: 'calibration', parameters: { pointerType: 'touch' }, actions: [
+    { type: 'pointerMove', duration: 0, x: calibrationPoint.x, y: calibrationPoint.y },
+    { type: 'pointerDown', button: 0 }, { type: 'pause', duration: 100 }, { type: 'pointerUp', button: 0 },
+  ] }] }); await call('/actions', 'DELETE');
+  await waitFor(async () => (await execute('return window.__touchCalibration')).value, 'safe navigation calibration touch');
+  const calibrationEvent = (await execute('return window.__touchCalibration')).value;
+  coordinateCorrection = {x: calibration.value.x - calibrationEvent.x, y: calibration.value.y - calibrationEvent.y};
+  assert.ok(Math.abs(coordinateCorrection.x) <= 10 && Math.abs(coordinateCorrection.y) <= 10,
+    `Safari content origin correction remains small: ${JSON.stringify(coordinateCorrection)}`);
+  await waitFor(async () => (await visible('#more-menu')).value, 'More menu after calibration touch');
+  await click('#more');
+  result.touchDiagnostics = { calibration: { intended: calibration.value, observed: calibrationEvent, correction: coordinateCorrection, geometry: calibrationGeometry } };
+
   const plot = await execute("const canvas=document.querySelector('#farm'),c=canvas.getBoundingClientRect(),x=Math.round(c.left+c.width*1010/1600),y=Math.round(c.top+c.height*580/900); window.__iosPointerEvents=[]; for(const type of ['pointerdown','pointerup','pointercancel','click']) canvas.addEventListener(type,e=>window.__iosPointerEvents.push({type:e.type,pointerType:e.pointerType,pointerId:e.pointerId,clientX:e.clientX,clientY:e.clientY}),true); return {x,y,rect:{left:c.left,top:c.top,width:c.width,height:c.height},viewport:{width:innerWidth,height:innerHeight,visualWidth:visualViewport?.width,visualHeight:visualViewport?.height,visualScale:visualViewport?.scale,offsetTop:visualViewport?.offsetTop},hit:document.elementFromPoint(x,y)?.tagName}");
-  result.touchDiagnostics = plot.value;
+  Object.assign(result.touchDiagnostics, plot.value);
   result.touchDiagnostics.mapping = await touch(plot.value.x, plot.value.y);
   result.touchDiagnostics.events = (await execute('return window.__iosPointerEvents')).value;
   const plotPanelOpen = async () => (await execute("return document.querySelector('#modal-title').textContent === 'Comprar terra' && document.querySelector('#modal').open")).value;
@@ -187,16 +205,16 @@ try {
   const canvasRect = (await execute("const r=document.querySelector('#farm').getBoundingClientRect(); return {left:r.left,top:r.top,width:r.width,height:r.height}")).value;
   const center = { x: canvasRect.left + canvasRect.width * .72, y: canvasRect.top + canvasRect.height * .58 };
   const panStart = await screenGeometry();
-  const start = viewportPointToScreen(center, panStart.viewportRect, panStart.screenInfo);
+  const start = viewportPointToScreen(center, panStart.viewportRect, {...panStart.screenInfo, coordinateCorrection});
   const endCss = { x: center.x - 42, y: center.y + 28 };
-  const end = viewportPointToScreen(endCss, panStart.viewportRect, panStart.screenInfo);
+  const end = viewportPointToScreen(endCss, panStart.viewportRect, {...panStart.screenInfo, coordinateCorrection});
   await call('/actions', 'POST', { actions: [{ type: 'pointer', id: 'pan', parameters: { pointerType: 'touch' }, actions: [
     { type: 'pointerMove', duration: 0, x: start.x, y: start.y }, { type: 'pointerDown', button: 0 },
     { type: 'pointerMove', duration: 450, x: end.x, y: end.y }, { type: 'pointerUp', button: 0 },
   ] }] }); await call('/actions', 'DELETE');
   const pinchStartCss = { x: center.x - 35, y: center.y }, pinchEndCss = { x: center.x + 35, y: center.y };
-  const pinchStart = viewportPointToScreen(pinchStartCss, panStart.viewportRect, panStart.screenInfo);
-  const pinchEnd = viewportPointToScreen(pinchEndCss, panStart.viewportRect, panStart.screenInfo);
+  const pinchStart = viewportPointToScreen(pinchStartCss, panStart.viewportRect, {...panStart.screenInfo, coordinateCorrection});
+  const pinchEnd = viewportPointToScreen(pinchEndCss, panStart.viewportRect, {...panStart.screenInfo, coordinateCorrection});
   await call('/actions', 'POST', { actions: [
     { type: 'pointer', id: 'pinch-left', parameters: { pointerType: 'touch' }, actions: [
       { type: 'pointerMove', duration: 0, x: pinchStart.x, y: pinchStart.y }, { type: 'pointerDown', button: 0 },
@@ -207,7 +225,7 @@ try {
       { type: 'pause', duration: 100 }, { type: 'pointerMove', duration: 450, x: pinchEnd.x + 22, y: pinchEnd.y }, { type: 'pointerUp', button: 0 },
     ] },
   ] }); await call('/actions', 'DELETE');
-  const interruptedStart = viewportPointToScreen(center, panStart.viewportRect, panStart.screenInfo);
+  const interruptedStart = viewportPointToScreen(center, panStart.viewportRect, {...panStart.screenInfo, coordinateCorrection});
   await call('/actions', 'POST', { actions: [{ type: 'pointer', id: 'interrupted-pan', parameters: { pointerType: 'touch' }, actions: [
     { type: 'pointerMove', duration: 0, x: interruptedStart.x, y: interruptedStart.y },
     { type: 'pointerDown', button: 0 }, { type: 'pointerMove', duration: 150, x: interruptedStart.x - 18, y: interruptedStart.y + 12 },

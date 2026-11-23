@@ -53,7 +53,7 @@ npm run test:safari:simulator --prefix web
 
 O CI usa macOS 15, Xcode 16.4 e PostgreSQL 17 descartável. Os testes usam contas sintéticas e não acessam produção. Relatórios, traces, screenshots e logs ficam nos artefatos do CI por sete dias. Não há comparação pixel a pixel versionada: este checkout Windows não oferece baseline de captura macOS. O job Safari consome minutos de GitHub Actions.
 
-O toque na fazenda usa o evento recebido pelo canvas para corrigir o deslocamento entre coordenadas do WebDriver e o viewport do Safari; o artefato `result.json` registra a calibração observada.
+O conversor centralizado combina `mobile: viewportRect`, `mobile: deviceScreenInfo` e os insets CSS `env(safe-area-inset-*)`. Um toque W3C inofensivo no botão Mais mede uma vez o pequeno offset entre a origem WebDriver e o conteúdo Safari; esse offset entra no conversor usado pelos gestos seguintes. O toque de terreno é enviado uma vez e o `pointerup` deve coincidir com o ponto CSS esperado, sem retry corretivo. O artefato `result.json` registra as duas geometrias e a medição.
 
 O cliente inclui um modo de revisão visual com dados sintéticos. Os menus de Loja, Depósito, Tarefas, Conquistas, Decorações, Eventos (com a aba Calendário Diário), Amigos e Ajustes são acessíveis por botões; regras e contrato online do calendário estão em [ONLINE.md](ONLINE.md). A seleção de avatar é uma preferência local por conta e dispositivo, não uma atualização do perfil no banco.
 
@@ -137,7 +137,7 @@ node web/e2e/safari-simulator.mjs --list
 npm run test:safari:simulator --prefix web
 ```
 
-Antes do último comando, deixe PostgreSQL 17, a API Gradle em `127.0.0.1:8080`, o cliente web em `127.0.0.1:5173` e Appium em `127.0.0.1:4723` rodando com o banco descartável. O teste do Simulator usa ações W3C de toque e coordenadas convertidas pelos metadados do XCUITest. A emulação iOS/WebKit e o iPhone Simulator não substituem a validação em Safari num iPhone físico; esse teste precisa de dispositivo real e não é declarado como coberto por CI.
+Antes do último comando, deixe PostgreSQL 17, a API Gradle em `127.0.0.1:8080`, o cliente web em `127.0.0.1:5173` e Appium em `127.0.0.1:4723` rodando com o banco descartável. O teste do Simulator usa ações W3C de toque e coordena viewport, status bar e safe area via XCUITest e CSS. A emulação iOS/WebKit e o iPhone Simulator não substituem a validação em Safari num iPhone físico; esse teste precisa de dispositivo real e não é declarado como coberto por CI.
 
 ### WebKit móvel e referências visuais
 

@@ -23,6 +23,13 @@ test('uses the larger CSS safe-area origin when Safari content begins below the 
   );
 });
 
+test('applies the one-time measured WebDriver-to-WebKit origin offset to later touches', () => {
+  assert.deepEqual(
+    viewportPointToScreen({ x: 354, y: 371 }, { left: 0, top: 162 }, { scale: 3, coordinateCorrection: { x: 0, y: 5 } }),
+    { x: 354, y: 430 },
+  );
+});
+
 test('rejects invalid screen scale and non-finite coordinates', () => {
   assert.throws(() => viewportPointToScreen({ x: 1, y: 2 }, { left: 0, top: 0 }, { scale: 0 }), /scale/);
   assert.throws(() => viewportPointToScreen({ x: Number.NaN, y: 2 }, { left: 0, top: 0 }, { scale: 2 }), /coordinate/);
