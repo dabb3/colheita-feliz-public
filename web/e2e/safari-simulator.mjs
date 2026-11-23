@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { request as httpRequest } from 'node:http';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { viewportPointToScreen } from './safari-coordinates.mjs';
+import { createWebDriverRequester, requireFinitePoint, requireTouchPoint } from './safari-webdriver.mjs';
 
 const appium = process.env.APPIUM_URL ?? 'http://127.0.0.1:4723';
 const appUrl = process.env.E2E_APP_URL ?? 'http://127.0.0.1:5173';
@@ -45,37 +45,7 @@ if (process.argv.includes('--list')) {
   process.exit(0);
 }
 
-async function request(path, method = 'GET', body) {
-  const timeoutMs = 600_000;
-  return new Promise((resolve, reject) => {
-    const req = httpRequest(new URL(`${appium}${path}`), {
-      method,
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    }, response => {
-      let payload = '';
-      response.setEncoding('utf8');
-      response.on('data', chunk => { payload += chunk; });
-      response.on('end', () => {
-        let result;
-        try {
-          result = JSON.parse(payload);
-        } catch (error) {
-          reject(error);
-          return;
-        }
-        if ((response.statusCode ?? 500) >= 400 || result.value?.error) {
-          reject(new Error(`${method} ${path}: ${JSON.stringify(result.value ?? result)}`));
-          return;
-        }
-        resolve(result.value ?? result);
-      });
-    });
-    req.setTimeout(timeoutMs, () => req.destroy(new Error(`Timed out after ${timeoutMs}ms: ${method} ${path}`)));
-    req.on('error', reject);
-    if (body !== undefined) req.write(JSON.stringify(body));
-    req.end();
-  });
-}
+const request = createWebDriverRequester(appium);
 
 async function waitFor(check, label, timeout = 30_000) {
   const deadline = Date.now() + timeout;
@@ -170,21 +140,28 @@ try {
   await screenshot('farm');
 
   // Measure Safari's content origin once using a harmless navigation button. Reuse that origin for every W3C touch.
-  const calibration = await execute("const e=document.querySelector('#more'),r=e.getBoundingClientRect(); window.__touchCalibration=null; window.addEventListener('pointerup',event=>{if(event.pointerType==='touch')window.__touchCalibration={x:event.clientX,y:event.clientY,type:event.pointerType}}, {capture:true,once:true}); return {x:r.left+r.width/2,y:r.top+r.height/2}");
+  const calibration = await execute("const e=document.querySelector('#more'),r=e.getBoundingClientRect(); window.__touchCalibration=null; window.__touchPointerUps=[]; window.addEventListener('pointerup',event=>{const observed={x:event.clientX,y:event.clientY,pointerType:event.pointerType}; window.__touchPointerUps.push(observed); if(event.pointerType==='touch')window.__touchCalibration=observed}, {capture:true}) ; return {x:r.left+r.width/2,y:r.top+r.height/2}");
+  const calibrationCssPoint = requireFinitePoint(calibration.value, 'Intended calibration point');
   const calibrationGeometry = await screenGeometry();
-  const calibrationPoint = viewportPointToScreen(calibration.value, calibrationGeometry.viewportRect, calibrationGeometry.screenInfo);
+  const calibrationPoint = viewportPointToScreen(calibrationCssPoint, calibrationGeometry.viewportRect, calibrationGeometry.screenInfo);
+  result.touchDiagnostics = { calibration: { intended: calibrationCssPoint, geometry: calibrationGeometry, pointerUps: [] } };
   await call('/actions', 'POST', { actions: [{ type: 'pointer', id: 'calibration', parameters: { pointerType: 'touch' }, actions: [
     { type: 'pointerMove', duration: 0, x: calibrationPoint.x, y: calibrationPoint.y },
     { type: 'pointerDown', button: 0 }, { type: 'pause', duration: 100 }, { type: 'pointerUp', button: 0 },
   ] }] }); await call('/actions', 'DELETE');
-  await waitFor(async () => (await execute('return window.__touchCalibration')).value, 'safe navigation calibration touch');
-  const calibrationEvent = (await execute('return window.__touchCalibration')).value;
+  await waitFor(async () => {
+    const observed = await execute('return {touch:window.__touchCalibration,pointerUps:window.__touchPointerUps}');
+    result.touchDiagnostics.calibration.pointerUps = observed.value.pointerUps;
+    if (!observed.value.touch) throw new Error(`No touch pointerup observed; pointerups=${JSON.stringify(observed.value.pointerUps)}`);
+    return observed.value.touch;
+  }, 'safe navigation calibration touch');
+  const calibrationEvent = requireTouchPoint((await execute('return window.__touchCalibration')).value, 'Observed calibration');
   coordinateCorrection = {x: calibration.value.x - calibrationEvent.x, y: calibration.value.y - calibrationEvent.y};
   assert.ok(Math.abs(coordinateCorrection.x) <= 10 && Math.abs(coordinateCorrection.y) <= 10,
     `Safari content origin correction remains small: ${JSON.stringify(coordinateCorrection)}`);
   await waitFor(async () => (await visible('#more-menu')).value, 'More menu after calibration touch');
   await click('#more');
-  result.touchDiagnostics = { calibration: { intended: calibration.value, observed: calibrationEvent, correction: coordinateCorrection, geometry: calibrationGeometry } };
+  Object.assign(result.touchDiagnostics.calibration, { observed: calibrationEvent, correction: coordinateCorrection });
 
   const plot = await execute("const canvas=document.querySelector('#farm'),c=canvas.getBoundingClientRect(),x=Math.round(c.left+c.width*1010/1600),y=Math.round(c.top+c.height*580/900); window.__iosPointerEvents=[]; for(const type of ['pointerdown','pointerup','pointercancel','click']) canvas.addEventListener(type,e=>window.__iosPointerEvents.push({type:e.type,pointerType:e.pointerType,pointerId:e.pointerId,clientX:e.clientX,clientY:e.clientY}),true); return {x,y,rect:{left:c.left,top:c.top,width:c.width,height:c.height},viewport:{width:innerWidth,height:innerHeight,visualWidth:visualViewport?.width,visualHeight:visualViewport?.height,visualScale:visualViewport?.scale,offsetTop:visualViewport?.offsetTop},hit:document.elementFromPoint(x,y)?.tagName}");
   Object.assign(result.touchDiagnostics, plot.value);
@@ -192,10 +169,11 @@ try {
   result.touchDiagnostics.events = (await execute('return window.__iosPointerEvents')).value;
   const plotPanelOpen = async () => (await execute("return document.querySelector('#modal-title').textContent === 'Comprar terra' && document.querySelector('#modal').open")).value;
   await waitFor(plotPanelOpen, 'touch opening the plot panel');
-  const observed = result.touchDiagnostics.events.find(event => event.type === 'pointerup');
+  const observed = result.touchDiagnostics.events.find(event => event.type === 'pointerup' && event.pointerType === 'touch');
   assert.ok(observed, 'Safari reports the native touch pointerup');
-  assert.ok(Math.abs(observed.clientX - plot.value.x) <= 1 && Math.abs(observed.clientY - plot.value.y) <= 1,
-    `mapped touch reaches intended CSS point: intended=${plot.value.x},${plot.value.y} observed=${observed.clientX},${observed.clientY}`);
+  const observedPlotPoint = requireTouchPoint({ pointerType: observed.pointerType, x: observed.clientX, y: observed.clientY }, 'Observed farm touch');
+  assert.ok(Math.abs(observedPlotPoint.x - plot.value.x) <= 1 && Math.abs(observedPlotPoint.y - plot.value.y) <= 1,
+    `mapped touch reaches intended CSS point: intended=${plot.value.x},${plot.value.y} observed=${observedPlotPoint.x},${observedPlotPoint.y}`);
   await screenshot('plot-touch');
   await click('#close-modal');
 
