@@ -5,17 +5,30 @@ $docker = Get-Command docker -ErrorAction Stop
 $name = "colheita-test-$([Guid]::NewGuid().ToString('N'))"
 $oldJavaHome = $env:JAVA_HOME
 $oldPath = $env:PATH
-$oldGradleHome = $env:GRADLE_USER_HOME
 $oldDatabaseUrl = $env:TEST_DATABASE_URL
 $oldDatabaseUser = $env:TEST_DATABASE_USER
 $started = $false
 $verificationPassed = $false
 try {
-  $jdk = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { Join-Path $env:USERPROFILE '.jdks\corretto-21.0.12.1' }
-  if (-not (Test-Path (Join-Path $jdk 'bin\java.exe'))) { throw 'JDK 21 was not found. Set JAVA_HOME for this PowerShell process and rerun.' }
+  $jdkCandidates = @($env:JAVA_HOME)
+  $userJdks = Join-Path $env:USERPROFILE '.jdks'
+  if (Test-Path -LiteralPath $userJdks) { $jdkCandidates += Get-ChildItem -LiteralPath $userJdks -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName }
+  foreach ($programFiles in @($env:ProgramFiles, ${env:ProgramFiles(x86)}) | Where-Object { $_ }) {
+    foreach ($vendor in @('Java', 'Amazon Corretto', 'Eclipse Adoptium', 'Microsoft')) {
+      $vendorPath = Join-Path $programFiles $vendor
+      if (Test-Path -LiteralPath $vendorPath) { $jdkCandidates += Get-ChildItem -LiteralPath $vendorPath -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName }
+    }
+  }
+  $jdk = $null
+  foreach ($candidate in ($jdkCandidates | Where-Object { $_ } | Select-Object -Unique)) {
+    $java = Join-Path $candidate 'bin\java.exe'
+    if (-not (Test-Path -LiteralPath $java) -or -not (Test-Path -LiteralPath (Join-Path $candidate 'bin\javac.exe'))) { continue }
+    $version = (& $java -version 2>&1 | Out-String)
+    if ($version -match 'version "21([.+_-]|"|$)|build 21([.+_-]|$)') { $jdk = $candidate; break }
+  }
+  if (-not $jdk) { throw 'JDK 21 was not found. Set JAVA_HOME for this PowerShell process and rerun.' }
   $env:JAVA_HOME = $jdk
   $env:PATH = "$jdk\bin;$env:PATH"
-  $env:GRADLE_USER_HOME = Join-Path $env:TEMP "gradle-colheita-test-$([Guid]::NewGuid().ToString('N'))"
   & $docker.Source run --detach --rm --name $name --publish '127.0.0.1::5432' --tmpfs '/var/lib/postgresql/data:rw,noexec,nosuid,size=1g' --env POSTGRES_DB=colheita_test --env POSTGRES_USER=postgres --env POSTGRES_HOST_AUTH_METHOD=trust postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b | Out-Null
   if ($LASTEXITCODE -ne 0) { throw "Could not start isolated PostgreSQL container (docker exit $LASTEXITCODE)." }
   $started = $true
@@ -60,7 +73,6 @@ try {
   }
   $env:JAVA_HOME = $oldJavaHome
   $env:PATH = $oldPath
-  $env:GRADLE_USER_HOME = $oldGradleHome
   $env:TEST_DATABASE_URL = $oldDatabaseUrl
   $env:TEST_DATABASE_USER = $oldDatabaseUser
 }

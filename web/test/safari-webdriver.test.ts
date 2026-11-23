@@ -30,8 +30,17 @@ test('WebDriver requester unwraps valid W3C value objects', async () => {
 });
 
 test('WebDriver requester rejects WebDriver protocol errors', async () => {
-  await withServer((_request, response) => response.end(JSON.stringify({ value: { error: 'invalid argument', message: 'bad coordinates' } })), async url => {
+  await withServer((_request, response) => {
+    response.writeHead(400, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ value: { error: 'invalid argument', message: 'bad coordinates' } }));
+  }, async url => {
     await assert.rejects(createWebDriverRequester(url)('/session/s/actions', 'POST'), /invalid argument.*bad coordinates/);
+  });
+});
+
+test('WebDriver requester preserves application objects with an error field', async () => {
+  await withServer((_request, response) => response.end(JSON.stringify({ value: { error: 'application data' } })), async url => {
+    assert.deepEqual(await createWebDriverRequester(url)('/session/s/execute/sync'), { error: 'application data' });
   });
 });
 

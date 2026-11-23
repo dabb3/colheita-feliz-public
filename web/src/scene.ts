@@ -66,7 +66,8 @@ export class Scene {
   private animalHoverTimer?: number;
   private hoveredAnimal?: string;
   /** The click following a touch may be reported as a MouseEvent on iOS Safari. */
-  private lastPointerDown?: { type: string; x: number; y: number; time: number; pointerId: number; moved: boolean };
+  private activePointer?: { type: string; x: number; y: number; pointerId: number; moved: boolean };
+  private lastPointerDown?: { type: string; x: number; y: number; time: number; pointerId: number };
   private draggedClick?: { x: number; y: number; expires: number };
   private onHover: (
     tile: Tile | null,
@@ -107,44 +108,45 @@ export class Scene {
     this.onPeriodChange = onPeriodChange;
     canvas.width = 1600;
     canvas.height = 900;
-    canvas.addEventListener(
+    if (typeof window.addEventListener === "function") window.addEventListener(
       "pointerdown",
+      () => { this.activePointer = undefined; this.lastPointerDown = undefined; this.draggedClick = undefined; },
+      { capture: true, signal: this.events.signal },
+    );
+    canvas.addEventListener("pointerdown", (e) => {
+      this.draggedClick = undefined;
+      this.activePointer = { type: e.pointerType || "mouse", x: e.clientX, y: e.clientY, pointerId: e.pointerId, moved: false };
+      this.lastPointerDown = { type: e.pointerType || "mouse", x: e.clientX, y: e.clientY, time: performance.now(), pointerId: e.pointerId };
+    }, { signal: this.events.signal });
+    if (typeof window.addEventListener === "function") window.addEventListener(
+      "pointerup",
       (e) => {
-        this.lastPointerDown = {
-          type: e.pointerType || "mouse",
-          x: e.clientX,
-          y: e.clientY,
-          time: performance.now(),
-          pointerId: e.pointerId,
-          moved: false,
-        };
+        const down = this.activePointer;
+        if (down && down.pointerId === e.pointerId && down.moved)
+          this.draggedClick = {x: e.clientX, y: e.clientY, expires: performance.now() + 450};
+        if (down?.pointerId === e.pointerId) this.activePointer = undefined;
       },
       { signal: this.events.signal },
     );
     if (typeof window.addEventListener === "function") window.addEventListener(
-      "pointerup",
-      (e) => {
-        const down = this.lastPointerDown;
-        if (down && down.pointerId === e.pointerId && down.moved)
-          this.draggedClick = {x: e.clientX, y: e.clientY, expires: performance.now() + 450};
-      },
-      { signal: this.events.signal },
-    );
-    canvas.addEventListener(
       "pointercancel",
-      () => { this.lastPointerDown = undefined; },
+      (e) => {
+        const active = this.activePointer;
+        if (active && (e.pointerId === undefined || active.pointerId === e.pointerId)) {
+          this.activePointer = undefined;
+          this.lastPointerDown = undefined;
+          this.draggedClick = undefined;
+        }
+      },
       { signal: this.events.signal },
     );
     canvas.addEventListener(
       "pointermove",
       (e) => {
-        const down = this.lastPointerDown;
-        if (down && down.pointerId === e.pointerId && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10)
+        const down = this.activePointer;
+        if (down && down.pointerId === e.pointerId && e.buttons > 0 &&
+            Math.hypot(e.clientX - down.x, e.clientY - down.y) > (down.type === "touch" ? 24 : 10))
           down.moved = true;
-        // A drag must not be remembered as a tap when Safari synthesizes its click.
-        if (down?.type === "touch" && e.pointerType === "touch" &&
-            Math.hypot(e.clientX - down.x, e.clientY - down.y) > 24)
-          this.lastPointerDown = undefined;
         const p = this.point(e);
         const pick = p ? pickTile(p.x, p.y) : null;
         const animal = e.pointerType === "mouse" && !pick && p ? this.animalAt(p) : undefined;
@@ -187,6 +189,7 @@ export class Scene {
         const dragged = this.draggedClick;
         this.draggedClick = undefined;
         if (dragged && performance.now() <= dragged.expires && Math.hypot(e.clientX - dragged.x, e.clientY - dragged.y) <= 24) {
+          this.activePointer = undefined;
           this.lastPointerDown = undefined;
           e.preventDefault();
           e.stopImmediatePropagation();
@@ -221,6 +224,7 @@ export class Scene {
   }
   private clickPointerType(event: MouseEvent): string {
     const down = this.lastPointerDown;
+    this.activePointer = undefined;
     this.lastPointerDown = undefined; // A touch must not leak into a later mouse/keyboard click.
     const reported = "pointerType" in event && typeof event.pointerType === "string" && event.pointerType
       ? event.pointerType : "mouse";

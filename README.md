@@ -27,7 +27,8 @@ npm.cmd run build:local --prefix web
 O build local configura a API em `http://127.0.0.1:8080`. Para iniciar uma API local com contas de desenvolvimento e PostgreSQL descartável, consulte [ONLINE.md](ONLINE.md).
 
 Os testes de navegador usam o cliente compilado, imagens reais e respostas de API sintéticas,
-sem contas ou serviços de produção. Após o build local acima, execute:
+sem contas ou serviços de produção. No CI, os testes de integração e a API E2E usam
+dois bancos PostgreSQL descartáveis separados. Após o build local acima, execute:
 
 ```powershell
 cd web
@@ -51,9 +52,11 @@ npx --yes appium@2.19.0 --address 127.0.0.1 --port 4723
 npm run test:safari:simulator --prefix web
 ```
 
-O CI usa macOS 15, Xcode 16.4 e PostgreSQL 17 descartável. Os testes usam contas sintéticas e não acessam produção. Relatórios, traces, screenshots e logs ficam nos artefatos do CI por sete dias. Não há comparação pixel a pixel versionada: este checkout Windows não oferece baseline de captura macOS. O job Safari consome minutos de GitHub Actions.
+O CI usa macOS 15, Xcode 16.4 e PostgreSQL 17 descartável. Os testes usam contas sintéticas e não acessam produção. Relatórios, traces, screenshots e logs ficam nos artefatos do CI por sete dias. O job Safari roda nos PRs e valida o Safari iOS Simulator; ele não bloqueia o deploy de produção.
 
-O conversor centralizado combina `mobile: viewportRect`, `mobile: deviceScreenInfo` e os insets CSS `env(safe-area-inset-*)`. Um toque W3C inofensivo no botão Mais mede uma vez o pequeno offset entre a origem WebDriver e o conteúdo Safari; esse offset entra no conversor usado pelos gestos seguintes. O toque de terreno é enviado uma vez e o `pointerup` deve coincidir com o ponto CSS esperado, sem retry corretivo. O artefato `result.json` registra as duas geometrias e a medição.
+O conversor centralizado combina `mobile: viewportRect`, `mobile: deviceScreenInfo` e os insets CSS `env(safe-area-inset-*)`. Um toque W3C inofensivo no botão Mais mede uma vez o pequeno offset entre a origem WebDriver e o conteúdo Safari; esse offset entra no conversor usado pelos gestos seguintes. O toque de terreno é enviado uma vez e o `pointerup` deve coincidir com o ponto CSS esperado, sem retry corretivo. O artefato `result.json` registra as duas geometrias e a medição. A automação exige coordenadas numéricas finitas e confirma eventos `pointerup` de toque observados no navegador. O cenário `released-pan` termina com `pointerup` via W3C Release Actions; ele não simula `pointercancel`. A unidade de `Scene` testa o tratamento do evento `pointercancel` diretamente.
+
+As 12 referências PNG versionadas para comparação visual são capturas Playwright WebKit móvel em Linux e Windows; não existe baseline macOS/Safari Simulator. O CI compara com esses arquivos e permite no máximo 100 pixels com limiar de cor 0,1 por captura, sem atualizar snapshots automaticamente. Atualize as referências localmente e revise o diff quando uma mudança visual intencional exigir novos arquivos.
 
 O cliente inclui um modo de revisão visual com dados sintéticos. Os menus de Loja, Depósito, Tarefas, Conquistas, Decorações, Eventos (com a aba Calendário Diário), Amigos e Ajustes são acessíveis por botões; regras e contrato online do calendário estão em [ONLINE.md](ONLINE.md). A seleção de avatar é uma preferência local por conta e dispositivo, não uma atualização do perfil no banco.
 
@@ -95,7 +98,7 @@ Produtos animais usam o custo e a moeda reais da aquisição do produtor. A raç
 
 O fundo acompanha o horário real local do computador: dia das 06:00 às 16:59; pôr do sol das 17:00 às 18:30; noite das 18:31 às 05:59. Os animais dormem durante esse mesmo período noturno e acordam às 06:00. À noite, os passeios e a exibição da cauda do pavão param; as abelhas recolhem-se na colmeia. As poses de sono usam os sprites disponíveis no acervo. A troca é automática com o jogo aberto e não depende da aceleração por `T`, nem altera crescimento, recompensas ou o save.
 
-O GitHub Actions executa build, testes, SpotBugs e JaCoCo em pushes e PRs. O SpotBugs roda como parte do `build` com `ignoreFailures = false`; achados novos quebram o build local e no CI. Warnings pré-existentes estão listados em `config/spotbugs/exclude.xml`, escopados por classe e método para não mascarar código novo. Os resultados são publicados como annotations no PR via SARIF. O JaCoCo gera relatório de cobertura em `build/reports/jacoco/test/`. Tags `vMAJOR.MINOR.PATCH` geram um Release com o ZIP e checksum SHA-256. A branch padrão atual é `codex/online-core-compartilhado`. Alterações de produção devem passar por Pull Request e revisão independente, conforme as regras ativas do GitHub.
+O GitHub Actions executa build, testes, SpotBugs e JaCoCo em pushes da branch `codex/online-core-compartilhado`, tags e PRs para qualquer branch de destino. O Safari iOS Simulator é obrigatório no CI de PR. O deploy exige push protegido diretamente para `codex/online-core-compartilhado`, além de build aprovado; PRs e pushes de outras branches não fazem deploy. O SpotBugs roda como parte do `build` com `ignoreFailures = false`; achados novos quebram o build local e no CI. Warnings pré-existentes estão listados em `config/spotbugs/exclude.xml`, escopados por classe e método para não mascarar código novo. Os resultados são publicados como annotations no PR via SARIF. O JaCoCo gera relatório de cobertura em `build/reports/jacoco/test/`. Tags `vMAJOR.MINOR.PATCH` geram um Release com o ZIP e checksum SHA-256. Alterações de produção devem passar por Pull Request e revisão independente, conforme as regras ativas do GitHub.
 
 ## Licença
 
@@ -125,7 +128,7 @@ pwsh -NoProfile -File scripts/test-local.ps1
 pwsh -NoProfile -File scripts/test-local.ps1 -RerunTasks
 ```
 
-O script usa JDK 21 em `~/.jdks/corretto-21.0.12.1`, quando presente, sem alterar as variáveis persistentes do Windows. Se seu JDK 21 estiver em outro local, defina `$env:JAVA_HOME` apenas nessa sessão antes de executar. O PostgreSQL descartável usa tmpfs de até 1 GiB; em falha, o script salva o log do container em `%TEMP%` antes de removê-lo. Ele remove somente o container criado pelo próprio teste. `-RerunTasks` força todas as tasks Gradle a executar e leva mais tempo. Não use o banco de desenvolvimento do `compose.yaml` para esses testes.
+O script usa o JDK 21 indicado por `$env:JAVA_HOME` ou, se ausente, procura JDKs instalados em `~/.jdks` e diretórios comuns de fornecedores no Windows. O diagnóstico lista os JDKs instalados e mantém as verificações de permissões de Docker, WSL e processos filhos. O PostgreSQL descartável usa tmpfs de até 1 GiB; em falha, o script salva o log do container em `%TEMP%` antes de removê-lo. Ele remove somente o container criado pelo próprio teste. O Gradle usa o cache habitual do usuário em vez de criar um `GRADLE_USER_HOME` temporário novo a cada execução. `-RerunTasks` força todas as tasks Gradle a executar e leva mais tempo. Não use o banco de desenvolvimento do `compose.yaml` para esses testes.
 
 ### macOS (Safari iOS Simulator)
 

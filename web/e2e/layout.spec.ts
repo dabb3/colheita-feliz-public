@@ -2,11 +2,11 @@ import { expect, test } from '@playwright/test';
 
 const mobileProject = (name: string) => name === 'webkit-iphone' || name.startsWith('webkit-mobile-');
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, testInfo) => {
   page.on('pageerror', error => test.info().annotations.push({ type: 'pageerror', description: error.message }));
   await page.goto('/');
-  if (test.info().title === 'critical login, farm, zoom, shop and deposit views produce review screenshots') {
-    await page.screenshot({ path: test.info().outputPath('login.png'), animations: 'disabled' });
+  if (testInfo.tags.includes('@review-screenshots')) {
+    await page.screenshot({ path: testInfo.outputPath('login.png'), animations: 'disabled' });
   }
   await page.getByRole('button', { name: 'Testar como Alice' }).click();
   await expect(page.locator('#game')).toBeVisible();
@@ -138,7 +138,7 @@ test('shop remains visible and scrollable in portrait and landscape', async ({ p
   }
 });
 
-test('critical login, farm, zoom, shop and deposit views produce review screenshots', async ({ page }, testInfo) => {
+test('critical login, farm, zoom, shop and deposit views produce review screenshots', { tag: '@review-screenshots' }, async ({ page }, testInfo) => {
   await expect(page.locator('#game')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('farm.png'), animations: 'disabled' });
   if (testInfo.project.name === 'webkit-iphone') {

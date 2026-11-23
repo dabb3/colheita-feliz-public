@@ -12,15 +12,22 @@ function Run-Version([string]$Path, [string[]]$Arguments) {
   try { return ((& $Path @Arguments 2>&1 | Select-Object -First 1).ToString().Trim()) } catch { return "error: $($_.Exception.Message)" }
 }
 
-$jdkCandidates = @(
-  $env:JAVA_HOME,
-  (Join-Path $env:USERPROFILE '.jdks\corretto-21.0.12.1'),
-  (Join-Path $env:USERPROFILE '.jdks\openjdk-27'),
-  (Join-Path $env:USERPROFILE '.jdks\semeru-1.8.0_482')
-) | Where-Object { $_ } | Select-Object -Unique
+$jdkCandidates = @($env:JAVA_HOME)
+$javaOnPath = Get-Command java -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($javaOnPath -and $javaOnPath.Source) { $jdkCandidates += Split-Path (Split-Path $javaOnPath.Source -Parent) -Parent }
+$userJdks = Join-Path $env:USERPROFILE '.jdks'
+if (Test-Path -LiteralPath $userJdks) { $jdkCandidates += Get-ChildItem -LiteralPath $userJdks -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName }
+foreach ($programFiles in @($env:ProgramFiles, ${env:ProgramFiles(x86)}) | Where-Object { $_ }) {
+  foreach ($vendor in @('Java', 'Amazon Corretto', 'Eclipse Adoptium', 'Microsoft')) {
+    $vendorPath = Join-Path $programFiles $vendor
+    if (Test-Path -LiteralPath $vendorPath) { $jdkCandidates += Get-ChildItem -LiteralPath $vendorPath -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName }
+  }
+}
+$jdkCandidates = $jdkCandidates | Where-Object { $_ } | Select-Object -Unique
 $jdks = foreach ($candidate in $jdkCandidates) {
   $java = Join-Path $candidate 'bin\java.exe'
-  if (Test-Path -LiteralPath $java) { [pscustomobject]@{ home=$candidate; javaVersion=(Run-Version $java @('-version')) } }
+  $javac = Join-Path $candidate 'bin\javac.exe'
+  if ((Test-Path -LiteralPath $java) -and (Test-Path -LiteralPath $javac)) { [pscustomobject]@{ home=$candidate; javaVersion=(Run-Version $java @('-version')); javacVersion=(Run-Version $javac @('-version')) } }
 }
 $javaPath = Resolve-Tool 'java'
 $javacPath = Resolve-Tool 'javac'
@@ -39,9 +46,15 @@ if ($dockerPath) {
   if (-not $dockerServer) { $dockerServer = 'unreachable: Docker returned no server version.' }
 }
 $gradleUserHome = if ($env:GRADLE_USER_HOME) { $env:GRADLE_USER_HOME } else { Join-Path $env:USERPROFILE '.gradle' }
-$gradleLockProbe = Join-Path $gradleUserHome 'codex-doctor-write-probe.tmp'
+$gradleLockProbe = Join-Path $gradleUserHome "codex-doctor-write-probe-$([Guid]::NewGuid().ToString('N')).tmp"
 $gradleHomeWritable = $false
-try { [IO.File]::WriteAllText($gradleLockProbe, 'probe'); Remove-Item -LiteralPath $gradleLockProbe -Force; $gradleHomeWritable=$true } catch { $gradleHomeWritable=$false }
+try {
+  if (-not (Test-Path -LiteralPath $gradleUserHome)) { New-Item -ItemType Directory -Path $gradleUserHome -Force | Out-Null }
+  [IO.File]::WriteAllText($gradleLockProbe, 'probe')
+  $gradleHomeWritable=$true
+} catch { $gradleHomeWritable=$false } finally {
+  Remove-Item -LiteralPath $gradleLockProbe -Force -ErrorAction SilentlyContinue
+}
 $wslStatus = if ($wslPath) { try { ((& $wslPath --list --verbose 2>&1 | Out-String) -replace [char]0, '').Trim() } catch { "unreachable: $($_.Exception.Message)" } } else { 'not installed' }
 $childProcessProbe = if ($nodePath) {
   try {

@@ -92,12 +92,13 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  assert.deepEqual(selected,[{id:'vaca',pointerType:'mouse'}]);
  // iOS Safari can emit mouse/zero-detail click after a real touch pointerdown.
  events.get('pointerdown')({clientX:1515,clientY:400,pointerType:'touch'});
+ windowEvents.get('pointerup')({pointerId:undefined,clientX:1515,clientY:400});
  events.get('click')({clientX:1515,clientY:400,pointerType:'mouse',detail:0});
  assert.deepEqual(selected.at(-1),{id:'vaca',pointerType:'touch'},'iOS tap keeps its touch origin');
  events.get('click')({clientX:1515,clientY:400,pointerType:'mouse',detail:0});
  assert.equal(selected.at(-1).pointerType,'mouse','the next click cannot reuse a stale touch');
  events.get('pointerdown')({clientX:1515,clientY:400,pointerType:'touch'});
- events.get('pointercancel')({});
+ windowEvents.get('pointercancel')({});
  events.get('click')({clientX:1515,clientY:400,pointerType:'mouse'});
  assert.equal(selected.at(-1).pointerType,'mouse','cancelled touches cannot affect a later click');
  events.get('pointerdown')({clientX:700,clientY:400,pointerType:'touch'});
@@ -114,7 +115,7 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  events.get('click')({clientX:1515,clientY:400,pointerType:'mouse',detail:1});
  assert.equal(selected.at(-1).pointerType,'mouse','desktop mouse remains unchanged');
  const selectedBeforeDrag=tilesSelected.length,drag={pointerId:9,pointerType:'mouse',clientX:670,clientY:436};
- events.get('pointerdown')(drag);events.get('pointermove')({...drag,clientX:700,clientY:450});
+ events.get('pointerdown')(drag);events.get('pointermove')({...drag,clientX:700,clientY:450,buttons:1});
  windowEvents.get('pointerup')({...drag,clientX:700,clientY:450});
  let prevented=false,stopped=false;
  events.get('click')({clientX:700,clientY:450,pointerType:'mouse',detail:1,preventDefault(){prevented=true;},stopImmediatePropagation(){stopped=true;}});
@@ -122,6 +123,34 @@ test('scene draws stage-sized plants, real pests, ready props and trimmed hive w
  events.get('pointerdown')({pointerId:10,pointerType:'mouse',clientX:670,clientY:436});
  events.get('click')({clientX:670,clientY:436,pointerType:'mouse',detail:1});
  assert.equal(tilesSelected.at(-1).tile.unlocked,false,'a later real click still selects the locked plot');
+ for(const [pointerType,distances,threshold] of [['mouse',[9,10,11],10],['touch',[23,24,25],24]]){
+  for(const distance of distances){
+   const count=tilesSelected.length,pointerId=distance+100;
+   const down={pointerId,pointerType,clientX:670,clientY:436};
+   events.get('pointerdown')(down);
+   events.get('pointermove')({...down,clientX:670+distance,buttons:1});
+   windowEvents.get('pointerup')({...down,clientX:670+distance});
+   events.get('click')({clientX:670+distance,clientY:436,pointerType:pointerType==='touch'?'mouse':pointerType,detail:pointerType==='touch'?0:1,preventDefault(){},stopImmediatePropagation(){}});
+   assert.equal(tilesSelected.length,count+(distance<=threshold?1:0),`${pointerType} movement ${distance}px ${distance<=threshold?'remains a tap':'is suppressed as a drag'}`);
+  }
+ }
+ const beforeCancel=tilesSelected.length,cancelledTouch={pointerId:200,pointerType:'touch',clientX:670,clientY:436};
+ events.get('pointerdown')(cancelledTouch);
+ events.get('pointermove')({...cancelledTouch,clientX:710,buttons:1});
+ windowEvents.get('pointercancel')({...cancelledTouch,clientX:710});
+ events.get('click')({clientX:710,clientY:436,pointerType:'mouse',detail:0,preventDefault(){},stopImmediatePropagation(){}});
+ assert.equal(tilesSelected.length,beforeCancel+1,'pointercancel clears touch attribution; a separately observed click remains actionable');
+ assert.equal(tilesSelected.at(-1).pointer,'mouse','pointercancel cannot make a later click look like a touch');
+ const beforeNoButton=tilesSelected.length,noButtonMove={pointerId:201,pointerType:'mouse',clientX:670,clientY:436};
+ events.get('pointerdown')(noButtonMove);
+ events.get('pointermove')({...noButtonMove,clientX:690,buttons:0});
+ windowEvents.get('pointerup')({...noButtonMove,clientX:690});
+ events.get('click')({clientX:690,clientY:436,pointerType:'mouse',detail:1,preventDefault(){},stopImmediatePropagation(){}});
+ assert.equal(tilesSelected.length,beforeNoButton+1,'pointermove without a pressed button cannot become a drag');
+ events.get('pointerdown')({pointerId:202,pointerType:'touch',clientX:670,clientY:436});
+ windowEvents.get('pointerdown')({pointerId:203,pointerType:'mouse',clientX:20,clientY:20});
+ events.get('click')({clientX:670,clientY:436,pointerType:'mouse',detail:1});
+ assert.equal(tilesSelected.at(-1).pointer,'mouse','a pointerdown outside canvas clears stale touch metadata');
  events.get('pointerdown')({clientX:585,clientY:400,pointerType:'touch'});
  events.get('click')({clientX:585,clientY:400,pointerType:'mouse',detail:0});
  assert.equal(tilesSelected.at(-1).pointer,'touch','iOS synthesised click also preserves tile tap origin');

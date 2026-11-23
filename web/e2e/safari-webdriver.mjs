@@ -20,7 +20,7 @@ export function createWebDriverRequester(appium, timeoutMs = 600_000) {
           }
           const hasW3cValue = result !== null && typeof result === 'object' && Object.hasOwn(result, 'value');
           const value = hasW3cValue ? result.value : result;
-          if ((response.statusCode ?? 500) >= 400 || value?.error) {
+          if ((response.statusCode ?? 500) >= 400) {
             reject(new Error(`${method} ${path}: ${JSON.stringify(value)}`));
             return;
           }
