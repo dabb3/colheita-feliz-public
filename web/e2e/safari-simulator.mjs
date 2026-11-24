@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { viewportPointToScreen } from './safari-coordinates.mjs';
+import { requireReleasedPanPointerPair } from './safari-events.mjs';
 import { createWebDriverRequester, requireFinitePoint, requireTouchPoint } from './safari-webdriver.mjs';
 
 const appium = process.env.APPIUM_URL ?? 'http://127.0.0.1:4723';
@@ -95,6 +96,21 @@ try {
   const call = (path, method = 'GET', body) => request(`/session/${sessionId}${path}`, method, body);
   const execute = async (script, args = []) => ({ value: await call('/execute/sync', 'POST', { script, args }) });
   let coordinateCorrection = {x: 0, y: 0};
+  const mapPointToScreen = (point, geometry) => {
+    const converterInput = {
+      ...geometry.screenInfo,
+      safeAreaInsets: geometry.browser.safeAreaInsets,
+      coordinateCorrection,
+    };
+    return {
+      screenPoint: viewportPointToScreen(point, geometry.viewportRect, converterInput),
+      converterInput: {
+        scale: converterInput.scale,
+        safeAreaInsets: converterInput.safeAreaInsets,
+        coordinateCorrection: {...converterInput.coordinateCorrection},
+      },
+    };
+  };
   const find = async selector => {
     const found = await call('/element', 'POST', { using: 'css selector', value: selector });
     const elementId = found['element-6066-11e4-a52e-4f735466cecf'] ?? found.ELEMENT;
@@ -112,7 +128,8 @@ try {
   };
   const touch = async (x, y, finger = 'finger') => {
     const geometry = await screenGeometry();
-    const screenPoint = viewportPointToScreen({ x, y }, geometry.viewportRect, {...geometry.screenInfo, coordinateCorrection});
+    const mapped = mapPointToScreen({ x, y }, geometry);
+    const screenPoint = mapped.screenPoint;
     await call('/actions', 'POST', { actions: [{ type: 'pointer', id: finger, parameters: { pointerType: 'touch' }, actions: [
       { type: 'pointerMove', duration: 0, x: screenPoint.x, y: screenPoint.y },
       { type: 'pointerDown', button: 0 },
@@ -120,7 +137,7 @@ try {
       { type: 'pointerUp', button: 0 },
     ] }] });
     await call('/actions', 'DELETE');
-    return { screenPoint, geometry };
+    return { screenPoint, geometry, converterInput: mapped.converterInput };
   };
   const screenshot = async name => {
     const data = await call('/screenshot');
@@ -143,8 +160,9 @@ try {
   const calibration = await execute("const e=document.querySelector('#more'),r=e.getBoundingClientRect(); window.__touchCalibration=null; window.__touchPointerUps=[]; window.addEventListener('pointerup',event=>{const observed={x:event.clientX,y:event.clientY,pointerType:event.pointerType}; window.__touchPointerUps.push(observed); if(event.pointerType==='touch')window.__touchCalibration={...observed}}, {capture:true}) ; return {x:r.left+r.width/2,y:r.top+r.height/2}");
   const calibrationCssPoint = requireFinitePoint(calibration.value, 'Intended calibration point');
   const calibrationGeometry = await screenGeometry();
-  const calibrationPoint = viewportPointToScreen(calibrationCssPoint, calibrationGeometry.viewportRect, calibrationGeometry.screenInfo);
-  result.touchDiagnostics = { calibration: { intended: calibrationCssPoint, geometry: calibrationGeometry, pointerUps: [] } };
+  const calibrationMapping = mapPointToScreen(calibrationCssPoint, calibrationGeometry);
+  const calibrationPoint = calibrationMapping.screenPoint;
+  result.touchDiagnostics = { calibration: { intended: calibrationCssPoint, geometry: calibrationGeometry, converterInput: calibrationMapping.converterInput, pointerUps: [] } };
   await call('/actions', 'POST', { actions: [{ type: 'pointer', id: 'calibration', parameters: { pointerType: 'touch' }, actions: [
     { type: 'pointerMove', duration: 0, x: calibrationPoint.x, y: calibrationPoint.y },
     { type: 'pointerDown', button: 0 }, { type: 'pause', duration: 100 }, { type: 'pointerUp', button: 0 },
@@ -180,24 +198,26 @@ try {
   await screenshot('plot-touch');
   await click('#close-modal');
 
-  // Capture browser events so gesture release and pointer cancellation are reported separately.
-  await execute("window.__cameraGestureEvents=[]; const c=document.querySelector('#farm'); for(const type of ['pointerup','pointercancel']) c.addEventListener(type,event=>window.__cameraGestureEvents.push({type:event.type,pointerType:event.pointerType}),true)");
   // Drive actual W3C touch input through the farm camera, then verify a tap still selects a safe panel.
   const beforeGestureActions = (await execute("return window.__farmTestActions ?? 0")).value;
   await call('/execute/sync', 'POST', { script: "window.__farmTestActions=0; const f=window.fetch; window.fetch=(...a)=>{if(String(a[0]).includes('/v1/me/actions')) window.__farmTestActions++; return f(...a)}", args: [] });
   const canvasRect = (await execute("const r=document.querySelector('#farm').getBoundingClientRect(); return {left:r.left,top:r.top,width:r.width,height:r.height}")).value;
   const center = { x: canvasRect.left + canvasRect.width * .72, y: canvasRect.top + canvasRect.height * .58 };
   const panStart = await screenGeometry();
-  const start = viewportPointToScreen(center, panStart.viewportRect, {...panStart.screenInfo, coordinateCorrection});
+  const startMapping = mapPointToScreen(center, panStart);
+  const start = startMapping.screenPoint;
   const endCss = { x: center.x - 42, y: center.y + 28 };
-  const end = viewportPointToScreen(endCss, panStart.viewportRect, {...panStart.screenInfo, coordinateCorrection});
+  const endMapping = mapPointToScreen(endCss, panStart);
+  const end = endMapping.screenPoint;
   await call('/actions', 'POST', { actions: [{ type: 'pointer', id: 'pan', parameters: { pointerType: 'touch' }, actions: [
     { type: 'pointerMove', duration: 0, x: start.x, y: start.y }, { type: 'pointerDown', button: 0 },
     { type: 'pointerMove', duration: 450, x: end.x, y: end.y }, { type: 'pointerUp', button: 0 },
   ] }] }); await call('/actions', 'DELETE');
   const pinchStartCss = { x: center.x - 35, y: center.y }, pinchEndCss = { x: center.x + 35, y: center.y };
-  const pinchStart = viewportPointToScreen(pinchStartCss, panStart.viewportRect, {...panStart.screenInfo, coordinateCorrection});
-  const pinchEnd = viewportPointToScreen(pinchEndCss, panStart.viewportRect, {...panStart.screenInfo, coordinateCorrection});
+  const pinchStartMapping = mapPointToScreen(pinchStartCss, panStart);
+  const pinchStart = pinchStartMapping.screenPoint;
+  const pinchEndMapping = mapPointToScreen(pinchEndCss, panStart);
+  const pinchEnd = pinchEndMapping.screenPoint;
   await call('/actions', 'POST', { actions: [
     { type: 'pointer', id: 'pinch-left', parameters: { pointerType: 'touch' }, actions: [
       { type: 'pointerMove', duration: 0, x: pinchStart.x, y: pinchStart.y }, { type: 'pointerDown', button: 0 },
@@ -208,20 +228,28 @@ try {
       { type: 'pause', duration: 100 }, { type: 'pointerMove', duration: 450, x: pinchEnd.x + 22, y: pinchEnd.y }, { type: 'pointerUp', button: 0 },
     ] },
   ] }); await call('/actions', 'DELETE');
-  const releasedPanStart = viewportPointToScreen(center, panStart.viewportRect, {...panStart.screenInfo, coordinateCorrection});
+  const releasedPanMapping = mapPointToScreen(center, panStart);
+  const releasedPanStart = releasedPanMapping.screenPoint;
+  // Start an isolated event buffer immediately before this scenario. Earlier pan/pinch events
+  // cannot satisfy the release assertion, and the WebDriver id is distinct from DOM pointerId.
+  await execute("window.__releasedPanEvents=[]; const c=document.querySelector('#farm'); for(const type of ['pointerdown','pointerup','pointercancel']) c.addEventListener(type,event=>window.__releasedPanEvents.push({type:event.type,pointerType:event.pointerType,pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY}),true)");
   await call('/actions', 'POST', { actions: [{ type: 'pointer', id: 'released-pan', parameters: { pointerType: 'touch' }, actions: [
     { type: 'pointerMove', duration: 0, x: releasedPanStart.x, y: releasedPanStart.y },
     { type: 'pointerDown', button: 0 }, { type: 'pointerMove', duration: 150, x: releasedPanStart.x - 18, y: releasedPanStart.y + 12 },
   ] }] });
   await call('/actions', 'DELETE');
-  const releaseEvents = (await execute('return window.__cameraGestureEvents')).value;
-  assert.ok(releaseEvents.some(event => event.type === 'pointerup' && event.pointerType === 'touch'),
-    `WebDriver release-actions must produce an observed touch pointerup: ${JSON.stringify(releaseEvents)}`);
-  assert.equal(releaseEvents.some(event => event.type === 'pointercancel'), false,
-    'W3C release-actions does not exercise browser pointercancel');
+  const releaseEvents = (await execute('return window.__releasedPanEvents')).value;
+  result.cameraGestures = { releasedPan: { start: releasedPanMapping, events: releaseEvents } };
+  const releasePair = requireReleasedPanPointerPair(releaseEvents);
   await click('#tools button[aria-label="Selecionar"]');
   await touch(center.x, center.y);
-  result.cameraGestures = { pan: { start, end }, pinch: { start: [pinchStart, pinchEnd], spread: 44 }, releasedPan: { start: releasedPanStart, events: releaseEvents }, apiActionsBefore: beforeGestureActions, apiActionsAfter: (await execute('return window.__farmTestActions')).value };
+  result.cameraGestures = {
+    pan: { start: startMapping, end: endMapping },
+    pinch: { start: [pinchStartMapping, pinchEndMapping], spread: 44 },
+    releasedPan: { ...result.cameraGestures.releasedPan, pointerDown: releasePair.pointerDown, pointerUp: releasePair.pointerUp },
+    apiActionsBefore: beforeGestureActions,
+    apiActionsAfter: (await execute('return window.__farmTestActions')).value,
+  };
   assert.equal(result.cameraGestures.apiActionsAfter, 0, 'camera and follow-up selection touch do not send farm actions');
   if ((await execute("return document.querySelector('#modal').open")).value) await click('#close-modal');
   await click('#zoom-out');
