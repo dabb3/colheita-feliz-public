@@ -38,7 +38,7 @@ class ProgressAndPestTest {
 
     @Test void lockedCropCannotBeBoughtUntilItsLevel() {
         ManualClock clock = new ManualClock();
-        GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
         CropType turnip = game.catalog().get("nabo");
         CropType potato = game.catalog().get("milho");
         assertFalse(game.unlocked(potato));
@@ -69,7 +69,7 @@ class ProgressAndPestTest {
 
     @Test void wateringMoistSoilIsRefusedAndDrySoilCanBeWateredAgain() {
         ManualClock clock = new ManualClock();
-        GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
         CropType turnip = game.catalog().get("nabo");
         game.buySeed(turnip);
         game.selectTool(Tool.HOE);
@@ -93,7 +93,7 @@ class ProgressAndPestTest {
 
     @Test void harvestDepositsOneUnitAndTheFormulaXp() {
         ManualClock clock = new ManualClock();
-        GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
         CropType carrot = game.catalog().get("cenoura");
         game.buySeed(carrot);
         game.selectTool(Tool.HOE);
@@ -187,7 +187,7 @@ class ProgressAndPestTest {
 
     @Test void harvestAfterInsectsDepositsOneUnitWithoutLoss() {
         ManualClock clock = new ManualClock();
-        GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
         CropType turnip = game.catalog().get("nabo");
         game.buySeed(turnip);
         game.selectTool(Tool.HOE);
@@ -219,7 +219,7 @@ class ProgressAndPestTest {
 
     @Test void removingOnePestOnlyAnnouncesGrowthWhenTheOtherIsGone() {
         ManualClock clock = new ManualClock();
-        GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
         CropType turnip = game.catalog().get("nabo");
         game.buySeed(turnip);
         game.selectTool(Tool.HOE);
@@ -250,7 +250,7 @@ class ProgressAndPestTest {
 
     @Test void herbicideOnlyRemovesWeedsAndPesticideOnlyInsects() {
         ManualClock clock = new ManualClock();
-        GameState game = new GameState(clock::instant, CropCatalogLoader.load(), bound -> 99);
+        GameState game = new GameState(clock::instant, clock, CropCatalogLoader.load(), bound -> 99);
         CropType turnip = game.catalog().get("nabo");
         game.buySeed(turnip);
         game.selectTool(Tool.HOE);

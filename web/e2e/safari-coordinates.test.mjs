@@ -1,0 +1,48 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { viewportPointToScreen } from './safari-coordinates.mjs';
+
+test('adds the iOS status-bar origin in CSS points using the device scale', () => {
+  assert.deepEqual(
+    viewportPointToScreen({ x: 354, y: 371 }, { left: 0, top: 177 }, { scale: 3 }),
+    { x: 354, y: 430 },
+  );
+});
+
+test('converts native viewport offsets before adding CSS viewport coordinates', () => {
+  assert.deepEqual(
+    viewportPointToScreen({ x: 12, y: 20 }, { left: 20, top: 96 }, { scale: 2 }),
+    { x: 22, y: 68 },
+  );
+});
+
+test('uses the larger CSS safe-area origin when Safari content begins below the native status bar', () => {
+  assert.deepEqual(
+    viewportPointToScreen({ x: 354, y: 371 }, { left: 0, top: 162 }, { scale: 3, safeAreaInsets: { left: 0, top: 59 } }),
+    { x: 354, y: 430 },
+  );
+});
+
+test('uses non-zero CSS insets while preferring a larger native offset and applying calibration once', () => {
+  assert.deepEqual(
+    viewportPointToScreen(
+      { x: 354, y: 371 },
+      { left: 20, top: 177 },
+      { scale: 3, safeAreaInsets: { left: 9, top: 44 }, coordinateCorrection: { x: -2, y: 3 } },
+    ),
+    { x: 361, y: 433 },
+  );
+});
+
+test('applies the one-time measured WebDriver-to-WebKit origin offset to later touches', () => {
+  assert.deepEqual(
+    viewportPointToScreen({ x: 354, y: 371 }, { left: 0, top: 162 }, { scale: 3, coordinateCorrection: { x: 0, y: 5 } }),
+    { x: 354, y: 430 },
+  );
+});
+
+test('rejects invalid screen scale and non-finite coordinates', () => {
+  assert.throws(() => viewportPointToScreen({ x: 1, y: 2 }, { left: 0, top: 0 }, { scale: 0 }), /scale/);
+  assert.throws(() => viewportPointToScreen({ x: Number.NaN, y: 2 }, { left: 0, top: 0 }, { scale: 2 }), /coordinate/);
+  assert.throws(() => viewportPointToScreen({ x: 1, y: 2 }, { left: 0, top: 0, width: 0 }, { scale: 2 }), /width/);
+});

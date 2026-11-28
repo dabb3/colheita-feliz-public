@@ -92,11 +92,14 @@ test('mobile touch can plow, plant and water the same plot', async ({browser}) =
   } finally { await context.close(); }
 });
 
-test('lost action response survives reload and replays the same receipt once', async ({page}) => {
+test('lost action response survives reload and replays the same receipt once', async ({page}, testInfo) => {
   const api = await farmApi(page); await login(page); api.loseResponse();
   await page.getByRole('button', {name: 'Arar / limpar', exact: true}).click();
-  const canvas = page.locator('#farm');
-  await canvas.click({position: await canvas.evaluate(node => ({x: 585 * node.clientWidth / 1600, y: 400 * node.clientHeight / 900}))});
+  if (testInfo.project.name === 'webkit-iphone' || testInfo.project.name.startsWith('webkit-mobile-')) await touchPlot(page);
+  else {
+    const canvas = page.locator('#farm');
+    await canvas.click({position: await canvas.evaluate(node => ({x: 585 * node.clientWidth / 1600, y: 400 * node.clientHeight / 900}))});
+  }
   await expect(page.locator('#pending')).toBeVisible();
   expect(api.farm.revision).toBe('2');
   await page.reload(); await expect(page.locator('#game')).toBeVisible();
@@ -106,7 +109,8 @@ test('lost action response survives reload and replays the same receipt once', a
   expect(api.farm.revision).toBe('2');
 });
 
-test('period and pack changes retain the previous background until the fallback loads', async ({page}) => {
+test('period and pack changes retain the previous background until the fallback loads', async ({page}, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium-desktop', 'This background animation check uses the desktop toolbar layout.');
   await page.clock.install({time: new Date('2026-11-21T15:00:00Z')});
   const api = await farmApi(page);
   let release!: () => void;
@@ -139,9 +143,10 @@ test('period and pack changes retain the previous background until the fallback 
 });
 
 
-test('first entry uses a quiet placeholder until any background is ready', async ({page}) => {
+test('first entry uses a quiet placeholder until any background is ready', async ({page}, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium-desktop', 'This background loading check is covered in the desktop Chromium project.');
   await page.clock.install({time: new Date('2026-11-21T15:00:00Z')});
-  await farmApi(page);
+  const api = await farmApi(page);
   let release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
   await page.route('**/assets/classic/background/*', async route => { await gate; await route.continue(); });
@@ -152,4 +157,43 @@ test('first entry uses a quiet placeholder until any background is ready', async
     expect(await pixel()).toEqual([231, 227, 216, 255]);
     release(); await expect.poll(pixel).not.toEqual([231, 227, 216, 255]);
   } finally { release(); }
+});
+
+test('deterministic mobile visual baselines cover farm, zoom, shop, deposit and plant popup', async ({page}, testInfo) => {
+  test.skip(testInfo.project.name !== 'webkit-mobile-large', 'Visual references use the pinned large mobile WebKit profile.');
+  await page.clock.install({time: new Date('2026-11-21T15:00:00Z')});
+  const api = await farmApi(page);
+  await login(page);
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all([...document.images].map(image => image.decode().catch(() => undefined)));
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  });
+  await page.clock.pauseAt(new Date('2026-11-21T15:00:10Z'));
+  // Permit tiny cross-run rasterization noise while keeping the per-screen diff below 0.03%.
+  const screenshot = {animations: 'disabled' as const, threshold: 0.1, maxDiffPixels: 100};
+  await expect(page).toHaveScreenshot('farm-mobile-large.png', screenshot);
+  await page.getByRole('button', {name: 'Aproximar'}).tap();
+  await expect(page).toHaveScreenshot('farm-zoom-mobile-large.png', screenshot);
+  await page.locator('#more').tap();
+  await expect(page).toHaveScreenshot('more-mobile-large.png', screenshot);
+  await page.locator('#shop').tap();
+  await expect(page.locator('#modal-title')).toHaveText('Loja');
+  await expect(page).toHaveScreenshot('shop-mobile-large.png', screenshot);
+  await page.locator('#close-modal').tap();
+  await page.locator('#deposit').tap();
+  await expect(page.locator('#modal-title')).toHaveText('Depósito');
+  await expect(page).toHaveScreenshot('deposit-mobile-large.png', screenshot);
+  await page.locator('#close-modal').tap();
+  await expect(page.locator('#modal')).toHaveJSProperty('open', false);
+  Object.assign(api.farm.tiles[0], {state: 'GROWING', cropId: 'nabo', stage: 1, watered: true,
+    remainingSeconds: 900, nominalRemainingSeconds: 900});
+  await page.reload(); await expect(page.locator('#game')).toBeVisible();
+  await page.clock.runFor(100);
+  await page.waitForLoadState('networkidle');
+  await page.evaluate(() => { window.scrollTo(0, 0); document.querySelector('#game')?.scrollTo(0, 0); });
+  await page.getByRole('button', {name: 'Selecionar', exact: true}).tap();
+  await touchPlot(page);
+  await expect(page.locator('#plant-health')).toBeVisible();
+  await expect(page).toHaveScreenshot('plant-popup-mobile-large.png', screenshot);
 });

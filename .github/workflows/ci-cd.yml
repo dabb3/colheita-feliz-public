@@ -2,6 +2,8 @@ name: CI and desktop release
 
 on:
   push:
+    branches: [codex/online-core-compartilhado]
+    tags: ['v*']
   pull_request:
 
 permissions:
@@ -10,7 +12,7 @@ permissions:
 jobs:
   build:
     name: Build and verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: write
@@ -23,6 +25,15 @@ jobs:
         ports: ['55439:5432']
         options: >-
           --health-cmd "pg_isready -U postgres -d colheita_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      e2e-postgres:
+        image: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+        env:
+          POSTGRES_DB: colheita_e2e
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['55440:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d colheita_e2e"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       TEST_DATABASE_URL: jdbc:postgresql://127.0.0.1:55439/colheita_test
@@ -54,8 +65,19 @@ jobs:
       - name: Verify browser flows against the local client and synthetic API
         working-directory: web
         run: |
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium webkit
           npm run test:browser
+
+      - name: Save Linux visual references for review
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: webkit-linux-visual-references
+          path: |
+            web/e2e/farm.spec.ts-snapshots/*linux.png
+            web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Save browser failure traces
         if: failure()
@@ -63,6 +85,55 @@ jobs:
         with:
           name: web-browser-results
           path: web/test-results/
+          retention-days: 7
+
+      - name: Start synthetic development API
+        env:
+          AUTH_MODE: development
+          HOST: 127.0.0.1
+          DATABASE_URL: jdbc:postgresql://127.0.0.1:55440/colheita_e2e
+          DATABASE_USER: postgres
+          ALLOWED_ORIGINS: http://127.0.0.1:5173
+        run: |
+          bash ./gradlew --no-daemon :server:run > "$RUNNER_TEMP/colheita-api.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/colheita-api.pid"
+          for _ in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:8080/health >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/colheita-api.log"
+          exit 1
+
+      - name: Run Chromium, WebKit desktop and iPhone WebKit E2E
+        working-directory: web
+        run: npm run test:e2e
+
+      - name: Stop synthetic development API
+        if: always()
+        run: |
+          stop_process_tree() {
+            local parent="$1" child
+            while IFS= read -r child; do
+              [ -z "$child" ] || stop_process_tree "$child"
+            done < <(pgrep -P "$parent" || true)
+            kill "$parent" 2>/dev/null || true
+          }
+          if [ -f "$RUNNER_TEMP/colheita-api.pid" ]; then
+            api_pid="$(cat "$RUNNER_TEMP/colheita-api.pid")"
+            stop_process_tree "$api_pid"
+            wait "$api_pid" 2>/dev/null || true
+          fi
+
+      - name: Save browser test evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: web-playwright-evidence
+          path: |
+            web/test-results/
+            web/playwright-report/
+            ${{ runner.temp }}/colheita-api.log
+          if-no-files-found: ignore
           retention-days: 7
 
       - name: Verify Fly deploy guards without network or credentials
@@ -210,10 +281,123 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  safari-ios:
+    name: Safari iOS Simulator
+    if: github.event_name == 'pull_request'
+    needs: build
+    runs-on: macos-15
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Java 21
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Set up Node 24
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Select Xcode 16.4
+        run: sudo xcode-select --switch /Applications/Xcode_16.4.app
+
+      - name: Install web dependencies and build local client
+        working-directory: web
+        run: |
+          npm ci --ignore-scripts
+          npm run build:local
+
+      - name: Validate Xcode and available iPhone simulators
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices available
+          node web/e2e/safari-simulator.mjs --list
+
+      - name: Start disposable PostgreSQL 17
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: |
+          brew install postgresql@17
+          pg_bin="$(brew --prefix postgresql@17)/bin"
+          pg_data="$RUNNER_TEMP/colheita-postgres"
+          "$pg_bin/initdb" -D "$pg_data" --username=postgres --auth=trust --encoding=UTF8 --no-locale
+          "$pg_bin/pg_ctl" -D "$pg_data" -l "$RUNNER_TEMP/postgres.log" -o "-h 127.0.0.1 -p 55439" start
+          "$pg_bin/createdb" -h 127.0.0.1 -p 55439 -U postgres colheita_test
+
+      - name: Run Safari simulator flow with isolated development API
+        env:
+          AUTH_MODE: development
+          HOST: 127.0.0.1
+          DATABASE_URL: jdbc:postgresql://127.0.0.1:55439/colheita_test
+          DATABASE_USER: postgres
+          ALLOWED_ORIGINS: http://127.0.0.1:5173
+          E2E_APP_URL: http://127.0.0.1:5173
+          SAFARI_ARTIFACT_DIR: web/test-results/safari-simulator
+        run: |
+          set -Eeuo pipefail
+          mkdir -p web/test-results/safari-simulator
+          api_pid=
+          web_pid=
+          appium_pid=
+          stop_process_tree() {
+            local parent="$1" child
+            while IFS= read -r child; do
+              [ -z "$child" ] || stop_process_tree "$child"
+            done < <(pgrep -P "$parent" || true)
+            kill "$parent" 2>/dev/null || true
+          }
+          cleanup() {
+            [ -z "$appium_pid" ] || kill "$appium_pid" 2>/dev/null || true
+            [ -z "$web_pid" ] || kill "$web_pid" 2>/dev/null || true
+            [ -z "$api_pid" ] || stop_process_tree "$api_pid"
+            [ -z "$appium_pid" ] || wait "$appium_pid" 2>/dev/null || true
+            [ -z "$web_pid" ] || wait "$web_pid" 2>/dev/null || true
+            [ -z "$api_pid" ] || wait "$api_pid" 2>/dev/null || true
+            cp "$RUNNER_TEMP/colheita-api.log" web/test-results/safari-simulator/api.log 2>/dev/null || true
+            cp "$RUNNER_TEMP/postgres.log" web/test-results/safari-simulator/postgres.log 2>/dev/null || true
+            "$(brew --prefix postgresql@17)/bin/pg_ctl" -D "$RUNNER_TEMP/colheita-postgres" stop 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          bash ./gradlew --no-daemon :server:run > "$RUNNER_TEMP/colheita-api.log" 2>&1 &
+          api_pid=$!
+          npm run serve --prefix web > web/test-results/safari-simulator/web.log 2>&1 &
+          web_pid=$!
+          npx --yes appium@2.19.0 driver install xcuitest@9.10.5
+          npx --yes appium@2.19.0 --address 127.0.0.1 --port 4723 > web/test-results/safari-simulator/appium.log 2>&1 &
+          appium_pid=$!
+          ready=0
+          for _ in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:8080/health >/dev/null && curl --fail --silent http://127.0.0.1:5173/ >/dev/null && curl --fail --silent http://127.0.0.1:4723/status >/dev/null; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat "$RUNNER_TEMP/colheita-api.log" web/test-results/safari-simulator/web.log web/test-results/safari-simulator/appium.log
+            exit 1
+          fi
+          node web/e2e/safari-simulator.mjs
+
+      - name: Save Safari simulator logs and screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: safari-ios-simulator-evidence
+          path: web/test-results/safari-simulator/
+          if-no-files-found: ignore
+          retention-days: 7
+
   deploy:
     name: Deploy API to Fly.io
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/codex/online-core-compartilhado'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/codex/online-core-compartilhado' && github.ref_protected == true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
