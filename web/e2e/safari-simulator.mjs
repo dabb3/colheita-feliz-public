@@ -198,60 +198,141 @@ try {
   await screenshot('plot-touch');
   await click('#close-modal');
 
-  // Drive actual W3C touch input through the farm camera, then verify a tap still selects a safe panel.
-  const beforeGestureActions = (await execute("return window.__farmTestActions ?? 0")).value;
-  await call('/execute/sync', 'POST', { script: "window.__farmTestActions=0; const f=window.fetch; window.fetch=(...a)=>{if(String(a[0]).includes('/v1/me/actions')) window.__farmTestActions++; return f(...a)}", args: [] });
-  const canvasRect = (await execute("const r=document.querySelector('#farm').getBoundingClientRect(); return {left:r.left,top:r.top,width:r.width,height:r.height}")).value;
-  const center = { x: canvasRect.left + canvasRect.width * .72, y: canvasRect.top + canvasRect.height * .58 };
+  // Drive actual W3C touch input through the farm camera. Measure the rendered
+  // canvas, not its backing-store size, and keep all gesture points in the scene.
+  const cameraState = async () => (await execute(`
+    const rect = selector => {
+      const r = document.querySelector(selector).getBoundingClientRect();
+      return {left:r.left,top:r.top,width:r.width,height:r.height};
+    };
+    return {canvas:rect('#farm'),scene:rect('#scene')};
+  `)).value;
+  const lockedPlot = state => ({
+    x: Math.round(state.canvas.left + state.canvas.width * 1010 / 1600),
+    y: Math.round(state.canvas.top + state.canvas.height * 580 / 900),
+  });
+  const sceneCenter = state => ({
+    x: state.scene.left + state.scene.width / 2,
+    y: state.scene.top + state.scene.height / 2,
+  });
+  const requireCanvasHit = async (point, label) => {
+    requireFinitePoint(point, label);
+    const hit = (await execute("return document.elementFromPoint(arguments[0],arguments[1])?.id ?? null", [point.x, point.y])).value;
+    assert.equal(hit, 'farm', `${label} must hit the canvas at ${JSON.stringify(point)}`);
+  };
+  const requireClosedPanel = async label => {
+    assert.equal((await execute("return document.querySelector('#modal').open")).value, false, `${label} must not open a panel`);
+  };
+
+  await requireClosedPanel('Before gestures');
+  await execute("window.__farmTestActions=0; const f=window.fetch; window.fetch=(...a)=>{if(String(a[0]).includes('/v1/me/actions')) window.__farmTestActions++; return f(...a)}");
+  const beforePan = await cameraState();
+  result.cameraGestures = {pan: {before: beforePan}};
+  const center = sceneCenter(beforePan);
   const panStart = await screenGeometry();
+  const endCss = {x: center.x - 42, y: center.y};
+  await requireCanvasHit(center, 'Pan start');
+  await requireCanvasHit(endCss, 'Pan end');
   const startMapping = mapPointToScreen(center, panStart);
-  const start = startMapping.screenPoint;
-  const endCss = { x: center.x - 42, y: center.y + 28 };
   const endMapping = mapPointToScreen(endCss, panStart);
+  const start = startMapping.screenPoint;
   const end = endMapping.screenPoint;
+  Object.assign(result.cameraGestures.pan, {start: startMapping, end: endMapping});
   await call('/actions', 'POST', { actions: [{ type: 'pointer', id: 'pan', parameters: { pointerType: 'touch' }, actions: [
     { type: 'pointerMove', duration: 0, x: start.x, y: start.y }, { type: 'pointerDown', button: 0 },
     { type: 'pointerMove', duration: 450, x: end.x, y: end.y }, { type: 'pointerUp', button: 0 },
   ] }] }); await call('/actions', 'DELETE');
-  const pinchStartCss = { x: center.x - 35, y: center.y }, pinchEndCss = { x: center.x + 35, y: center.y };
-  const pinchStartMapping = mapPointToScreen(pinchStartCss, panStart);
+  const afterPan = await cameraState();
+  result.cameraGestures.pan.after = afterPan;
+  assert.ok(afterPan.canvas.left < beforePan.canvas.left - 1,
+    `Pan must move the rendered canvas left: ${JSON.stringify(result.cameraGestures.pan)}`);
+  assert.ok(Math.abs(afterPan.canvas.width - beforePan.canvas.width) <= 1,
+    'Single-finger pan must not change the canvas scale');
+  await requireClosedPanel('Pan');
+
+  // Anchor pinch near the known locked plot while leaving room for both fingers.
+  const beforePinch = await cameraState();
+  const target = lockedPlot(beforePinch);
+  const scene = beforePinch.scene;
+  const pinchCenter = {
+    x: Math.min(scene.left + scene.width - 65, Math.max(scene.left + 65, target.x)),
+    y: Math.min(scene.top + scene.height - 30, Math.max(scene.top + 30, target.y)),
+  };
+  const pinchStartCss = {x: pinchCenter.x - 35, y: pinchCenter.y};
+  const pinchEndCss = {x: pinchCenter.x + 35, y: pinchCenter.y};
+  const pinchLeftEndCss = {x: pinchCenter.x - 57, y: pinchCenter.y};
+  const pinchRightEndCss = {x: pinchCenter.x + 57, y: pinchCenter.y};
+  for (const point of [pinchStartCss, pinchEndCss, pinchLeftEndCss, pinchRightEndCss]) {
+    await requireCanvasHit(point, 'Pinch point');
+  }
+  const pinchGeometry = await screenGeometry();
+  const pinchStartMapping = mapPointToScreen(pinchStartCss, pinchGeometry);
+  const pinchEndMapping = mapPointToScreen(pinchEndCss, pinchGeometry);
+  const pinchLeftEndMapping = mapPointToScreen(pinchLeftEndCss, pinchGeometry);
+  const pinchRightEndMapping = mapPointToScreen(pinchRightEndCss, pinchGeometry);
   const pinchStart = pinchStartMapping.screenPoint;
-  const pinchEndMapping = mapPointToScreen(pinchEndCss, panStart);
   const pinchEnd = pinchEndMapping.screenPoint;
+  const pinchLeftEnd = pinchLeftEndMapping.screenPoint;
+  const pinchRightEnd = pinchRightEndMapping.screenPoint;
+  result.cameraGestures.pinch = {before: beforePinch, start: [pinchStartMapping, pinchEndMapping], end: [pinchLeftEndMapping, pinchRightEndMapping], spread: 44};
   await call('/actions', 'POST', { actions: [
     { type: 'pointer', id: 'pinch-left', parameters: { pointerType: 'touch' }, actions: [
       { type: 'pointerMove', duration: 0, x: pinchStart.x, y: pinchStart.y }, { type: 'pointerDown', button: 0 },
-      { type: 'pause', duration: 100 }, { type: 'pointerMove', duration: 450, x: pinchStart.x - 22, y: pinchStart.y }, { type: 'pointerUp', button: 0 },
+      { type: 'pause', duration: 100 }, { type: 'pointerMove', duration: 450, x: pinchLeftEnd.x, y: pinchLeftEnd.y }, { type: 'pointerUp', button: 0 },
     ] },
     { type: 'pointer', id: 'pinch-right', parameters: { pointerType: 'touch' }, actions: [
       { type: 'pointerMove', duration: 0, x: pinchEnd.x, y: pinchEnd.y }, { type: 'pointerDown', button: 0 },
-      { type: 'pause', duration: 100 }, { type: 'pointerMove', duration: 450, x: pinchEnd.x + 22, y: pinchEnd.y }, { type: 'pointerUp', button: 0 },
+      { type: 'pause', duration: 100 }, { type: 'pointerMove', duration: 450, x: pinchRightEnd.x, y: pinchRightEnd.y }, { type: 'pointerUp', button: 0 },
     ] },
   ] }); await call('/actions', 'DELETE');
-  const releasedPanMapping = mapPointToScreen(center, panStart);
+  const afterPinch = await cameraState();
+  result.cameraGestures.pinch.after = afterPinch;
+  assert.ok(afterPinch.canvas.width > beforePinch.canvas.width * 1.05 &&
+    afterPinch.canvas.height > beforePinch.canvas.height * 1.05,
+    `Pinch spread must increase the rendered canvas scale: ${JSON.stringify(result.cameraGestures.pinch)}`);
+  await requireClosedPanel('Pinch');
+
+  const releaseCenter = sceneCenter(afterPinch);
+  const releaseTarget = lockedPlot(afterPinch);
+  // Pan toward the known plot to keep it in the visible part of the zoomed farm.
+  const releaseEndCss = {x: releaseCenter.x + (releaseTarget.x > releaseCenter.x ? -32 : 32), y: releaseCenter.y};
+  await requireCanvasHit(releaseCenter, 'Released-pan start');
+  await requireCanvasHit(releaseEndCss, 'Released-pan end');
+  const releaseGeometry = await screenGeometry();
+  const releasedPanMapping = mapPointToScreen(releaseCenter, releaseGeometry);
+  const releasedPanEndMapping = mapPointToScreen(releaseEndCss, releaseGeometry);
   const releasedPanStart = releasedPanMapping.screenPoint;
+  const releasedPanEnd = releasedPanEndMapping.screenPoint;
+  result.cameraGestures.releasedPan = {start: releasedPanMapping, end: releasedPanEndMapping, before: afterPinch};
   // Start an isolated event buffer immediately before this scenario. Earlier pan/pinch events
   // cannot satisfy the release assertion, and the WebDriver id is distinct from DOM pointerId.
   await execute("window.__releasedPanEvents=[]; const c=document.querySelector('#farm'); for(const type of ['pointerdown','pointerup','pointercancel']) c.addEventListener(type,event=>window.__releasedPanEvents.push({type:event.type,pointerType:event.pointerType,pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY}),true)");
   await call('/actions', 'POST', { actions: [{ type: 'pointer', id: 'released-pan', parameters: { pointerType: 'touch' }, actions: [
     { type: 'pointerMove', duration: 0, x: releasedPanStart.x, y: releasedPanStart.y },
-    { type: 'pointerDown', button: 0 }, { type: 'pointerMove', duration: 150, x: releasedPanStart.x - 18, y: releasedPanStart.y + 12 },
+    { type: 'pointerDown', button: 0 }, { type: 'pointerMove', duration: 150, x: releasedPanEnd.x, y: releasedPanEnd.y },
   ] }] });
   await call('/actions', 'DELETE');
   const releaseEvents = (await execute('return window.__releasedPanEvents')).value;
-  result.cameraGestures = { releasedPan: { start: releasedPanMapping, events: releaseEvents } };
+  Object.assign(result.cameraGestures.releasedPan, {events: releaseEvents, after: await cameraState()});
   const releasePair = requireReleasedPanPointerPair(releaseEvents);
+  Object.assign(result.cameraGestures.releasedPan, releasePair);
+  await requireClosedPanel('Released pan');
   await click('#tools button[aria-label="Selecionar"]');
-  await touch(center.x, center.y);
-  result.cameraGestures = {
-    pan: { start: startMapping, end: endMapping },
-    pinch: { start: [pinchStartMapping, pinchEndMapping], spread: 44 },
-    releasedPan: { ...result.cameraGestures.releasedPan, pointerDown: releasePair.pointerDown, pointerUp: releasePair.pointerUp },
-    apiActionsBefore: beforeGestureActions,
-    apiActionsAfter: (await execute('return window.__farmTestActions')).value,
-  };
+  // Recalculate the same known locked plot (column 5, row 0) after every gesture.
+  const afterGestures = await cameraState();
+  const selection = lockedPlot(afterGestures);
+  result.cameraGestures.selection = {point: selection, camera: afterGestures, expectedPlot: {column: 5, row: 0}};
+  await requireCanvasHit(selection, 'Follow-up locked plot');
+  await requireClosedPanel('Before follow-up touch');
+  result.cameraGestures.selection.mapping = await touch(selection.x, selection.y, 'follow-up-plot');
+  await waitFor(plotPanelOpen, 'follow-up touch opening the purchase panel');
+  const panelText = (await execute("return document.querySelector('#modal').textContent")).value;
+  result.cameraGestures.selection.panelText = panelText;
+  assert.ok(panelText.includes('Terra 6, 1'), 'Follow-up touch must select the expected locked plot (5, 0)');
+  result.cameraGestures.apiActionsBefore = 0;
+  result.cameraGestures.apiActionsAfter = (await execute('return window.__farmTestActions')).value;
   assert.equal(result.cameraGestures.apiActionsAfter, 0, 'camera and follow-up selection touch do not send farm actions');
-  if ((await execute("return document.querySelector('#modal').open")).value) await click('#close-modal');
+  await click('#close-modal');
   await click('#zoom-out');
   assert.equal((await execute("return document.querySelector('#modal').open")).value, false, 'zoom control remains usable after gestures');
   await click('#more');

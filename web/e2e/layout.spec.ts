@@ -67,10 +67,15 @@ test('desktop camera drag does not activate a plot and a later click still works
   await page.mouse.down();
   await page.mouse.move(end.x, end.y, { steps: 8 });
   await page.mouse.up();
+  await expect(page.locator('#modal')).toHaveJSProperty('open', false);
   expect(await page.evaluate(() => (window as typeof window & { farmActions: number }).farmActions)).toBe(0);
-  await page.getByRole('button', { name: 'Selecionar' }).click();
-  await page.locator('#farm').click({position: {x: bounds!.width * 1010 / 1600, y: bounds!.height * 580 / 900}});
+  // The release point is the center of locked plot (1, 0). A new click at
+  // exactly the same point must work, unlike the click synthesized by the drag.
+  await page.mouse.click(end.x, end.y);
+  await expect(page.locator('#modal')).toHaveJSProperty('open', true);
   await expect(page.locator('#modal-title')).toHaveText('Comprar terra');
+  await expect(page.locator('#modal')).toContainText('Terra 2, 1');
+  expect(await page.evaluate(() => (window as typeof window & { farmActions: number }).farmActions)).toBe(0);
 });
 
 test('mobile zoom changes the canvas scale without hiding controls', async ({ page }, testInfo) => {
